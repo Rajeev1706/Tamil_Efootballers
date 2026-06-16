@@ -19,7 +19,8 @@ export async function uploadPlayerImage(playerId, file) {
     .from("player-images")
     .getPublicUrl(path)
 
-  return data.publicUrl
+  // Add timestamp to bust browser cache on re-upload
+  return `${data.publicUrl}?t=${Date.now()}`
 }
 
 export async function uploadTeamLogo(teamId, file) {
@@ -36,5 +37,6 @@ export async function uploadTeamLogo(teamId, file) {
     .from("player-images")
     .getPublicUrl(path)
 
-  return data.publicUrl
+  // Add timestamp to bust browser cache on re-upload
+  return `${data.publicUrl}?t=${Date.now()}`
 }
