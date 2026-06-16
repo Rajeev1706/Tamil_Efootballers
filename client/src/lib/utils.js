@@ -28,16 +28,16 @@ export function calcMV(record) {
 
   const ew     = Math.min(ewRaw, 14)
   const pp     = ew * 3
-  const winPct = ew / 14
-  const mvRaw  = pp * 5 + winPct * 85
+  const winPct = Math.max(ew / 14, 0)
+  const mvRaw  = pp * 5 + winPct * 140
   return Math.max(50, roundTo5(mvRaw))
 }
 
 export function getMVTier(mv) {
-  if (mv >= 280) return { label: "Elite",    color: "text-amber-400" }
-  if (mv >= 240) return { label: "Top",      color: "text-violet-400" }
-  if (mv >= 190) return { label: "Strong",   color: "text-blue-400" }
-  if (mv >= 140) return { label: "Mid",      color: "text-slate-300" }
+  if (mv >= 320) return { label: "Elite",    color: "text-amber-400" }
+  if (mv >= 270) return { label: "Top",      color: "text-violet-400" }
+  if (mv >= 210) return { label: "Strong",   color: "text-blue-400" }
+  if (mv >= 150) return { label: "Mid",      color: "text-slate-300" }
   if (mv >= 90)  return { label: "Low-mid",  color: "text-slate-400" }
   return             { label: "Weak",        color: "text-slate-500" }
 }
