@@ -1,5 +1,6 @@
 import GradeBadge from "../common/GradeBadge"
 import { getMVTier, cn } from "../../lib/utils"
+import PlayerAvatar from "../common/PlayerAvatar"
 
 const FormDot = ({ result }) => {
   const cls = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
