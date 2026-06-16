@@ -20,10 +20,7 @@ function PlayerCard({ player, onPlayerClick }) {
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-import PlayerAvatar from "../common/PlayerAvatar"
-
-// In JSX:
-<PlayerAvatar player={player} size="md" />
+          <PlayerAvatar player={player} size="md" />
           <div>
             <p className="font-semibold text-white text-sm leading-tight">{player.name}</p>
             <p className="text-xs text-slate-500 mt-0.5">"{player.alias}"</p>
