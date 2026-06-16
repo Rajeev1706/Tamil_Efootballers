@@ -3,7 +3,7 @@ import { Pencil, Check, X, Trash2, Camera, Trophy } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
-import { useUpdatePlayer, useDeletePlayer } from "../../lib/queries"
+import { useUpdatePlayer, useDeletePlayer, useTeams } from "../../lib/queries"
 import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["S","A+","A","B","C"]
@@ -11,6 +11,7 @@ const GRADES = ["S","A+","A","B","C"]
 function EditableRow({ player, onPlayerClick }) {
   const [editing, setEditing]       = useState(false)
   const [grade, setGrade]           = useState(player.grade)
+  const [teamId, setTeamId]         = useState(player.teamId ?? "")
   const [bdrDelta, setBdrDelta]     = useState("")
   const [trophy1, setTrophy1]       = useState(player.trophy1Count ?? 0)
   const [trophy2, setTrophy2]       = useState(player.trophy2Count ?? 0)
@@ -18,19 +19,22 @@ function EditableRow({ player, onPlayerClick }) {
   const [confirmDel, setConfirmDel] = useState(false)
   const updatePlayer                = useUpdatePlayer()
   const deletePlayer                = useDeletePlayer()
+  const { data: teams = [] }        = useTeams()
   const tier                        = getMVTier(player.marketValue)
   const deltaNum                    = parseInt(bdrDelta) || 0
 
   const handleSave = () => {
     const body = {}
-    if (grade !== player.grade) body.grade = grade
-    if (bdrDelta !== "") body.bdrDelta = deltaNum
+    if (grade  !== player.grade)              body.grade      = grade
+    if (bdrDelta !== "")                      body.bdrDelta   = deltaNum
+    if (parseInt(teamId) !== player.teamId)   body.teamId     = parseInt(teamId)
     if (trophy1 !== (player.trophy1Count ?? 0)) body.trophy1Count = trophy1
     if (trophy2 !== (player.trophy2Count ?? 0)) body.trophy2Count = trophy2
     if (trophy3 !== (player.trophy3Count ?? 0)) body.trophy3Count = trophy3
     if (!Object.keys(body).length) return setEditing(false)
     updatePlayer.mutate({ id: player.id, ...body }, {
       onSuccess: () => { setEditing(false); setBdrDelta("") },
+      onError:   (err) => alert(err.response?.data?.error || "Update failed"),
     })
   }
 
@@ -38,6 +42,7 @@ function EditableRow({ player, onPlayerClick }) {
     setEditing(false)
     setBdrDelta("")
     setGrade(player.grade)
+    setTeamId(player.teamId ?? "")
     setTrophy1(player.trophy1Count ?? 0)
     setTrophy2(player.trophy2Count ?? 0)
     setTrophy3(player.trophy3Count ?? 0)
@@ -88,7 +93,23 @@ function EditableRow({ player, onPlayerClick }) {
                 className="text-sm font-medium text-white hover:text-accent transition-colors text-left">
                 {player.name}
               </button>
-              <p className="text-xs text-slate-500">{player.team}</p>
+              {/* Team shown */}
+              {editing ? (
+                <select
+                  value={teamId}
+                  onChange={e => setTeamId(e.target.value)}
+                  className="mt-1 bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-accent/40 w-full max-w-[160px]"
+                >
+                  <option value="">— No team —</option>
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {player.team || "No team"}
+                </p>
+              )}
             </div>
           </div>
         </td>
@@ -168,7 +189,7 @@ function EditableRow({ player, onPlayerClick }) {
         </td>
       </tr>
 
-      {/* Image upload row — shown when editing */}
+      {/* Image upload row */}
       {editing && (
         <tr className="border-b border-surface-border/60 bg-pitch-800">
           <td colSpan={6} className="px-5 py-4">
@@ -181,7 +202,7 @@ function EditableRow({ player, onPlayerClick }) {
         </tr>
       )}
 
-      {/* Trophy counts row — shown when editing */}
+      {/* Trophy counts row */}
       {editing && (
         <tr className="border-b border-surface-border/60 bg-pitch-800">
           <td colSpan={6} className="px-5 py-4">
@@ -190,7 +211,7 @@ function EditableRow({ player, onPlayerClick }) {
                 <Trophy className="w-4 h-4 text-gold" />
                 <span className="text-xs text-slate-400">Trophies</span>
               </div>
- {[
+              {[
                 { label: "Ballon d'Or", value: trophy1, onChange: setTrophy1 },
                 { label: "Team League", value: trophy2, onChange: setTrophy2 },
                 { label: "Weekly",      value: trophy3, onChange: setTrophy3 },
@@ -216,17 +237,19 @@ export default function PlayerManagement({ players, onPlayerClick }) {
   return (
     <div>
       <p className="text-sm text-slate-400 mb-4">
-        Edit grades, BDR points, squad images, and trophy counts.
+        Edit grades, BDR points, team assignment, squad images, and trophy counts.
+        Click the pencil icon to edit — the team dropdown appears under the player name.
       </p>
+
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-border">
-                {["Player","Grade","Auction","Market value","BDR points",""].map(h => (
+                {["Player / Team","Grade","Auction","Market value","BDR points",""].map(h => (
                   <th key={h} className={cn(
                     "py-3 text-xs font-semibold text-slate-500 tracking-wide uppercase",
-                    h === "Player" || h === "" ? "px-5 text-left" : "px-4 text-center",
+                    h === "Player / Team" || h === "" ? "px-5 text-left" : "px-4 text-center",
                     h === "" && "text-right"
                   )}>
                     {h}
