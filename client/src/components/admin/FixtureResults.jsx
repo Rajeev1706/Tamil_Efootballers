@@ -1,9 +1,171 @@
 import { useState } from "react"
-import { Check, Lock, Pencil, Trash2, X, Save } from "lucide-react"
-import { useSaveFixtureResult, useUpdateFixture, useDeleteFixture } from "../../lib/queries"
-import { useTeams } from "../../lib/queries"
+import { Check, Lock, Pencil, Trash2, X, Save, Plus, Calendar } from "lucide-react"
+import {
+  useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
+  useCreateFixture, useTeams
+} from "../../lib/queries"
 import { cn } from "../../lib/utils"
 
+// ── Create Fixture Form ───────────────────────────────────────────────────────
+function CreateFixtureForm({ teams }) {
+  const [homeTeamId, setHomeTeamId] = useState("")
+  const [awayTeamId, setAwayTeamId] = useState("")
+  const [round, setRound]           = useState("")
+  const [date, setDate]             = useState("")
+  const [success, setSuccess]       = useState(false)
+  const [open, setOpen]             = useState(false)
+  const createFixture               = useCreateFixture()
+
+  const canCreate = homeTeamId && awayTeamId && round && date && homeTeamId !== awayTeamId
+
+  const handleCreate = () => {
+    createFixture.mutate({
+      homeTeamId: parseInt(homeTeamId),
+      awayTeamId: parseInt(awayTeamId),
+      round:      parseInt(round),
+      date,
+    }, {
+      onSuccess: () => {
+        setSuccess(true)
+        setHomeTeamId("")
+        setAwayTeamId("")
+        setRound("")
+        setDate("")
+        setTimeout(() => { setSuccess(false); setOpen(false) }, 1500)
+      },
+      onError: (err) => alert(err.response?.data?.error || "Failed to create fixture"),
+    })
+  }
+
+  return (
+    <div className="card overflow-hidden mb-6">
+      {/* Header toggle */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-hover transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center">
+            <Plus className="w-4 h-4 text-accent" />
+          </div>
+          <span className="text-sm font-semibold text-white">Create new fixture</span>
+        </div>
+        <span className={cn(
+          "text-xs font-medium transition-colors",
+          open ? "text-accent" : "text-slate-500"
+        )}>
+          {open ? "Close ▲" : "Open ▼"}
+        </span>
+      </button>
+
+      {/* Form */}
+      {open && (
+        <div className="px-5 pb-5 border-t border-surface-border pt-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Home team */}
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1.5 block">Home team</label>
+              <select
+                value={homeTeamId}
+                onChange={e => setHomeTeamId(e.target.value)}
+                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+              >
+                <option value="">— Select team —</option>
+                {teams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Away team */}
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1.5 block">Away team</label>
+              <select
+                value={awayTeamId}
+                onChange={e => setAwayTeamId(e.target.value)}
+                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+              >
+                <option value="">— Select team —</option>
+                {teams.filter(t => t.id !== parseInt(homeTeamId)).map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Round */}
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1.5 block">Round number</label>
+              <input
+                type="number" min={1}
+                value={round}
+                onChange={e => setRound(e.target.value)}
+                placeholder="e.g. 1"
+                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/40 transition-colors"
+              />
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1.5 block">Match date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Preview */}
+          {homeTeamId && awayTeamId && homeTeamId !== awayTeamId && (
+            <div className="flex items-center justify-center gap-3 bg-pitch-900/60 border border-surface-border rounded-xl py-3 px-4">
+              <span className="text-sm font-bold text-white">
+                {teams.find(t => t.id === parseInt(homeTeamId))?.name}
+              </span>
+              <span className="text-xs font-bold text-accent bg-accent/15 border border-accent/25 px-2 py-0.5 rounded">
+                H
+              </span>
+              <span className="text-slate-500 font-bold">vs</span>
+              <span className="text-xs font-bold text-slate-400 bg-surface-border px-2 py-0.5 rounded">
+                A
+              </span>
+              <span className="text-sm font-bold text-white">
+                {teams.find(t => t.id === parseInt(awayTeamId))?.name}
+              </span>
+              {round && <span className="text-xs text-slate-500 ml-2">· Round {round}</span>}
+              {date && (
+                <span className="text-xs text-slate-500">
+                  · {new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={handleCreate}
+            disabled={!canCreate || createFixture.isPending}
+            className={cn(
+              "w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2",
+              canCreate
+                ? "bg-accent hover:bg-accent-dim text-white"
+                : "bg-surface-border text-slate-600 cursor-not-allowed"
+            )}
+          >
+            {success ? (
+              <><Check className="w-4 h-4" /> Fixture created!</>
+            ) : createFixture.isPending ? (
+              "Creating…"
+            ) : (
+              <><Calendar className="w-4 h-4" /> Create fixture</>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Score Input ───────────────────────────────────────────────────────────────
 function ScoreInput({ value, onChange, disabled }) {
   return (
     <input
@@ -16,20 +178,19 @@ function ScoreInput({ value, onChange, disabled }) {
   )
 }
 
+// ── Fixture Card ──────────────────────────────────────────────────────────────
 function FixtureCard({ fixture }) {
   const { data: teams = [] } = useTeams()
-  const saveResult   = useSaveFixtureResult()
+  const saveResult    = useSaveFixtureResult()
   const updateFixture = useUpdateFixture()
   const deleteFixture = useDeleteFixture()
 
   const isCompleted = fixture.status === "completed"
 
-  // Score state
   const [hs, setHs]       = useState(fixture.homeScore ?? "")
   const [as_, setAs]      = useState(fixture.awayScore ?? "")
   const [saved, setSaved] = useState(isCompleted)
 
-  // Edit state
   const [editing, setEditing]     = useState(false)
   const [editRound, setEditRound] = useState(fixture.round)
   const [editDate, setEditDate]   = useState(
@@ -37,8 +198,6 @@ function FixtureCard({ fixture }) {
   )
   const [editHome, setEditHome] = useState(fixture.homeTeamId)
   const [editAway, setEditAway] = useState(fixture.awayTeamId)
-
-  // Delete confirm state
   const [confirmDel, setConfirmDel] = useState(false)
 
   const winner  = saved ? (hs > as_ ? "home" : hs < as_ ? "away" : "draw") : null
@@ -47,12 +206,12 @@ function FixtureCard({ fixture }) {
   const handleSaveResult = () => {
     saveResult.mutate({ id: fixture.id, homeScore: parseInt(hs), awayScore: parseInt(as_) }, {
       onSuccess: () => setSaved(true),
-      onError: (err) => alert(err.response?.data?.error || "Failed to save result"),
+      onError:   (err) => alert(err.response?.data?.error || "Failed to save result"),
     })
   }
 
   const handleSaveEdit = () => {
-    if (editHome === editAway) return alert("Home and away teams must differ")
+    if (parseInt(editHome) === parseInt(editAway)) return alert("Home and away teams must differ")
     updateFixture.mutate({
       id: fixture.id,
       round:      parseInt(editRound),
@@ -77,7 +236,7 @@ function FixtureCard({ fixture }) {
 
   return (
     <div className={cn("card p-5 transition-all", saved && "border-accent/20", confirmDel && "border-rose-500/30")}>
-      {/* Header row */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-500">Round {fixture.round}</span>
@@ -91,7 +250,6 @@ function FixtureCard({ fixture }) {
             : <span className="text-xs text-amber-400 font-medium">Pending</span>
           }
 
-          {/* Edit button — only for upcoming */}
           {!isCompleted && !confirmDel && (
             <button
               onClick={() => setEditing(e => !e)}
@@ -105,7 +263,6 @@ function FixtureCard({ fixture }) {
             </button>
           )}
 
-          {/* Delete button */}
           {!confirmDel ? (
             <button
               onClick={() => setConfirmDel(true)}
@@ -117,17 +274,12 @@ function FixtureCard({ fixture }) {
           ) : (
             <div className="flex items-center gap-1.5 ml-1">
               <span className="text-xs text-rose-400">Delete?</span>
-              <button
-                onClick={() => setConfirmDel(false)}
-                className="text-xs px-2 py-1 rounded-lg border border-surface-border text-slate-400 hover:text-white"
-              >
+              <button onClick={() => setConfirmDel(false)}
+                className="text-xs px-2 py-1 rounded-lg border border-surface-border text-slate-400 hover:text-white">
                 No
               </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteFixture.isPending}
-                className="text-xs px-2 py-1 rounded-lg bg-rose-500 text-white font-semibold disabled:opacity-50"
-              >
+              <button onClick={handleDelete} disabled={deleteFixture.isPending}
+                className="text-xs px-2 py-1 rounded-lg bg-rose-500 text-white font-semibold disabled:opacity-50">
                 {deleteFixture.isPending ? "…" : "Yes"}
               </button>
             </div>
@@ -141,57 +293,38 @@ function FixtureCard({ fixture }) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Round</label>
-              <input
-                type="number" min={1}
-                value={editRound}
+              <input type="number" min={1} value={editRound}
                 onChange={e => setEditRound(e.target.value)}
-                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40"
-              />
+                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Date</label>
-              <input
-                type="date"
-                value={editDate}
+              <input type="date" value={editDate}
                 onChange={e => setEditDate(e.target.value)}
-                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40"
-              />
+                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Home team</label>
-              <select
-                value={editHome}
-                onChange={e => setEditHome(e.target.value)}
-                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40"
-              >
+              <select value={editHome} onChange={e => setEditHome(e.target.value)}
+                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Away team</label>
-              <select
-                value={editAway}
-                onChange={e => setEditAway(e.target.value)}
-                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40"
-              >
+              <select value={editAway} onChange={e => setEditAway(e.target.value)}
+                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
           </div>
           <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => setEditing(false)}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white transition-colors"
-            >
+            <button onClick={() => setEditing(false)}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white transition-colors">
               <X className="w-3 h-3" /> Cancel
             </button>
-            <button
-              onClick={handleSaveEdit}
-              disabled={updateFixture.isPending}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50 transition-colors"
-            >
+            <button onClick={handleSaveEdit} disabled={updateFixture.isPending}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50 transition-colors">
               <Save className="w-3 h-3" /> {updateFixture.isPending ? "Saving…" : "Save changes"}
             </button>
           </div>
@@ -215,16 +348,12 @@ function FixtureCard({ fixture }) {
         </div>
       </div>
 
-      {/* Save result / locked */}
       {!saved ? (
-        <button
-          onClick={handleSaveResult}
-          disabled={!canSave || saveResult.isPending}
+        <button onClick={handleSaveResult} disabled={!canSave || saveResult.isPending}
           className={cn(
             "mt-4 w-full py-2 rounded-lg text-sm font-semibold transition-all",
             canSave ? "bg-accent hover:bg-accent-dim text-white" : "bg-surface-border text-slate-600 cursor-not-allowed"
-          )}
-        >
+          )}>
           {saveResult.isPending ? "Saving…" : "Save result"}
         </button>
       ) : (
@@ -236,12 +365,17 @@ function FixtureCard({ fixture }) {
   )
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function FixtureResults({ fixtures }) {
+  const { data: teams = [] } = useTeams()
   const upcoming  = fixtures.filter(f => f.status === "upcoming")
   const completed = fixtures.filter(f => f.status === "completed")
 
   return (
     <div className="space-y-8">
+      {/* Create fixture form always at top */}
+      <CreateFixtureForm teams={teams} />
+
       {upcoming.length > 0 && (
         <div>
           <p className="section-label mb-4">Upcoming fixtures</p>
@@ -250,6 +384,7 @@ export default function FixtureResults({ fixtures }) {
           </div>
         </div>
       )}
+
       {completed.length > 0 && (
         <div>
           <p className="section-label mb-4">Completed fixtures</p>
@@ -258,8 +393,11 @@ export default function FixtureResults({ fixtures }) {
           </div>
         </div>
       )}
-      {fixtures.length === 0 && (
-        <div className="card py-16 text-center text-slate-500 text-sm">No fixtures created yet.</div>
+
+      {fixtures.length === 0 && upcoming.length === 0 && (
+        <div className="card py-16 text-center text-slate-500 text-sm">
+          No fixtures yet — create one above.
+        </div>
       )}
     </div>
   )
