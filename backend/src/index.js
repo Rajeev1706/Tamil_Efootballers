@@ -47,7 +47,7 @@ app.use((_req, res) => res.status(404).json({ error: "Route not found" }))
 app.use(errorHandler)
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`)
+  console.log(`\n🚀 Server running on port ${PORT}`)
   console.log(`   Env: ${process.env.NODE_ENV || "development"}`)
   console.log(`   DB:  ${process.env.DATABASE_URL ? "connected" : "⚠️  DATABASE_URL not set"}`)
 })
