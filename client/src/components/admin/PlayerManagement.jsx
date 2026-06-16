@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Pencil, Check, X, Trash2, Camera, Trophy } from "lucide-react"
+import { Pencil, Check, X, Trash2, Camera, Trophy, Search } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
@@ -236,11 +236,53 @@ function EditableRow({ player, onPlayerClick }) {
 }
 
 export default function PlayerManagement({ players, onPlayerClick }) {
+  const [search, setSearch]   = useState("")
+  const [gradeFilter, setGradeFilter] = useState("All")
+  const [teamFilter, setTeamFilter]   = useState("All")
+  const { data: teams = [] }  = useTeams()
+
+  const filtered = players.filter(p => {
+    const matchName  = p.name.toLowerCase().includes(search.toLowerCase())
+    const matchGrade = gradeFilter === "All" || p.grade === gradeFilter
+    const matchTeam  = teamFilter  === "All" || p.team  === teamFilter
+    return matchName && matchGrade && matchTeam
+  })
+
+  const allTeamNames = ["All", ...new Set(players.map(p => p.team).filter(Boolean))]
+
   return (
     <div>
-      <p className="text-sm text-slate-400 mb-4">
-        Edit grades, BDR points, team assignment, squad images, and trophy counts.
-        Click the pencil icon to edit — the team dropdown appears under the player name.
+      {/* Search + filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search player name…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full bg-pitch-800 border border-surface-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/40 transition-colors"
+          />
+        </div>
+        <select
+          value={gradeFilter}
+          onChange={e => setGradeFilter(e.target.value)}
+          className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
+        >
+          {["All","S","A+","A","B","C"].map(g => <option key={g}>{g}</option>)}
+        </select>
+        <select
+          value={teamFilter}
+          onChange={e => setTeamFilter(e.target.value)}
+          className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 max-w-[160px]"
+        >
+          {allTeamNames.map(t => <option key={t}>{t}</option>)}
+        </select>
+      </div>
+
+      <p className="text-xs text-slate-500 mb-3">
+        {filtered.length} of {players.length} player{players.length !== 1 ? "s" : ""}
+        {search || gradeFilter !== "All" || teamFilter !== "All" ? " matched" : " total"}
       </p>
 
       <div className="card overflow-hidden">
@@ -260,14 +302,14 @@ export default function PlayerManagement({ players, onPlayerClick }) {
               </tr>
             </thead>
             <tbody>
-              {players.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500 text-sm">
-                    No players yet — add them in the Setup tab.
+                    {players.length === 0 ? "No players yet — add them in the Setup tab." : "No players match your search."}
                   </td>
                 </tr>
               ) : (
-                players.map(p => (
+                filtered.map(p => (
                   <EditableRow key={p.id} player={p} onPlayerClick={onPlayerClick} />
                 ))
               )}
