@@ -22,17 +22,21 @@ function FixtureRow({ fixture, myTeamName }) {
     draw: "bg-amber-400/15 text-amber-400 border-amber-400/30",
   }
 
+  const formattedDate = fixture.date
+    ? new Date(fixture.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "TBD"
+
   return (
     <div className={cn(
       "flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover",
-      !isUpcoming && result === "win" && "border-l-2 border-emerald-500",
+      !isUpcoming && result === "win"  && "border-l-2 border-emerald-500",
       !isUpcoming && result === "loss" && "border-l-2 border-rose-500",
       !isUpcoming && result === "draw" && "border-l-2 border-amber-400",
-      isUpcoming && "border-l-2 border-slate-700",
+      isUpcoming && "border-l-2 border-accent/40",
     )}>
       {/* Date + round */}
-      <div className="w-16 flex-shrink-0 text-center">
-        <p className="text-xs font-semibold text-white">{fixture.date}</p>
+      <div className="w-20 flex-shrink-0 text-center">
+        <p className="text-xs font-semibold text-white">{formattedDate}</p>
         <p className="text-xs text-slate-600 mt-0.5">Round {fixture.round}</p>
       </div>
 
@@ -52,9 +56,9 @@ function FixtureRow({ fixture, myTeamName }) {
         <p className="text-xs text-slate-600 mt-0.5">{isHome ? "Home" : "Away"}</p>
       </div>
 
-      {/* Score or countdown */}
+      {/* Score or upcoming */}
       {isUpcoming ? (
-        <div className="flex items-center gap-1.5 text-slate-500">
+        <div className="flex items-center gap-1.5 text-accent/70">
           <Clock className="w-3.5 h-3.5" />
           <span className="text-xs font-medium">Upcoming</span>
         </div>
@@ -80,9 +84,9 @@ function FixtureRow({ fixture, myTeamName }) {
 }
 
 export default function TeamFixtures({ fixtures, myTeamName }) {
-  const myFixtures  = fixtures.filter(f => f.home === myTeamName || f.away === myTeamName)
-  const past        = myFixtures.filter(f => f.status === "completed").reverse()
-  const upcoming    = myFixtures.filter(f => f.status === "upcoming")
+  const myFixtures = fixtures.filter(f => f.home === myTeamName || f.away === myTeamName)
+  const past       = myFixtures.filter(f => f.status === "completed").reverse()
+  const upcoming   = myFixtures.filter(f => f.status === "upcoming")
 
   const wins   = past.filter(f => {
     const isHome = f.home === myTeamName
@@ -107,18 +111,27 @@ export default function TeamFixtures({ fixtures, myTeamName }) {
         ))}
       </div>
 
-      {/* Upcoming */}
-      {upcoming.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
-            <Calendar className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold text-white">Upcoming fixtures</h2>
+      {/* Upcoming fixtures */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
+          <Calendar className="w-4 h-4 text-accent" />
+          <h2 className="text-sm font-semibold text-white">Upcoming fixtures</h2>
+          {upcoming.length > 0 && (
+            <span className="ml-auto text-xs font-semibold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-full">
+              {upcoming.length} match{upcoming.length !== 1 ? "es" : ""}
+            </span>
+          )}
+        </div>
+        {upcoming.length === 0 ? (
+          <div className="px-5 py-10 text-center text-slate-500 text-sm">
+            No upcoming fixtures scheduled yet.
           </div>
+        ) : (
           <div className="divide-y divide-surface-border/60">
             {upcoming.map(f => <FixtureRow key={f.id} fixture={f} myTeamName={myTeamName} />)}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Past results */}
       <div className="card overflow-hidden">
@@ -126,9 +139,15 @@ export default function TeamFixtures({ fixtures, myTeamName }) {
           <Clock className="w-4 h-4 text-slate-500" />
           <h2 className="text-sm font-semibold text-white">Past results</h2>
         </div>
-        <div className="divide-y divide-surface-border/60">
-          {past.map(f => <FixtureRow key={f.id} fixture={f} myTeamName={myTeamName} />)}
-        </div>
+        {past.length === 0 ? (
+          <div className="px-5 py-10 text-center text-slate-500 text-sm">
+            No completed matches yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-surface-border/60">
+            {past.map(f => <FixtureRow key={f.id} fixture={f} myTeamName={myTeamName} />)}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -64,9 +64,9 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
       <p className="text-xs text-slate-600 mb-4">{filtered.length} player{filtered.length!==1?"s":""} found</p>
 
       <div className="card overflow-hidden">
-        <div className="hidden sm:grid grid-cols-[2fr_1fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-2.5 border-b border-surface-border">
+        <div className="hidden sm:grid grid-cols-[2fr_80px_2fr_100px_100px_100px_140px] px-5 py-2.5 border-b border-surface-border">
           {["Player","Grade","Team","Auction","MV","BDR",""].map(h => (
-            <span key={h} className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{h}</span>
+            <span key={h} className={cn("text-xs font-semibold text-slate-600 uppercase tracking-wide", h === "Auction" || h === "MV" || h === "BDR" ? "text-right" : "")}>{h}</span>
           ))}
         </div>
         <div className="divide-y divide-surface-border/60">
@@ -77,7 +77,7 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
             const hasRequested = requested.has(player.id)
             const tier         = getMVTier(player.marketValue)
             return (
-              <div key={player.id} className={cn("grid grid-cols-1 sm:grid-cols-[2fr_1fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-4 items-center transition-colors", isMyPlayer?"bg-accent/5":"hover:bg-surface-hover")}>
+              <div key={player.id} className={cn("grid grid-cols-1 sm:grid-cols-[2fr_80px_2fr_100px_100px_100px_140px] px-5 py-4 items-center transition-colors", isMyPlayer?"bg-accent/5":"hover:bg-surface-hover")}>
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-surface-border flex items-center justify-center text-xs font-bold text-slate-400 flex-shrink-0">
                     {player.name.split(" ").map(n=>n[0]).join("")}
@@ -89,12 +89,12 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
                 </div>
                 <div><GradeBadge grade={player.grade} /></div>
                 <p className="hidden sm:block text-sm text-slate-400 truncate">{player.team}</p>
-                <p className="text-sm font-mono text-slate-400">{player.auctionPrice}</p>
-                <div>
+                <p className="text-sm font-mono text-slate-400 text-right">{player.auctionPrice}</p>
+                <div className="text-right">
                   <p className="text-sm font-bold font-mono text-white">{player.marketValue}</p>
-                  <p className={cn("text-xs",tier.color)}>{tier.label}</p>
+                  <p className={cn("text-xs", tier.color)}>{tier.label}</p>
                 </div>
-                <p className="text-sm font-mono text-slate-300">{player.bdrPoints?.toLocaleString()}</p>
+                <p className="text-sm font-mono text-slate-300 text-right">{player.bdrPoints?.toLocaleString()}</p>
                 <div className="flex justify-end">
                   {isMyPlayer ? (
                     <span className="text-xs text-accent font-semibold bg-accent/10 border border-accent/20 px-2.5 py-1 rounded-lg">Your player</span>

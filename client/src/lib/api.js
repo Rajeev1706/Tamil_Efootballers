@@ -31,11 +31,14 @@ export const authApi = {
 }
 
 export const teamsApi = {
-  list:   ()       => api.get("/teams").then(r => r.data),
-  get:    (id)     => api.get(`/teams/${id}`).then(r => r.data),
-  create: (body)   => api.post("/teams", body).then(r => r.data),
-  update: (id, b)  => api.patch(`/teams/${id}`, b).then(r => r.data),
-  delete: (id)     => api.delete(`/teams/${id}`).then(r => r.data),
+  list:           ()       => api.get("/teams").then(r => r.data),
+  get:            (id)     => api.get(`/teams/${id}`).then(r => r.data),
+  create:         (body)   => api.post("/teams", body).then(r => r.data),
+  update:         (id, b)  => api.patch(`/teams/${id}`, b).then(r => r.data),
+  updateSettings: (id, b)  => api.patch(`/teams/${id}/settings`, b).then(r => r.data),
+  changePassword: (id, newPassword) =>
+    api.patch(`/teams/${id}/password`, { newPassword }).then(r => r.data),
+  delete:         (id)     => api.delete(`/teams/${id}`).then(r => r.data),
 }
 
 export const playersApi = {
@@ -53,17 +56,24 @@ export const recordsApi = {
 }
 
 export const fixturesApi = {
-  list:       (params)                  => api.get("/fixtures", { params }).then(r => r.data),
-  recent:     ()                        => api.get("/fixtures/recent").then(r => r.data),
-  create:     (body)                    => api.post("/fixtures", body).then(r => r.data),
+  list:       (params)                   => api.get("/fixtures", { params }).then(r => r.data),
+  recent:     ()                         => api.get("/fixtures/recent").then(r => r.data),
+  create:     (body)                     => api.post("/fixtures", body).then(r => r.data),
   saveResult: (id, homeScore, awayScore) =>
     api.patch(`/fixtures/${id}/result`, { homeScore, awayScore }).then(r => r.data),
 }
 
 export const tradesApi = {
-  list:    (params)             => api.get("/trades", { params }).then(r => r.data),
-  request: (playerId, toTeamId) =>
+  list:    (params)              => api.get("/trades", { params }).then(r => r.data),
+  request: (playerId, toTeamId)  =>
     api.post("/trades", { playerId, toTeamId }).then(r => r.data),
-  review:  (id, action)         => api.patch(`/trades/${id}/review`, { action }).then(r => r.data),
-  cancel:  (id)                 => api.patch(`/trades/${id}/cancel`).then(r => r.data),
+  review:  (id, action)          => api.patch(`/trades/${id}/review`, { action }).then(r => r.data),
+  cancel:  (id)                  => api.patch(`/trades/${id}/cancel`).then(r => r.data),
+}
+
+export const lineupsApi = {
+  get:    (fixtureId)            => api.get(`/lineups/${fixtureId}`).then(r => r.data),
+  save:   (fixtureId, matchups)  => api.put(`/lineups/${fixtureId}`, { matchups }).then(r => r.data),
+  delete: (fixtureId)            => api.delete(`/lineups/${fixtureId}`).then(r => r.data),
+  h2h:    (p1Id, p2Id)           => api.get(`/lineups/h2h/${p1Id}/${p2Id}`).then(r => r.data),
 }

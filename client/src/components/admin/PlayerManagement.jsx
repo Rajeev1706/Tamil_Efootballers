@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Pencil, Check, X, Trash2, Camera } from "lucide-react"
+import { Pencil, Check, X, Trash2, Camera, Trophy } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
@@ -12,6 +12,9 @@ function EditableRow({ player, onPlayerClick }) {
   const [editing, setEditing]       = useState(false)
   const [grade, setGrade]           = useState(player.grade)
   const [bdrDelta, setBdrDelta]     = useState("")
+  const [trophy1, setTrophy1]       = useState(player.trophy1Count ?? 0)
+  const [trophy2, setTrophy2]       = useState(player.trophy2Count ?? 0)
+  const [trophy3, setTrophy3]       = useState(player.trophy3Count ?? 0)
   const [confirmDel, setConfirmDel] = useState(false)
   const updatePlayer                = useUpdatePlayer()
   const deletePlayer                = useDeletePlayer()
@@ -22,10 +25,22 @@ function EditableRow({ player, onPlayerClick }) {
     const body = {}
     if (grade !== player.grade) body.grade = grade
     if (bdrDelta !== "") body.bdrDelta = deltaNum
+    if (trophy1 !== (player.trophy1Count ?? 0)) body.trophy1Count = trophy1
+    if (trophy2 !== (player.trophy2Count ?? 0)) body.trophy2Count = trophy2
+    if (trophy3 !== (player.trophy3Count ?? 0)) body.trophy3Count = trophy3
     if (!Object.keys(body).length) return setEditing(false)
     updatePlayer.mutate({ id: player.id, ...body }, {
       onSuccess: () => { setEditing(false); setBdrDelta("") },
     })
+  }
+
+  const handleCancel = () => {
+    setEditing(false)
+    setBdrDelta("")
+    setGrade(player.grade)
+    setTrophy1(player.trophy1Count ?? 0)
+    setTrophy2(player.trophy2Count ?? 0)
+    setTrophy3(player.trophy3Count ?? 0)
   }
 
   const handleDelete = () => {
@@ -127,8 +142,7 @@ function EditableRow({ player, onPlayerClick }) {
         <td className="py-3.5 px-5 text-right">
           {editing ? (
             <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => { setEditing(false); setBdrDelta(""); setGrade(player.grade) }}
+              <button onClick={handleCancel}
                 className="w-8 h-8 rounded-lg border border-surface-border flex items-center justify-center text-slate-400 hover:text-white transition-colors">
                 <X className="w-4 h-4" />
               </button>
@@ -166,6 +180,34 @@ function EditableRow({ player, onPlayerClick }) {
           </td>
         </tr>
       )}
+
+      {/* Trophy counts row — shown when editing */}
+      {editing && (
+        <tr className="border-b border-surface-border/60 bg-pitch-800">
+          <td colSpan={6} className="px-5 py-4">
+            <div className="flex items-center gap-6 flex-wrap">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Trophy className="w-4 h-4 text-gold" />
+                <span className="text-xs text-slate-400">Trophies</span>
+              </div>
+ {[
+                { label: "Ballon d'Or", value: trophy1, onChange: setTrophy1 },
+                { label: "Team League", value: trophy2, onChange: setTrophy2 },
+                { label: "Weekly",      value: trophy3, onChange: setTrophy3 },
+              ].map(t => (
+                <div key={t.label} className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{t.label}</span>
+                  <input
+                    type="number" min="0" value={t.value}
+                    onChange={e => t.onChange(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-16 bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white font-mono text-center focus:outline-none focus:border-accent/40"
+                  />
+                </div>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
     </>
   )
 }
@@ -174,7 +216,7 @@ export default function PlayerManagement({ players, onPlayerClick }) {
   return (
     <div>
       <p className="text-sm text-slate-400 mb-4">
-        Edit grades, BDR points, and squad images.
+        Edit grades, BDR points, squad images, and trophy counts.
       </p>
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">

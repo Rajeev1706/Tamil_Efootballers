@@ -1,22 +1,26 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Users, Search, Calendar, ArrowLeftRight } from "lucide-react"
+import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import TeamHeader from "../components/team/TeamHeader"
 import Squad from "../components/team/Squad"
 import Scouting from "../components/team/Scouting"
 import TeamFixtures from "../components/team/TeamFixtures"
 import Trades from "../components/team/Trades"
+import TeamSettings from "../components/team/TeamSettings"
+import FixtureMaker from "../components/team/FixtureMaker"
 import Loading from "../components/common/Loading"
 import { useAuthStore } from "../store/authStore"
 import { useTeam, usePlayers, useFixtures, useTrades } from "../lib/queries"
 import { cn } from "../lib/utils"
 
 const TABS = [
-  { id: "squad",    label: "My squad",  icon: Users          },
-  { id: "scouting", label: "Scouting",  icon: Search         },
-  { id: "fixtures", label: "Fixtures",  icon: Calendar       },
-  { id: "trades",   label: "Trades",    icon: ArrowLeftRight },
+  { id: "squad",        label: "My squad",      icon: Users          },
+  { id: "scouting",    label: "Scouting",       icon: Search         },
+  { id: "fixtures",    label: "Fixtures",       icon: Calendar       },
+  { id: "fixmaker",    label: "Fixture maker",  icon: ClipboardList  },
+  { id: "trades",      label: "Trades",         icon: ArrowLeftRight },
+  { id: "settings",    label: "Settings",       icon: Settings       },
 ]
 
 export default function TeamDashboard() {
@@ -84,7 +88,16 @@ export default function TeamDashboard() {
         {activeTab === "fixtures" && (
           <TeamFixtures fixtures={fixtures} myTeamName={myTeamName} />
         )}
+        {activeTab === "fixmaker" && (
+          <FixtureMaker
+            fixtures={fixtures}
+            myTeamName={myTeamName}
+            myPlayers={myPlayers}
+            allPlayers={allPlayers}
+          />
+        )}
         {activeTab === "trades" && <Trades trades={trades} />}
+        {activeTab === "settings" && <TeamSettings team={teamData} />}
       </div>
     </Layout>
   )

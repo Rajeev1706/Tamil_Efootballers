@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { Trophy, BarChart2, Shield, LogIn, LogOut, Users } from "lucide-react"
+import { BarChart2, Shield, LogIn, LogOut, Users } from "lucide-react"
 import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
@@ -20,9 +20,7 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center">
-            <Trophy className="w-4 h-4 text-accent" />
-          </div>
+          <img src="/images/logo.png" alt="TEC Logo" className="w-14 h-14 rounded-lg object-cover" />
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold text-white tracking-wide">Tamil</span>
             <span className="text-xs text-accent font-semibold tracking-widest uppercase">Efootballers</span>

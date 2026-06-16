@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -122,6 +122,7 @@ export const useCancelTrade = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trades"] }),
   })
 }
+
 export const useCreateTeam = () => {
   const qc = useQueryClient()
   return useMutation({
@@ -170,3 +171,52 @@ export const useUpdateTeam = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: QK.teams }),
   })
 }
+
+export const useUpdateTeamSettings = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => teamsApi.updateSettings(id, body),
+    onSuccess: (data, variables) => {
+      qc.invalidateQueries({ queryKey: QK.teams })
+      qc.invalidateQueries({ queryKey: QK.team(variables.id) })
+    },
+  })
+}
+
+export const useChangeTeamPassword = () => {
+  return useMutation({
+    mutationFn: ({ id, newPassword }) => teamsApi.changePassword(id, newPassword),
+  })
+}
+
+// ── Lineup hooks ──────────────────────────────────────────────────────────────
+
+export const useLineup = (fixtureId) =>
+  useQuery({
+    queryKey: ["lineup", fixtureId],
+    queryFn:  () => lineupsApi.get(fixtureId),
+    enabled:  !!fixtureId,
+  })
+
+export const useSaveLineup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ fixtureId, matchups }) => lineupsApi.save(fixtureId, matchups),
+    onSuccess: (_, { fixtureId }) => qc.invalidateQueries({ queryKey: ["lineup", fixtureId] }),
+  })
+}
+
+export const useClearLineup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (fixtureId) => lineupsApi.delete(fixtureId),
+    onSuccess: (_, fixtureId) => qc.invalidateQueries({ queryKey: ["lineup", fixtureId] }),
+  })
+}
+
+export const useH2H = (p1Id, p2Id) =>
+  useQuery({
+    queryKey: ["h2h", p1Id, p2Id],
+    queryFn:  () => lineupsApi.h2h(p1Id, p2Id),
+    enabled:  !!p1Id && !!p2Id,
+  })

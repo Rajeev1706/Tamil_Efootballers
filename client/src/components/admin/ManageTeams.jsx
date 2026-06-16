@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { Pencil, Trash2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Users } from "lucide-react"
-import { useTeams, useDeleteTeam, useUpdateTeam, useDeletePlayer } from "../../lib/queries"
+import { Pencil, Trash2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react"
+import { useTeams, useDeleteTeam, useUpdateTeam, useDeletePlayer, useChangeTeamPassword } from "../../lib/queries"
 import PlayerAvatar from "../common/PlayerAvatar"
 import GradeBadge from "../common/GradeBadge"
 import { cn } from "../../lib/utils"
@@ -55,12 +55,17 @@ function RosterPlayerRow({ player }) {
 }
 
 function TeamRow({ team, players }) {
-  const [editing, setEditing]       = useState(false)
-  const [name, setName]             = useState(team.name)
-  const [confirmDel, setConfirmDel] = useState(false)
-  const [expanded, setExpanded]     = useState(false)
-  const updateTeam                  = useUpdateTeam()
-  const deleteTeam                  = useDeleteTeam()
+  const [editing, setEditing]           = useState(false)
+  const [name, setName]                 = useState(team.name)
+  const [confirmDel, setConfirmDel]     = useState(false)
+  const [expanded, setExpanded]         = useState(false)
+  const [changingPwd, setChangingPwd]   = useState(false)
+  const [newPassword, setNewPassword]   = useState("")
+  const [pwdError, setPwdError]         = useState("")
+  const [pwdSuccess, setPwdSuccess]     = useState(false)
+  const updateTeam                      = useUpdateTeam()
+  const deleteTeam                      = useDeleteTeam()
+  const changePassword                  = useChangeTeamPassword()
 
   const roster = players.filter(p => p.teamId === team.id)
 
@@ -77,6 +82,32 @@ function TeamRow({ team, players }) {
       onSuccess: () => setConfirmDel(false),
       onError: (err) => alert(err.response?.data?.error || "Delete failed"),
     })
+  }
+
+  const handlePasswordSave = () => {
+    setPwdError("")
+    if (newPassword.length < 6) {
+      setPwdError("Password must be at least 6 characters")
+      return
+    }
+    changePassword.mutate({ id: team.id, newPassword }, {
+      onSuccess: () => {
+        setPwdSuccess(true)
+        setNewPassword("")
+        setTimeout(() => {
+          setPwdSuccess(false)
+          setChangingPwd(false)
+        }, 2000)
+      },
+      onError: (err) => setPwdError(err.response?.data?.error || "Failed to change password"),
+    })
+  }
+
+  const cancelPassword = () => {
+    setChangingPwd(false)
+    setNewPassword("")
+    setPwdError("")
+    setPwdSuccess(false)
   }
 
   return (
@@ -146,7 +177,17 @@ function TeamRow({ team, players }) {
             </>
           ) : (
             <>
-              <button onClick={() => setEditing(true)}
+              <button onClick={() => { setChangingPwd(e => !e); setEditing(false) }}
+                className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center transition-colors",
+                  changingPwd
+                    ? "bg-amber-400/15 text-amber-400"
+                    : "hover:bg-surface text-slate-400 hover:text-amber-400"
+                )}
+                title="Change password">
+                <KeyRound className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => { setEditing(true); setChangingPwd(false) }}
                 className="w-7 h-7 rounded-lg hover:bg-surface flex items-center justify-center text-slate-400 hover:text-white transition-colors"
                 title="Edit name">
                 <Pencil className="w-3.5 h-3.5" />
@@ -160,6 +201,53 @@ function TeamRow({ team, players }) {
           )}
         </div>
       </div>
+
+      {/* Change password panel */}
+      {changingPwd && (
+        <div className="px-5 pb-4 pl-14">
+          <div className="bg-amber-400/5 border border-amber-400/20 rounded-xl p-4">
+            <p className="text-xs font-semibold text-amber-400 mb-3 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5" />
+              Reset password for <span className="text-white">{team.name}</span> owner account
+            </p>
+
+            {pwdSuccess ? (
+              <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
+                <Check className="w-4 h-4" />
+                Password changed successfully
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => { setNewPassword(e.target.value); setPwdError("") }}
+                  onKeyDown={e => e.key === "Enter" && handlePasswordSave()}
+                  placeholder="New password (min 6 chars)"
+                  className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-400/40 transition-colors"
+                />
+                <button
+                  onClick={handlePasswordSave}
+                  disabled={changePassword.isPending}
+                  className="px-3 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-pitch-900 text-sm font-semibold transition-colors disabled:opacity-50 flex-shrink-0"
+                >
+                  {changePassword.isPending ? "Saving…" : "Save"}
+                </button>
+                <button
+                  onClick={cancelPassword}
+                  className="w-8 h-8 rounded-lg border border-surface-border flex items-center justify-center text-slate-400 hover:text-white transition-colors flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {pwdError && (
+              <p className="text-xs text-rose-400 mt-2">{pwdError}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Expanded roster */}
       {expanded && (
@@ -187,7 +275,7 @@ export default function ManageTeams({ players = [] }) {
       <div className="px-5 py-4 border-b border-surface-border">
         <h3 className="text-sm font-semibold text-white">Existing teams</h3>
         <p className="text-xs text-slate-500 mt-0.5">
-          Click a team to expand its roster · pencil to rename · trash to delete
+          Click a team to expand its roster · pencil to rename · key to reset password · trash to delete
         </p>
       </div>
       {teams.length === 0 ? (

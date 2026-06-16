@@ -9,6 +9,7 @@ import playerRoutes  from "./routes/players.js"
 import recordRoutes  from "./routes/records.js"
 import fixtureRoutes from "./routes/fixtures.js"
 import tradeRoutes   from "./routes/trades.js"
+import lineupRoutes  from "./routes/lineup.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
 const app  = express()
@@ -36,6 +37,7 @@ app.use("/api/players",  playerRoutes)
 app.use("/api/records",  recordRoutes)
 app.use("/api/fixtures", fixtureRoutes)
 app.use("/api/trades",   tradeRoutes)
+app.use("/api/lineups",  lineupRoutes)
 
 // Health check
 app.get("/health", (_req, res) => res.json({ status: "ok", env: process.env.NODE_ENV }))

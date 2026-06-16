@@ -68,6 +68,65 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// PATCH /api/teams/:id/settings — team owner (own team only) or admin updates name/logo
+const settingsSchema = z.object({
+  name:    z.string().min(1).optional(),
+  logoUrl: z.string().url().optional().nullable(),
+}).refine(d => d.name !== undefined || d.logoUrl !== undefined, {
+  message: "Provide at least name or logoUrl",
+})
+
+router.patch("/:id/settings", authenticate, async (req, res, next) => {
+  try {
+    const targetId = parseInt(req.params.id)
+    const isOwner  = req.user.role === "team_owner" && req.user.teamId === targetId
+    const isAdmin  = req.user.role === "admin"
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: "Not authorized to edit this team" })
+    }
+
+    const { name, logoUrl } = settingsSchema.parse(req.body)
+    const result = await query(`
+      UPDATE teams SET
+        name     = COALESCE($1, name),
+        logo_url = COALESCE($2, logo_url)
+      WHERE id = $3
+      RETURNING id, name, logo_url AS "logoUrl"
+    `, [name ?? null, logoUrl ?? null, targetId])
+
+    if (!result.rows[0]) return res.status(404).json({ error: "Team not found" })
+    res.json(result.rows[0])
+  } catch (err) { next(err) }
+})
+
+// PATCH /api/teams/:id/password — admin resets the team owner's password
+const changePasswordSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters"),
+})
+
+router.patch("/:id/password", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { newPassword } = changePasswordSchema.parse(req.body)
+
+    // Find the team_owner user linked to this team
+    const userRes = await query(
+      "SELECT id FROM users WHERE team_id = $1 AND role = 'team_owner'",
+      [req.params.id]
+    )
+    if (!userRes.rows[0]) {
+      return res.status(404).json({ error: "No team owner account found for this team" })
+    }
+
+    const hash = await bcrypt.hash(newPassword, 12)
+    await query(
+      "UPDATE users SET password_hash = $1 WHERE id = $2",
+      [hash, userRes.rows[0].id]
+    )
+
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
 // DELETE /api/teams/:id — admin deletes team
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {

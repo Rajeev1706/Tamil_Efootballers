@@ -92,21 +92,26 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 
 // PATCH /api/players/:id — admin updates any field
 const updateSchema = z.object({
-  name:         z.string().min(1).optional(),
-  alias:        z.string().optional(),
-  grade:        z.enum(["S","A+","A","B","C"]).optional(),
-  bdrDelta:     z.number().int().optional(),
-  auctionPrice: z.number().int().min(0).optional(),
-  teamId:       z.number().int().positive().optional(),
-  imageUrl:     z.string().url().optional().nullable(),
+  name:          z.string().min(1).optional(),
+  alias:         z.string().optional(),
+  grade:         z.enum(["S","A+","A","B","C"]).optional(),
+  bdrDelta:      z.number().int().optional(),
+  auctionPrice:  z.number().int().min(0).optional(),
+  teamId:        z.number().int().positive().optional(),
+  imageUrl:      z.string().url().optional().nullable(),
+  trophy1Count:  z.number().int().min(0).optional(),
+  trophy2Count:  z.number().int().min(0).optional(),
+  trophy3Count:  z.number().int().min(0).optional(),
 }).refine(d => Object.values(d).some(v => v !== undefined), {
   message: "Provide at least one field to update",
 })
 
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { name, alias, grade, bdrDelta, auctionPrice, teamId, imageUrl } =
-      updateSchema.parse(req.body)
+    const {
+      name, alias, grade, bdrDelta, auctionPrice, teamId, imageUrl,
+      trophy1Count, trophy2Count, trophy3Count,
+    } = updateSchema.parse(req.body)
 
     const result = await query(`
       UPDATE players SET
@@ -116,18 +121,26 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         bdr_points    = GREATEST(0, bdr_points + COALESCE($4, 0)),
         auction_price = COALESCE($5, auction_price),
         team_id       = COALESCE($6, team_id),
-        image_url     = COALESCE($7, image_url)
-      WHERE id = $8
+        image_url     = COALESCE($7, image_url),
+        trophy1_count = COALESCE($8, trophy1_count),
+        trophy2_count = COALESCE($9, trophy2_count),
+        trophy3_count = COALESCE($10, trophy3_count)
+      WHERE id = $11
       RETURNING id, name, alias, grade,
                 image_url     AS "imageUrl",
                 bdr_points    AS "bdrPoints",
                 market_value  AS "marketValue",
                 auction_price AS "auctionPrice",
-                team_id       AS "teamId"
+                team_id       AS "teamId",
+                trophy1_count AS "trophy1Count",
+                trophy2_count AS "trophy2Count",
+                trophy3_count AS "trophy3Count"
     `, [
       name ?? null, alias ?? null, grade ?? null,
       bdrDelta ?? null, auctionPrice ?? null, teamId ?? null,
-      imageUrl ?? null, req.params.id,
+      imageUrl ?? null,
+      trophy1Count ?? null, trophy2Count ?? null, trophy3Count ?? null,
+      req.params.id,
     ])
 
     if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })

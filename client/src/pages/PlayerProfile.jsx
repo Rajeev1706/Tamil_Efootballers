@@ -5,6 +5,9 @@ import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import { usePlayer } from "../lib/queries"
 import { cn } from "../lib/utils"
+import ballondorTrophy from "../../images/ballondor.png"
+import teamLeagueTrophy from "../../images/Team League.png"
+import weeklyTrophy from "../../images/Weekly.png"
 
 const MATCH_TYPE_OPTIONS = [
   { value: "all",    label: "Total matches" },
@@ -175,7 +178,7 @@ function HeadToHead({ matchHistory = [] }) {
                   )}
                 </div>
               ))}
-            </div>
+</div>
           </div>
         )}
       </div>
@@ -183,6 +186,33 @@ function HeadToHead({ matchHistory = [] }) {
   )
 }
 
+function TrophyCase({ player }) {
+  const trophies = [
+    { image: ballondorTrophy,  label: "Ballon d'Or", count: player.trophy1Count ?? 0 },
+    { image: teamLeagueTrophy, label: "Team League", count: player.trophy2Count ?? 0 },
+    { image: weeklyTrophy,     label: "Weekly",      count: player.trophy3Count ?? 0 },
+  ]
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
+        <Trophy className="w-4 h-4 text-gold" />
+        <h2 className="text-base font-semibold text-white">Trophies</h2>
+      </div>
+      <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {trophies.map((t, i) => (
+          <div key={i} className="flex items-center gap-3 bg-pitch-800 rounded-xl p-4 border border-surface-border">
+            <img src={t.image} alt={t.label} className="w-10 h-10 object-contain flex-shrink-0" />
+            <div>
+              <p className="text-2xl font-extrabold font-mono text-white">{t.count}</p>
+              <p className="text-xs text-slate-500">{t.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 export default function PlayerProfile() {
   const { id }   = useParams()
   const navigate = useNavigate()
@@ -391,11 +421,16 @@ export default function PlayerProfile() {
                 label="Win rate"
                 value={filteredTotal ? `${Math.round((filteredWins / filteredTotal) * 100)}%` : "—"}
               />
-              <SummaryRow label="BDR points" value={player.bdrPoints?.toLocaleString() ?? "—"} />
+ <SummaryRow label="BDR points" value={player.bdrPoints?.toLocaleString() ?? "—"} />
             </div>
           </div>
 
         </div>
+      </div>
+
+      {/* ── Trophies (full width row) ── */}
+      <div className="mt-6">
+        <TrophyCase player={player} />
       </div>
     </Layout>
   )

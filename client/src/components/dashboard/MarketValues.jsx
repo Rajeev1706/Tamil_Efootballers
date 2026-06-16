@@ -18,7 +18,7 @@ export default function MarketValues({ players, onPlayerClick }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-border">
-              {["#", "Player", "Team", "Auction", "MV"].map((h) => (
+              {["#", "Player", "Team", "MV"].map((h) => (
                 <th
                   key={h}
                   className={cn(
@@ -35,7 +35,6 @@ export default function MarketValues({ players, onPlayerClick }) {
           <tbody>
             {sorted.map((player, idx) => {
               const isFirst = idx === 0
-              const delta   = player.marketValue - player.auctionPrice
 
               return (
                 <tr
@@ -58,18 +57,10 @@ export default function MarketValues({ players, onPlayerClick }) {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-slate-400 text-xs">{player.team}</td>
-                  <td className="py-3 px-3 text-center font-mono text-slate-400 text-sm">
-                    {player.auctionPrice}
-                  </td>
                   <td className="py-3 px-3 text-center">
-                    <div className="flex flex-col items-center">
-                      <span className={cn("font-bold font-mono text-sm", isFirst ? "text-gold" : "text-white")}>
-                        {player.marketValue}
-                      </span>
-                      <span className={cn("text-xs font-mono", delta > 0 ? "text-emerald-400" : delta < 0 ? "text-rose-400" : "text-slate-500")}>
-                        {delta > 0 ? `+${delta}` : delta}
-                      </span>
-                    </div>
+                    <span className={cn("font-bold font-mono text-sm", isFirst ? "text-gold" : "text-white")}>
+                      {player.marketValue}
+                    </span>
                   </td>
                 </tr>
               )

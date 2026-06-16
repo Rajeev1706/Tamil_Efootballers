@@ -15,8 +15,14 @@ export default function TeamHeader({ team, myPlayers }) {
 
           {/* Team identity */}
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-accent/20 border-2 border-accent/30 flex items-center justify-center flex-shrink-0">
-              <span className="text-2xl font-extrabold text-accent">{team.name.charAt(0)}</span>
+            <div className="w-20 h-20 rounded-2xl border-2 border-accent/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {team.logoUrl ? (
+                <img src={team.logoUrl} alt={team.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-accent/20 flex items-center justify-center">
+                  <span className="text-3xl font-extrabold text-accent">{team.name.charAt(0)}</span>
+                </div>
+              )}
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-0.5">My team</p>
