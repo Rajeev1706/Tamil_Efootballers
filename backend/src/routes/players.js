@@ -97,7 +97,7 @@ const updateSchema = z.object({
   grade:         z.enum(["S","A+","A","B","C"]).optional(),
   bdrDelta:      z.number().int().optional(),
   auctionPrice:  z.number().int().min(0).optional(),
-  teamId:        z.number().int().positive().optional(),
+  teamId:        z.number().int().positive().optional().nullable(),
   imageUrl:      z.string().url().optional().nullable(),
   trophy1Count:  z.number().int().min(0).optional(),
   trophy2Count:  z.number().int().min(0).optional(),
@@ -113,6 +113,10 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       trophy1Count, trophy2Count, trophy3Count,
     } = updateSchema.parse(req.body)
 
+    // teamId needs special handling: undefined = don't change, null = remove team
+    const teamIdProvided = "teamId" in req.body
+    const teamIdValue    = teamIdProvided ? (teamId ?? null) : undefined
+
     const result = await query(`
       UPDATE players SET
         name          = COALESCE($1, name),
@@ -120,7 +124,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         grade         = COALESCE($3, grade),
         bdr_points    = GREATEST(0, bdr_points + COALESCE($4, 0)),
         auction_price = COALESCE($5, auction_price),
-        team_id       = COALESCE($6, team_id),
+        team_id       = CASE WHEN $12 THEN $6 ELSE team_id END,
         image_url     = COALESCE($7, image_url),
         trophy1_count = COALESCE($8, trophy1_count),
         trophy2_count = COALESCE($9, trophy2_count),
@@ -137,10 +141,11 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
                 trophy3_count AS "trophy3Count"
     `, [
       name ?? null, alias ?? null, grade ?? null,
-      bdrDelta ?? null, auctionPrice ?? null, teamId ?? null,
+      bdrDelta ?? null, auctionPrice ?? null, teamIdValue ?? null,
       imageUrl ?? null,
       trophy1Count ?? null, trophy2Count ?? null, trophy3Count ?? null,
       req.params.id,
+      teamIdProvided,
     ])
 
     if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })

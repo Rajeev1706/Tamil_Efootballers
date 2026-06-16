@@ -27,7 +27,9 @@ function EditableRow({ player, onPlayerClick }) {
     const body = {}
     if (grade  !== player.grade)              body.grade      = grade
     if (bdrDelta !== "")                      body.bdrDelta   = deltaNum
-    if (parseInt(teamId) !== player.teamId)   body.teamId     = parseInt(teamId)
+    if (teamId !== String(player.teamId ?? "")) {
+      body.teamId = teamId === "" ? null : parseInt(teamId)
+    }
     if (trophy1 !== (player.trophy1Count ?? 0)) body.trophy1Count = trophy1
     if (trophy2 !== (player.trophy2Count ?? 0)) body.trophy2Count = trophy2
     if (trophy3 !== (player.trophy3Count ?? 0)) body.trophy3Count = trophy3
