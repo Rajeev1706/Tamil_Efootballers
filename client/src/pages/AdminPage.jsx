@@ -115,8 +115,8 @@ export default function AdminPage() {
         {activeTab === "overview" && (
           <AdminOverview stats={stats} activity={adminActivity} onNavigate={setActiveTab} />
         )}
-        {activeTab === "players" && !isLoading && (
-          <PlayerManagement players={players} onPlayerClick={p => navigate(`/player/${p.id}`)} />
+{activeTab === "players" && !isLoading && (
+          <PlayerManagement players={players} onPlayerClick={p => navigate(`/player/${p.id}?ctx=admin`)} />
         )}
         {activeTab === "records" && !isLoading && (
           <MatchRecordEntry players={players} initialRecords={records} />
