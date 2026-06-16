@@ -80,6 +80,22 @@ export const useCreateFixture = () => {
   })
 }
 
+export const useUpdateFixture = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => fixturesApi.update(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fixtures"] }),
+  })
+}
+
+export const useDeleteFixture = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => fixturesApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fixtures"] }),
+  })
+}
+
 export const useSaveFixtureResult = () => {
   const qc = useQueryClient()
   return useMutation({

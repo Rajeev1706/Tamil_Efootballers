@@ -128,4 +128,43 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// PATCH /api/fixtures/:id  — admin edits fixture date/round (upcoming only)
+const editSchema = z.object({
+  round: z.number().int().positive().optional(),
+  date:  z.string().optional(),
+  homeTeamId: z.number().int().positive().optional(),
+  awayTeamId: z.number().int().positive().optional(),
+})
+
+router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { round, date, homeTeamId, awayTeamId } = editSchema.parse(req.body)
+
+    const result = await query(`
+      UPDATE fixtures SET
+        round        = COALESCE($1, round),
+        scheduled_date = COALESCE($2, scheduled_date),
+        home_team_id = COALESCE($3, home_team_id),
+        away_team_id = COALESCE($4, away_team_id)
+      WHERE id = $5
+      RETURNING id
+    `, [round ?? null, date ?? null, homeTeamId ?? null, awayTeamId ?? null, req.params.id])
+
+    if (!result.rows[0]) return res.status(404).json({ error: "Fixture not found" })
+    const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [req.params.id])
+    res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
+// DELETE /api/fixtures/:id  — admin deletes fixture
+router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const result = await query(
+      "DELETE FROM fixtures WHERE id = $1 RETURNING id", [req.params.id]
+    )
+    if (!result.rows[0]) return res.status(404).json({ error: "Fixture not found" })
+    res.json({ deleted: true })
+  } catch (err) { next(err) }
+})
+
 export default router
