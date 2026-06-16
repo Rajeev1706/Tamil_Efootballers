@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react"
-import { Settings, Camera, Loader2, CheckCircle } from "lucide-react"
+import { Settings, Camera, Loader2, CheckCircle, KeyRound, Eye, EyeOff, Check, X } from "lucide-react"
 import { uploadTeamLogo } from "../../lib/supabase"
 import { useUpdateTeamSettings } from "../../lib/queries"
+import { authApi } from "../../lib/api"
 import { cn } from "../../lib/utils"
 
 export default function TeamSettings({ team }) {
@@ -12,6 +13,16 @@ export default function TeamSettings({ team }) {
   const inputRef                      = useRef(null)
   const updateSettings                = useUpdateTeamSettings()
 
+  // Password change state
+  const [currentPwd, setCurrentPwd]   = useState("")
+  const [newPwd, setNewPwd]           = useState("")
+  const [confirmPwd, setConfirmPwd]   = useState("")
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew]         = useState(false)
+  const [pwdLoading, setPwdLoading]   = useState(false)
+  const [pwdError, setPwdError]       = useState("")
+  const [pwdSuccess, setPwdSuccess]   = useState(false)
+
   // Sync when team data refreshes from server
   useEffect(() => {
     if (team?.logoUrl) setLogoPreview(team.logoUrl)
@@ -21,10 +32,8 @@ export default function TeamSettings({ team }) {
   const handleLogoFile = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     setLogoPreview(URL.createObjectURL(file))
     setLogoLoading(true)
-
     try {
       const publicUrl = await uploadTeamLogo(team.id, file)
       updateSettings.mutate({ id: team.id, logoUrl: publicUrl }, {
@@ -46,8 +55,32 @@ export default function TeamSettings({ team }) {
     })
   }
 
+  const handleChangePassword = async () => {
+    setPwdError("")
+    if (!currentPwd) return setPwdError("Enter your current password")
+    if (newPwd.length < 6) return setPwdError("New password must be at least 6 characters")
+    if (newPwd !== confirmPwd) return setPwdError("New passwords do not match")
+    if (newPwd === currentPwd) return setPwdError("New password must differ from current password")
+
+    setPwdLoading(true)
+    try {
+      await authApi.changePassword(currentPwd, newPwd)
+      setPwdSuccess(true)
+      setCurrentPwd("")
+      setNewPwd("")
+      setConfirmPwd("")
+      setTimeout(() => setPwdSuccess(false), 3000)
+    } catch (err) {
+      setPwdError(err.response?.data?.error || "Failed to change password")
+    } finally {
+      setPwdLoading(false)
+    }
+  }
+
   return (
-    <div className="max-w-lg">
+    <div className="max-w-lg space-y-4">
+
+      {/* ── Team settings card ── */}
       <div className="card overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
           <Settings className="w-4 h-4 text-accent" />
@@ -93,17 +126,11 @@ export default function TeamSettings({ team }) {
                 </button>
                 <p className="text-xs text-slate-600 mt-1">Square images work best</p>
               </div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleLogoFile}
-                className="hidden"
-              />
+              <input ref={inputRef} type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
             </div>
           </div>
 
-          {/* Name */}
+          {/* Team name */}
           <div>
             <label className="text-xs font-medium text-slate-400 mb-2 block">Team name</label>
             <div className="flex items-center gap-2">
@@ -129,6 +156,108 @@ export default function TeamSettings({ team }) {
           </div>
         </div>
       </div>
+
+      {/* ── Change password card ── */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
+          <KeyRound className="w-4 h-4 text-amber-400" />
+          <h2 className="text-base font-semibold text-white">Change password</h2>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {pwdSuccess && (
+            <div className="flex items-center gap-2 bg-emerald-400/10 border border-emerald-400/20 rounded-xl px-4 py-3">
+              <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <p className="text-sm text-emerald-400 font-semibold">Password changed successfully!</p>
+            </div>
+          )}
+
+          {pwdError && (
+            <div className="flex items-center gap-2 bg-rose-400/10 border border-rose-400/20 rounded-xl px-4 py-3">
+              <X className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <p className="text-sm text-rose-400">{pwdError}</p>
+            </div>
+          )}
+
+          {/* Current password */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Current password</label>
+            <div className="relative">
+              <input
+                type={showCurrent ? "text" : "password"}
+                value={currentPwd}
+                onChange={e => { setCurrentPwd(e.target.value); setPwdError("") }}
+                placeholder="Enter current password"
+                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 pr-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/40 transition-colors"
+              />
+              <button
+                onClick={() => setShowCurrent(s => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+              >
+                {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* New password */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">New password</label>
+            <div className="relative">
+              <input
+                type={showNew ? "text" : "password"}
+                value={newPwd}
+                onChange={e => { setNewPwd(e.target.value); setPwdError("") }}
+                placeholder="Min 6 characters"
+                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 pr-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/40 transition-colors"
+              />
+              <button
+                onClick={() => setShowNew(s => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+              >
+                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm new password */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Confirm new password</label>
+            <input
+              type="password"
+              value={confirmPwd}
+              onChange={e => { setConfirmPwd(e.target.value); setPwdError("") }}
+              onKeyDown={e => e.key === "Enter" && handleChangePassword()}
+              placeholder="Re-enter new password"
+              className={cn(
+                "w-full bg-pitch-800 border rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none transition-colors",
+                confirmPwd && newPwd && confirmPwd !== newPwd
+                  ? "border-rose-400/50 focus:border-rose-400/70"
+                  : "border-surface-border focus:border-accent/40"
+              )}
+            />
+            {confirmPwd && newPwd && confirmPwd !== newPwd && (
+              <p className="text-xs text-rose-400 mt-1">Passwords do not match</p>
+            )}
+          </div>
+
+          <button
+            onClick={handleChangePassword}
+            disabled={pwdLoading || !currentPwd || !newPwd || !confirmPwd}
+            className={cn(
+              "w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2",
+              (!currentPwd || !newPwd || !confirmPwd)
+                ? "bg-surface-border text-slate-600 cursor-not-allowed"
+                : "bg-amber-400 hover:bg-amber-300 text-pitch-900"
+            )}
+          >
+            {pwdLoading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Changing…</>
+              : <><KeyRound className="w-4 h-4" /> Change password</>
+            }
+          </button>
+        </div>
+      </div>
+
     </div>
   )
 }
