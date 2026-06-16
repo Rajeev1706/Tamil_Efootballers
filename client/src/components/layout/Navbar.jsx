@@ -20,7 +20,7 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <img src="/images/logo.png" alt="TEC Logo" className="w-14 h-14 rounded-lg object-cover" />
+          <img src="/logo.png" alt="TEC Logo" className="w-14 h-14 rounded-lg object-cover" />
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold text-white tracking-wide">Tamil</span>
             <span className="text-xs text-accent font-semibold tracking-widest uppercase">Efootballers</span>
