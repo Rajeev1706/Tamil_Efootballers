@@ -8,7 +8,7 @@ import axios from "axios"
 
 // ── Axios instance ────────────────────────────────────────────────────────────
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://https://tamil-efootballers.onrender.com/api",
+  baseURL: import.meta.env.VITE_API_URL || "https://tamil-efootballers.onrender.com/api",
   withCredentials: true,
 })
 
