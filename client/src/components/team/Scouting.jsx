@@ -1,8 +1,8 @@
 import { useState } from "react"
-import { Search, ArrowLeftRight, CheckCircle, Crown } from "lucide-react"
+import { Search, ArrowLeftRight, CheckCircle, Crown, Star } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import TradeModal from "./TradeModal"
-import { useRequestTrade } from "../../lib/queries"
+import { useRequestTrade, useFavorites, useToggleFavorite } from "../../lib/queries"
 import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["All","S","A","B","C"]
@@ -13,11 +13,20 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
   const [search, setSearch]           = useState("")
   const [tradeTarget, setTradeTarget] = useState(null)
   const [requested, setRequested]     = useState(new Set())
+  const [view, setView]               = useState("favorites") // "favorites" | "all"
 
-  const requestTrade = useRequestTrade()
+  const requestTrade   = useRequestTrade()
+  const { data: favoriteIds = [] } = useFavorites()
+  const toggleFavorite = useToggleFavorite()
+  const favoriteSet     = new Set(favoriteIds)
+
   const teams = ["All", ...new Set(allPlayers.map(p => p.team))]
 
-  const filtered = allPlayers.filter(p => {
+  const scopedPlayers = view === "favorites"
+    ? allPlayers.filter(p => favoriteSet.has(p.id))
+    : allPlayers
+
+  const filtered = scopedPlayers.filter(p => {
     const matchGrade = gradeFilter === "All" || p.grade === gradeFilter
     const matchTeam  = teamFilter  === "All" || p.team  === teamFilter
     const matchName  = p.name.toLowerCase().includes(search.toLowerCase())
@@ -41,8 +50,40 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
     )
   }
 
+  const handleToggleFavorite = (playerId, e) => {
+    e.stopPropagation()
+    toggleFavorite.mutate({ playerId, isFavorited: favoriteSet.has(playerId) })
+  }
+
   return (
     <>
+      {/* View toggle: My favorites vs All players */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          onClick={() => setView("favorites")}
+          className={cn(
+            "flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-xl border transition-all",
+            view === "favorites"
+              ? "border-amber-400/50 bg-amber-400/10 text-amber-400"
+              : "border-surface-border text-slate-400 hover:text-white hover:border-slate-500"
+          )}
+        >
+          <Star className={cn("w-3.5 h-3.5", view === "favorites" && "fill-amber-400")} />
+          My favorites {favoriteIds.length > 0 && `(${favoriteIds.length})`}
+        </button>
+        <button
+          onClick={() => setView("all")}
+          className={cn(
+            "text-sm font-semibold px-3.5 py-2 rounded-xl border transition-all",
+            view === "all"
+              ? "border-accent/50 bg-accent/10 text-accent"
+              : "border-surface-border text-slate-400 hover:text-white hover:border-slate-500"
+          )}
+        >
+          All players
+        </button>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -64,20 +105,35 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
       <p className="text-xs text-slate-600 mb-4">{filtered.length} player{filtered.length!==1?"s":""} found</p>
 
       <div className="card overflow-hidden">
-        <div className="hidden sm:grid grid-cols-[2fr_80px_2fr_100px_100px_100px_140px] px-5 py-2.5 border-b border-surface-border">
-          {["Player","Grade","Team","Auction","MV","BDR",""].map(h => (
-            <span key={h} className={cn("text-xs font-semibold text-slate-600 uppercase tracking-wide", h === "Auction" || h === "MV" || h === "BDR" ? "text-right" : "")}>{h}</span>
+        <div className="hidden sm:grid grid-cols-[32px_2fr_80px_2fr_100px_100px_100px_140px] px-5 py-2.5 border-b border-surface-border">
+          {["","Player","Grade","Team","Auction","MV","BDR",""].map((h, i) => (
+            <span key={i} className={cn("text-xs font-semibold text-slate-600 uppercase tracking-wide", h === "Auction" || h === "MV" || h === "BDR" ? "text-right" : "")}>{h}</span>
           ))}
         </div>
         <div className="divide-y divide-surface-border/60">
           {filtered.length === 0 ? (
-            <div className="px-5 py-12 text-center text-slate-500 text-sm">No players match your filters.</div>
+            <div className="px-5 py-12 text-center text-slate-500 text-sm">
+              {view === "favorites"
+                ? "No favorites yet — star players to track them here."
+                : "No players match your filters."}
+            </div>
           ) : filtered.map(player => {
             const isMyPlayer   = player.team === myTeamName
             const hasRequested = requested.has(player.id)
             const tier         = getMVTier(player.marketValue)
+            const isFavorited  = favoriteSet.has(player.id)
             return (
-              <div key={player.id} className={cn("grid grid-cols-1 sm:grid-cols-[2fr_80px_2fr_100px_100px_100px_140px] px-5 py-4 items-center transition-colors", isMyPlayer?"bg-accent/5":"hover:bg-surface-hover")}>
+              <div key={player.id} className={cn("grid grid-cols-1 sm:grid-cols-[32px_2fr_80px_2fr_100px_100px_100px_140px] px-5 py-4 items-center transition-colors", isMyPlayer?"bg-accent/5":"hover:bg-surface-hover")}>
+                <button
+                  onClick={(e) => handleToggleFavorite(player.id, e)}
+                  className="flex items-center justify-center w-6 h-6 mb-2 sm:mb-0 hover:scale-110 transition-transform"
+                  title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+                >
+                  <Star className={cn(
+                    "w-4 h-4 transition-colors",
+                    isFavorited ? "fill-amber-400 text-amber-400" : "text-slate-600 hover:text-slate-400"
+                  )} />
+                </button>
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-surface-border flex items-center justify-center text-xs font-bold text-slate-400 flex-shrink-0">
                     {player.name.split(" ").map(n=>n[0]).join("")}

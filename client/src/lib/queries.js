@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -236,3 +236,17 @@ export const useH2H = (p1Id, p2Id) =>
     queryFn:  () => lineupsApi.h2h(p1Id, p2Id),
     enabled:  !!p1Id && !!p2Id,
   })
+
+// ── Favorites hooks ───────────────────────────────────────────────────────────
+
+export const useFavorites = () =>
+  useQuery({ queryKey: ["favorites"], queryFn: favoritesApi.list })
+
+export const useToggleFavorite = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ playerId, isFavorited }) =>
+      isFavorited ? favoritesApi.remove(playerId) : favoritesApi.add(playerId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["favorites"] }),
+  })
+}

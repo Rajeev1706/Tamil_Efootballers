@@ -28,8 +28,6 @@ export const authApi = {
     api.post("/auth/login", { email, password }).then(r => r.data),
   me: () =>
     api.get("/auth/me").then(r => r.data),
-  changePassword: (currentPassword, newPassword) =>
-    api.post("/auth/change-password", { currentPassword, newPassword }).then(r => r.data),
 }
 
 export const teamsApi = {
@@ -58,26 +56,30 @@ export const recordsApi = {
 }
 
 export const fixturesApi = {
-  list:       (params)                   => api.get("/fixtures", { params }).then(r => r.data),
-  recent:     ()                         => api.get("/fixtures/recent").then(r => r.data),
-  create:     (body)                     => api.post("/fixtures", body).then(r => r.data),
-  update:     (id, body)                 => api.patch(`/fixtures/${id}`, body).then(r => r.data),
-  delete:     (id)                       => api.delete(`/fixtures/${id}`).then(r => r.data),
+  list:       (params)                  => api.get("/fixtures", { params }).then(r => r.data),
+  recent:     ()                        => api.get("/fixtures/recent").then(r => r.data),
+  create:     (body)                    => api.post("/fixtures", body).then(r => r.data),
   saveResult: (id, homeScore, awayScore) =>
     api.patch(`/fixtures/${id}/result`, { homeScore, awayScore }).then(r => r.data),
 }
 
 export const tradesApi = {
-  list:    (params)              => api.get("/trades", { params }).then(r => r.data),
-  request: (playerId, toTeamId)  =>
+  list:    (params)             => api.get("/trades", { params }).then(r => r.data),
+  request: (playerId, toTeamId) =>
     api.post("/trades", { playerId, toTeamId }).then(r => r.data),
-  review:  (id, action)          => api.patch(`/trades/${id}/review`, { action }).then(r => r.data),
-  cancel:  (id)                  => api.patch(`/trades/${id}/cancel`).then(r => r.data),
+  review:  (id, action)         => api.patch(`/trades/${id}/review`, { action }).then(r => r.data),
+  cancel:  (id)                 => api.patch(`/trades/${id}/cancel`).then(r => r.data),
 }
 
 export const lineupsApi = {
-  get:    (fixtureId)            => api.get(`/lineups/${fixtureId}`).then(r => r.data),
-  save:   (fixtureId, matchups)  => api.put(`/lineups/${fixtureId}`, { matchups }).then(r => r.data),
-  delete: (fixtureId)            => api.delete(`/lineups/${fixtureId}`).then(r => r.data),
-  h2h:    (p1Id, p2Id)           => api.get(`/lineups/h2h/${p1Id}/${p2Id}`).then(r => r.data),
+  get:    (fixtureId)           => api.get(`/lineups/${fixtureId}`).then(r => r.data),
+  save:   (fixtureId, matchups) => api.put(`/lineups/${fixtureId}`, { matchups }).then(r => r.data),
+  delete: (fixtureId)           => api.delete(`/lineups/${fixtureId}`).then(r => r.data),
+  h2h:    (p1Id, p2Id)          => api.get(`/lineups/h2h/${p1Id}/${p2Id}`).then(r => r.data),
+}
+
+export const favoritesApi = {
+  list:   ()         => api.get("/favorites").then(r => r.data),
+  add:    (playerId) => api.post(`/favorites/${playerId}`).then(r => r.data),
+  remove: (playerId) => api.delete(`/favorites/${playerId}`).then(r => r.data),
 }
