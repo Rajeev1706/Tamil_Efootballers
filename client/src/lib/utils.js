@@ -14,7 +14,7 @@ export function formatMV(value) {
 }
 
 export function calcMV(record, bdrPoints = 0) {
-  const WIN_W  = { S: 1.0,  A: 0.65, B: 0.49,  C: 0.39 }
+  const WIN_W  = { S: 1.32, A: 0.86, B: 0.65,  C: 0.52 }
   const DRAW_W = { S: 0.75, A: 0.50, B: 0.375, C: 0.30 }
   const LOSS_W = { S: -0.5, A: -0.7, B: -0.85, C: -1.0 }
   const grades = ["S", "A", "B", "C"]
