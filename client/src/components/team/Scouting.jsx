@@ -134,18 +134,21 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
                     isFavorited ? "fill-amber-400 text-amber-400" : "text-slate-600 hover:text-slate-400"
                   )} />
                 </button>
-                <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => onPlayerClick?.(player)}
+                  className="flex items-center gap-2.5 text-left hover:opacity-80 transition-opacity"
+                >
                   <div className="w-8 h-8 rounded-lg bg-surface-border flex items-center justify-center text-xs font-bold text-slate-400 flex-shrink-0">
                     {player.name.split(" ").map(n=>n[0]).join("")}
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => onPlayerClick?.(player)} className="text-sm font-medium text-white hover:text-accent transition-colors text-left">{player.name}</button>
+                      <span className="text-sm font-medium text-white hover:text-accent transition-colors">{player.name}</span>
                       {player.isCaptain && <Crown className="w-3 h-3 text-gold flex-shrink-0" />}
                     </div>
                     <p className="text-xs text-slate-600 sm:hidden">{player.team}</p>
                   </div>
-                </div>
+                </button>
                 <div><GradeBadge grade={player.grade} /></div>
                 <p className="hidden sm:block text-sm text-slate-400 truncate">{player.team}</p>
                 <p className={cn("text-sm font-mono text-right", player.isCaptain ? "font-bold text-gold" : "text-slate-400")}>
