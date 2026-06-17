@@ -2,7 +2,6 @@ import { cn } from "../../lib/utils"
 
 const gradeConfig = {
   S:   { bg: "bg-amber-400/15",   text: "text-amber-400",   border: "border-amber-400/30",   label: "S"  },
-  "A+":{ bg: "bg-violet-400/15",  text: "text-violet-400",  border: "border-violet-400/30",  label: "A+" },
   A:   { bg: "bg-blue-400/15",    text: "text-blue-400",    border: "border-blue-400/30",    label: "A"  },
   B:   { bg: "bg-emerald-400/15", text: "text-emerald-400", border: "border-emerald-400/30", label: "B"  },
   C:   { bg: "bg-slate-500/20",   text: "text-slate-400",   border: "border-slate-500/30",   label: "C"  },

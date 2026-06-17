@@ -2,7 +2,6 @@ import { cn } from "../../lib/utils"
 
 const gradeColors = {
   S:   "bg-gold/20 text-gold border-gold/40",
-  "A+":"bg-violet-400/20 text-violet-400 border-violet-400/40",
   A:   "bg-blue-400/20 text-blue-400 border-blue-400/40",
   B:   "bg-emerald-400/20 text-emerald-400 border-emerald-400/40",
   C:   "bg-slate-500/20 text-slate-400 border-slate-500/40",

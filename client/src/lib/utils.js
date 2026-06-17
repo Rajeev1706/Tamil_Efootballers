@@ -14,10 +14,10 @@ export function formatMV(value) {
 }
 
 export function calcMV(record) {
-  const WIN_W  = { S: 1.5, "A+": 1.2, A: 0.9, B: 0.7, C: 0.6 }
-  const DRAW_W = { S: 0.75, "A+": 0.60, A: 0.45, B: 0.35, C: 0.30 }
-  const LOSS_W = { S: -0.5, "A+": -0.6, A: -0.7, B: -0.8, C: -1.0 }
-  const grades = ["S", "A+", "A", "B", "C"]
+  const WIN_W  = { S: 1.5,  A: 1.0,  B: 0.75,  C: 0.6 }
+  const DRAW_W = { S: 0.75, A: 0.50, B: 0.375, C: 0.30 }
+  const LOSS_W = { S: -0.5, A: -0.7, B: -0.85, C: -1.0 }
+  const grades = ["S", "A", "B", "C"]
 
   let ewRaw = 0
   grades.forEach((g) => {

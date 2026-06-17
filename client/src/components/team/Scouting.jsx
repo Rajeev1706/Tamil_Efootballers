@@ -5,7 +5,7 @@ import TradeModal from "./TradeModal"
 import { useRequestTrade } from "../../lib/queries"
 import { getMVTier, cn } from "../../lib/utils"
 
-const GRADES = ["All","S","A+","A","B","C"]
+const GRADES = ["All","S","A","B","C"]
 
 export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTradeSuccess }) {
   const [gradeFilter, setGradeFilter] = useState("All")

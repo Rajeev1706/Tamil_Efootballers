@@ -6,7 +6,7 @@ import ImageUpload from "./ImageUpload"
 import { useUpdatePlayer, useDeletePlayer, useTeams } from "../../lib/queries"
 import { getMVTier, cn } from "../../lib/utils"
 
-const GRADES = ["S","A+","A","B","C"]
+const GRADES = ["S","A","B","C"]
 
 function EditableRow({ player, onPlayerClick }) {
   const [editing, setEditing]       = useState(false)
@@ -269,7 +269,7 @@ export default function PlayerManagement({ players, onPlayerClick }) {
           onChange={e => setGradeFilter(e.target.value)}
           className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
         >
-          {["All","S","A+","A","B","C"].map(g => <option key={g}>{g}</option>)}
+          {["All","S","A","B","C"].map(g => <option key={g}>{g}</option>)}
         </select>
         <select
           value={teamFilter}

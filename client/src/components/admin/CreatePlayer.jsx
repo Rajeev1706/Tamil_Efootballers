@@ -5,7 +5,7 @@ import { uploadPlayerImage } from "../../lib/supabase"
 import GradeBadge from "../common/GradeBadge"
 import { cn } from "../../lib/utils"
 
-const GRADES = ["S", "A+", "A", "B", "C"]
+const GRADES = ["S", "A", "B", "C"]
 
 export default function CreatePlayer({ onSuccess }) {
   const [name, setName]               = useState("")
