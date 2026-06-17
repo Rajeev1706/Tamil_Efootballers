@@ -17,6 +17,7 @@ export default function CreatePlayer({ onSuccess }) {
   const [trophy1, setTrophy1]           = useState("")
   const [trophy2, setTrophy2]           = useState("")
   const [trophy3, setTrophy3]           = useState("")
+  const [trophy4, setTrophy4]           = useState("")
   const [imageFile, setImageFile]       = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [done, setDone]                 = useState(null)
@@ -48,6 +49,7 @@ export default function CreatePlayer({ onSuccess }) {
         trophy1Count: parseInt(trophy1) || 0,
         trophy2Count: parseInt(trophy2) || 0,
         trophy3Count: parseInt(trophy3) || 0,
+        trophy4Count: parseInt(trophy4) || 0,
       },
       {
         onSuccess: async (data) => {
@@ -63,7 +65,7 @@ export default function CreatePlayer({ onSuccess }) {
           setName(""); setAlias(""); setTeamId(""); setGrade("B")
           setIsCaptain(false)
           setAuctionPrice("")
-          setTrophy1(""); setTrophy2(""); setTrophy3("")
+          setTrophy1(""); setTrophy2(""); setTrophy3(""); setTrophy4("")
           setImageFile(null); setImagePreview(null)
           onSuccess?.()
         },
@@ -223,10 +225,11 @@ export default function CreatePlayer({ onSuccess }) {
             <Trophy className="w-3.5 h-3.5 text-gold" />
             Trophies <span className="text-slate-600">(optional)</span>
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
               { label: "Ballon d'Or", value: trophy1, onChange: setTrophy1 },
               { label: "Team League", value: trophy2, onChange: setTrophy2 },
+              { label: "UCL",         value: trophy4, onChange: setTrophy4 },
               { label: "Weekly",      value: trophy3, onChange: setTrophy3 },
             ].map(t => (
               <div key={t.label}>
