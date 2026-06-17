@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
-import { ArrowLeft, Trophy, Swords, ImageIcon } from "lucide-react"
+import { ArrowLeft, Trophy, Swords, ImageIcon, Crown } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import { usePlayer } from "../lib/queries"
@@ -234,7 +234,7 @@ export default function PlayerProfile() {
     </Layout>
   )
 
-  const delta = player.marketValue - player.auctionPrice
+  const delta = player.isCaptain ? 0 : player.marketValue - player.auctionPrice
 
   const allHistory = player.matchHistory || []
 
@@ -268,7 +268,10 @@ export default function PlayerProfile() {
         <div className="relative px-6 py-8 sm:px-10">
           <div className="flex flex-col sm:flex-row sm:items-center gap-6">
             <div>
-              <h1 className="text-2xl font-extrabold text-white mb-1">{player.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-extrabold text-white mb-1">{player.name}</h1>
+                {player.isCaptain && <Crown className="w-5 h-5 text-gold flex-shrink-0" />}
+              </div>
               {player.alias && (
                 <p className="text-slate-400 text-sm mb-1">"{player.alias}"</p>
               )}
@@ -289,7 +292,11 @@ export default function PlayerProfile() {
 
           <div className="grid grid-cols-3 gap-3 mt-6">
             {[
-              { label: "Auction price", value: player.auctionPrice },
+              {
+                label: "Auction price",
+                value: player.isCaptain ? "CAP" : player.auctionPrice,
+                cls: player.isCaptain ? "text-gold" : undefined,
+              },
               {
                 label: "Market value",
                 value: player.marketValue,
@@ -304,7 +311,7 @@ export default function PlayerProfile() {
             ))}
           </div>
 
-{showAuctionDelta && (
+{showAuctionDelta && !player.isCaptain && (
             <div className="flex items-center gap-3 mt-4">
               <span className={cn(
                 "text-sm font-semibold font-mono px-3 py-1 rounded-lg border",
@@ -313,6 +320,13 @@ export default function PlayerProfile() {
                 : "text-slate-400 bg-surface-border border-surface-border"
               )}>
                 {delta > 0 ? "+" : ""}{delta} from auction
+              </span>
+            </div>
+          )}
+          {player.isCaptain && (
+            <div className="flex items-center gap-2 mt-4">
+              <span className="text-sm font-semibold font-mono px-3 py-1 rounded-lg border text-gold bg-gold/10 border-gold/25 flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5" /> Team captain
               </span>
             </div>
           )}

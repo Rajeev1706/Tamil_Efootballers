@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { User, CheckCircle, Camera } from "lucide-react"
+import { User, CheckCircle, Camera, Crown } from "lucide-react"
 import { useCreatePlayer, useTeams, useUpdatePlayer } from "../../lib/queries"
 import { uploadPlayerImage } from "../../lib/supabase"
 import GradeBadge from "../common/GradeBadge"
@@ -8,20 +8,21 @@ import { cn } from "../../lib/utils"
 const GRADES = ["S", "A", "B", "C"]
 
 export default function CreatePlayer({ onSuccess }) {
-  const [name, setName]               = useState("")
-  const [alias, setAlias]             = useState("")
-  const [teamId, setTeamId]           = useState("")
-  const [grade, setGrade]             = useState("B")
+  const [name, setName]                 = useState("")
+  const [alias, setAlias]               = useState("")
+  const [teamId, setTeamId]             = useState("")
+  const [grade, setGrade]               = useState("B")
+  const [isCaptain, setIsCaptain]       = useState(false)
   const [auctionPrice, setAuctionPrice] = useState("")
-  const [imageFile, setImageFile]     = useState(null)
+  const [imageFile, setImageFile]       = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
-  const [done, setDone]               = useState(null)
+  const [done, setDone]                 = useState(null)
 
   const { data: teams = [] } = useTeams()
   const createPlayer         = useCreatePlayer()
   const updatePlayer         = useUpdatePlayer()
 
-  const canSubmit = name && teamId && grade && auctionPrice
+  const canSubmit = name && teamId && grade && (isCaptain || auctionPrice)
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0]
@@ -39,11 +40,11 @@ export default function CreatePlayer({ onSuccess }) {
         alias: alias || undefined,
         teamId: parseInt(teamId),
         grade,
-        auctionPrice: parseInt(auctionPrice),
+        isCaptain,
+        auctionPrice: isCaptain ? undefined : parseInt(auctionPrice),
       },
       {
         onSuccess: async (data) => {
-          // Upload image if selected
           if (imageFile) {
             try {
               const publicUrl = await uploadPlayerImage(data.id, imageFile)
@@ -54,6 +55,7 @@ export default function CreatePlayer({ onSuccess }) {
           }
           setDone(data)
           setName(""); setAlias(""); setTeamId(""); setGrade("B")
+          setIsCaptain(false)
           setAuctionPrice(""); setImageFile(null); setImagePreview(null)
           onSuccess?.()
         },
@@ -87,10 +89,10 @@ export default function CreatePlayer({ onSuccess }) {
           Squad image <span className="text-slate-600">(optional)</span>
         </label>
         <div className="flex items-center gap-4">
-<label className={cn(
-  "w-56 aspect-[20/9] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden",
-  imagePreview ? "border-accent/30" : "border-surface-border hover:border-accent/40"
-)}>
+          <label className={cn(
+            "w-56 aspect-[20/9] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group overflow-hidden",
+            imagePreview ? "border-accent/30" : "border-surface-border hover:border-accent/40"
+          )}>
             {imagePreview ? (
               <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
             ) : (
@@ -141,6 +143,35 @@ export default function CreatePlayer({ onSuccess }) {
           </select>
         </div>
 
+        {/* Captain toggle */}
+        <div className="col-span-2">
+          <button
+            type="button"
+            onClick={() => setIsCaptain(c => !c)}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left",
+              isCaptain
+                ? "border-gold/50 bg-gold/10"
+                : "border-surface-border hover:border-slate-500"
+            )}
+          >
+            <div className={cn(
+              "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all",
+              isCaptain ? "bg-gold border-gold" : "border-slate-500"
+            )}>
+              {isCaptain && <Crown className="w-3 h-3 text-pitch-900" />}
+            </div>
+            <div>
+              <p className={cn("text-sm font-semibold", isCaptain ? "text-gold" : "text-white")}>
+                This player is the team captain
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Captains have no auction price — shown as "CAP" everywhere instead
+              </p>
+            </div>
+          </button>
+        </div>
+
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1.5 block">Grade</label>
           <div className="flex gap-1.5 flex-wrap">
@@ -160,12 +191,22 @@ export default function CreatePlayer({ onSuccess }) {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-400 mb-1.5 block">Auction price</label>
-          <input type="number" min="0" value={auctionPrice}
+          <label className="text-xs font-medium text-slate-400 mb-1.5 block">
+            Auction price
+            {isCaptain && <span className="text-gold ml-1">(N/A — captain)</span>}
+          </label>
+          <input
+            type="number" min="0"
+            value={isCaptain ? "" : auctionPrice}
             onChange={e => setAuctionPrice(e.target.value)}
-            placeholder="e.g. 150"
-            className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/40 transition-colors font-mono" />
-          <p className="text-xs text-slate-600 mt-1">auction points</p>
+            disabled={isCaptain}
+            placeholder={isCaptain ? "CAP" : "e.g. 150"}
+            className={cn(
+              "w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm placeholder-slate-600 focus:outline-none focus:border-accent/40 transition-colors font-mono",
+              isCaptain ? "text-gold opacity-60 cursor-not-allowed" : "text-white"
+            )}
+          />
+          <p className="text-xs text-slate-600 mt-1">{isCaptain ? "captains skip auction" : "auction points"}</p>
         </div>
       </div>
 

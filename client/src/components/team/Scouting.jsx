@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, ArrowLeftRight, CheckCircle } from "lucide-react"
+import { Search, ArrowLeftRight, CheckCircle, Crown } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import TradeModal from "./TradeModal"
 import { useRequestTrade } from "../../lib/queries"
@@ -83,13 +83,18 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
                     {player.name.split(" ").map(n=>n[0]).join("")}
                   </div>
                   <div>
-                    <button onClick={() => onPlayerClick?.(player)} className="text-sm font-medium text-white hover:text-accent transition-colors text-left">{player.name}</button>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => onPlayerClick?.(player)} className="text-sm font-medium text-white hover:text-accent transition-colors text-left">{player.name}</button>
+                      {player.isCaptain && <Crown className="w-3 h-3 text-gold flex-shrink-0" />}
+                    </div>
                     <p className="text-xs text-slate-600 sm:hidden">{player.team}</p>
                   </div>
                 </div>
                 <div><GradeBadge grade={player.grade} /></div>
                 <p className="hidden sm:block text-sm text-slate-400 truncate">{player.team}</p>
-                <p className="text-sm font-mono text-slate-400 text-right">{player.auctionPrice}</p>
+                <p className={cn("text-sm font-mono text-right", player.isCaptain ? "font-bold text-gold" : "text-slate-400")}>
+                  {player.isCaptain ? "CAP" : player.auctionPrice}
+                </p>
                 <div className="text-right">
                   <p className="text-sm font-bold font-mono text-white">{player.marketValue}</p>
                   <p className={cn("text-xs", tier.color)}>{tier.label}</p>

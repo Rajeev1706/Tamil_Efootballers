@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Pencil, Check, X, Trash2, Camera, Trophy, Search } from "lucide-react"
+import { Pencil, Check, X, Trash2, Camera, Trophy, Search, Crown } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
@@ -9,26 +9,32 @@ import { getMVTier, cn } from "../../lib/utils"
 const GRADES = ["S","A","B","C"]
 
 function EditableRow({ player, onPlayerClick }) {
-  const [editing, setEditing]       = useState(false)
-  const [grade, setGrade]           = useState(player.grade)
-  const [teamId, setTeamId]         = useState(player.teamId ?? "")
-  const [bdrDelta, setBdrDelta]     = useState("")
-  const [trophy1, setTrophy1]       = useState(player.trophy1Count ?? 0)
-  const [trophy2, setTrophy2]       = useState(player.trophy2Count ?? 0)
-  const [trophy3, setTrophy3]       = useState(player.trophy3Count ?? 0)
-  const [confirmDel, setConfirmDel] = useState(false)
-  const updatePlayer                = useUpdatePlayer()
-  const deletePlayer                = useDeletePlayer()
-  const { data: teams = [] }        = useTeams()
-  const tier                        = getMVTier(player.marketValue)
-  const deltaNum                    = parseInt(bdrDelta) || 0
+  const [editing, setEditing]         = useState(false)
+  const [grade, setGrade]             = useState(player.grade)
+  const [teamId, setTeamId]           = useState(player.teamId ?? "")
+  const [bdrDelta, setBdrDelta]       = useState("")
+  const [isCaptain, setIsCaptain]     = useState(player.isCaptain ?? false)
+  const [auctionPrice, setAuctionPrice] = useState(player.auctionPrice ?? "")
+  const [trophy1, setTrophy1]         = useState(player.trophy1Count ?? 0)
+  const [trophy2, setTrophy2]         = useState(player.trophy2Count ?? 0)
+  const [trophy3, setTrophy3]         = useState(player.trophy3Count ?? 0)
+  const [confirmDel, setConfirmDel]   = useState(false)
+  const updatePlayer                  = useUpdatePlayer()
+  const deletePlayer                  = useDeletePlayer()
+  const { data: teams = [] }          = useTeams()
+  const tier                          = getMVTier(player.marketValue)
+  const deltaNum                      = parseInt(bdrDelta) || 0
 
   const handleSave = () => {
     const body = {}
-    if (grade  !== player.grade)              body.grade      = grade
-    if (bdrDelta !== "")                      body.bdrDelta   = deltaNum
+    if (grade !== player.grade) body.grade = grade
+    if (bdrDelta !== "") body.bdrDelta = deltaNum
     if (teamId !== String(player.teamId ?? "")) {
       body.teamId = teamId === "" ? null : parseInt(teamId)
+    }
+    if (isCaptain !== (player.isCaptain ?? false)) body.isCaptain = isCaptain
+    if (!isCaptain && parseInt(auctionPrice) !== player.auctionPrice) {
+      body.auctionPrice = parseInt(auctionPrice) || 0
     }
     if (trophy1 !== (player.trophy1Count ?? 0)) body.trophy1Count = trophy1
     if (trophy2 !== (player.trophy2Count ?? 0)) body.trophy2Count = trophy2
@@ -45,6 +51,8 @@ function EditableRow({ player, onPlayerClick }) {
     setBdrDelta("")
     setGrade(player.grade)
     setTeamId(player.teamId ?? "")
+    setIsCaptain(player.isCaptain ?? false)
+    setAuctionPrice(player.auctionPrice ?? "")
     setTrophy1(player.trophy1Count ?? 0)
     setTrophy2(player.trophy2Count ?? 0)
     setTrophy3(player.trophy3Count ?? 0)
@@ -90,12 +98,16 @@ function EditableRow({ player, onPlayerClick }) {
           <div className="flex items-center gap-3">
             <PlayerAvatar player={player} size="sm" />
             <div>
-              <button
-                onClick={() => onPlayerClick?.(player)}
-                className="text-sm font-medium text-white hover:text-accent transition-colors text-left">
-                {player.name}
-              </button>
-              {/* Team shown */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => onPlayerClick?.(player)}
+                  className="text-sm font-medium text-white hover:text-accent transition-colors text-left">
+                  {player.name}
+                </button>
+                {player.isCaptain && !editing && (
+                  <Crown className="w-3.5 h-3.5 text-gold flex-shrink-0" title="Captain" />
+                )}
+              </div>
               {editing ? (
                 <select
                   value={teamId}
@@ -127,8 +139,33 @@ function EditableRow({ player, onPlayerClick }) {
         </td>
 
         {/* Auction */}
-        <td className="py-3.5 px-4 text-center font-mono text-sm text-slate-400">
-          {player.auctionPrice}
+        <td className="py-3.5 px-4 text-center">
+          {editing ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                onClick={() => setIsCaptain(c => !c)}
+                className={cn(
+                  "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg border transition-all",
+                  isCaptain ? "bg-gold/15 border-gold/40 text-gold" : "border-surface-border text-slate-500 hover:text-slate-300"
+                )}
+              >
+                <Crown className="w-3 h-3" /> Captain
+              </button>
+              {!isCaptain && (
+                <input
+                  type="number" min="0" value={auctionPrice}
+                  onChange={e => setAuctionPrice(e.target.value)}
+                  className="w-20 bg-pitch-900 border border-surface-border rounded-lg px-2 py-1 text-sm text-white font-mono text-center focus:outline-none focus:border-accent/40"
+                />
+              )}
+            </div>
+          ) : player.isCaptain ? (
+            <span className="text-xs font-bold text-gold bg-gold/10 border border-gold/30 px-2 py-1 rounded-lg">
+              CAP
+            </span>
+          ) : (
+            <span className="font-mono text-sm text-slate-400">{player.auctionPrice}</span>
+          )}
         </td>
 
         {/* MV */}

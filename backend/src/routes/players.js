@@ -49,7 +49,7 @@ router.get("/:id", async (req, res, next) => {
       ORDER BY mr.recorded_at DESC, mr.id DESC
     `, [req.params.id])
 
-    const grades = ["S","A+","A","B","C"]
+    const grades = ["S","A","B","C"]
     const record = {
       wins:   Object.fromEntries(grades.map(g => [g, 0])),
       draws:  Object.fromEntries(grades.map(g => [g, 0])),
@@ -69,23 +69,33 @@ const createSchema = z.object({
   name:         z.string().min(1),
   alias:        z.string().optional(),
   teamId:       z.number().int().positive(),
-  grade:        z.enum(["S","A+","A","B","C"]),
-  auctionPrice: z.number().int().min(0),
+  grade:        z.enum(["S","A","B","C"]),
+  isCaptain:    z.boolean().optional().default(false),
+  auctionPrice: z.number().int().min(0).optional(),
+}).refine(d => d.isCaptain || d.auctionPrice !== undefined, {
+  message: "Auction price is required unless the player is a captain",
+  path: ["auctionPrice"],
 })
 
 router.post("/", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { name, alias, teamId, grade, auctionPrice } = createSchema.parse(req.body)
+    const { name, alias, teamId, grade, isCaptain, auctionPrice } = createSchema.parse(req.body)
+
+    // Captains have no auction price — stored as 0, MV starts at 0 too (built up by matches/BDR)
+    const finalAuctionPrice = isCaptain ? 0 : auctionPrice
+    const finalMarketValue  = isCaptain ? 50 : auctionPrice
+
     const result = await query(`
-      INSERT INTO players (name, alias, team_id, grade, auction_price, market_value)
-      VALUES ($1, $2, $3, $4, $5, $5)
+      INSERT INTO players (name, alias, team_id, grade, is_captain, auction_price, market_value)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id, name, alias, grade,
                 image_url     AS "imageUrl",
+                is_captain    AS "isCaptain",
                 auction_price AS "auctionPrice",
                 market_value  AS "marketValue",
                 bdr_points    AS "bdrPoints",
                 team_id       AS "teamId"
-    `, [name, alias || null, teamId, grade, auctionPrice])
+    `, [name, alias || null, teamId, grade, isCaptain, finalAuctionPrice, finalMarketValue])
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
 })
@@ -94,8 +104,9 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 const updateSchema = z.object({
   name:          z.string().min(1).optional(),
   alias:         z.string().optional(),
-  grade:         z.enum(["S","A+","A","B","C"]).optional(),
+  grade:         z.enum(["S","A","B","C"]).optional(),
   bdrDelta:      z.number().int().optional(),
+  isCaptain:     z.boolean().optional(),
   auctionPrice:  z.number().int().min(0).optional(),
   teamId:        z.number().int().positive().optional().nullable(),
   imageUrl:      z.string().url().optional().nullable(),
@@ -109,7 +120,7 @@ const updateSchema = z.object({
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      name, alias, grade, bdrDelta, auctionPrice, teamId, imageUrl,
+      name, alias, grade, bdrDelta, isCaptain, auctionPrice, teamId, imageUrl,
       trophy1Count, trophy2Count, trophy3Count,
     } = updateSchema.parse(req.body)
 
@@ -117,21 +128,27 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
     const teamIdProvided = "teamId" in req.body
     const teamIdValue    = teamIdProvided ? (teamId ?? null) : undefined
 
+    // If becoming captain, auction price resets to 0
+    const isCaptainProvided  = "isCaptain" in req.body
+    const auctionPriceValue  = isCaptainProvided && isCaptain ? 0 : (auctionPrice ?? null)
+
     const result = await query(`
       UPDATE players SET
         name          = COALESCE($1, name),
         alias         = COALESCE($2, alias),
         grade         = COALESCE($3, grade),
         bdr_points    = GREATEST(0, bdr_points + COALESCE($4, 0)),
-        auction_price = COALESCE($5, auction_price),
-        team_id       = CASE WHEN $12 THEN $6 ELSE team_id END,
-        image_url     = COALESCE($7, image_url),
-        trophy1_count = COALESCE($8, trophy1_count),
-        trophy2_count = COALESCE($9, trophy2_count),
-        trophy3_count = COALESCE($10, trophy3_count)
-      WHERE id = $11
+        is_captain    = COALESCE($5, is_captain),
+        auction_price = COALESCE($6, auction_price),
+        team_id       = CASE WHEN $13 THEN $7 ELSE team_id END,
+        image_url     = COALESCE($8, image_url),
+        trophy1_count = COALESCE($9, trophy1_count),
+        trophy2_count = COALESCE($10, trophy2_count),
+        trophy3_count = COALESCE($11, trophy3_count)
+      WHERE id = $12
       RETURNING id, name, alias, grade,
                 image_url     AS "imageUrl",
+                is_captain    AS "isCaptain",
                 bdr_points    AS "bdrPoints",
                 market_value  AS "marketValue",
                 auction_price AS "auctionPrice",
@@ -141,7 +158,8 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
                 trophy3_count AS "trophy3Count"
     `, [
       name ?? null, alias ?? null, grade ?? null,
-      bdrDelta ?? null, auctionPrice ?? null, teamIdValue ?? null,
+      bdrDelta ?? null, isCaptain ?? null, auctionPriceValue,
+      teamIdValue ?? null,
       imageUrl ?? null,
       trophy1Count ?? null, trophy2Count ?? null, trophy3Count ?? null,
       req.params.id,

@@ -1,3 +1,4 @@
+import { Crown } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import { getMVTier, cn } from "../../lib/utils"
 import PlayerAvatar from "../common/PlayerAvatar"
@@ -8,7 +9,7 @@ const FormDot = ({ result }) => {
 }
 
 function PlayerCard({ player, onPlayerClick }) {
-  const delta    = player.marketValue - player.auctionPrice
+  const delta    = player.isCaptain ? 0 : player.marketValue - player.auctionPrice
   const tier     = getMVTier(player.marketValue)
   const isElite  = player.grade === "S"
 
@@ -22,7 +23,10 @@ function PlayerCard({ player, onPlayerClick }) {
         <div className="flex items-center gap-3">
           <PlayerAvatar player={player} size="md" />
           <div>
-            <p className="font-semibold text-white text-sm leading-tight">{player.name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-white text-sm leading-tight">{player.name}</p>
+              {player.isCaptain && <Crown className="w-3.5 h-3.5 text-gold flex-shrink-0" />}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">"{player.alias}"</p>
           </div>
         </div>
@@ -31,7 +35,12 @@ function PlayerCard({ player, onPlayerClick }) {
 
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-2">
-        <StatCell label="Auction" value={player.auctionPrice} mono />
+        <StatCell
+          label="Auction"
+          value={player.isCaptain ? "CAP" : player.auctionPrice}
+          mono
+          valueClass={player.isCaptain ? "text-gold" : undefined}
+        />
         <StatCell
           label="Market val"
           value={player.marketValue}
@@ -43,12 +52,16 @@ function PlayerCard({ player, onPlayerClick }) {
 
       {/* Delta + tier */}
       <div className="flex items-center justify-between pt-1 border-t border-surface-border">
-        <span className={cn(
-          "text-xs font-semibold font-mono",
-          delta > 0 ? "text-emerald-400" : delta < 0 ? "text-rose-400" : "text-slate-500"
-        )}>
-          {delta > 0 ? `+${delta}` : delta} from auction
-        </span>
+        {player.isCaptain ? (
+          <span className="text-xs font-semibold text-gold">Team captain</span>
+        ) : (
+          <span className={cn(
+            "text-xs font-semibold font-mono",
+            delta > 0 ? "text-emerald-400" : delta < 0 ? "text-rose-400" : "text-slate-500"
+          )}>
+            {delta > 0 ? `+${delta}` : delta} from auction
+          </span>
+        )}
         <span className={cn("text-xs font-semibold", tier.color)}>{tier.label}</span>
       </div>
 
