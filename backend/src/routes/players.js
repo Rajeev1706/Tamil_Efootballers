@@ -68,7 +68,7 @@ router.get("/:id", async (req, res, next) => {
 const createSchema = z.object({
   name:         z.string().min(1),
   alias:        z.string().optional(),
-  teamId:       z.number().int().positive(),
+  teamId:       z.number().int().positive().optional(),
   grade:        z.enum(["S","A","B","C"]),
   isCaptain:    z.boolean().optional().default(false),
   auctionPrice: z.number().int().min(0).optional(),
@@ -81,9 +81,9 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { name, alias, teamId, grade, isCaptain, auctionPrice } = createSchema.parse(req.body)
 
-    // Captains have no auction price — stored as 0, MV starts at 0 too (built up by matches/BDR)
+    // Captains have no auction price — stored as 0, MV starts at 300 (built up/down by matches/BDR after)
     const finalAuctionPrice = isCaptain ? 0 : auctionPrice
-    const finalMarketValue  = isCaptain ? 50 : auctionPrice
+    const finalMarketValue  = isCaptain ? 300 : auctionPrice
 
     const result = await query(`
       INSERT INTO players (name, alias, team_id, grade, is_captain, auction_price, market_value)
@@ -95,7 +95,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
                 market_value  AS "marketValue",
                 bdr_points    AS "bdrPoints",
                 team_id       AS "teamId"
-    `, [name, alias || null, teamId, grade, isCaptain, finalAuctionPrice, finalMarketValue])
+    `, [name, alias || null, teamId ?? null, grade, isCaptain, finalAuctionPrice, finalMarketValue])
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
 })
