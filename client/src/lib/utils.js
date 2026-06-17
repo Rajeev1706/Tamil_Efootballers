@@ -13,8 +13,8 @@ export function formatMV(value) {
   return value.toLocaleString()
 }
 
-export function calcMV(record) {
-  const WIN_W  = { S: 1.5,  A: 1.0,  B: 0.75,  C: 0.6 }
+export function calcMV(record, bdrPoints = 0) {
+  const WIN_W  = { S: 1.0,  A: 0.65, B: 0.49,  C: 0.39 }
   const DRAW_W = { S: 0.75, A: 0.50, B: 0.375, C: 0.30 }
   const LOSS_W = { S: -0.5, A: -0.7, B: -0.85, C: -1.0 }
   const grades = ["S", "A", "B", "C"]
@@ -26,10 +26,22 @@ export function calcMV(record) {
     ewRaw += (record.losses?.[g] || 0) * LOSS_W[g]
   })
 
-  const ew     = Math.min(ewRaw, 14)
+  // EW clipped to [0, 14] — negative EW (net losses) clips to 0, never penalizes below base
+  const ew     = Math.min(Math.max(ewRaw, 0), 14)
   const pp     = ew * 3
-  const winPct = Math.max(ew / 14, 0)
-  const mvRaw  = pp * 5 + winPct * 140
+  const winPct = ew / 14
+
+  // Match swing — max 264 at EW=14
+  const matchSwing = Math.max(0, pp * 5 + winPct * 54)
+
+  // BDR swing — max 36, only counts if player has actually played
+  let bdrSwing = 0
+  if (ewRaw > 0) {
+    bdrSwing = (Math.min(bdrPoints, 120) / 120) * 36
+  }
+
+  // Fixed base of 50 PLUS swing — never subtracted below 50
+  const mvRaw = 50 + matchSwing + bdrSwing
   return Math.max(50, roundTo5(mvRaw))
 }
 
