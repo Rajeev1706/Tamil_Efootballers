@@ -66,12 +66,15 @@ router.get("/:id", async (req, res, next) => {
 
 // POST /api/players — admin creates player
 const createSchema = z.object({
-  name:         z.string().min(1),
-  alias:        z.string().optional(),
-  teamId:       z.number().int().positive().optional(),
-  grade:        z.enum(["S","A","B","C"]),
-  isCaptain:    z.boolean().optional().default(false),
-  auctionPrice: z.number().int().min(0).optional(),
+  name:          z.string().min(1),
+  alias:         z.string().optional(),
+  teamId:        z.number().int().positive().optional(),
+  grade:         z.enum(["S","A","B","C"]),
+  isCaptain:     z.boolean().optional().default(false),
+  auctionPrice:  z.number().int().min(0).optional(),
+  trophy1Count:  z.number().int().min(0).optional().default(0),
+  trophy2Count:  z.number().int().min(0).optional().default(0),
+  trophy3Count:  z.number().int().min(0).optional().default(0),
 }).refine(d => d.isCaptain || d.auctionPrice !== undefined, {
   message: "Auction price is required unless the player is a captain",
   path: ["auctionPrice"],
@@ -79,23 +82,36 @@ const createSchema = z.object({
 
 router.post("/", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { name, alias, teamId, grade, isCaptain, auctionPrice } = createSchema.parse(req.body)
+    const {
+      name, alias, teamId, grade, isCaptain, auctionPrice,
+      trophy1Count, trophy2Count, trophy3Count,
+    } = createSchema.parse(req.body)
 
     // Captains have no auction price — stored as 0, MV starts at 300 (built up/down by matches/BDR after)
     const finalAuctionPrice = isCaptain ? 0 : auctionPrice
     const finalMarketValue  = isCaptain ? 300 : auctionPrice
 
     const result = await query(`
-      INSERT INTO players (name, alias, team_id, grade, is_captain, auction_price, market_value)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO players (
+        name, alias, team_id, grade, is_captain, auction_price, market_value,
+        trophy1_count, trophy2_count, trophy3_count
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id, name, alias, grade,
                 image_url     AS "imageUrl",
                 is_captain    AS "isCaptain",
                 auction_price AS "auctionPrice",
                 market_value  AS "marketValue",
                 bdr_points    AS "bdrPoints",
-                team_id       AS "teamId"
-    `, [name, alias || null, teamId ?? null, grade, isCaptain, finalAuctionPrice, finalMarketValue])
+                team_id       AS "teamId",
+                trophy1_count AS "trophy1Count",
+                trophy2_count AS "trophy2Count",
+                trophy3_count AS "trophy3Count"
+    `, [
+      name, alias || null, teamId ?? null, grade, isCaptain,
+      finalAuctionPrice, finalMarketValue,
+      trophy1Count, trophy2Count, trophy3Count,
+    ])
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
 })

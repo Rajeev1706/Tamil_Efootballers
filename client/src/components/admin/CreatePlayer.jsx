@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { User, CheckCircle, Camera, Crown } from "lucide-react"
+import { User, CheckCircle, Camera, Crown, Trophy } from "lucide-react"
 import { useCreatePlayer, useTeams, useUpdatePlayer } from "../../lib/queries"
 import { uploadPlayerImage } from "../../lib/supabase"
 import GradeBadge from "../common/GradeBadge"
@@ -14,6 +14,9 @@ export default function CreatePlayer({ onSuccess }) {
   const [grade, setGrade]               = useState("B")
   const [isCaptain, setIsCaptain]       = useState(false)
   const [auctionPrice, setAuctionPrice] = useState("")
+  const [trophy1, setTrophy1]           = useState("")
+  const [trophy2, setTrophy2]           = useState("")
+  const [trophy3, setTrophy3]           = useState("")
   const [imageFile, setImageFile]       = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [done, setDone]                 = useState(null)
@@ -22,7 +25,7 @@ export default function CreatePlayer({ onSuccess }) {
   const createPlayer         = useCreatePlayer()
   const updatePlayer         = useUpdatePlayer()
 
-  const canSubmit = name && teamId && grade && (isCaptain || auctionPrice)
+  const canSubmit = name && grade && (isCaptain || auctionPrice)
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0]
@@ -38,10 +41,13 @@ export default function CreatePlayer({ onSuccess }) {
       {
         name,
         alias: alias || undefined,
-        teamId: parseInt(teamId),
+        teamId: teamId ? parseInt(teamId) : undefined,
         grade,
         isCaptain,
         auctionPrice: isCaptain ? undefined : parseInt(auctionPrice),
+        trophy1Count: parseInt(trophy1) || 0,
+        trophy2Count: parseInt(trophy2) || 0,
+        trophy3Count: parseInt(trophy3) || 0,
       },
       {
         onSuccess: async (data) => {
@@ -56,7 +62,9 @@ export default function CreatePlayer({ onSuccess }) {
           setDone(data)
           setName(""); setAlias(""); setTeamId(""); setGrade("B")
           setIsCaptain(false)
-          setAuctionPrice(""); setImageFile(null); setImagePreview(null)
+          setAuctionPrice("")
+          setTrophy1(""); setTrophy2(""); setTrophy3("")
+          setImageFile(null); setImagePreview(null)
           onSuccess?.()
         },
         onError: (err) => alert(err.response?.data?.error || "Failed to create player"),
@@ -138,7 +146,7 @@ export default function CreatePlayer({ onSuccess }) {
           <label className="text-xs font-medium text-slate-400 mb-1.5 block">Team</label>
           <select value={teamId} onChange={e => setTeamId(e.target.value)}
             className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors">
-            <option value="">Select team…</option>
+            <option value="">— No team —</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
@@ -207,6 +215,32 @@ export default function CreatePlayer({ onSuccess }) {
             )}
           />
           <p className="text-xs text-slate-600 mt-1">{isCaptain ? "captains skip auction" : "auction points"}</p>
+        </div>
+
+        {/* Trophy counts — optional */}
+        <div className="col-span-2">
+          <label className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5 text-gold" />
+            Trophies <span className="text-slate-600">(optional)</span>
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Ballon d'Or", value: trophy1, onChange: setTrophy1 },
+              { label: "Team League", value: trophy2, onChange: setTrophy2 },
+              { label: "Weekly",      value: trophy3, onChange: setTrophy3 },
+            ].map(t => (
+              <div key={t.label}>
+                <input
+                  type="number" min="0"
+                  value={t.value}
+                  onChange={e => t.onChange(e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 font-mono text-center focus:outline-none focus:border-accent/40 transition-colors"
+                />
+                <p className="text-xs text-slate-600 mt-1 text-center">{t.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
