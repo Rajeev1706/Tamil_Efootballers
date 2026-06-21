@@ -7,15 +7,19 @@ const router = Router()
 
 // Recalculates a player's market_value correctly for the "zero matches" edge case.
 // compute_market_value() always floors at 50 — even for a player with NO match
-// records — because the floor is meant for "played but did poorly", not "never
-// played". So here we check first: if the player has no match_records of their
-// own (as player_id) left, set market_value straight to 0 (their fresh/never-
-// played state). Otherwise let compute_market_value() do its normal floored
-// calculation. Used after both creating and deleting match records, for
-// whichever player(s) are affected.
+// records of their own — because that floor is meant for "has played, just
+// computes low", not "never involved in any match at all".
+//
+// IMPORTANT: "has this player ever been involved in a match" must check BOTH
+// player_id and opponent_id. A player who's only ever been logged as the
+// opponent (e.g. their result was entered from the other player's side) still
+// has zero rows as player_id — but they HAVE played, so compute_market_value()
+// should still run for them (it naturally floors to 50 from its own formula).
+// Only reset straight to 0 when the player has no match involvement whatsoever,
+// on either side.
 async function recalcMarketValue(playerId) {
   const countRes = await query(
-    "SELECT COUNT(*)::int AS count FROM match_records WHERE player_id = $1",
+    "SELECT COUNT(*)::int AS count FROM match_records WHERE player_id = $1 OR opponent_id = $1",
     [playerId]
   )
   if (countRes.rows[0].count === 0) {
