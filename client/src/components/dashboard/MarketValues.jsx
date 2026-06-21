@@ -2,7 +2,9 @@ import { TrendingUp } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 export default function MarketValues({ players, onPlayerClick }) {
-  const sorted = [...players].sort((a, b) => b.marketValue - a.marketValue)
+  const sorted = [...players].sort((a, b) =>
+    (b.marketValue - a.marketValue) || a.name.localeCompare(b.name)
+  )
 
   return (
     <div className="card overflow-hidden">

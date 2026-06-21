@@ -18,7 +18,7 @@ export default function TrophyRanking({ players, onPlayerClick }) {
 
   const sorted = [...players]
     .filter(p => (p[trophyKey] ?? 0) > 0)
-    .sort((a, b) => (b[trophyKey] ?? 0) - (a[trophyKey] ?? 0))
+    .sort((a, b) => ((b[trophyKey] ?? 0) - (a[trophyKey] ?? 0)) || a.name.localeCompare(b.name))
 
   const activeOption = TROPHY_OPTIONS.find(o => o.value === trophyKey)
   const activeLabel  = activeOption?.label

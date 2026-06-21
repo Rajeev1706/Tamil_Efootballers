@@ -16,19 +16,19 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-surface-border bg-pitch-900/90 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
 
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <img src="/logo.png" alt="TEC Logo" className="w-14 h-14 rounded-lg object-cover" />
-          <div className="flex flex-col leading-none">
-            <span className="text-sm font-bold text-white tracking-wide">Tamil</span>
-            <span className="text-xs text-accent font-semibold tracking-widest uppercase">Efootballers</span>
+        <Link to="/" className="flex items-center gap-2 sm:gap-2.5 group min-w-0 flex-shrink-0">
+          <img src="/logo.png" alt="TEC Logo" className="w-9 h-9 sm:w-14 sm:h-14 rounded-lg object-cover flex-shrink-0" />
+          <div className="flex flex-col leading-none min-w-0">
+            <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">Tamil</span>
+            <span className="text-[10px] sm:text-xs text-accent font-semibold tracking-widest uppercase truncate">Efootballers</span>
           </div>
         </Link>
 
         {/* Nav */}
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
           <NavLink to="/" label="Dashboard" icon={BarChart2} active={pathname === "/"} />
 
           {!user && (
@@ -44,14 +44,14 @@ export default function Navbar() {
           )}
 
           {user && (
-            <div className="flex items-center gap-2 ml-2 pl-2 border-l border-surface-border">
+            <div className="flex items-center gap-2 ml-1 sm:ml-2 pl-1 sm:pl-2 border-l border-surface-border">
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-semibold text-white">{user.username}</p>
                 <p className="text-xs text-slate-500 capitalize">{user.role.replace("_", " ")}</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="w-8 h-8 rounded-lg hover:bg-surface flex items-center justify-center text-slate-400 hover:text-rose-400 transition-colors"
+                className="w-8 h-8 rounded-lg hover:bg-surface flex items-center justify-center text-slate-400 hover:text-rose-400 transition-colors flex-shrink-0"
                 title="Logout"
               >
                 <LogOut className="w-4 h-4" />
@@ -69,14 +69,14 @@ function NavLink({ to, label, icon: Icon, active }) {
     <Link
       to={to}
       className={cn(
-        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+        "flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
         active
           ? "bg-accent/15 text-accent border border-accent/25"
           : "text-slate-400 hover:text-white hover:bg-surface"
       )}
     >
-      <Icon className="w-4 h-4" />
-      {label}
+      <Icon className="w-4 h-4 flex-shrink-0" />
+      <span className="hidden sm:inline">{label}</span>
     </Link>
   )
 }

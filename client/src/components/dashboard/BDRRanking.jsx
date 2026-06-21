@@ -7,7 +7,9 @@ const FormDot = ({ result }) => {
 }
 
 export default function BDRRanking({ players, onPlayerClick }) {
-  const sorted = [...players].sort((a, b) => b.bdrPoints - a.bdrPoints)
+  const sorted = [...players].sort((a, b) =>
+    (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
+  )
   const maxPts = sorted[0]?.bdrPoints || 1
 
   return (
