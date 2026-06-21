@@ -2,6 +2,7 @@ import { Router } from "express"
 import { z } from "zod"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
+import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
@@ -88,7 +89,9 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
       trophy1Count, trophy2Count, trophy3Count, trophy4Count,
     } = createSchema.parse(req.body)
 
-    // Captains have no auction price — stored as 0, MV starts at 300 (built up/down by matches/BDR after)
+    // Captains have no auction price — stored as 0.
+    // Market value always starts at 0 for every player (captain or not) and is
+    // only set once the first match result is logged (via the DB trigger).
     const finalAuctionPrice = isCaptain ? 0 : auctionPrice
     const finalMarketValue  = 0
 
@@ -188,6 +191,19 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
     ])
 
     if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })
+
+    // bdr_points just changed (or could have, via bdrDelta), and market_value
+    // now factors BDR points into its calculation — recalc so the two stay
+    // in sync. Skip the work entirely if bdrDelta wasn't actually provided.
+    if (bdrDelta != null && bdrDelta !== 0) {
+      await recalcMarketValue(req.params.id)
+      const fresh = await query(
+        `SELECT market_value AS "marketValue" FROM players WHERE id = $1`,
+        [req.params.id]
+      )
+      result.rows[0].marketValue = fresh.rows[0].marketValue
+    }
+
     res.json(result.rows[0])
   } catch (err) { next(err) }
 })

@@ -2,35 +2,9 @@ import { Router } from "express"
 import { z } from "zod"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
+import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
-
-// Recalculates a player's market_value correctly for the "zero matches" edge case.
-// compute_market_value() always floors at 50 — even for a player with NO match
-// records of their own — because that floor is meant for "has played, just
-// computes low", not "never involved in any match at all".
-//
-// IMPORTANT: "has this player ever been involved in a match" must check BOTH
-// player_id and opponent_id. A player who's only ever been logged as the
-// opponent (e.g. their result was entered from the other player's side) still
-// has zero rows as player_id — but they HAVE played, so compute_market_value()
-// should still run for them (it naturally floors to 50 from its own formula).
-// Only reset straight to 0 when the player has no match involvement whatsoever,
-// on either side.
-async function recalcMarketValue(playerId) {
-  const countRes = await query(
-    "SELECT COUNT(*)::int AS count FROM match_records WHERE player_id = $1 OR opponent_id = $1",
-    [playerId]
-  )
-  if (countRes.rows[0].count === 0) {
-    await query("UPDATE players SET market_value = 0 WHERE id = $1", [playerId])
-  } else {
-    await query(
-      "UPDATE players SET market_value = compute_market_value($1) WHERE id = $1",
-      [playerId]
-    )
-  }
-}
 
 // GET /api/records — all records (admin)
 router.get("/", authenticate, adminOnly, async (req, res, next) => {
@@ -100,9 +74,10 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
       WHERE id = $2
     `, [letter, playerId])
 
-    // The DB trigger on match_records only recalculates market_value for the
-    // player the result was logged FROM (player_id). The opponent never gets
-    // touched by it, so we explicitly recompute their market_value here too.
+    // market_value now factors in BDR points (see services/marketValue.js), so
+    // we can't rely on the DB trigger anymore — it only runs the old, BDR-blind
+    // SQL formula. Recalculate both sides explicitly here with the real logic.
+    await recalcMarketValue(playerId)
     await recalcMarketValue(opponentId)
 
     const fresh = await query(
@@ -135,10 +110,8 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
     )
     if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })
 
-    // The DB trigger already recomputed player_id via compute_market_value(),
-    // which floors at 50 even when zero matches remain — that's exactly the
-    // "still shows 50 after deleting the only match" issue. Override both
-    // sides here with the zero-aware helper instead.
+    // Recalculate both sides with the BDR-aware logic — can't rely on the DB
+    // trigger's old SQL formula anymore, same reasoning as in POST above.
     await recalcMarketValue(result.rows[0].player_id)
     await recalcMarketValue(result.rows[0].opponent_id)
 
