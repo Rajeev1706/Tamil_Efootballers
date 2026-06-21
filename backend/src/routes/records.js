@@ -5,6 +5,29 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 
 const router = Router()
 
+// Recalculates a player's market_value correctly for the "zero matches" edge case.
+// compute_market_value() always floors at 50 — even for a player with NO match
+// records — because the floor is meant for "played but did poorly", not "never
+// played". So here we check first: if the player has no match_records of their
+// own (as player_id) left, set market_value straight to 0 (their fresh/never-
+// played state). Otherwise let compute_market_value() do its normal floored
+// calculation. Used after both creating and deleting match records, for
+// whichever player(s) are affected.
+async function recalcMarketValue(playerId) {
+  const countRes = await query(
+    "SELECT COUNT(*)::int AS count FROM match_records WHERE player_id = $1",
+    [playerId]
+  )
+  if (countRes.rows[0].count === 0) {
+    await query("UPDATE players SET market_value = 0 WHERE id = $1", [playerId])
+  } else {
+    await query(
+      "UPDATE players SET market_value = compute_market_value($1) WHERE id = $1",
+      [playerId]
+    )
+  }
+}
+
 // GET /api/records — all records (admin)
 router.get("/", authenticate, adminOnly, async (req, res, next) => {
   try {
@@ -73,6 +96,11 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
       WHERE id = $2
     `, [letter, playerId])
 
+    // The DB trigger on match_records only recalculates market_value for the
+    // player the result was logged FROM (player_id). The opponent never gets
+    // touched by it, so we explicitly recompute their market_value here too.
+    await recalcMarketValue(opponentId)
+
     const fresh = await query(
       `SELECT id, name, grade,
               market_value AS "marketValue",
@@ -98,10 +126,18 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const result = await query(
-      "DELETE FROM match_records WHERE id = $1 RETURNING player_id",
+      "DELETE FROM match_records WHERE id = $1 RETURNING player_id, opponent_id",
       [req.params.id]
     )
     if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })
+
+    // The DB trigger already recomputed player_id via compute_market_value(),
+    // which floors at 50 even when zero matches remain — that's exactly the
+    // "still shows 50 after deleting the only match" issue. Override both
+    // sides here with the zero-aware helper instead.
+    await recalcMarketValue(result.rows[0].player_id)
+    await recalcMarketValue(result.rows[0].opponent_id)
+
     const fresh = await query(
       `SELECT id, market_value AS "marketValue" FROM players WHERE id = $1`,
       [result.rows[0].player_id]

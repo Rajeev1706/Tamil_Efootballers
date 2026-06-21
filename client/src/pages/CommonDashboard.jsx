@@ -46,7 +46,7 @@ export default function CommonDashboard() {
         <div className="absolute inset-0 bg-gradient-to-r from-pitch-800 via-pitch-800 to-pitch-700" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.12),transparent_60%)]" />
         <div className="relative px-6 py-8 sm:px-8">
-          <p className="section-label mb-2">Season 1 · 2024–25</p>
+          <p className="section-label mb-2">26-27</p>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1">
             Tamil Efootball League
           </h1>

@@ -90,7 +90,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 
     // Captains have no auction price — stored as 0, MV starts at 300 (built up/down by matches/BDR after)
     const finalAuctionPrice = isCaptain ? 0 : auctionPrice
-    const finalMarketValue  = isCaptain ? 300 : auctionPrice
+    const finalMarketValue  = 0
 
     const result = await query(`
       INSERT INTO players (
