@@ -5,6 +5,7 @@ import StandingsTable from "../components/dashboard/StandingsTable"
 import BDRRanking from "../components/dashboard/BDRRanking"
 import MarketValues from "../components/dashboard/MarketValues"
 import TrophyRanking from "../components/dashboard/TrophyRanking"
+import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import Loading from "../components/common/Loading"
 import { useTeams, usePlayers } from "../lib/queries"
 import { Trophy, Users, TrendingUp, Activity } from "lucide-react"
@@ -27,6 +28,7 @@ const PANEL_OPTIONS = [
   { value: "bdr",        label: "BDR ranking" },
   { value: "market",     label: "Market values" },
   { value: "trophies",   label: "Trophies" },
+  { value: "players",    label: "Total players" },
 ]
 
 export default function CommonDashboard() {
@@ -94,6 +96,7 @@ export default function CommonDashboard() {
           {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
           {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
           {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} />}
+          {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
         </>
       )}
     </Layout>
