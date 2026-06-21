@@ -1,12 +1,16 @@
 import { useState } from "react"
 import { Trophy } from "lucide-react"
 import { cn } from "../../lib/utils"
+import ballondorTrophy  from "../../../images/ballondor.png"
+import teamLeagueTrophy from "../../../images/Team League.png"
+import weeklyTrophy     from "../../../images/Weekly.png"
+import uclTrophy        from "../../../images/ucl.png"
 
 const TROPHY_OPTIONS = [
-  { value: "trophy1Count", label: "Ballon d'Or"  },
-  { value: "trophy2Count", label: "Team League"  },
-  { value: "trophy4Count", label: "UCL"          },
-  { value: "trophy3Count", label: "Weekly"       },
+  { value: "trophy1Count", label: "Ballon d'Or",  image: ballondorTrophy  },
+  { value: "trophy2Count", label: "Team League",  image: teamLeagueTrophy },
+  { value: "trophy4Count", label: "UCL",          image: uclTrophy        },
+  { value: "trophy3Count", label: "Weekly",       image: weeklyTrophy     },
 ]
 
 export default function TrophyRanking({ players, onPlayerClick }) {
@@ -16,14 +20,22 @@ export default function TrophyRanking({ players, onPlayerClick }) {
     .filter(p => (p[trophyKey] ?? 0) > 0)
     .sort((a, b) => (b[trophyKey] ?? 0) - (a[trophyKey] ?? 0))
 
-  const activeLabel = TROPHY_OPTIONS.find(o => o.value === trophyKey)?.label
+  const activeOption = TROPHY_OPTIONS.find(o => o.value === trophyKey)
+  const activeLabel  = activeOption?.label
 
   return (
     <div className="card overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <p className="section-label mb-0.5">Trophies</p>
-          <h2 className="text-base font-semibold text-white">{activeLabel} winners</h2>
+        <div className="flex items-center gap-3">
+          <img
+            src={activeOption?.image}
+            alt={activeLabel}
+            className="w-9 h-9 object-contain flex-shrink-0"
+          />
+          <div>
+            <p className="section-label mb-0.5">Trophies</p>
+            <h2 className="text-base font-semibold text-white">{activeLabel} winners</h2>
+          </div>
         </div>
         <select
           value={trophyKey}
