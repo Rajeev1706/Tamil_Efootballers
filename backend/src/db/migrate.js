@@ -176,15 +176,23 @@ $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- MV TRIGGER
+-- Recomputes market_value for BOTH players involved in a match_records row —
+-- not just the one the result was logged "from". Without this, a player who
+-- only ever appears as opponent_id (the losing side, when results are logged
+-- from the winner's perspective) never gets their market_value recalculated,
+-- and stays stuck at whatever it was initialized to instead of the proper
+-- floor/formula result from compute_market_value().
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION trigger_update_market_value()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    UPDATE players SET market_value = compute_market_value(OLD.player_id) WHERE id = OLD.player_id;
+    UPDATE players SET market_value = compute_market_value(OLD.player_id)   WHERE id = OLD.player_id;
+    UPDATE players SET market_value = compute_market_value(OLD.opponent_id) WHERE id = OLD.opponent_id;
     RETURN OLD;
   ELSE
-    UPDATE players SET market_value = compute_market_value(NEW.player_id) WHERE id = NEW.player_id;
+    UPDATE players SET market_value = compute_market_value(NEW.player_id)   WHERE id = NEW.player_id;
+    UPDATE players SET market_value = compute_market_value(NEW.opponent_id) WHERE id = NEW.opponent_id;
     RETURN NEW;
   END IF;
 END;
@@ -194,6 +202,7 @@ DROP TRIGGER IF EXISTS trg_update_mv ON match_records;
 CREATE TRIGGER trg_update_mv
   AFTER INSERT OR UPDATE OR DELETE ON match_records
   FOR EACH ROW EXECUTE FUNCTION trigger_update_market_value();
+
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- VIEWS  (used directly in routes)
@@ -218,6 +227,10 @@ SELECT
   p.market_value  AS "marketValue",
   p.bdr_points    AS "bdrPoints",
   p.form,
+  p.trophy1_count AS "trophy1Count",
+  p.trophy2_count AS "trophy2Count",
+  p.trophy3_count AS "trophy3Count",
+  p.trophy4_count AS "trophy4Count",
   t.name          AS team,
   p.team_id       AS "teamId"
 FROM players p

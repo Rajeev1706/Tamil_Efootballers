@@ -4,6 +4,7 @@ import Layout from "../components/layout/Layout"
 import StandingsTable from "../components/dashboard/StandingsTable"
 import BDRRanking from "../components/dashboard/BDRRanking"
 import MarketValues from "../components/dashboard/MarketValues"
+import TrophyRanking from "../components/dashboard/TrophyRanking"
 import Loading from "../components/common/Loading"
 import { useTeams, usePlayers } from "../lib/queries"
 import { Trophy, Users, TrendingUp, Activity } from "lucide-react"
@@ -25,6 +26,7 @@ const PANEL_OPTIONS = [
   { value: "standings", label: "League table" },
   { value: "bdr",        label: "BDR ranking" },
   { value: "market",     label: "Market values" },
+  { value: "trophies",   label: "Trophies" },
 ]
 
 export default function CommonDashboard() {
@@ -46,7 +48,7 @@ export default function CommonDashboard() {
         <div className="absolute inset-0 bg-gradient-to-r from-pitch-800 via-pitch-800 to-pitch-700" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.12),transparent_60%)]" />
         <div className="relative px-6 py-8 sm:px-8">
-          <p className="section-label mb-2">26-27</p>
+          <p className="section-label mb-2">Season 1 · 2024–25</p>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1">
             Tamil Efootball League
           </h1>
@@ -91,6 +93,7 @@ export default function CommonDashboard() {
           {activePanel === "standings" && <StandingsTable teams={teams} />}
           {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
           {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
+          {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} />}
         </>
       )}
     </Layout>
