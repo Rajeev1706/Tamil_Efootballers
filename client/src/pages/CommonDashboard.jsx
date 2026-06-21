@@ -40,8 +40,12 @@ export default function CommonDashboard() {
   const handlePlayer = (player) => navigate(`/player/${player.id}`)
   const isLoading = teamsLoading || playersLoading
 
-  const leader = [...players].sort((a, b) => b.bdrPoints - a.bdrPoints)[0]
-  const topMV  = [...players].sort((a, b) => b.marketValue - a.marketValue)[0]
+  const leader = [...players].sort((a, b) =>
+    (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
+  )[0]
+  const topMV  = [...players].sort((a, b) =>
+    (b.marketValue - a.marketValue) || a.name.localeCompare(b.name)
+  )[0]
 
   return (
     <Layout>
