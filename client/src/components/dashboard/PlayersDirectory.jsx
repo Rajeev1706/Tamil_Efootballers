@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react"
 import { Search, Users, X } from "lucide-react"
-import { cn } from "../../lib/utils"
 
 export default function PlayersDirectory({ players, onPlayerClick }) {
   const [query, setQuery] = useState("")
@@ -63,7 +62,6 @@ export default function PlayersDirectory({ players, onPlayerClick }) {
               <tr className="border-b border-surface-border">
                 <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 tracking-wide">Player</th>
                 <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 tracking-wide">Team</th>
-                <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 tracking-wide">Grade</th>
               </tr>
             </thead>
             <tbody>
@@ -80,14 +78,6 @@ export default function PlayersDirectory({ players, onPlayerClick }) {
                     )}
                   </td>
                   <td className="py-3 px-4 text-slate-400 text-xs">{player.team ?? "—"}</td>
-                  <td className="py-3 px-3 text-center">
-                    <span className={cn(
-                      "inline-flex items-center justify-center w-6 h-6 rounded-md text-xs font-bold",
-                      "bg-pitch-800 text-slate-300 border border-surface-border"
-                    )}>
-                      {player.grade}
-                    </span>
-                  </td>
                 </tr>
               ))}
             </tbody>

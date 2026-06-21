@@ -24,18 +24,18 @@ const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
 )
 
 const PANEL_OPTIONS = [
+  { value: "players",    label: "Total players" },
   { value: "standings", label: "League table" },
   { value: "bdr",        label: "BDR ranking" },
   { value: "market",     label: "Market values" },
   { value: "trophies",   label: "Trophies" },
-  { value: "players",    label: "Total players" },
 ]
 
 export default function CommonDashboard() {
   const navigate = useNavigate()
   const { data: teams = [],   isLoading: teamsLoading }   = useTeams()
   const { data: players = [], isLoading: playersLoading } = usePlayers()
-  const [activePanel, setActivePanel] = useState("standings")
+  const [activePanel, setActivePanel] = useState("players")
 
   const handlePlayer = (player) => navigate(`/player/${player.id}`)
   const isLoading = teamsLoading || playersLoading
