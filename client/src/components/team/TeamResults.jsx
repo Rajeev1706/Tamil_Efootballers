@@ -10,21 +10,27 @@ const RESULTS = [
 ]
 
 export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId }) {
+  // Only show the current matchday — the lowest upcoming round for this team
   const upcomingFixtures = fixtures.filter(f => f.status === "upcoming")
+  const currentRound = upcomingFixtures.length > 0
+    ? Math.min(...upcomingFixtures.map(f => f.round))
+    : null
+  const currentFixtures = upcomingFixtures.filter(f => f.round === currentRound)
 
-  if (upcomingFixtures.length === 0) {
+  if (currentFixtures.length === 0) {
     return (
       <div className="card px-6 py-12 text-center">
         <CheckCircle className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 font-medium">No upcoming fixtures</p>
-        <p className="text-sm text-slate-600 mt-1">Results will appear here once fixtures are scheduled</p>
+        <p className="text-slate-400 font-medium">No active fixture</p>
+        <p className="text-sm text-slate-600 mt-1">Results will appear here once the admin schedules your next matchday</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {upcomingFixtures.map(fixture => (
+      <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Round {currentRound} · Current matchday</p>
+      {currentFixtures.map(fixture => (
         <FixtureResultCard
           key={fixture.id}
           fixture={fixture}
