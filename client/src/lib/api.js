@@ -62,8 +62,8 @@ export const fixturesApi = {
   list:       (params)                  => api.get("/fixtures", { params }).then(r => r.data),
   recent:     ()                        => api.get("/fixtures/recent").then(r => r.data),
   create:     (body)                    => api.post("/fixtures", body).then(r => r.data),
-  saveResult: (id, homeScore, awayScore) =>
-    api.patch(`/fixtures/${id}/result`, { homeScore, awayScore }).then(r => r.data),
+  saveResult: (id, homeScore, awayScore, homeGoals, awayGoals) =>
+    api.patch(`/fixtures/${id}/result`, { homeScore, awayScore, homeGoals, awayGoals }).then(r => r.data),
 }
 
 export const tradesApi = {

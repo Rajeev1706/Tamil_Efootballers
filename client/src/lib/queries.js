@@ -120,7 +120,7 @@ export const useSaveFixtureResult = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, homeScore, awayScore }) =>
-      fixturesApi.saveResult(id, homeScore, awayScore),
+      fixturesApi.saveResult(id, homeScore, awayScore, homeGoals, awayGoals),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fixtures"] })
       qc.invalidateQueries({ queryKey: QK.teams })

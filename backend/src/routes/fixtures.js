@@ -79,14 +79,15 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 const resultSchema = z.object({
   homeScore: z.number().int().min(0),
   awayScore: z.number().int().min(0),
+  homeGoals: z.number().int().min(0),
+  awayGoals: z.number().int().min(0),
 })
 
 router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { homeScore, awayScore } = resultSchema.parse(req.body)
+    const { homeScore, awayScore, homeGoals, awayGoals } = resultSchema.parse(req.body)
 
     await withTransaction(async ({ query: q }) => {
-      // Get the fixture first
       const fRes = await q("SELECT * FROM fixtures WHERE id = $1 AND status = 'upcoming'", [req.params.id])
       if (!fRes.rows[0]) throw Object.assign(new Error("Fixture not found or already completed"), { status: 404 })
       const f = fRes.rows[0]
@@ -97,7 +98,7 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
         WHERE id = $3
       `, [homeScore, awayScore, req.params.id])
 
-      // Update team W/D/L/GF/GA
+      // W/D/L is determined by match points (homeScore/awayScore)
       const homeResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
       const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
@@ -108,9 +109,10 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
         gf: scored, ga: conceded,
       })
 
+      // GF/GA uses actual goals (homeGoals/awayGoals), not match points
       for (const [teamId, res, scored, conceded] of [
-        [f.home_team_id, homeResult, homeScore, awayScore],
-        [f.away_team_id, awayResult, awayScore, homeScore],
+        [f.home_team_id, homeResult, homeGoals, awayGoals],
+        [f.away_team_id, awayResult, awayGoals, homeGoals],
       ]) {
         const d = statDelta(res, scored, conceded)
         await q(`

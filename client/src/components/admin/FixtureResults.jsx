@@ -189,6 +189,8 @@ function FixtureCard({ fixture }) {
 
   const [hs, setHs]       = useState(fixture.homeScore ?? "")
   const [as_, setAs]      = useState(fixture.awayScore ?? "")
+  const [hg, setHg]       = useState(fixture.homeGoals ?? "")
+  const [ag, setAg]       = useState(fixture.awayGoals ?? "")
   const [saved, setSaved] = useState(isCompleted)
 
   const [editing, setEditing]     = useState(false)
@@ -201,10 +203,16 @@ function FixtureCard({ fixture }) {
   const [confirmDel, setConfirmDel] = useState(false)
 
   const winner  = saved ? (hs > as_ ? "home" : hs < as_ ? "away" : "draw") : null
-  const canSave = hs !== "" && as_ !== "" && !saved
+  const canSave = hs !== "" && as_ !== "" && hg !== "" && ag !== "" && !saved
 
   const handleSaveResult = () => {
-    saveResult.mutate({ id: fixture.id, homeScore: parseInt(hs), awayScore: parseInt(as_) }, {
+    saveResult.mutate({
+      id: fixture.id,
+      homeScore: parseInt(hs),
+      awayScore: parseInt(as_),
+      homeGoals: parseInt(hg),
+      awayGoals: parseInt(ag),
+    }, {
       onSuccess: () => setSaved(true),
       onError:   (err) => alert(err.response?.data?.error || "Failed to save result"),
     })
@@ -331,21 +339,38 @@ function FixtureCard({ fixture }) {
         </div>
       )}
 
-      {/* Score row */}
+      {/* Match score (points) row */}
       <div className="flex items-center gap-3">
         <div className={cn("flex-1 text-right", winner === "home" && "text-white", winner === "away" && "text-slate-500")}>
           <p className="text-sm font-semibold">{fixture.home}</p>
           <p className="text-xs text-accent mt-0.5">Home</p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <ScoreInput value={hs} onChange={setHs} disabled={saved} />
-          <span className="text-slate-600 font-bold text-lg">–</span>
-          <ScoreInput value={as_} onChange={setAs} disabled={saved} />
+        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+          <span className="text-xs text-slate-500 uppercase tracking-wide">Match pts</span>
+          <div className="flex items-center gap-2">
+            <ScoreInput value={hs} onChange={setHs} disabled={saved} />
+            <span className="text-slate-600 font-bold text-lg">–</span>
+            <ScoreInput value={as_} onChange={setAs} disabled={saved} />
+          </div>
         </div>
         <div className={cn("flex-1", winner === "away" && "text-white", winner === "home" && "text-slate-500")}>
           <p className="text-sm font-semibold">{fixture.away}</p>
           <p className="text-xs text-slate-500 mt-0.5">Away</p>
         </div>
+      </div>
+
+      {/* Goals row (for GF/GA/GD in league table) */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1" />
+        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+          <span className="text-xs text-slate-500 uppercase tracking-wide">Goals (GD)</span>
+          <div className="flex items-center gap-2">
+            <ScoreInput value={hg} onChange={setHg} disabled={saved} />
+            <span className="text-slate-600 font-bold text-lg">–</span>
+            <ScoreInput value={ag} onChange={setAg} disabled={saved} />
+          </div>
+        </div>
+        <div className="flex-1" />
       </div>
 
       {!saved ? (
