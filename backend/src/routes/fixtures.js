@@ -10,6 +10,7 @@ const FIXTURE_SELECT = `
     f.id, f.round, f.status,
     f.scheduled_date AS date,
     f.home_score AS "homeScore", f.away_score AS "awayScore",
+    f.home_goals AS "homeGoals", f.away_goals AS "awayGoals",
     ht.id AS "homeTeamId", ht.name AS home,
     at.id AS "awayTeamId", at.name AS away
   FROM fixtures f
@@ -100,13 +101,15 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
         gf: scored, ga: conceded,
       })
 
-      // If already completed, reverse the old stats first before applying new ones
+      // If already completed, reverse the old stats using stored goals (not match points)
       if (f.status === "completed") {
         const oldHomeResult = f.home_score > f.away_score ? "win" : f.home_score < f.away_score ? "loss" : "draw"
         const oldAwayResult = oldHomeResult === "win" ? "loss" : oldHomeResult === "loss" ? "win" : "draw"
+        const oldHomeGoals  = f.home_goals ?? 0
+        const oldAwayGoals  = f.away_goals ?? 0
         for (const [teamId, res, scored, conceded, oldPts] of [
-          [f.home_team_id, oldHomeResult, f.home_score, f.away_score, f.home_score],
-          [f.away_team_id, oldAwayResult, f.away_score, f.home_score, f.away_score],
+          [f.home_team_id, oldHomeResult, oldHomeGoals, oldAwayGoals, f.home_score],
+          [f.away_team_id, oldAwayResult, oldAwayGoals, oldHomeGoals, f.away_score],
         ]) {
           const d = statDelta(res, scored, conceded)
           await q(`
@@ -120,11 +123,11 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
         }
       }
 
-      // Save new score + mark completed
+      // Save new score + goals + mark completed
       await q(`
-        UPDATE fixtures SET home_score = $1, away_score = $2, status = 'completed'
-        WHERE id = $3
-      `, [homeScore, awayScore, req.params.id])
+        UPDATE fixtures SET home_score = $1, away_score = $2, home_goals = $3, away_goals = $4, status = 'completed'
+        WHERE id = $5
+      `, [homeScore, awayScore, homeGoals, awayGoals, req.params.id])
 
       // W/D/L determined by match points
       const homeResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
