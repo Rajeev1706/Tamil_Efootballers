@@ -271,12 +271,18 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isE
           </div>
 
           {/* Matchup rows */}
-          {matchups.map((m, idx) => (
+          {matchups.map((m, idx) => {
+            // Exclude players already selected in OTHER rows from each dropdown
+            const usedMyIds  = matchups.filter((x, i) => i !== idx && x.myPlayerId).map(x => x.myPlayerId)
+            const usedOppIds = matchups.filter((x, i) => i !== idx && x.oppPlayerId).map(x => x.oppPlayerId)
+            const availableMyPlayers  = myPlayers.filter(p => !usedMyIds.includes(p.id))
+            const availableOppPlayers = oppPlayers.filter(p => !usedOppIds.includes(p.id))
+            return (
             <div key={m.slot} className="relative group">
               <MatchupRow
                 slot={m.slot}
-                myPlayers={myPlayers}
-                oppPlayers={oppPlayers}
+                myPlayers={availableMyPlayers}
+                oppPlayers={availableOppPlayers}
                 matchup={m}
                 onChange={handleChange}
                 onViewH2H={(p1, p2) => setH2hTarget({ p1, p2 })}
@@ -290,7 +296,8 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isE
                 </button>
               )}
             </div>
-          ))}
+            )
+          })}
 
           {/* Add matchup + actions */}
           <div className="px-5 py-4 flex items-center justify-between gap-3 bg-pitch-900/30 border-t border-surface-border/50">
