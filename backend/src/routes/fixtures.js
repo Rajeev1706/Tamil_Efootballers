@@ -104,18 +104,19 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
       if (f.status === "completed") {
         const oldHomeResult = f.home_score > f.away_score ? "win" : f.home_score < f.away_score ? "loss" : "draw"
         const oldAwayResult = oldHomeResult === "win" ? "loss" : oldHomeResult === "loss" ? "win" : "draw"
-        for (const [teamId, res, scored, conceded] of [
-          [f.home_team_id, oldHomeResult, f.home_score, f.away_score],
-          [f.away_team_id, oldAwayResult, f.away_score, f.home_score],
+        for (const [teamId, res, scored, conceded, oldPts] of [
+          [f.home_team_id, oldHomeResult, f.home_score, f.away_score, f.home_score],
+          [f.away_team_id, oldAwayResult, f.away_score, f.home_score, f.away_score],
         ]) {
           const d = statDelta(res, scored, conceded)
           await q(`
             UPDATE teams SET
-              played = played - 1,
-              won    = won - $1, drawn = drawn - $2, lost  = lost - $3,
-              gf     = gf  - $4, ga    = ga    - $5
+              played       = played - 1,
+              won          = won - $1, drawn = drawn - $2, lost  = lost - $3,
+              gf           = gf  - $4, ga    = ga    - $5,
+              score_points = score_points - $7
             WHERE id = $6
-          `, [d.won, d.drawn, d.lost, d.gf, d.ga, teamId])
+          `, [d.won, d.drawn, d.lost, d.gf, d.ga, teamId, oldPts])
         }
       }
 
@@ -129,19 +130,20 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
       const homeResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
       const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
-      // GF/GA uses actual goals
-      for (const [teamId, res, scored, conceded] of [
-        [f.home_team_id, homeResult, homeGoals, awayGoals],
-        [f.away_team_id, awayResult, awayGoals, homeGoals],
+      // GF/GA uses actual goals, score_points uses actual match scores
+      for (const [teamId, res, scored, conceded, matchPts] of [
+        [f.home_team_id, homeResult, homeGoals, awayGoals, homeScore],
+        [f.away_team_id, awayResult, awayGoals, homeGoals, awayScore],
       ]) {
         const d = statDelta(res, scored, conceded)
         await q(`
           UPDATE teams SET
-            played = played + 1,
-            won    = won + $1, drawn = drawn + $2, lost  = lost + $3,
-            gf     = gf  + $4, ga    = ga    + $5
+            played       = played + 1,
+            won          = won + $1, drawn = drawn + $2, lost  = lost + $3,
+            gf           = gf  + $4, ga    = ga    + $5,
+            score_points = score_points + $7
           WHERE id = $6
-        `, [d.won, d.drawn, d.lost, d.gf, d.ga, teamId])
+        `, [d.won, d.drawn, d.lost, d.gf, d.ga, teamId, matchPts])
       }
     })
 
