@@ -6,13 +6,22 @@ import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
-// Rebuilds a player's form from their last 5 match_records as player_id.
-// Used after delete so stale form letters don't linger.
+// Rebuilds a player's form from their last 5 match_records — both sides.
+// When the player was the opponent_id, the result is flipped (win→loss, loss→win).
 async function recalcForm(playerId) {
-  const res = await query(
-    `SELECT result FROM match_records WHERE player_id = $1 ORDER BY recorded_at DESC, id DESC LIMIT 5`,
-    [playerId]
-  )
+  const res = await query(`
+    SELECT
+      CASE
+        WHEN player_id = $1 THEN result
+        WHEN result = 'win'  THEN 'loss'
+        WHEN result = 'loss' THEN 'win'
+        ELSE 'draw'
+      END AS result
+    FROM match_records
+    WHERE player_id = $1 OR opponent_id = $1
+    ORDER BY recorded_at DESC, id DESC
+    LIMIT 5
+  `, [playerId])
   const form = res.rows.map(r => r.result === "win" ? "W" : r.result === "draw" ? "D" : "L")
   await query("UPDATE players SET form = $1 WHERE id = $2", [form, playerId])
 }
