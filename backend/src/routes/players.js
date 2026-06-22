@@ -34,19 +34,32 @@ router.get("/:id", async (req, res, next) => {
     const historyRes = await query(`
       SELECT
         mr.id,
-        mr.result,
-        mr.match_type     AS "matchType",
-        mr.opponent_grade AS "opponentGrade",
-        mr.player_score   AS "playerScore",
-        mr.opponent_score AS "opponentScore",
-        mr.recorded_at    AS date,
-        opp.id            AS "opponentId",
-        opp.name          AS "opponentName",
-        ot.name           AS "opponentTeam"
+        -- When this player is the opponent, flip the result to show from their perspective
+        CASE
+          WHEN mr.player_id = $1 THEN mr.result
+          WHEN mr.result = 'win'  THEN 'loss'
+          WHEN mr.result = 'loss' THEN 'win'
+          ELSE 'draw'
+        END AS result,
+        mr.match_type AS "matchType",
+        -- Grade of whoever they played against
+        CASE
+          WHEN mr.player_id = $1 THEN mr.opponent_grade
+          ELSE p2.grade
+        END AS "opponentGrade",
+        -- Scores from this player's perspective
+        CASE WHEN mr.player_id = $1 THEN mr.player_score   ELSE mr.opponent_score END AS "playerScore",
+        CASE WHEN mr.player_id = $1 THEN mr.opponent_score ELSE mr.player_score   END AS "opponentScore",
+        mr.recorded_at AS date,
+        CASE WHEN mr.player_id = $1 THEN opp.id   ELSE p2.id   END AS "opponentId",
+        CASE WHEN mr.player_id = $1 THEN opp.name ELSE p2.name END AS "opponentName",
+        CASE WHEN mr.player_id = $1 THEN ot.name  ELSE pt.name END AS "opponentTeam"
       FROM match_records mr
       JOIN players opp ON mr.opponent_id = opp.id
       LEFT JOIN teams ot ON opp.team_id = ot.id
-      WHERE mr.player_id = $1
+      JOIN players p2 ON mr.player_id = p2.id
+      LEFT JOIN teams pt ON p2.team_id = pt.id
+      WHERE mr.player_id = $1 OR mr.opponent_id = $1
       ORDER BY mr.recorded_at DESC, mr.id DESC
     `, [req.params.id])
 
