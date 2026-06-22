@@ -178,6 +178,7 @@ function RecordRow({ record, onDeleted, onEdited }) {
 
 export default function MatchRecordEntry({ players, initialRecords }) {
   const [records, setRecords]         = useState(initialRecords)
+  const [page, setPage]               = useState(1)
   const [playerId, setPlayerId]       = useState("")
   const [oppId, setOppId]             = useState("")
   const [result, setResult]           = useState("")
@@ -221,6 +222,7 @@ export default function MatchRecordEntry({ players, initialRecords }) {
         setTimeout(() => setSaved(false), 2500)
         setPlayerId(""); setOppId(""); setResult("")
         setMatchType("league"); setPlayerScore(""); setOppScore("")
+        setPage(1)
       },
       onError: (err) => alert(err.response?.data?.error || "Failed to log record"),
     })
@@ -332,12 +334,63 @@ export default function MatchRecordEntry({ players, initialRecords }) {
             <h2 className="text-sm font-semibold text-white">Match records</h2>
             <span className="text-xs text-slate-500">{records.length} logged</span>
           </div>
-          <div className="divide-y divide-surface-border/60 max-h-[540px] overflow-y-auto">
-            {records.length === 0
-              ? <div className="px-5 py-10 text-center text-slate-500 text-sm">No records yet.</div>
-              : records.map(r => <RecordRow key={r.id} record={r} onDeleted={handleDeleted} onEdited={handleEdited} />)
-            }
-          </div>
+
+          {(() => {
+            // FIFO display — show only the latest 100 records, actual DB data untouched
+            const displayed   = records.slice(0, 100)
+            const totalPages  = Math.max(1, Math.ceil(displayed.length / 10))
+            const currentPage = Math.min(page, totalPages)
+            const pageRecords = displayed.slice((currentPage - 1) * 10, currentPage * 10)
+
+            return (
+              <>
+                <div className="divide-y divide-surface-border/60">
+                  {displayed.length === 0
+                    ? <div className="px-5 py-10 text-center text-slate-500 text-sm">No records yet.</div>
+                    : pageRecords.map(r => (
+                        <RecordRow key={r.id} record={r} onDeleted={handleDeleted} onEdited={handleEdited} />
+                      ))
+                  }
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-5 py-3 border-t border-surface-border">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={cn(
+                            "w-7 h-7 rounded-lg text-xs font-medium transition-colors",
+                            p === currentPage
+                              ? "bg-accent text-white"
+                              : "text-slate-500 hover:text-white hover:bg-surface"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       </div>
     </div>
