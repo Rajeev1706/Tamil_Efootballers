@@ -382,8 +382,16 @@ function FixtureCard({ fixture }) {
           {saveResult.isPending ? "Saving…" : "Save result"}
         </button>
       ) : (
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-600">
-          <Lock className="w-3 h-3" /> Result locked
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <Lock className="w-3 h-3" /> Result locked
+          </div>
+          <button
+            onClick={() => setSaved(false)}
+            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+          >
+            <Pencil className="w-3 h-3" /> Edit result
+          </button>
         </div>
       )}
     </div>

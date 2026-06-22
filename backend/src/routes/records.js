@@ -206,6 +206,47 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// PATCH /api/records/:id — admin edits an existing match record
+router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { result, playerScore, opponentScore } = z.object({
+      result:        z.enum(["win", "draw", "loss"]),
+      playerScore:   z.number().int().min(0).optional(),
+      opponentScore: z.number().int().min(0).optional(),
+    }).parse(req.body)
+
+    // Fetch existing record to get player/opponent IDs
+    const existing = await query(
+      "SELECT player_id, opponent_id FROM match_records WHERE id = $1",
+      [req.params.id]
+    )
+    if (!existing.rows[0]) return res.status(404).json({ error: "Record not found" })
+    const { player_id: playerId, opponent_id: opponentId } = existing.rows[0]
+
+    await query(`
+      UPDATE match_records
+      SET result = $1, player_score = $2, opponent_score = $3
+      WHERE id = $4
+    `, [result, playerScore ?? null, opponentScore ?? null, req.params.id])
+
+    // Rebuild form and MV for both players since result may have changed
+    const letter    = result === "win" ? "W" : result === "draw" ? "D" : "L"
+    const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
+    await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [letter, playerId])
+    await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
+    await recalcMarketValue(playerId)
+    await recalcMarketValue(opponentId)
+    await recalcForm(playerId)
+    await recalcForm(opponentId)
+
+    const fresh = await query(
+      `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
+      [playerId]
+    )
+    res.json({ updated: true, player: fresh.rows[0] })
+  } catch (err) { next(err) }
+})
+
 // DELETE /api/records/:id — admin only
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {

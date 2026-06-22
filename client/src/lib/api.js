@@ -53,6 +53,7 @@ export const playersApi = {
 export const recordsApi = {
   list:          ()         => api.get("/records").then(r => r.data),
   create:        (body)     => api.post("/records", body).then(r => r.data),
+  update:        (id, body) => api.patch(`/records/${id}`, body).then(r => r.data),
   delete:        (id)       => api.delete(`/records/${id}`).then(r => r.data),
   createTeam:    (body)     => api.post("/records/team", body).then(r => r.data),
   byFixture:     (id)       => api.get(`/records/fixture/${id}`).then(r => r.data),

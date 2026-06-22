@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Plus, CheckCircle, ArrowRight, Trash2 } from "lucide-react"
+import { Plus, CheckCircle, ArrowRight, Trash2, Pencil, X, Save } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
-import { useLogRecord, useDeleteRecord } from "../../lib/queries"
+import { useLogRecord, useDeleteRecord, useEditRecord } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 
 const MATCH_TYPES = [
@@ -30,9 +30,15 @@ function ToggleBtn({ value, selected, onChange, label, color }) {
   )
 }
 
-function RecordRow({ record, onDeleted }) {
+function RecordRow({ record, onDeleted, onEdited }) {
   const [confirmDel, setConfirmDel] = useState(false)
+  const [editing, setEditing]       = useState(false)
+  const [editResult, setEditResult] = useState(record.result)
+  const [editPS, setEditPS]         = useState(record.playerScore ?? "")
+  const [editOS, setEditOS]         = useState(record.opponentScore ?? "")
   const deleteRecord                = useDeleteRecord()
+  const editRecord                  = useEditRecord()
+
   const hasScore = record.playerScore !== null && record.playerScore !== undefined &&
                    record.opponentScore !== null && record.opponentScore !== undefined
 
@@ -43,12 +49,29 @@ function RecordRow({ record, onDeleted }) {
     })
   }
 
+  const handleEdit = () => {
+    editRecord.mutate({
+      id: record.id,
+      result: editResult,
+      playerScore:   editPS !== "" ? parseInt(editPS)   : undefined,
+      opponentScore: editOS !== "" ? parseInt(editOS) : undefined,
+    }, {
+      onSuccess: () => {
+        onEdited(record.id, {
+          result: editResult,
+          playerScore:   editPS !== "" ? parseInt(editPS)   : null,
+          opponentScore: editOS !== "" ? parseInt(editOS) : null,
+        })
+        setEditing(false)
+      },
+      onError: (err) => alert(err.response?.data?.error || "Failed to edit record"),
+    })
+  }
+
   if (confirmDel) {
     return (
       <div className="flex items-center gap-3 px-5 py-3.5 bg-rose-400/5">
-        <p className="text-sm text-rose-400 flex-1">
-          Delete this match record? Market value will recalculate.
-        </p>
+        <p className="text-sm text-rose-400 flex-1">Delete this match record? Market value will recalculate.</p>
         <button onClick={() => setConfirmDel(false)}
           className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white">
           Cancel
@@ -57,6 +80,49 @@ function RecordRow({ record, onDeleted }) {
           className="text-xs px-3 py-1.5 rounded-lg bg-rose-500 text-white font-semibold disabled:opacity-50">
           {deleteRecord.isPending ? "Deleting…" : "Yes, delete"}
         </button>
+      </div>
+    )
+  }
+
+  if (editing) {
+    return (
+      <div className="px-5 py-3.5 bg-pitch-800/50 space-y-3">
+        <p className="text-xs text-slate-400 font-medium">
+          Edit: <span className="text-white">{record.playerName}</span> vs <span className="text-white">{record.opponentName}</span>
+        </p>
+        <div className="flex gap-2">
+          {["win", "draw", "loss"].map(r => (
+            <button key={r} onClick={() => setEditResult(r)}
+              className={cn(
+                "flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all capitalize",
+                editResult === r
+                  ? r === "win"  ? "border-emerald-400 text-emerald-400 bg-emerald-400/10"
+                  : r === "draw" ? "border-amber-400 text-amber-400 bg-amber-400/10"
+                  :                "border-rose-400 text-rose-400 bg-rose-400/10"
+                  : "border-surface-border text-slate-500"
+              )}>
+              {r}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Score:</span>
+          <input type="number" min="0" value={editPS} onChange={e => setEditPS(e.target.value)} placeholder="0"
+            className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-xs text-white focus:outline-none focus:border-accent/40" />
+          <span className="text-slate-600 text-xs">–</span>
+          <input type="number" min="0" value={editOS} onChange={e => setEditOS(e.target.value)} placeholder="0"
+            className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-xs text-white focus:outline-none focus:border-accent/40" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setEditing(false)}
+            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white">
+            <X className="w-3 h-3" /> Cancel
+          </button>
+          <button onClick={handleEdit} disabled={editRecord.isPending}
+            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50">
+            <Save className="w-3 h-3" /> {editRecord.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
     )
   }
@@ -96,11 +162,14 @@ function RecordRow({ record, onDeleted }) {
         : record.result === "draw" ? "bg-amber-400/10 text-amber-400 border-amber-400/25"
         : "bg-rose-400/10 text-rose-400 border-rose-400/25"
       )}>{record.result.toUpperCase()}</span>
-      <button
-        onClick={() => setConfirmDel(true)}
+      <button onClick={() => setEditing(true)}
+        className="w-7 h-7 rounded-lg hover:bg-accent/10 flex items-center justify-center text-slate-500 hover:text-accent transition-colors opacity-0 group-hover:opacity-100"
+        title="Edit record">
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <button onClick={() => setConfirmDel(true)}
         className="w-7 h-7 rounded-lg hover:bg-rose-400/10 flex items-center justify-center text-slate-500 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"
-        title="Delete record"
-      >
+        title="Delete record">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -159,6 +228,10 @@ export default function MatchRecordEntry({ players, initialRecords }) {
 
   const handleDeleted = (id) => {
     setRecords(prev => prev.filter(r => r.id !== id))
+  }
+
+  const handleEdited = (id, updates) => {
+    setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r))
   }
 
   return (
@@ -262,7 +335,7 @@ export default function MatchRecordEntry({ players, initialRecords }) {
           <div className="divide-y divide-surface-border/60 max-h-[540px] overflow-y-auto">
             {records.length === 0
               ? <div className="px-5 py-10 text-center text-slate-500 text-sm">No records yet.</div>
-              : records.map(r => <RecordRow key={r.id} record={r} onDeleted={handleDeleted} />)
+              : records.map(r => <RecordRow key={r.id} record={r} onDeleted={handleDeleted} onEdited={handleEdited} />)
             }
           </div>
         </div>
