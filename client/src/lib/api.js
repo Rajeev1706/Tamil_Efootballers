@@ -2,6 +2,7 @@ import axios from "axios"
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "https://tamil-efootballers.onrender.com/api",
+  timeout: 15000, // 15s — prevents requests hanging forever on Render cold starts
 })
 
 api.interceptors.request.use((config) => {
@@ -50,9 +51,11 @@ export const playersApi = {
 }
 
 export const recordsApi = {
-  list:   ()     => api.get("/records").then(r => r.data),
-  create: (body) => api.post("/records", body).then(r => r.data),
-  delete: (id)   => api.delete(`/records/${id}`).then(r => r.data),
+  list:          ()         => api.get("/records").then(r => r.data),
+  create:        (body)     => api.post("/records", body).then(r => r.data),
+  delete:        (id)       => api.delete(`/records/${id}`).then(r => r.data),
+  createTeam:    (body)     => api.post("/records/team", body).then(r => r.data),
+  byFixture:     (id)       => api.get(`/records/fixture/${id}`).then(r => r.data),
 }
 
 export const fixturesApi = {

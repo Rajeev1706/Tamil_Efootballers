@@ -55,6 +55,26 @@ export const useLogRecord = () => {
   })
 }
 
+export const useLogTeamRecord = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: recordsApi.createTeam,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["players"] })
+      qc.invalidateQueries({ queryKey: QK.records })
+      qc.invalidateQueries({ queryKey: ["fixture-records"] })
+    },
+  })
+}
+
+export const useFixtureRecords = (fixtureId) =>
+  useQuery({
+    queryKey: ["fixture-records", fixtureId],
+    queryFn:  () => recordsApi.byFixture(fixtureId),
+    enabled:  !!fixtureId,
+    refetchInterval: 30000, // poll every 30s so both teams see each other's updates
+  })
+
 export const useDeleteRecord = () => {
   const qc = useQueryClient()
   return useMutation({
