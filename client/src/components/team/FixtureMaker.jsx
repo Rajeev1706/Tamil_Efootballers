@@ -341,7 +341,7 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isE
 // ── Main FixtureMaker ─────────────────────────────────────────────────────────
 export default function FixtureMaker({ fixtures, myTeamName, myPlayers, allPlayers }) {
   const upcoming = fixtures.filter(
-    f => f.status === "upcoming" && (f.home === myTeamName || f.away === myTeamName)
+    f => f.status === "upcoming" && f.home === myTeamName
   )
   const [expandedId, setExpandedId] = useState(null)
 
