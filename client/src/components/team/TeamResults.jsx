@@ -99,8 +99,8 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
         playerId:      Number(entry.myPlayerId),
         opponentId:    Number(entry.oppPlayerId),
         result:        entry.result,
-        playerScore:   entry.playerScore !== "" ? Number(entry.playerScore) : undefined,
-        opponentScore: entry.oppScore    !== "" ? Number(entry.oppScore)    : undefined,
+        playerScore:   Number(entry.playerScore),
+        opponentScore: Number(entry.oppScore),
         fixtureId:     fixture.id,
       })
       setEntries(prev => prev.filter(e => e.id !== entry.id))
@@ -198,7 +198,7 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
 }
 
 function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, submitting }) {
-  const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result
+  const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result && entry.playerScore !== "" && entry.oppScore !== ""
 
   return (
     <div className="space-y-2">
@@ -273,7 +273,6 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
           onChange={e => onChange("oppScore", e.target.value)}
           className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-1 text-xs text-white focus:outline-none focus:border-accent/40"
         />
-        <span className="text-xs text-slate-600">(optional)</span>
       </div>
     </div>
   )

@@ -61,7 +61,7 @@ router.get("/fixture/:fixtureId", authenticate, async (req, res, next) => {
       FROM match_records mr
       JOIN players p   ON mr.player_id   = p.id
       JOIN players opp ON mr.opponent_id = opp.id
-      WHERE mr.match_type = 'team_league'
+      WHERE mr.match_type = 'league'
         AND (
           (p.team_id IN (SELECT home_team_id FROM fixtures WHERE id = $1)
             OR p.team_id IN (SELECT away_team_id FROM fixtures WHERE id = $1))
@@ -135,7 +135,7 @@ router.post("/team", authenticate, async (req, res, next) => {
     const ins = await query(`
       INSERT INTO match_records
         (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by)
-      VALUES ($1,$2,$3,$4,'team_league',$5,$6,$7,$8)
+      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8)
       RETURNING *
     `, [
       playerId, opponentId, result, oppCheck.rows[0].grade,
