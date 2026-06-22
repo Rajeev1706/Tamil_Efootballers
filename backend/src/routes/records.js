@@ -6,7 +6,23 @@ import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
-// GET /api/records — all records (admin)
+// Rebuilds a player's form array from scratch based on their last 5 match_records.
+// Used after any delete so stale form letters don't linger. Also used after
+// creating a record for the opponent side — POST currently only updates the
+// logged player's form, never the opponent's.
+async function recalcForm(playerId) {
+  const res = await query(
+    `SELECT result FROM match_records
+     WHERE player_id = $1
+     ORDER BY recorded_at DESC, id DESC
+     LIMIT 5`,
+    [playerId]
+  )
+  const form = res.rows.map(r =>
+    r.result === "win" ? "W" : r.result === "draw" ? "D" : "L"
+  )
+  await query("UPDATE players SET form = $1 WHERE id = $2", [form, playerId])
+}
 router.get("/", authenticate, adminOnly, async (req, res, next) => {
   try {
     const result = await query(`
@@ -74,6 +90,14 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
       WHERE id = $2
     `, [letter, playerId])
 
+    // Also update the opponent's form — they got the mirror result
+    const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
+    await query(`
+      UPDATE players
+      SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5))
+      WHERE id = $2
+    `, [oppLetter, opponentId])
+
     // market_value now factors in BDR points (see services/marketValue.js), so
     // we can't rely on the DB trigger anymore — it only runs the old, BDR-blind
     // SQL formula. Recalculate both sides explicitly here with the real logic.
@@ -114,6 +138,12 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
     // trigger's old SQL formula anymore, same reasoning as in POST above.
     await recalcMarketValue(result.rows[0].player_id)
     await recalcMarketValue(result.rows[0].opponent_id)
+
+    // Rebuild form from remaining match records for both sides — the DELETE
+    // above removed a result that was contributing to the form array, so we
+    // recompute from scratch rather than trying to remove one letter in place.
+    await recalcForm(result.rows[0].player_id)
+    await recalcForm(result.rows[0].opponent_id)
 
     const fresh = await query(
       `SELECT id, market_value AS "marketValue" FROM players WHERE id = $1`,
