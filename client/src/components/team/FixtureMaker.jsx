@@ -320,8 +320,25 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
       ctx.font      = "11px system-ui, sans-serif"
       ctx.textAlign = "center"
       ctx.fillText("tamil-efootballers.vercel.app", width / 2, height - footerH + 26)
+    }
 
-      // Download
+    function drawWithLogo() {
+      drawContent()
+      const logo       = new Image()
+      logo.crossOrigin = "anonymous"
+      logo.onload  = () => {
+        const logoSize = 40
+        // Top left
+        ctx.drawImage(logo, padding - 10, 12, logoSize, logoSize)
+        // Bottom right
+        ctx.drawImage(logo, width - padding - logoSize + 10, height - footerH + (footerH - logoSize) / 2, logoSize, logoSize)
+        triggerDownload()
+      }
+      logo.onerror = () => triggerDownload()
+      logo.src = "/images/logo.png"
+    }
+
+    function triggerDownload() {
       const link    = document.createElement("a")
       link.download = `lineup-${myTeam}-vs-${oppTeam}-R${fixture.round}.png`
       link.href     = canvas.toDataURL("image/png")
@@ -332,21 +349,19 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
       const img    = new Image()
       img.crossOrigin = "anonymous"
       img.onload  = () => {
-        // Draw team image stretched as background
         ctx.drawImage(img, 0, 0, width, height)
-        drawContent()
+        drawWithLogo()
       }
       img.onerror = () => {
-        // Fallback to dark background if image fails to load
         ctx.fillStyle = "#0d1117"
         ctx.fillRect(0, 0, width, height)
-        drawContent()
+        drawWithLogo()
       }
       img.src = teamLogoUrl
     } else {
       ctx.fillStyle = "#0d1117"
       ctx.fillRect(0, 0, width, height)
-      drawContent()
+      drawWithLogo()
     }
   }
 
