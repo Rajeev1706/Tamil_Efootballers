@@ -335,7 +335,8 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
         triggerDownload()
       }
       logo.onerror = () => triggerDownload()
-      logo.src = "/images/logo.png"
+      // Use absolute URL so canvas can load it on deployed site
+      logo.src = `${window.location.origin}/images/logo.png`
     }
 
     function triggerDownload() {
