@@ -328,14 +328,10 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
       const logo   = new Image()
       logo.onload  = () => {
         const logoSize = 70
-        // Top left
         ctx.drawImage(logo, padding - 15, 8, logoSize, logoSize)
-        // Bottom right
-        ctx.drawImage(logo, width - padding - logoSize + 15, height - footerH + (footerH - logoSize) / 2, logoSize, logoSize)
         triggerDownload()
       }
       logo.onerror = () => triggerDownload()
-      // Use Vite-bundled module URL — no CORS issues
       logo.src = tecLogo
     }
 
