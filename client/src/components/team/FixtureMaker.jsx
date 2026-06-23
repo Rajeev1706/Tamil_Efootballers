@@ -3,6 +3,7 @@ import { ClipboardList, ChevronRight, X, Save, Trash2, History, Check, ChevronDo
 import GradeBadge from "../common/GradeBadge"
 import { useLineup, useSaveLineup, useClearLineup, useH2H } from "../../lib/queries"
 import { cn } from "../../lib/utils"
+import tecLogo from "../../../images/logo.png"
 
 // ── H2H Popup ────────────────────────────────────────────────────────────────
 function H2HPopup({ p1, p2, onClose }) {
@@ -324,8 +325,7 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
 
     function drawWithLogo() {
       drawContent()
-      const logo       = new Image()
-      logo.crossOrigin = "anonymous"
+      const logo   = new Image()
       logo.onload  = () => {
         const logoSize = 70
         // Top left
@@ -335,8 +335,8 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
         triggerDownload()
       }
       logo.onerror = () => triggerDownload()
-      // Use absolute URL so canvas can load it on deployed site
-      logo.src = `${window.location.origin}/images/logo.png`
+      // Use Vite-bundled module URL — no CORS issues
+      logo.src = tecLogo
     }
 
     function triggerDownload() {
