@@ -327,11 +327,11 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
       const logo       = new Image()
       logo.crossOrigin = "anonymous"
       logo.onload  = () => {
-        const logoSize = 40
+        const logoSize = 70
         // Top left
-        ctx.drawImage(logo, padding - 10, 12, logoSize, logoSize)
+        ctx.drawImage(logo, padding - 15, 8, logoSize, logoSize)
         // Bottom right
-        ctx.drawImage(logo, width - padding - logoSize + 10, height - footerH + (footerH - logoSize) / 2, logoSize, logoSize)
+        ctx.drawImage(logo, width - padding - logoSize + 15, height - footerH + (footerH - logoSize) / 2, logoSize, logoSize)
         triggerDownload()
       }
       logo.onerror = () => triggerDownload()
