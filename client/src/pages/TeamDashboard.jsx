@@ -133,6 +133,7 @@ export default function TeamDashboard() {
               myTeamName={myTeamName}
               myPlayers={myPlayers}
               allPlayers={allPlayers}
+              teamLogoUrl={teamData?.logoUrl}
             />
           )}
           {activeTab === "trades" && <Trades trades={trades} />}

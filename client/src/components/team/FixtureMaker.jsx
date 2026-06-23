@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ClipboardList, ChevronRight, X, Save, Trash2, History, Check, ChevronDown } from "lucide-react"
+import { ClipboardList, ChevronRight, X, Save, Trash2, History, Check, ChevronDown, Download } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import { useLineup, useSaveLineup, useClearLineup, useH2H } from "../../lib/queries"
 import { cn } from "../../lib/utils"
@@ -157,7 +157,7 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H 
 }
 
 // ── Fixture Card ──────────────────────────────────────────────────────────────
-function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isExpanded }) {
+function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, onExpand, isExpanded }) {
   const isHome    = fixture.home === myTeamName
   const opponent  = isHome ? fixture.away : fixture.home
   const oppTeamId = isHome ? fixture.awayTeamId : fixture.homeTeamId
@@ -224,6 +224,130 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isE
         setInitialized(false)
       },
     })
+  }
+
+  function handleExport() {
+    const filledMatchups = matchups.filter(m => m.myPlayerId && m.oppPlayerId)
+    if (filledMatchups.length === 0) return alert("Add at least one matchup to export.")
+
+    const myTeam  = myTeamName
+    const oppTeam = opponent
+    const padding = 40
+    const rowH    = 44
+    const headerH = 110
+    const footerH = 44
+    const width   = 700
+    const height  = headerH + filledMatchups.length * rowH + footerH + padding
+
+    const canvas  = document.createElement("canvas")
+    canvas.width  = width * 2
+    canvas.height = height * 2
+    const ctx     = canvas.getContext("2d")
+    ctx.scale(2, 2)
+
+    function drawContent() {
+      // Dark overlay for readability
+      ctx.fillStyle = "rgba(5, 10, 18, 0.78)"
+      ctx.fillRect(0, 0, width, height)
+
+      // Green top bar
+      ctx.fillStyle = "#00c896"
+      ctx.fillRect(0, 0, width, 5)
+
+      // Title
+      ctx.fillStyle = "#ffffff"
+      ctx.font      = "bold 22px system-ui, sans-serif"
+      ctx.textAlign = "center"
+      ctx.fillText("FIXTURE LINEUP", width / 2, 40)
+
+      // Round + date
+      ctx.fillStyle = "#94a3b8"
+      ctx.font      = "13px system-ui, sans-serif"
+      ctx.fillText(`Round ${fixture.round}  ·  ${fixture.date?.slice(0, 10) ?? ""}`, width / 2, 62)
+
+      // Team names
+      ctx.fillStyle = "#00c896"
+      ctx.font      = "bold 17px system-ui, sans-serif"
+      ctx.textAlign = "left"
+      ctx.fillText(myTeam.toUpperCase(), padding, 92)
+      ctx.textAlign = "right"
+      ctx.fillText(oppTeam.toUpperCase(), width - padding, 92)
+      ctx.fillStyle = "#475569"
+      ctx.font      = "bold 13px system-ui, sans-serif"
+      ctx.textAlign = "center"
+      ctx.fillText("vs", width / 2, 92)
+
+      // Divider
+      ctx.strokeStyle = "rgba(255,255,255,0.12)"
+      ctx.lineWidth   = 1
+      ctx.beginPath()
+      ctx.moveTo(padding, headerH - 6)
+      ctx.lineTo(width - padding, headerH - 6)
+      ctx.stroke()
+
+      // Matchup rows
+      filledMatchups.forEach((m, i) => {
+        const myP  = myPlayers.find(p => p.id === m.myPlayerId)
+        const oppP = (allPlayers || []).find(p => p.id === m.oppPlayerId)
+        const y    = headerH + i * rowH
+        const midY = y + rowH / 2 + 5
+
+        if (i % 2 === 0) {
+          ctx.fillStyle = "rgba(255,255,255,0.04)"
+          ctx.fillRect(0, y, width, rowH)
+        }
+
+        ctx.fillStyle = "#e2e8f0"
+        ctx.font      = "14px system-ui, sans-serif"
+        ctx.textAlign = "left"
+        ctx.fillText(myP?.name ?? "—", padding, midY)
+
+        ctx.fillStyle = "#334155"
+        ctx.font      = "12px system-ui, sans-serif"
+        ctx.textAlign = "center"
+        ctx.fillText("vs", width / 2, midY)
+
+        ctx.fillStyle = "#e2e8f0"
+        ctx.font      = "14px system-ui, sans-serif"
+        ctx.textAlign = "right"
+        ctx.fillText(oppP?.name ?? "—", width - padding, midY)
+      })
+
+      // Footer
+      ctx.fillStyle = "rgba(0,0,0,0.4)"
+      ctx.fillRect(0, height - footerH, width, footerH)
+      ctx.fillStyle = "#475569"
+      ctx.font      = "11px system-ui, sans-serif"
+      ctx.textAlign = "center"
+      ctx.fillText("tamil-efootballers.vercel.app", width / 2, height - footerH + 26)
+
+      // Download
+      const link    = document.createElement("a")
+      link.download = `lineup-${myTeam}-vs-${oppTeam}-R${fixture.round}.png`
+      link.href     = canvas.toDataURL("image/png")
+      link.click()
+    }
+
+    if (teamLogoUrl) {
+      const img    = new Image()
+      img.crossOrigin = "anonymous"
+      img.onload  = () => {
+        // Draw team image stretched as background
+        ctx.drawImage(img, 0, 0, width, height)
+        drawContent()
+      }
+      img.onerror = () => {
+        // Fallback to dark background if image fails to load
+        ctx.fillStyle = "#0d1117"
+        ctx.fillRect(0, 0, width, height)
+        drawContent()
+      }
+      img.src = teamLogoUrl
+    } else {
+      ctx.fillStyle = "#0d1117"
+      ctx.fillRect(0, 0, width, height)
+      drawContent()
+    }
   }
 
   const formattedDate = fixture.date
@@ -310,13 +434,21 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isE
 
             <div className="flex items-center gap-2">
               {savedLineup.length > 0 && (
-                <button
-                  onClick={handleClear}
-                  disabled={clearLineup.isPending}
-                  className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-white bg-rose-400/10 hover:bg-rose-400/20 border border-rose-400/25 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
-                >
-                  <Trash2 className="w-3 h-3" /> Clear
-                </button>
+                <>
+                  <button
+                    onClick={handleExport}
+                    className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-white bg-violet-400/10 hover:bg-violet-400/20 border border-violet-400/25 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    <Download className="w-3 h-3" /> Export
+                  </button>
+                  <button
+                    onClick={handleClear}
+                    disabled={clearLineup.isPending}
+                    className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-white bg-rose-400/10 hover:bg-rose-400/20 border border-rose-400/25 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear
+                  </button>
+                </>
               )}
               <button
                 onClick={handleSave}
@@ -346,7 +478,7 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, onExpand, isE
 }
 
 // ── Main FixtureMaker ─────────────────────────────────────────────────────────
-export default function FixtureMaker({ fixtures, myTeamName, myPlayers, allPlayers }) {
+export default function FixtureMaker({ fixtures, myTeamName, myPlayers, allPlayers, teamLogoUrl }) {
   const upcoming = fixtures.filter(
     f => f.status === "upcoming" && f.home === myTeamName
   )
@@ -377,6 +509,7 @@ export default function FixtureMaker({ fixtures, myTeamName, myPlayers, allPlaye
           myTeamName={myTeamName}
           myPlayers={myPlayers}
           allPlayers={allPlayers}
+          teamLogoUrl={teamLogoUrl}
           isExpanded={expandedId === fixture.id}
           onExpand={() => setExpandedId(id => id === fixture.id ? null : fixture.id)}
         />
