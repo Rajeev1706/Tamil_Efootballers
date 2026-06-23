@@ -6,6 +6,29 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 
 const router = Router()
 
+// GET /api/teams/top-scorers — top 10 players by goals in team league
+router.get("/top-scorers", async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        p.id,
+        p.name,
+        t.name AS team,
+        COALESCE(SUM(mr.player_score), 0) AS goals
+      FROM players p
+      LEFT JOIN match_records mr
+        ON mr.player_id = p.id
+        AND mr.match_type = 'league'
+        AND mr.player_score IS NOT NULL
+      LEFT JOIN teams t ON p.team_id = t.id
+      GROUP BY p.id, p.name, t.name
+      ORDER BY goals DESC, p.name ASC
+      LIMIT 10
+    `)
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
 // GET /api/teams — public
 router.get("/", async (req, res, next) => {
   try {

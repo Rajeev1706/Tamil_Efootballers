@@ -40,6 +40,7 @@ export const teamsApi = {
   changePassword: (id, newPassword) =>
     api.patch(`/teams/${id}/password`, { newPassword }).then(r => r.data),
   delete:         (id)     => api.delete(`/teams/${id}`).then(r => r.data),
+  topScorers:     ()       => api.get("/teams/top-scorers").then(r => r.data),
 }
 
 export const playersApi = {

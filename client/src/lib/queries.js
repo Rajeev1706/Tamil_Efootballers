@@ -15,6 +15,9 @@ export const QK = {
 export const useTeams = () =>
   useQuery({ queryKey: QK.teams, queryFn: teamsApi.list })
 
+export const useTopScorers = () =>
+  useQuery({ queryKey: ["top-scorers"], queryFn: teamsApi.topScorers })
+
 export const useTeam = (id) =>
   useQuery({ queryKey: QK.team(id), queryFn: () => teamsApi.get(id), enabled: !!id })
 
