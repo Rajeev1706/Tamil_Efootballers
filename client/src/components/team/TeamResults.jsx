@@ -201,33 +201,36 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
   const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result && entry.playerScore !== "" && entry.oppScore !== ""
 
   return (
-    <div className="space-y-2">
-      {/* Player selects + result */}
-      <div className="grid grid-cols-[1fr_auto_1fr_auto_auto] gap-2 items-center">
+    <div className="space-y-2 border border-surface-border rounded-xl p-3">
+      {/* Row 1: Your player vs Opp player */}
+      <div className="flex items-center gap-2">
         <select
           value={entry.myPlayerId}
           onChange={e => onChange("myPlayerId", e.target.value)}
-          className="bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40 truncate"
+          className="flex-1 min-w-0 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
         >
           <option value="">— Your player —</option>
           {myPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
 
-        <span className="text-slate-600 text-xs font-bold">vs</span>
+        <span className="text-slate-600 text-xs font-bold flex-shrink-0">vs</span>
 
         <select
           value={entry.oppPlayerId}
           onChange={e => onChange("oppPlayerId", e.target.value)}
-          className="bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40 truncate"
+          className="flex-1 min-w-0 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
         >
           <option value="">— Opp player —</option>
           {oppPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+      </div>
 
+      {/* Row 2: Result + Score */}
+      <div className="flex items-center gap-2">
         <select
           value={entry.result}
           onChange={e => onChange("result", e.target.value)}
-          className="bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+          className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
         >
           <option value="">Result</option>
           <option value="win">Win</option>
@@ -235,44 +238,42 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
           <option value="loss">Loss</option>
         </select>
 
-        <div className="flex gap-1">
-          <button
-            onClick={onSubmit}
-            disabled={!canSubmit || submitting}
-            className={cn(
-              "px-3 py-2 rounded-lg text-xs font-semibold transition-colors",
-              canSubmit
-                ? "bg-accent/15 text-accent border border-accent/25 hover:bg-accent/25"
-                : "bg-pitch-800 text-slate-600 border border-surface-border cursor-not-allowed"
-            )}
-          >
-            {submitting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Log"}
-          </button>
-          <button
-            onClick={onRemove}
-            className="px-2 py-2 rounded-lg text-xs text-slate-600 hover:text-rose-400 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      {/* Per-player score inputs */}
-      <div className="flex items-center gap-2 pl-1">
-        <span className="text-xs text-slate-600">Score:</span>
+        <span className="text-xs text-slate-600 flex-shrink-0">Score:</span>
         <input
           type="number" min="0" placeholder="0"
           value={entry.playerScore}
           onChange={e => onChange("playerScore", e.target.value)}
-          className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-1 text-xs text-white focus:outline-none focus:border-accent/40"
+          className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
         />
-        <span className="text-slate-600 text-xs">—</span>
+        <span className="text-slate-600 text-xs flex-shrink-0">—</span>
         <input
           type="number" min="0" placeholder="0"
           value={entry.oppScore}
           onChange={e => onChange("oppScore", e.target.value)}
-          className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-1 text-xs text-white focus:outline-none focus:border-accent/40"
+          className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
         />
+      </div>
+
+      {/* Row 3: Log + Remove buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={onSubmit}
+          disabled={!canSubmit || submitting}
+          className={cn(
+            "flex-1 py-2 rounded-lg text-sm font-semibold transition-colors",
+            canSubmit
+              ? "bg-accent/15 text-accent border border-accent/25 hover:bg-accent/25"
+              : "bg-pitch-800 text-slate-600 border border-surface-border cursor-not-allowed"
+          )}
+        >
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Log result"}
+        </button>
+        <button
+          onClick={onRemove}
+          className="px-3 py-2 rounded-lg text-sm text-slate-600 hover:text-rose-400 border border-surface-border transition-colors"
+        >
+          ✕
+        </button>
       </div>
     </div>
   )
