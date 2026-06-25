@@ -61,7 +61,10 @@ app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
       )
     `)
     const ids = involved.rows.map(r => r.id)
-    await Promise.all(ids.map(id => recalcMarketValue(id)))
+    // Run sequentially to avoid exhausting the connection pool
+    for (const id of ids) {
+      await recalcMarketValue(id)
+    }
     res.json({ success: true, updated: ids.length, message: `Recalculated MV for ${ids.length} players` })
   } catch (err) {
     res.status(500).json({ error: err.message })
