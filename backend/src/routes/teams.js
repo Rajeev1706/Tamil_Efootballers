@@ -14,12 +14,17 @@ router.get("/top-scorers", async (req, res, next) => {
         p.id,
         p.name,
         t.name AS team,
-        COALESCE(SUM(mr.player_score), 0) AS goals
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
+            WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
+            ELSE 0
+          END
+        ), 0) AS goals
       FROM players p
       LEFT JOIN match_records mr
-        ON mr.player_id = p.id
+        ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.match_type = 'league'
-        AND mr.player_score IS NOT NULL
       LEFT JOIN teams t ON p.team_id = t.id
       GROUP BY p.id, p.name, t.name
       ORDER BY goals DESC, p.name ASC
