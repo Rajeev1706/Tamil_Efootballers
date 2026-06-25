@@ -44,6 +44,30 @@ app.use("/api/favorites", favoriteRoutes)
 // Health check
 app.get("/health", (_req, res) => res.json({ status: "ok", env: process.env.NODE_ENV }))
 
+// One-off admin utility — recalculates market_value for ALL players using the
+// full corrected JS formula (both sides + BDR). Hit once after deploying the
+// marketValue.js fix to correct stale MVs. Admin auth required.
+import { query } from "./db/pool.js"
+import { recalcMarketValue } from "./services/marketValue.js"
+import { authenticate, adminOnly } from "./middleware/auth.js"
+
+app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
+  try {
+    const involved = await query(`
+      SELECT DISTINCT id FROM players WHERE id IN (
+        SELECT player_id   FROM match_records
+        UNION
+        SELECT opponent_id FROM match_records
+      )
+    `)
+    const ids = involved.rows.map(r => r.id)
+    await Promise.all(ids.map(id => recalcMarketValue(id)))
+    res.json({ success: true, updated: ids.length, message: `Recalculated MV for ${ids.length} players` })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // 404 handler
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }))
 
