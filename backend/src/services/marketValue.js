@@ -48,7 +48,19 @@ function resultWeight(result, grade) {
 export async function calculateMarketValue(playerId) {
   const [matchesRes, playerRes] = await Promise.all([
     query(
-      "SELECT result, opponent_grade AS grade FROM match_records WHERE player_id = $1",
+      `SELECT
+         CASE
+           WHEN player_id = $1 THEN result
+           WHEN result = 'win'  THEN 'loss'
+           WHEN result = 'loss' THEN 'win'
+           ELSE 'draw'
+         END AS result,
+         CASE
+           WHEN player_id = $1 THEN opponent_grade
+           ELSE (SELECT grade FROM players WHERE id = player_id)
+         END AS grade
+       FROM match_records
+       WHERE player_id = $1 OR opponent_id = $1`,
       [playerId]
     ),
     query("SELECT bdr_points AS bdr FROM players WHERE id = $1", [playerId]),
