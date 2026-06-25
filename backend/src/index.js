@@ -53,19 +53,148 @@ import { authenticate, adminOnly } from "./middleware/auth.js"
 
 app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
   try {
-    const involved = await query(`
-      SELECT DISTINCT id FROM players WHERE id IN (
-        SELECT player_id   FROM match_records
+    // Do everything in one SQL query to avoid connection pool exhaustion.
+    // Computes MV for every player involved in a match using the correct
+    // both-sides formula, then updates in bulk.
+    await query(`
+      UPDATE players p
+      SET market_value = GREATEST(50, ROUND(computed.mv_raw / 5.0) * 5)
+      FROM (
+        SELECT
+          pl.id,
+          CASE
+            WHEN COALESCE(SUM(
+              CASE
+                WHEN mr.player_id = pl.id THEN
+                  CASE
+                    WHEN mr.result = 'win'  AND mr.opponent_grade = 'S'  THEN 1.5
+                    WHEN mr.result = 'win'  AND mr.opponent_grade = 'A+' THEN 1.2
+                    WHEN mr.result = 'win'  AND mr.opponent_grade = 'A'  THEN 0.9
+                    WHEN mr.result = 'win'  AND mr.opponent_grade = 'B'  THEN 0.7
+                    WHEN mr.result = 'win'  AND mr.opponent_grade = 'C'  THEN 0.6
+                    WHEN mr.result = 'draw' AND mr.opponent_grade = 'S'  THEN 0.75
+                    WHEN mr.result = 'draw' AND mr.opponent_grade = 'A+' THEN 0.60
+                    WHEN mr.result = 'draw' AND mr.opponent_grade = 'A'  THEN 0.45
+                    WHEN mr.result = 'draw' AND mr.opponent_grade = 'B'  THEN 0.35
+                    WHEN mr.result = 'draw' AND mr.opponent_grade = 'C'  THEN 0.30
+                    WHEN mr.result = 'loss' AND mr.opponent_grade = 'S'  THEN -0.5
+                    WHEN mr.result = 'loss' AND mr.opponent_grade = 'A+' THEN -0.6
+                    WHEN mr.result = 'loss' AND mr.opponent_grade = 'A'  THEN -0.7
+                    WHEN mr.result = 'loss' AND mr.opponent_grade = 'B'  THEN -0.8
+                    WHEN mr.result = 'loss' AND mr.opponent_grade = 'C'  THEN -1.0
+                    ELSE 0
+                  END
+                WHEN mr.opponent_id = pl.id THEN
+                  CASE
+                    WHEN mr.result = 'loss' AND pl2.grade = 'S'  THEN 1.5
+                    WHEN mr.result = 'loss' AND pl2.grade = 'A+' THEN 1.2
+                    WHEN mr.result = 'loss' AND pl2.grade = 'A'  THEN 0.9
+                    WHEN mr.result = 'loss' AND pl2.grade = 'B'  THEN 0.7
+                    WHEN mr.result = 'loss' AND pl2.grade = 'C'  THEN 0.6
+                    WHEN mr.result = 'draw' AND pl2.grade = 'S'  THEN 0.75
+                    WHEN mr.result = 'draw' AND pl2.grade = 'A+' THEN 0.60
+                    WHEN mr.result = 'draw' AND pl2.grade = 'A'  THEN 0.45
+                    WHEN mr.result = 'draw' AND pl2.grade = 'B'  THEN 0.35
+                    WHEN mr.result = 'draw' AND pl2.grade = 'C'  THEN 0.30
+                    WHEN mr.result = 'win'  AND pl2.grade = 'S'  THEN -0.5
+                    WHEN mr.result = 'win'  AND pl2.grade = 'A+' THEN -0.6
+                    WHEN mr.result = 'win'  AND pl2.grade = 'A'  THEN -0.7
+                    WHEN mr.result = 'win'  AND pl2.grade = 'B'  THEN -0.8
+                    WHEN mr.result = 'win'  AND pl2.grade = 'C'  THEN -1.0
+                    ELSE 0
+                  END
+                ELSE 0
+              END
+            ), 0) > 0
+            THEN
+              LEAST(COALESCE(SUM(
+                CASE
+                  WHEN mr.player_id = pl.id THEN
+                    CASE
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'S'  THEN 1.5
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'A+' THEN 1.2
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'A'  THEN 0.9
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'B'  THEN 0.7
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'C'  THEN 0.6
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'S'  THEN 0.75
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'A+' THEN 0.60
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'A'  THEN 0.45
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'B'  THEN 0.35
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'C'  THEN 0.30
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'S'  THEN -0.5
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'A+' THEN -0.6
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'A'  THEN -0.7
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'B'  THEN -0.8
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'C'  THEN -1.0
+                      ELSE 0
+                    END
+                  WHEN mr.opponent_id = pl.id THEN
+                    CASE
+                      WHEN mr.result = 'loss' AND pl2.grade = 'S'  THEN 1.5
+                      WHEN mr.result = 'loss' AND pl2.grade = 'A+' THEN 1.2
+                      WHEN mr.result = 'loss' AND pl2.grade = 'A'  THEN 0.9
+                      WHEN mr.result = 'loss' AND pl2.grade = 'B'  THEN 0.7
+                      WHEN mr.result = 'loss' AND pl2.grade = 'C'  THEN 0.6
+                      WHEN mr.result = 'draw' AND pl2.grade = 'S'  THEN 0.75
+                      WHEN mr.result = 'draw' AND pl2.grade = 'A+' THEN 0.60
+                      WHEN mr.result = 'draw' AND pl2.grade = 'A'  THEN 0.45
+                      WHEN mr.result = 'draw' AND pl2.grade = 'B'  THEN 0.35
+                      WHEN mr.result = 'draw' AND pl2.grade = 'C'  THEN 0.30
+                      WHEN mr.result = 'win'  AND pl2.grade = 'S'  THEN -0.5
+                      WHEN mr.result = 'win'  AND pl2.grade = 'A+' THEN -0.6
+                      WHEN mr.result = 'win'  AND pl2.grade = 'A'  THEN -0.7
+                      WHEN mr.result = 'win'  AND pl2.grade = 'B'  THEN -0.8
+                      WHEN mr.result = 'win'  AND pl2.grade = 'C'  THEN -1.0
+                      ELSE 0
+                    END
+                  ELSE 0
+                END
+              ), 0), 14) * 3 * 5
+              + (LEAST(COALESCE(SUM(
+                CASE
+                  WHEN mr.player_id = pl.id THEN
+                    CASE
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'S'  THEN 1.5
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'A'  THEN 0.9
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'B'  THEN 0.7
+                      WHEN mr.result = 'win'  AND mr.opponent_grade = 'C'  THEN 0.6
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'S'  THEN 0.75
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'A'  THEN 0.45
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'B'  THEN 0.35
+                      WHEN mr.result = 'draw' AND mr.opponent_grade = 'C'  THEN 0.30
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'S'  THEN -0.5
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'A'  THEN -0.7
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'B'  THEN -0.8
+                      WHEN mr.result = 'loss' AND mr.opponent_grade = 'C'  THEN -1.0
+                      ELSE 0
+                    END
+                  ELSE 0
+                END
+              ), 0), 14) / 14.0) * 85
+            ELSE 50
+          END AS mv_raw
+        FROM players pl
+        LEFT JOIN match_records mr ON mr.player_id = pl.id OR mr.opponent_id = pl.id
+        LEFT JOIN players pl2 ON pl2.id = mr.player_id
+        WHERE pl.id IN (
+          SELECT player_id FROM match_records
+          UNION
+          SELECT opponent_id FROM match_records
+        )
+        GROUP BY pl.id
+      ) AS computed
+      WHERE p.id = computed.id
+    `)
+
+    const countRes = await query(`
+      SELECT COUNT(DISTINCT id) AS cnt FROM (
+        SELECT player_id AS id FROM match_records
         UNION
         SELECT opponent_id FROM match_records
-      )
+      ) sub
     `)
-    const ids = involved.rows.map(r => r.id)
-    // Run sequentially to avoid exhausting the connection pool
-    for (const id of ids) {
-      await recalcMarketValue(id)
-    }
-    res.json({ success: true, updated: ids.length, message: `Recalculated MV for ${ids.length} players` })
+    const updated = parseInt(countRes.rows[0].cnt)
+    res.json({ success: true, updated, message: `Recalculated MV for ${updated} players` })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
