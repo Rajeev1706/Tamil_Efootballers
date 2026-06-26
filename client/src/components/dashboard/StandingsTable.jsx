@@ -14,7 +14,7 @@ export default function StandingsTable({ teams, players, onPlayerClick }) {
         <div>
           <p className="section-label mb-0.5">League table</p>
           <h2 className="text-base font-semibold text-white">
-            {view === "table" ? "Season standings" : "Top 10 Goal Scorers"}
+            {view === "table" ? "Season standings" : "Golden Boot"}
           </h2>
         </div>
         <select
