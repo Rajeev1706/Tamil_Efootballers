@@ -10,7 +10,8 @@ const EMPTY = {
   highestMvPlayer: "", highestMv: "",
   longestStreakPlayer: "", longestStreak: "",
   ballondorWinner: "", teamLeagueWinner: "",
-  uclWinner: "", weeklyWinner: "",
+  uclWinner: "",
+  weeklyWinners: ["", "", "", ""], // 4 weeks
   notes: ""
 }
 
@@ -30,8 +31,18 @@ function Field({ label, value, onChange, type = "text", placeholder = "" }) {
 }
 
 function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
-  const [form, setForm] = useState(initial)
+  const [form, setForm] = useState({
+    ...EMPTY,
+    ...initial,
+    weeklyWinners: initial.weeklyWinners?.length ? initial.weeklyWinners : ["", "", "", ""]
+  })
   const set = (key) => (val) => setForm(f => ({ ...f, [key]: val }))
+
+  function setWeek(idx, val) {
+    const updated = [...form.weeklyWinners]
+    updated[idx] = val
+    setForm(f => ({ ...f, weeklyWinners: updated }))
+  }
 
   return (
     <div className="space-y-4">
@@ -56,11 +67,29 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
 
       <div className="border-t border-surface-border pt-3">
         <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">Trophy Winners</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <Field label="Ballon d'Or Winner" value={form.ballondorWinner} onChange={set("ballondorWinner")} placeholder="Sidhu" />
           <Field label="Team League Winner" value={form.teamLeagueWinner} onChange={set("teamLeagueWinner")} placeholder="Japan" />
           <Field label="UCL Winner" value={form.uclWinner} onChange={set("uclWinner")} placeholder="Gnana" />
-          <Field label="Weekly Winner" value={form.weeklyWinner} onChange={set("weeklyWinner")} placeholder="Sathyan" />
+        </div>
+
+        {/* Weekly — 4 separate week inputs */}
+        <div className="bg-pitch-800 border border-surface-border rounded-xl p-4">
+          <p className="text-xs text-slate-400 font-semibold mb-3">Weekly Trophy Winners</p>
+          <div className="space-y-2">
+            {form.weeklyWinners.map((winner, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <span className="text-xs text-slate-500 w-14 flex-shrink-0 font-medium">Week {idx + 1}</span>
+                <input
+                  type="text"
+                  value={winner}
+                  onChange={e => setWeek(idx, e.target.value)}
+                  placeholder={`Week ${idx + 1} winner`}
+                  className="flex-1 bg-pitch-900 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -95,6 +124,10 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
 function SeasonCard({ record, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+
+  const weeklyWinners = Array.isArray(record.weekly_winners)
+    ? record.weekly_winners.filter(Boolean)
+    : record.weekly_winner ? [record.weekly_winner] : []
 
   return (
     <div className="card overflow-hidden">
@@ -135,7 +168,7 @@ function SeasonCard({ record, onEdit, onDelete }) {
       )}
 
       {expanded && (
-        <div className="border-t border-surface-border px-5 py-4">
+        <div className="border-t border-surface-border px-5 py-4 space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
             {[
               ["Top Scorer", record.top_scorer, `${record.top_scorer_goals ?? 0} goals`],
@@ -144,7 +177,6 @@ function SeasonCard({ record, onEdit, onDelete }) {
               ["Ballon d'Or", record.ballondor_winner, "Winner"],
               ["Team League", record.team_league_winner, "Winner"],
               ["UCL", record.ucl_winner, "Winner"],
-              ["Weekly", record.weekly_winner, "Winner"],
             ].filter(([, val]) => val).map(([label, val, sub]) => (
               <div key={label} className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
                 <p className="text-xs text-slate-500 mb-1">{label}</p>
@@ -153,8 +185,24 @@ function SeasonCard({ record, onEdit, onDelete }) {
               </div>
             ))}
           </div>
+
+          {/* Weekly winners */}
+          {weeklyWinners.length > 0 && (
+            <div className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
+              <p className="text-xs text-slate-500 mb-2">Weekly Trophy Winners</p>
+              <div className="space-y-1">
+                {weeklyWinners.map((w, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <span className="text-xs text-slate-600 w-14">Week {i + 1}</span>
+                    <span className="text-white font-medium">{w}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {record.notes && (
-            <p className="mt-3 text-xs text-slate-500 italic">"{record.notes}"</p>
+            <p className="text-xs text-slate-500 italic">"{record.notes}"</p>
           )}
         </div>
       )}
@@ -168,11 +216,11 @@ export default function SeasonRecordsAdmin() {
   const updateRecord = useUpdateSeasonRecord()
   const deleteRecord = useDeleteSeasonRecord()
 
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm]       = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
 
-  function handleSave(form) {
-    const body = {
+  function buildBody(form) {
+    return {
       seasonNumber:        parseInt(form.seasonNumber),
       seasonName:          form.seasonName,
       championTeam:        form.championTeam || null,
@@ -186,18 +234,21 @@ export default function SeasonRecordsAdmin() {
       ballondorWinner:     form.ballondorWinner || null,
       teamLeagueWinner:    form.teamLeagueWinner || null,
       uclWinner:           form.uclWinner || null,
-      weeklyWinner:        form.weeklyWinner || null,
+      weeklyWinners:       form.weeklyWinners || ["", "", "", ""],
       notes:               form.notes || null,
     }
+  }
 
+  function handleSave(form) {
+    const body = buildBody(form)
     if (editingRecord) {
       updateRecord.mutate({ id: editingRecord.id, ...body }, {
-        onSuccess: () => { setEditingRecord(null) },
+        onSuccess: () => setEditingRecord(null),
         onError: (err) => alert(err?.response?.data?.error || "Failed to update"),
       })
     } else {
       createRecord.mutate(body, {
-        onSuccess: () => { setShowForm(false) },
+        onSuccess: () => setShowForm(false),
         onError: (err) => alert(err?.response?.data?.error || "Failed to save"),
       })
     }
@@ -216,7 +267,6 @@ export default function SeasonRecordsAdmin() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-gold" />
@@ -233,39 +283,37 @@ export default function SeasonRecordsAdmin() {
         )}
       </div>
 
-      {/* Add form */}
       {showForm && (
         <div className="card p-5">
           <p className="text-sm font-semibold text-white mb-4">Add New Season Record</p>
-          <SeasonForm
-            onSave={handleSave}
-            onCancel={() => setShowForm(false)}
-            saving={createRecord.isPending}
-          />
+          <SeasonForm onSave={handleSave} onCancel={() => setShowForm(false)} saving={createRecord.isPending} />
         </div>
       )}
 
-      {/* Edit form */}
       {editingRecord && (
         <div className="card p-5 border-accent/20">
           <p className="text-sm font-semibold text-white mb-4">Edit: {editingRecord.season_name}</p>
           <SeasonForm
             initial={{
-              seasonNumber: editingRecord.season_number,
-              seasonName: editingRecord.season_name,
-              championTeam: editingRecord.champion_team ?? "",
-              championPts: editingRecord.champion_pts ?? "",
-              topScorer: editingRecord.top_scorer ?? "",
-              topScorerGoals: editingRecord.top_scorer_goals ?? "",
-              highestMvPlayer: editingRecord.highest_mv_player ?? "",
-              highestMv: editingRecord.highest_mv ?? "",
-              longestStreakPlayer: editingRecord.longest_streak_player ?? "",
-              longestStreak: editingRecord.longest_streak ?? "",
-              ballondorWinner: editingRecord.ballondor_winner ?? "",
-              teamLeagueWinner: editingRecord.team_league_winner ?? "",
-              uclWinner: editingRecord.ucl_winner ?? "",
-              weeklyWinner: editingRecord.weekly_winner ?? "",
-              notes: editingRecord.notes ?? "",
+              seasonNumber:        editingRecord.season_number,
+              seasonName:          editingRecord.season_name,
+              championTeam:        editingRecord.champion_team ?? "",
+              championPts:         editingRecord.champion_pts ?? "",
+              topScorer:           editingRecord.top_scorer ?? "",
+              topScorerGoals:      editingRecord.top_scorer_goals ?? "",
+              highestMvPlayer:     editingRecord.highest_mv_player ?? "",
+              highestMv:           editingRecord.highest_mv ?? "",
+              longestStreakPlayer:  editingRecord.longest_streak_player ?? "",
+              longestStreak:       editingRecord.longest_streak ?? "",
+              ballondorWinner:     editingRecord.ballondor_winner ?? "",
+              teamLeagueWinner:    editingRecord.team_league_winner ?? "",
+              uclWinner:           editingRecord.ucl_winner ?? "",
+              weeklyWinners:       editingRecord.weekly_winners?.length
+                                     ? editingRecord.weekly_winners
+                                     : editingRecord.weekly_winner
+                                       ? [editingRecord.weekly_winner, "", "", ""]
+                                       : ["", "", "", ""],
+              notes:               editingRecord.notes ?? "",
             }}
             onSave={handleSave}
             onCancel={() => setEditingRecord(null)}
@@ -274,7 +322,6 @@ export default function SeasonRecordsAdmin() {
         </div>
       )}
 
-      {/* Records list */}
       {isLoading ? (
         <p className="text-sm text-slate-500 text-center py-6">Loading…</p>
       ) : records.length === 0 ? (
@@ -286,12 +333,7 @@ export default function SeasonRecordsAdmin() {
       ) : (
         <div className="space-y-3">
           {records.map(r => (
-            <SeasonCard
-              key={r.id}
-              record={r}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+            <SeasonCard key={r.id} record={r} onEdit={handleEdit} onDelete={handleDelete} />
           ))}
         </div>
       )}

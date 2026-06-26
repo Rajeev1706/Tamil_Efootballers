@@ -23,7 +23,7 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
       seasonNumber, seasonName, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
-      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes
+      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinners, notes
     } = req.body
 
     const result = await query(`
@@ -31,14 +31,15 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
         season_number, season_name, champion_team, champion_pts,
         top_scorer, top_scorer_goals, highest_mv_player, highest_mv,
         longest_streak_player, longest_streak,
-        ballondor_winner, team_league_winner, ucl_winner, weekly_winner, notes
+        ballondor_winner, team_league_winner, ucl_winner, weekly_winners, notes
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING *
     `, [
       seasonNumber, seasonName, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
-      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes
+      ballondorWinner, teamLeagueWinner, uclWinner,
+      weeklyWinners || [], notes
     ])
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
@@ -51,7 +52,7 @@ router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, ne
       seasonNumber, seasonName, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
-      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes
+      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinners, notes
     } = req.body
 
     const result = await query(`
@@ -62,13 +63,14 @@ router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, ne
         highest_mv_player = $7, highest_mv = $8,
         longest_streak_player = $9, longest_streak = $10,
         ballondor_winner = $11, team_league_winner = $12,
-        ucl_winner = $13, weekly_winner = $14, notes = $15
+        ucl_winner = $13, weekly_winners = $14, notes = $15
       WHERE id = $16 RETURNING *
     `, [
       seasonNumber, seasonName, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
-      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes,
+      ballondorWinner, teamLeagueWinner, uclWinner,
+      weeklyWinners || [], notes,
       req.params.id
     ])
     if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })

@@ -77,7 +77,16 @@ function SeasonCard({ record }) {
               <TrophyRow image={ballondorImg}  label="Ballon d'Or"  winner={record.ballondor_winner} />
               <TrophyRow image={teamLeagueImg} label="Team League"  winner={record.team_league_winner} />
               <TrophyRow image={uclImg}        label="UCL"          winner={record.ucl_winner} />
-              <TrophyRow image={weeklyImg}     label="Weekly"       winner={record.weekly_winner} />
+              {/* Weekly — show each week separately */}
+              {(() => {
+                const weeks = Array.isArray(record.weekly_winners)
+                  ? record.weekly_winners.filter(Boolean)
+                  : record.weekly_winner ? [record.weekly_winner] : []
+                if (weeks.length === 0) return null
+                return weeks.map((w, i) => (
+                  <TrophyRow key={i} image={weeklyImg} label={`Weekly · Week ${i + 1}`} winner={w} />
+                ))
+              })()}
             </div>
           </div>
 
