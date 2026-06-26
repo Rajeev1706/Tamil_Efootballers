@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Target } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers } from "../../lib/queries"
+import teamLeagueTrophy from "../../../images/Team League.png"
 
 export default function StandingsTable({ teams, players, onPlayerClick }) {
   const [view, setView]       = useState("table")
@@ -11,11 +12,18 @@ export default function StandingsTable({ teams, players, onPlayerClick }) {
     <div className="card overflow-hidden">
       {/* Header with dropdown */}
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <p className="section-label mb-0.5">League table</p>
-          <h2 className="text-base font-semibold text-white">
-            {view === "table" ? "Season standings" : "GOLDEN BOOT"}
-          </h2>
+        <div className="flex items-center gap-3">
+          <img
+            src={teamLeagueTrophy}
+            alt="Team League"
+            className="w-9 h-9 object-contain flex-shrink-0"
+          />
+          <div>
+            <p className="section-label mb-0.5">League table</p>
+            <h2 className="text-base font-semibold text-white">
+              {view === "table" ? "Season standings" : "Golden Boot"}
+            </h2>
+          </div>
         </div>
         <select
           value={view}
