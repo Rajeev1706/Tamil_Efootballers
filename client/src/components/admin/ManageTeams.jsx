@@ -1,18 +1,18 @@
 import { useState } from "react"
 import { Pencil, Trash2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react"
-import { useTeams, useDeleteTeam, useUpdateTeam, useDeletePlayer, useChangeTeamPassword } from "../../lib/queries"
+import { useTeams, useDeleteTeam, useUpdateTeam, useUnassignPlayer, useChangeTeamPassword } from "../../lib/queries"
 import PlayerAvatar from "../common/PlayerAvatar"
 import GradeBadge from "../common/GradeBadge"
 import { cn } from "../../lib/utils"
 
 function RosterPlayerRow({ player }) {
   const [confirmDel, setConfirmDel] = useState(false)
-  const deletePlayer                = useDeletePlayer()
+  const unassignPlayer             = useUnassignPlayer()
 
-  const handleDelete = () => {
-    deletePlayer.mutate(player.id, {
+  const handleUnassign = () => {
+    unassignPlayer.mutate(player.id, {
       onSuccess: () => setConfirmDel(false),
-      onError:   (err) => alert(err.response?.data?.error || "Delete failed"),
+      onError:   (err) => alert(err.response?.data?.error || "Failed to remove from team"),
     })
   }
 
@@ -20,15 +20,15 @@ function RosterPlayerRow({ player }) {
     return (
       <div className="flex items-center gap-3 px-4 py-2.5 bg-rose-400/5 rounded-lg">
         <p className="text-xs text-rose-400 flex-1">
-          Delete <span className="font-semibold">{player.name}</span>? Removes their match records too.
+          Remove <span className="font-semibold">{player.name}</span> from this team? They'll stay in the player list.
         </p>
         <button onClick={() => setConfirmDel(false)}
           className="text-xs px-2.5 py-1 rounded-lg border border-surface-border text-slate-400 hover:text-white">
           Cancel
         </button>
-        <button onClick={handleDelete} disabled={deletePlayer.isPending}
+        <button onClick={handleUnassign} disabled={unassignPlayer.isPending}
           className="text-xs px-2.5 py-1 rounded-lg bg-rose-500 text-white font-semibold disabled:opacity-50">
-          {deletePlayer.isPending ? "Deleting…" : "Yes, delete"}
+          {unassignPlayer.isPending ? "Removing…" : "Yes, remove"}
         </button>
       </div>
     )

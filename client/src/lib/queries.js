@@ -203,6 +203,17 @@ export const useDeletePlayer = () => {
   })
 }
 
+export const useUnassignPlayer = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => playersApi.unassign(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["players"] })
+      qc.invalidateQueries({ queryKey: QK.teams })
+    },
+  })
+}
+
 export const useDeleteTeam = () => {
   const qc = useQueryClient()
   return useMutation({
