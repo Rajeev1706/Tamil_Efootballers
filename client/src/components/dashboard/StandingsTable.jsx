@@ -3,6 +3,7 @@ import { Target } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers } from "../../lib/queries"
 import teamLeagueTrophy from "../../../images/Team League.png"
+import goldenBoot from "../../../images/Golden Boot.png"
 
 export default function StandingsTable({ teams, players, onPlayerClick }) {
   const [view, setView]       = useState("table")
@@ -14,8 +15,8 @@ export default function StandingsTable({ teams, players, onPlayerClick }) {
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <img
-            src={teamLeagueTrophy}
-            alt="Team League"
+            src={view === "table" ? teamLeagueTrophy : goldenBoot}
+            alt={view === "table" ? "Team League" : "Golden Boot"}
             className="w-9 h-9 object-contain flex-shrink-0"
           />
           <div>
