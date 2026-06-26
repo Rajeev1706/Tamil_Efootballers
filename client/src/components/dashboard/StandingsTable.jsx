@@ -14,7 +14,7 @@ export default function StandingsTable({ teams, players, onPlayerClick }) {
         <div>
           <p className="section-label mb-0.5">League table</p>
           <h2 className="text-base font-semibold text-white">
-            {view === "table" ? "Season standings" : "Golden Boot"}
+            {view === "table" ? "Season standings" : "Top 10 Goal Scorers"}
           </h2>
         </div>
         <select
@@ -23,7 +23,7 @@ export default function StandingsTable({ teams, players, onPlayerClick }) {
           className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
         >
           <option value="table">League table</option>
-          <option value="scorers">Top 10 Goal Scorer</option>
+          <option value="scorers">Golden Boot</option>
         </select>
       </div>
 
