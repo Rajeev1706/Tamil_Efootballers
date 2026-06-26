@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { BarChart2, Shield, LogIn, LogOut, Users } from "lucide-react"
+import { BarChart2, Shield, LogIn, LogOut, Users, Trophy } from "lucide-react"
 import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
@@ -30,6 +30,7 @@ export default function Navbar() {
         {/* Nav */}
         <nav className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
           <NavLink to="/" label="Dashboard" icon={BarChart2} active={pathname === "/"} />
+          <NavLink to="/hall-of-fame" label="Hall of Fame" icon={Trophy} active={pathname === "/hall-of-fame"} />
 
           {!user && (
             <NavLink to="/login" label="Login" icon={LogIn} active={pathname === "/login"} />

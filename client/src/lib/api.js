@@ -40,7 +40,13 @@ export const teamsApi = {
   changePassword: (id, newPassword) =>
     api.patch(`/teams/${id}/password`, { newPassword }).then(r => r.data),
   delete:         (id)     => api.delete(`/teams/${id}`).then(r => r.data),
-  topScorers:     ()       => api.get("/teams/top-scorers").then(r => r.data),
+  topScorers:   ()   => api.get("/teams/top-scorers").then(r => r.data),
+  hallOfFame:      ()        => api.get("/teams/hall-of-fame").then(r => r.data),
+  seasonReset:     ()        => api.post("/teams/season-reset").then(r => r.data),
+  seasonRecords:   ()        => api.get("/teams/season-records").then(r => r.data),
+  createSeasonRecord: (body) => api.post("/teams/season-records", body).then(r => r.data),
+  updateSeasonRecord: (id, body) => api.patch(`/teams/season-records/${id}`, body).then(r => r.data),
+  deleteSeasonRecord: (id)   => api.delete(`/teams/season-records/${id}`).then(r => r.data),
 }
 
 export const playersApi = {

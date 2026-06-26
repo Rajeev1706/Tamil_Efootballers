@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, ArrowLeftRight, Shield, Settings } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -11,9 +11,103 @@ import CreateTeam from "../components/admin/CreateTeam"
 import CreatePlayer from "../components/admin/CreatePlayer"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
+import { teamsApi } from "../lib/api"
 import { adminActivity } from "../data/mockData"
 import { cn } from "../lib/utils"
 import ManageTeams from "../components/admin/ManageTeams"
+import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
+
+function SeasonResetCard() {
+  const [step, setStep]       = useState("idle") // idle | confirm | done
+  const [loading, setLoading] = useState(false)
+  const [typed, setTyped]     = useState("")
+
+  async function handleReset() {
+    if (typed !== "RESET SEASON") return
+    setLoading(true)
+    try {
+      await teamsApi.seasonReset()
+      setStep("done")
+    } catch (err) {
+      alert(err?.response?.data?.error || "Reset failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (step === "done") {
+    return (
+      <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+        <p className="text-emerald-400 font-semibold text-lg mb-1">✅ Season reset complete!</p>
+        <p className="text-sm text-slate-400">Team stats, fixtures and trades cleared. Player records and trophies preserved. Ready for Season 2.</p>
+      </div>
+    )
+  }
+
+  if (step === "confirm") {
+    return (
+      <div className="card p-6 border-rose-500/30 bg-rose-500/5 space-y-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-rose-400 font-semibold mb-1">This cannot be undone</p>
+            <p className="text-sm text-slate-400">This will permanently clear:</p>
+            <ul className="text-sm text-slate-400 mt-1 space-y-0.5 list-disc list-inside">
+              <li>All team points, W/D/L, GF/GA stats</li>
+              <li>All fixtures and lineups</li>
+              <li>All trade requests</li>
+              <li>All player market values (reset to 0)</li>
+              <li>All player form</li>
+            </ul>
+            <p className="text-sm text-slate-400 mt-2">These are <span className="text-white font-semibold">kept safe</span>: player profiles, match records, trophies, BDR points.</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500">Type <span className="font-mono text-white">RESET SEASON</span> to confirm:</p>
+          <input
+            value={typed}
+            onChange={e => setTyped(e.target.value)}
+            placeholder="RESET SEASON"
+            className="w-full bg-pitch-900 border border-rose-500/30 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-rose-500/60"
+          />
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setStep("idle"); setTyped("") }}
+            className="flex-1 py-2 rounded-lg border border-surface-border text-slate-400 hover:text-white text-sm transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={typed !== "RESET SEASON" || loading}
+            className="flex-1 py-2 rounded-lg bg-rose-500 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-rose-600 transition-colors"
+          >
+            {loading ? "Resetting…" : "Reset Season"}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <RotateCcw className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Start New Season</p>
+          <p className="text-sm text-slate-500 mt-0.5">Archive Season 1 and start fresh. Keeps all player profiles, match records and trophies.</p>
+        </div>
+      </div>
+      <button
+        onClick={() => setStep("confirm")}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-sm font-semibold transition-colors"
+      >
+        Reset Season
+      </button>
+    </div>
+  )
+}
 
 const TABS = [
   { id: "setup",    label: "Setup",        icon: Settings        },
@@ -108,6 +202,18 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Players</p>
       <CreatePlayer onSuccess={() => {}} />
+    </div>
+
+    {/* Season Records / Hall of Fame */}
+    <div>
+      <p className="section-label mb-3">Hall of Fame</p>
+      <SeasonRecordsAdmin />
+    </div>
+
+    {/* Season Reset */}
+    <div>
+      <p className="section-label mb-3">Season Management</p>
+      <SeasonResetCard />
     </div>
   </div>
 )}

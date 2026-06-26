@@ -6,6 +6,185 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 
 const router = Router()
 
+// GET /api/teams/season-records — all past season records (public)
+router.get("/season-records", async (req, res, next) => {
+  try {
+    const result = await query(
+      "SELECT * FROM season_records ORDER BY season_number DESC"
+    )
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/season-records — admin saves a season record
+router.post("/season-records", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const {
+      seasonNumber, seasonName, championTeam, championPts,
+      topScorer, topScorerGoals, highestMvPlayer, highestMv,
+      longestStreakPlayer, longestStreak,
+      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes
+    } = req.body
+
+    const result = await query(`
+      INSERT INTO season_records (
+        season_number, season_name, champion_team, champion_pts,
+        top_scorer, top_scorer_goals, highest_mv_player, highest_mv,
+        longest_streak_player, longest_streak,
+        ballondor_winner, team_league_winner, ucl_winner, weekly_winner, notes
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      RETURNING *
+    `, [
+      seasonNumber, seasonName, championTeam, championPts,
+      topScorer, topScorerGoals, highestMvPlayer, highestMv,
+      longestStreakPlayer, longestStreak,
+      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes
+    ])
+    res.status(201).json(result.rows[0])
+  } catch (err) { next(err) }
+})
+
+// PATCH /api/teams/season-records/:id — admin edits a season record
+router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const {
+      seasonNumber, seasonName, championTeam, championPts,
+      topScorer, topScorerGoals, highestMvPlayer, highestMv,
+      longestStreakPlayer, longestStreak,
+      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes
+    } = req.body
+
+    const result = await query(`
+      UPDATE season_records SET
+        season_number = $1, season_name = $2,
+        champion_team = $3, champion_pts = $4,
+        top_scorer = $5, top_scorer_goals = $6,
+        highest_mv_player = $7, highest_mv = $8,
+        longest_streak_player = $9, longest_streak = $10,
+        ballondor_winner = $11, team_league_winner = $12,
+        ucl_winner = $13, weekly_winner = $14, notes = $15
+      WHERE id = $16 RETURNING *
+    `, [
+      seasonNumber, seasonName, championTeam, championPts,
+      topScorer, topScorerGoals, highestMvPlayer, highestMv,
+      longestStreakPlayer, longestStreak,
+      ballondorWinner, teamLeagueWinner, uclWinner, weeklyWinner, notes,
+      req.params.id
+    ])
+    if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })
+    res.json(result.rows[0])
+  } catch (err) { next(err) }
+})
+
+// DELETE /api/teams/season-records/:id — admin deletes a season record
+router.delete("/season-records/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    await query("DELETE FROM season_records WHERE id = $1", [req.params.id])
+    res.json({ deleted: true })
+  } catch (err) { next(err) }
+})
+
+// GET /api/teams/hall-of-fame — season records and award winners
+router.get("/hall-of-fame", async (req, res, next) => {
+  try {
+    // Highest ever MV achieved by any player
+    const highestMV = await query(`
+      SELECT p.id, p.name, t.name AS team, p.market_value AS "marketValue"
+      FROM players p LEFT JOIN teams t ON p.team_id = t.id
+      ORDER BY p.market_value DESC LIMIT 1
+    `)
+
+    // Most goals scored (both sides)
+    const topScorer = await query(`
+      SELECT p.id, p.name, t.name AS team,
+        COALESCE(SUM(
+          CASE WHEN mr.player_id = p.id THEN COALESCE(mr.player_score, 0)
+               WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
+               ELSE 0 END
+        ), 0) AS goals
+      FROM players p
+      LEFT JOIN match_records mr ON mr.player_id = p.id OR mr.opponent_id = p.id
+      LEFT JOIN teams t ON p.team_id = t.id
+      GROUP BY p.id, p.name, t.name
+      ORDER BY goals DESC LIMIT 1
+    `)
+
+    // Longest win streak (consecutive wins as player_id)
+    const winStreaks = await query(`
+      SELECT p.id, p.name, t.name AS team,
+        MAX(streak) AS "longestStreak"
+      FROM (
+        SELECT player_id,
+          COUNT(*) AS streak
+        FROM (
+          SELECT player_id, result,
+            ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY recorded_at, id) -
+            ROW_NUMBER() OVER (PARTITION BY player_id, result ORDER BY recorded_at, id) AS grp
+          FROM match_records
+          WHERE result = 'win'
+        ) grouped
+        GROUP BY player_id, grp
+      ) streaks
+      JOIN players p ON p.id = streaks.player_id
+      LEFT JOIN teams t ON p.team_id = t.id
+      GROUP BY p.id, p.name, t.name
+      ORDER BY "longestStreak" DESC LIMIT 1
+    `)
+
+    // Trophy winners
+    const ballondor = await query(`
+      SELECT p.id, p.name, t.name AS team, p.trophy1_count AS count
+      FROM players p LEFT JOIN teams t ON p.team_id = t.id
+      WHERE p.trophy1_count > 0 ORDER BY p.trophy1_count DESC LIMIT 3
+    `)
+    const teamLeague = await query(`
+      SELECT p.id, p.name, t.name AS team, p.trophy2_count AS count
+      FROM players p LEFT JOIN teams t ON p.team_id = t.id
+      WHERE p.trophy2_count > 0 ORDER BY p.trophy2_count DESC LIMIT 3
+    `)
+    const weekly = await query(`
+      SELECT p.id, p.name, t.name AS team, p.trophy3_count AS count
+      FROM players p LEFT JOIN teams t ON p.team_id = t.id
+      WHERE p.trophy3_count > 0 ORDER BY p.trophy3_count DESC LIMIT 3
+    `)
+    const ucl = await query(`
+      SELECT p.id, p.name, t.name AS team, p.trophy4_count AS count
+      FROM players p LEFT JOIN teams t ON p.team_id = t.id
+      WHERE p.trophy4_count > 0 ORDER BY p.trophy4_count DESC LIMIT 3
+    `)
+
+    // League champion (top team)
+    const champion = await query(`
+      SELECT id, name, score_points AS points, won, played FROM teams
+      ORDER BY score_points DESC, gd DESC LIMIT 1
+    `)
+
+    // Most matches played
+    const mostActive = await query(`
+      SELECT p.id, p.name, t.name AS team, COUNT(*) AS matches
+      FROM players p
+      JOIN match_records mr ON mr.player_id = p.id OR mr.opponent_id = p.id
+      LEFT JOIN teams t ON p.team_id = t.id
+      GROUP BY p.id, p.name, t.name
+      ORDER BY matches DESC LIMIT 1
+    `)
+
+    res.json({
+      highestMV:   highestMV.rows[0]  || null,
+      topScorer:   topScorer.rows[0]  || null,
+      longestStreak: winStreaks.rows[0] || null,
+      mostActive:  mostActive.rows[0] || null,
+      champion:    champion.rows[0]   || null,
+      trophies: {
+        ballondor:  ballondor.rows,
+        teamLeague: teamLeague.rows,
+        weekly:     weekly.rows,
+        ucl:        ucl.rows,
+      }
+    })
+  } catch (err) { next(err) }
+})
+
 // GET /api/teams/top-scorers — top 10 players by goals in team league
 router.get("/top-scorers", async (req, res, next) => {
   try {
@@ -163,6 +342,32 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
     )
     if (!result.rows[0]) return res.status(404).json({ error: "Team not found" })
     res.json({ deleted: true, team: result.rows[0] })
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/season-reset — admin only
+// Archives current season by resetting team stats, player MVs, fixtures
+// but KEEPS all player records, trophies, match history intact
+router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { withTransaction: tx } = await import("../db/pool.js")
+    await tx(async ({ query: q }) => {
+      // Reset all team season stats
+      await q(`
+        UPDATE teams SET
+          played = 0, won = 0, drawn = 0, lost = 0,
+          gf = 0, ga = 0, score_points = 0
+      `)
+      // Reset all player market values to 0 (fresh start)
+      await q(`UPDATE players SET market_value = 0, form = '{}'`)
+      // Delete all fixtures (admin re-creates for new season)
+      await q(`DELETE FROM fixtures`)
+      // Delete all fixture lineups
+      await q(`DELETE FROM fixture_lineups`)
+      // Delete all trade requests
+      await q(`DELETE FROM trade_requests`)
+    })
+    res.json({ success: true, message: "Season reset complete. Team stats, fixtures and trades cleared. Player records and trophies preserved." })
   } catch (err) { next(err) }
 })
 

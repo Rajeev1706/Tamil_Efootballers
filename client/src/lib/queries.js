@@ -18,6 +18,36 @@ export const useTeams = () =>
 export const useTopScorers = () =>
   useQuery({ queryKey: ["top-scorers"], queryFn: teamsApi.topScorers })
 
+export const useHallOfFame = () =>
+  useQuery({ queryKey: ["hall-of-fame"], queryFn: teamsApi.hallOfFame })
+
+export const useSeasonRecords = () =>
+  useQuery({ queryKey: ["season-records"], queryFn: teamsApi.seasonRecords })
+
+export const useCreateSeasonRecord = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => teamsApi.createSeasonRecord(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["season-records"] }),
+  })
+}
+
+export const useUpdateSeasonRecord = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => teamsApi.updateSeasonRecord(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["season-records"] }),
+  })
+}
+
+export const useDeleteSeasonRecord = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => teamsApi.deleteSeasonRecord(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["season-records"] }),
+  })
+}
+
 export const useTeam = (id) =>
   useQuery({ queryKey: QK.team(id), queryFn: () => teamsApi.get(id), enabled: !!id })
 

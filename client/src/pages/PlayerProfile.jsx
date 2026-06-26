@@ -249,6 +249,13 @@ export default function PlayerProfile() {
   const filteredLosses = filteredHistory.filter(m => m.result === "loss").length
   const filteredTotal  = filteredWins + filteredDraws + filteredLosses
 
+  // Goals scored — sum playerScore from all filtered matches
+  const filteredGoals  = filteredHistory.reduce((sum, m) =>
+    sum + (m.playerScore != null ? m.playerScore : 0), 0)
+  const goalsPerMatch  = filteredTotal > 0
+    ? (filteredGoals / filteredTotal).toFixed(1)
+    : "—"
+
   return (
     <Layout>
       <button
@@ -437,7 +444,9 @@ export default function PlayerProfile() {
                 label="Win rate"
                 value={filteredTotal ? `${Math.round((filteredWins / filteredTotal) * 100)}%` : "—"}
               />
- <SummaryRow label="BDR points" value={player.bdrPoints?.toLocaleString() ?? "—"} />
+              <SummaryRow label="Goals scored" value={filteredGoals} />
+              <SummaryRow label="Goals per match" value={goalsPerMatch} />
+              <SummaryRow label="BDR points" value={player.bdrPoints?.toLocaleString() ?? "—"} />
             </div>
           </div>
 
