@@ -356,19 +356,23 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     const { withTransaction: tx } = await import("../db/pool.js")
     await tx(async ({ query: q }) => {
       // Reset all team season stats
-      await q(`
-        UPDATE teams SET
-          played = 0, won = 0, drawn = 0, lost = 0,
-          gf = 0, ga = 0, score_points = 0
-      `)
+      await q(`UPDATE teams SET played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, score_points = 0`)
       // Reset all player market values to 0 (fresh start)
       await q(`UPDATE players SET market_value = 0, form = '{}'`)
-      // Delete all fixtures (admin re-creates for new season)
+      // Delete all fixtures and lineups and trades
       await q(`DELETE FROM fixtures`)
-      // Delete all fixture lineups
       await q(`DELETE FROM fixture_lineups`)
-      // Delete all trade requests
       await q(`DELETE FROM trade_requests`)
+      // Increment current season number
+      await q(`
+        INSERT INTO app_settings (key, value)
+        VALUES ('current_season', (
+          SELECT (COALESCE(value::int, 6) + 1)::text FROM app_settings WHERE key = 'current_season'
+        ))
+        ON CONFLICT (key) DO UPDATE SET value = (
+          SELECT (COALESCE(value::int, 6) + 1)::text FROM app_settings WHERE key = 'current_season'
+        )
+      `)
     })
     res.json({ success: true, message: "Season reset complete. Team stats, fixtures and trades cleared. Player records and trophies preserved." })
   } catch (err) { next(err) }

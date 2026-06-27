@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -11,6 +11,16 @@ export const QK = {
   recent:   ["fixtures", "recent"],
   trades:   (params) => ["trades", params ?? {}],
 }
+
+export const useSettings = () =>
+  useQuery({ queryKey: ["settings"], queryFn: settingsApi.get, staleTime: 60000 })
+
+export const useSeasonMatchRecords = (season) =>
+  useQuery({
+    queryKey: ["records", "season", season],
+    queryFn:  () => recordsApi.bySeason(season),
+    enabled:  !!season,
+  })
 
 export const useTeams = () =>
   useQuery({ queryKey: QK.teams, queryFn: teamsApi.list })

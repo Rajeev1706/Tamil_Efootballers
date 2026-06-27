@@ -41,8 +41,30 @@ app.use("/api/trades",   tradeRoutes)
 app.use("/api/lineups",  lineupRoutes)
 app.use("/api/favorites", favoriteRoutes)
 
-// Health check
-app.get("/health", (_req, res) => res.json({ status: "ok", env: process.env.NODE_ENV }))
+// GET /api/settings — public app settings (current season etc.)
+app.get("/api/settings", async (_req, res) => {
+  try {
+    const result = await query("SELECT key, value FROM app_settings")
+    const settings = Object.fromEntries(result.rows.map(r => [r.key, r.value]))
+    res.json(settings)
+  } catch (err) {
+    res.json({ current_season: "6" })
+  }
+})
+
+// PATCH /api/settings — admin updates settings
+app.patch("/api/settings", authenticate, adminOnly, async (req, res) => {
+  try {
+    const { key, value } = req.body
+    await query(
+      "INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+      [key, String(value)]
+    )
+    res.json({ key, value })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // One-off admin utility — recalculates market_value for ALL players using the
 // full corrected JS formula (both sides + BDR). Hit once after deploying the

@@ -6,6 +6,14 @@ import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
+// Get current season number from app_settings
+async function getCurrentSeason() {
+  try {
+    const res = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    return parseInt(res.rows[0]?.value || "6")
+  } catch { return 6 }
+}
+
 // Rebuilds a player's form from their last 5 match_records — both sides.
 // When the player was the opponent_id, the result is flipped (win→loss, loss→win).
 async function recalcForm(playerId) {
@@ -25,6 +33,33 @@ async function recalcForm(playerId) {
   const form = res.rows.map(r => r.result === "win" ? "W" : r.result === "draw" ? "D" : "L")
   await query("UPDATE players SET form = $1 WHERE id = $2", [form, playerId])
 }
+
+// GET /api/records/season/:season — all records for a specific season (public)
+router.get("/season/:season", async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        mr.id, mr.result,
+        mr.match_type     AS "matchType",
+        mr.player_score   AS "playerScore",
+        mr.opponent_score AS "opponentScore",
+        mr.recorded_at    AS date,
+        mr.season_number  AS "seasonNumber",
+        p.id   AS "playerId",   p.name AS "playerName",
+        pt.name AS "playerTeam",
+        opp.id AS "opponentId", opp.name AS "opponentName",
+        ot.name AS "opponentTeam"
+      FROM match_records mr
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
+      LEFT JOIN teams pt ON p.team_id   = pt.id
+      LEFT JOIN teams ot ON opp.team_id = ot.id
+      WHERE mr.season_number = $1
+      ORDER BY mr.recorded_at DESC, mr.id DESC
+    `, [req.params.season])
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
 
 // GET /api/records — admin only
 router.get("/", authenticate, adminOnly, async (req, res, next) => {
@@ -141,16 +176,17 @@ router.post("/team", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "Opponent must be from the opposing team in this fixture" })
     }
 
+    const seasonNumber = await getCurrentSeason()
     const ins = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by)
-      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number)
+      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9)
       RETURNING *
     `, [
       playerId, opponentId, result, oppCheck.rows[0].grade,
       playerScore ?? null, opponentScore ?? null,
       new Date().toISOString().slice(0, 10),
-      req.user.id,
+      req.user.id, seasonNumber,
     ])
 
     const letter    = result === "win" ? "W" : result === "draw" ? "D" : "L"
@@ -182,16 +218,17 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     if (!oppRes.rows[0]) return res.status(404).json({ error: "Opponent not found" })
     const opponentGrade = oppRes.rows[0].grade
 
+    const seasonNumber = await getCurrentSeason()
     const ins = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `, [
       playerId, opponentId, result, opponentGrade, matchType,
       playerScore ?? null, opponentScore ?? null,
       date || new Date().toISOString().slice(0, 10),
-      req.user.id,
+      req.user.id, seasonNumber,
     ])
 
     const letter = result === "win" ? "W" : result === "draw" ? "D" : "L"
