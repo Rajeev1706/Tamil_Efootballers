@@ -38,7 +38,9 @@ export default function CommonDashboard() {
   const { data: players = [], isLoading: playersLoading } = usePlayers()
   const { data: seasonRecords = [] }                      = useSeasonRecords()
   const { data: settings = {} }                          = useSettings()
-  const [activePanel, setActivePanel] = useState("players")
+  const [activePanel, setActivePanel]       = useState("players")
+  const [selectedYear, setSelectedYear]     = useState(new Date().getFullYear())
+  const [selectedSeason, setSelectedSeason] = useState(null)
 
   const handlePlayer = (player) => navigate(`/player/${player.id}`)
   const isLoading    = teamsLoading || playersLoading
@@ -46,15 +48,12 @@ export default function CommonDashboard() {
   const currentSeason = parseInt(settings.current_season || "6")
   const currentYear   = new Date().getFullYear()
 
-  // Get unique years from saved records + current year
+  const savedSeasons = [...seasonRecords].sort((a, b) => b.season_number - a.season_number)
+
   const availableYears = [
     ...new Set([currentYear, ...savedSeasons.map(r => r.year).filter(Boolean)])
   ].sort((a, b) => b - a)
 
-  const [selectedYear, setSelectedYear]     = useState(currentYear)
-  const [selectedSeason, setSelectedSeason] = useState(null) // null = current
-
-  // Seasons for selected year
   const seasonsForYear = selectedYear === currentYear
     ? [{ label: `Season ${currentSeason} · Current`, value: null }, ...savedSeasons.filter(r => r.year === selectedYear && r.season_number !== currentSeason).map(r => ({ label: r.season_name || `Season ${r.season_number}`, value: r.season_number }))]
     : savedSeasons.filter(r => r.year === selectedYear).map(r => ({ label: r.season_name || `Season ${r.season_number}`, value: r.season_number }))
