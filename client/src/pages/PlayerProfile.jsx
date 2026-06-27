@@ -9,6 +9,7 @@ import ballondorTrophy from "../../images/ballondor.png"
 import teamLeagueTrophy from "../../images/Team League.png"
 import weeklyTrophy from "../../images/Weekly.png"
 import uclTrophy from "../../images/ucl.png"
+import goldenBootTrophy from "../../images/Golden Boot.png"
 
 const MATCH_TYPE_OPTIONS = [
   { value: "all",    label: "Total matches" },
@@ -193,6 +194,7 @@ function TrophyCase({ player }) {
     { image: teamLeagueTrophy, label: "Team League", count: player.trophy2Count ?? 0 },
     { image: uclTrophy,        label: "UCL",          count: player.trophy4Count ?? 0 },
     { image: weeklyTrophy,     label: "Weekly",      count: player.trophy3Count ?? 0 },
+    { image: goldenBootTrophy, label: "Golden Boot", count: player.trophy5Count ?? 0 },
   ]
 
   return (

@@ -5,12 +5,14 @@ import ballondorTrophy  from "../../../images/ballondor.png"
 import teamLeagueTrophy from "../../../images/Team League.png"
 import weeklyTrophy     from "../../../images/Weekly.png"
 import uclTrophy        from "../../../images/ucl.png"
+import goldenBootTrophy from "../../../images/Golden Boot.png"
 
 const TROPHY_OPTIONS = [
   { value: "trophy1Count", label: "Ballon d'Or",  image: ballondorTrophy  },
   { value: "trophy2Count", label: "Team League",  image: teamLeagueTrophy },
   { value: "trophy4Count", label: "UCL",          image: uclTrophy        },
   { value: "trophy3Count", label: "Weekly",       image: weeklyTrophy     },
+  { value: "trophy5Count", label: "Golden Boot",  image: goldenBootTrophy },
 ]
 
 export default function TrophyRanking({ players, onPlayerClick }) {
