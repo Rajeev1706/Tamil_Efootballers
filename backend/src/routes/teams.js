@@ -20,7 +20,7 @@ router.get("/season-records", async (req, res, next) => {
 router.post("/season-records", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      seasonNumber, seasonName, championTeam, championPts,
+      seasonNumber, seasonName, year, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners, notes
@@ -28,14 +28,15 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
 
     const result = await query(`
       INSERT INTO season_records (
-        season_number, season_name, champion_team, champion_pts,
+        season_number, season_name, year, champion_team, champion_pts,
         top_scorer, top_scorer_goals, highest_mv_player, highest_mv,
         longest_streak_player, longest_streak,
         ballondor_winner, team_league_winner, team_league_players, ucl_winner, weekly_winners, notes
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       RETURNING *
     `, [
-      seasonNumber, seasonName, championTeam, championPts,
+      seasonNumber, seasonName, year || new Date().getFullYear(),
+      championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers || [],
@@ -49,7 +50,7 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
 router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      seasonNumber, seasonName, championTeam, championPts,
+      seasonNumber, seasonName, year, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners, notes
@@ -57,17 +58,18 @@ router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, ne
 
     const result = await query(`
       UPDATE season_records SET
-        season_number = $1, season_name = $2,
-        champion_team = $3, champion_pts = $4,
-        top_scorer = $5, top_scorer_goals = $6,
-        highest_mv_player = $7, highest_mv = $8,
-        longest_streak_player = $9, longest_streak = $10,
-        ballondor_winner = $11, team_league_winner = $12,
-        team_league_players = $13, ucl_winner = $14,
-        weekly_winners = $15, notes = $16
-      WHERE id = $17 RETURNING *
+        season_number = $1, season_name = $2, year = $3,
+        champion_team = $4, champion_pts = $5,
+        top_scorer = $6, top_scorer_goals = $7,
+        highest_mv_player = $8, highest_mv = $9,
+        longest_streak_player = $10, longest_streak = $11,
+        ballondor_winner = $12, team_league_winner = $13,
+        team_league_players = $14, ucl_winner = $15,
+        weekly_winners = $16, notes = $17
+      WHERE id = $18 RETURNING *
     `, [
-      seasonNumber, seasonName, championTeam, championPts,
+      seasonNumber, seasonName, year || new Date().getFullYear(),
+      championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers || [],

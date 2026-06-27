@@ -3,16 +3,19 @@ import { Plus, Pencil, Trash2, Trophy, ChevronDown, ChevronUp, Save, X } from "l
 import { useSeasonRecords, useCreateSeasonRecord, useUpdateSeasonRecord, useDeleteSeasonRecord } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 
+const CURRENT_YEAR = new Date().getFullYear()
+const YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR - 2 + i)
+
 const EMPTY = {
-  seasonNumber: "", seasonName: "",
+  seasonNumber: "", seasonName: "", year: String(CURRENT_YEAR),
   championTeam: "", championPts: "",
   topScorer: "", topScorerGoals: "",
   highestMvPlayer: "", highestMv: "",
   longestStreakPlayer: "", longestStreak: "",
   ballondorWinner: "", teamLeagueWinner: "",
   uclWinner: "",
-  weeklyWinners: ["", "", "", ""], // 4 weeks
-  teamLeaguePlayers: [""], // players in the winning team league squad
+  weeklyWinners: ["", "", "", ""],
+  teamLeaguePlayers: [""],
   notes: ""
 }
 
@@ -47,9 +50,19 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Season Number" value={form.seasonNumber} onChange={set("seasonNumber")} type="number" placeholder="1" />
-        <Field label="Season Name" value={form.seasonName} onChange={set("seasonName")} placeholder="Season 1 · 2024–25" />
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs text-slate-500 font-medium block mb-1">Year</label>
+          <select
+            value={form.year}
+            onChange={e => set("year")(e.target.value)}
+            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+          >
+            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <Field label="Season Number" value={form.seasonNumber} onChange={set("seasonNumber")} type="number" placeholder="6" />
+        <Field label="Season Name" value={form.seasonName} onChange={set("seasonName")} placeholder="Season 6" />
       </div>
 
       <div className="border-t border-surface-border pt-3">
@@ -183,7 +196,7 @@ function SeasonCard({ record, onEdit, onDelete }) {
             S{record.season_number}
           </div>
           <div className="text-left">
-            <p className="text-sm font-semibold text-white">{record.season_name}</p>
+            <p className="text-sm font-semibold text-white">{record.season_name} · {record.year}</p>
             {record.champion_team && (
               <p className="text-xs text-slate-500">🏆 {record.champion_team} · {record.champion_pts} pts</p>
             )}
@@ -280,6 +293,7 @@ export default function SeasonRecordsAdmin() {
     return {
       seasonNumber:        parseInt(form.seasonNumber),
       seasonName:          form.seasonName,
+      year:                parseInt(form.year) || CURRENT_YEAR,
       championTeam:        form.championTeam || null,
       championPts:         form.championPts ? parseInt(form.championPts) : null,
       topScorer:           form.topScorer || null,
@@ -355,6 +369,7 @@ export default function SeasonRecordsAdmin() {
             initial={{
               seasonNumber:        editingRecord.season_number,
               seasonName:          editingRecord.season_name,
+              year:                editingRecord.year ?? CURRENT_YEAR,
               championTeam:        editingRecord.champion_team ?? "",
               championPts:         editingRecord.champion_pts ?? "",
               topScorer:           editingRecord.top_scorer ?? "",

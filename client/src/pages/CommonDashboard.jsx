@@ -38,22 +38,29 @@ export default function CommonDashboard() {
   const { data: players = [], isLoading: playersLoading } = usePlayers()
   const { data: seasonRecords = [] }                      = useSeasonRecords()
   const { data: settings = {} }                          = useSettings()
-  const [activePanel, setActivePanel]       = useState("players")
-  const [selectedSeason, setSelectedSeason] = useState(null) // null = current
+  const [activePanel, setActivePanel] = useState("players")
 
   const handlePlayer = (player) => navigate(`/player/${player.id}`)
   const isLoading    = teamsLoading || playersLoading
 
   const currentSeason = parseInt(settings.current_season || "6")
+  const currentYear   = new Date().getFullYear()
 
-  // Season options: current + all saved seasons in desc order
-  const savedSeasons = seasonRecords
-    .sort((a, b) => b.season_number - a.season_number)
+  // Get unique years from saved records + current year
+  const availableYears = [
+    ...new Set([currentYear, ...savedSeasons.map(r => r.year).filter(Boolean)])
+  ].sort((a, b) => b - a)
 
-  const isCurrent = selectedSeason === null || selectedSeason === currentSeason
-  const pastRecord = selectedSeason
-    ? seasonRecords.find(r => r.season_number === selectedSeason)
-    : null
+  const [selectedYear, setSelectedYear]     = useState(currentYear)
+  const [selectedSeason, setSelectedSeason] = useState(null) // null = current
+
+  // Seasons for selected year
+  const seasonsForYear = selectedYear === currentYear
+    ? [{ label: `Season ${currentSeason} · Current`, value: null }, ...savedSeasons.filter(r => r.year === selectedYear && r.season_number !== currentSeason).map(r => ({ label: r.season_name || `Season ${r.season_number}`, value: r.season_number }))]
+    : savedSeasons.filter(r => r.year === selectedYear).map(r => ({ label: r.season_name || `Season ${r.season_number}`, value: r.season_number }))
+
+  const isCurrent  = selectedSeason === null
+  const pastRecord = selectedSeason ? seasonRecords.find(r => r.season_number === selectedSeason) : null
 
   const leader = [...players].sort((a, b) =>
     (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
@@ -72,34 +79,48 @@ export default function CommonDashboard() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.12),transparent_60%)]" />
         <div className="relative px-6 py-8 sm:px-8">
 
-          {/* Season selector */}
+          {/* Year + Season selectors */}
           <div className="flex items-center gap-2 mb-3 flex-wrap">
+            {/* Year dropdown */}
             <div className="relative">
               <select
-                value={selectedSeason ?? currentSeason}
+                value={selectedYear}
                 onChange={e => {
-                  const val = parseInt(e.target.value)
-                  setSelectedSeason(val === currentSeason ? null : val)
+                  const yr = parseInt(e.target.value)
+                  setSelectedYear(yr)
+                  setSelectedSeason(null) // reset to current when year changes
                 }}
                 className="appearance-none bg-white/10 border border-white/20 rounded-lg pl-3 pr-8 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-accent/50 cursor-pointer"
               >
-                <option value={currentSeason} className="bg-pitch-900 text-white">
-                  Season {currentSeason} · Current
-                </option>
-                {savedSeasons
-                  .filter(r => r.season_number !== currentSeason)
-                  .map(r => (
-                    <option key={r.season_number} value={r.season_number} className="bg-pitch-900 text-white">
-                      {r.season_name || `Season ${r.season_number}`}
-                    </option>
-                  ))
-                }
+                {availableYears.map(y => (
+                  <option key={y} value={y} className="bg-pitch-900 text-white">{y}</option>
+                ))}
               </select>
               <ChevronDown className="w-3 h-3 text-white/60 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
+
+            {/* Season dropdown */}
+            <div className="relative">
+              <select
+                value={selectedSeason ?? "current"}
+                onChange={e => {
+                  const val = e.target.value
+                  setSelectedSeason(val === "current" ? null : parseInt(val))
+                }}
+                className="appearance-none bg-white/10 border border-white/20 rounded-lg pl-3 pr-8 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-accent/50 cursor-pointer"
+              >
+                {seasonsForYear.map(s => (
+                  <option key={s.value ?? "current"} value={s.value ?? "current"} className="bg-pitch-900 text-white">
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-white/60 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
             {!isCurrent && (
               <span className="text-xs text-slate-500 bg-pitch-800 border border-surface-border px-2 py-1 rounded-lg">
-                Archived Season
+                Archived
               </span>
             )}
           </div>
