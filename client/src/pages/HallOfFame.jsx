@@ -149,6 +149,20 @@ export default function HallOfFame() {
           </div>
         ) : (
           <>
+            {/* League Info Board — shown above season dropdown */}
+            {infoItems.length > 0 && (
+              <div className="card overflow-hidden mb-4">
+                <div className="divide-y divide-surface-border/50">
+                  {infoItems.map(item => (
+                    <div key={item.id} className="px-5 py-4">
+                      <p className="text-sm font-bold text-accent mb-1">{item.title}</p>
+                      <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Season selector dropdown */}
             <div className="relative">
               <select
@@ -166,20 +180,6 @@ export default function HallOfFame() {
               </select>
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
-
-            {/* League Info Board — admin-managed entries */}
-            {infoItems.length > 0 && (
-              <div className="card overflow-hidden mt-4">
-                <div className="divide-y divide-surface-border/50">
-                  {infoItems.map(item => (
-                    <div key={item.id} className="px-5 py-4">
-                      <p className="text-sm font-bold text-accent mb-1">{item.title}</p>
-                      <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{item.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Selected season detail */}
             {selected && <SeasonDetail record={selected} />}
