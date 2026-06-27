@@ -76,6 +76,15 @@ function SeasonCard({ record }) {
             <div className="card px-4 py-1">
               <TrophyRow image={ballondorImg}  label="Ballon d'Or"  winner={record.ballondor_winner} />
               <TrophyRow image={teamLeagueImg} label="Team League"  winner={record.team_league_winner} />
+              {Array.isArray(record.team_league_players) && record.team_league_players.filter(Boolean).length > 0 && (
+                <div className="pl-11 pb-2 flex flex-wrap gap-1.5">
+                  {record.team_league_players.filter(Boolean).map((p, i) => (
+                    <span key={i} className="text-xs bg-pitch-800 border border-surface-border rounded-full px-2.5 py-0.5 text-slate-400">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              )}
               <TrophyRow image={uclImg}        label="UCL"          winner={record.ucl_winner} />
               {/* Weekly — show each week separately */}
               {(() => {

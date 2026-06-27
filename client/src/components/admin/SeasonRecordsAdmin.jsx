@@ -12,6 +12,7 @@ const EMPTY = {
   ballondorWinner: "", teamLeagueWinner: "",
   uclWinner: "",
   weeklyWinners: ["", "", "", ""], // 4 weeks
+  teamLeaguePlayers: [""], // players in the winning team league squad
   notes: ""
 }
 
@@ -69,8 +70,50 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
         <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">Trophy Winners</p>
         <div className="grid grid-cols-2 gap-3 mb-4">
           <Field label="Ballon d'Or Winner" value={form.ballondorWinner} onChange={set("ballondorWinner")} placeholder="Sidhu" />
-          <Field label="Team League Winner" value={form.teamLeagueWinner} onChange={set("teamLeagueWinner")} placeholder="Japan" />
           <Field label="UCL Winner" value={form.uclWinner} onChange={set("uclWinner")} placeholder="Gnana" />
+        </div>
+
+        {/* Team League — team name + squad players */}
+        <div className="bg-pitch-800 border border-surface-border rounded-xl p-4 mb-4">
+          <p className="text-xs text-slate-400 font-semibold mb-3">Team League Winner</p>
+          <Field label="Winning Team Name" value={form.teamLeagueWinner} onChange={set("teamLeagueWinner")} placeholder="Japan" />
+          <div className="mt-3">
+            <p className="text-xs text-slate-500 font-medium mb-2">Squad Players</p>
+            <div className="space-y-2">
+              {(form.teamLeaguePlayers || [""]).map((player, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs text-slate-600 w-5 flex-shrink-0">{idx + 1}.</span>
+                  <input
+                    type="text"
+                    value={player}
+                    onChange={e => {
+                      const updated = [...(form.teamLeaguePlayers || [""])]
+                      updated[idx] = e.target.value
+                      set("teamLeaguePlayers")(updated)
+                    }}
+                    placeholder={`Player ${idx + 1} name`}
+                    className="flex-1 bg-pitch-900 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                  />
+                  {(form.teamLeaguePlayers || [""]).length > 1 && (
+                    <button
+                      onClick={() => {
+                        const updated = [...(form.teamLeaguePlayers || [""])]
+                        updated.splice(idx, 1)
+                        set("teamLeaguePlayers")(updated)
+                      }}
+                      className="text-slate-600 hover:text-rose-400 transition-colors px-1 flex-shrink-0"
+                    >✕</button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => set("teamLeaguePlayers")([...(form.teamLeaguePlayers || [""]), ""])}
+                className="text-xs text-accent hover:text-accent/80 transition-colors mt-1"
+              >
+                + Add player
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Weekly — 4 separate week inputs */}
@@ -186,6 +229,20 @@ function SeasonCard({ record, onEdit, onDelete }) {
             ))}
           </div>
 
+          {/* Team League squad */}
+          {record.team_league_winner && Array.isArray(record.team_league_players) && record.team_league_players.filter(Boolean).length > 0 && (
+            <div className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
+              <p className="text-xs text-slate-500 mb-2">Team League Champions Squad — {record.team_league_winner}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {record.team_league_players.filter(Boolean).map((p, i) => (
+                  <span key={i} className="text-xs bg-pitch-900 border border-surface-border rounded-full px-2.5 py-1 text-slate-300">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Weekly winners */}
           {weeklyWinners.length > 0 && (
             <div className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
@@ -233,6 +290,7 @@ export default function SeasonRecordsAdmin() {
       longestStreak:       form.longestStreak ? parseInt(form.longestStreak) : null,
       ballondorWinner:     form.ballondorWinner || null,
       teamLeagueWinner:    form.teamLeagueWinner || null,
+      teamLeaguePlayers:   form.teamLeaguePlayers || [],
       uclWinner:           form.uclWinner || null,
       weeklyWinners:       form.weeklyWinners || ["", "", "", ""],
       notes:               form.notes || null,
@@ -307,6 +365,9 @@ export default function SeasonRecordsAdmin() {
               longestStreak:       editingRecord.longest_streak ?? "",
               ballondorWinner:     editingRecord.ballondor_winner ?? "",
               teamLeagueWinner:    editingRecord.team_league_winner ?? "",
+              teamLeaguePlayers:   editingRecord.team_league_players?.length
+                                     ? editingRecord.team_league_players
+                                     : [""],
               uclWinner:           editingRecord.ucl_winner ?? "",
               weeklyWinners:       editingRecord.weekly_winners?.length
                                      ? editingRecord.weekly_winners
