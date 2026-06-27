@@ -1,5 +1,6 @@
 import { Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
+import ballondorImg from "../../../images/ballondor.png"
 
 const FormDot = ({ result }) => {
   const map = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
@@ -14,9 +15,12 @@ export default function BDRRanking({ players, onPlayerClick }) {
 
   return (
     <div className="card overflow-hidden">
-      <div className="px-5 py-4 border-b border-surface-border">
-        <p className="section-label mb-0.5">BDR ranking</p>
-        <h2 className="text-base font-semibold text-white">BALLOND'OR</h2>
+      <div className="px-5 py-4 border-b border-surface-border flex items-center gap-3">
+        <img src={ballondorImg} alt="Ballon d'Or" className="w-9 h-9 object-contain flex-shrink-0" />
+        <div>
+          <p className="section-label mb-0.5">BDR ranking</p>
+          <h2 className="text-base font-semibold text-white">BALLOND'OR</h2>
+        </div>
       </div>
 
       <div className="divide-y divide-surface-border">
