@@ -6,6 +6,14 @@ import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
+// POST /api/players/reset-mv — admin resets all player market values and form to 0
+router.post("/reset-mv", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const result = await query("UPDATE players SET market_value = 0, form = '{}'")
+    res.json({ success: true, message: "All player market values reset to 0" })
+  } catch (err) { next(err) }
+})
+
 // GET /api/players — public
 router.get("/", async (req, res, next) => {
   try {
