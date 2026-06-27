@@ -16,6 +16,7 @@ import { adminActivity } from "../data/mockData"
 import { cn } from "../lib/utils"
 import ManageTeams from "../components/admin/ManageTeams"
 import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
+import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 
 function SeasonResetCard() {
   const [step, setStep]       = useState("idle") // idle | confirm | done
@@ -202,6 +203,12 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Players</p>
       <CreatePlayer onSuccess={() => {}} />
+    </div>
+
+    {/* League Info Board */}
+    <div>
+      <p className="section-label mb-3">League Info Board</p>
+      <LeagueInfoAdmin />
     </div>
 
     {/* Season Records / Hall of Fame */}

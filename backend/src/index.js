@@ -222,6 +222,40 @@ app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
   }
 })
 
+// ── League Info board (public read, admin write) ───────────────────────────
+app.get("/api/league-info", async (_req, res) => {
+  try {
+    const result = await query("SELECT * FROM league_info ORDER BY sort_order ASC, id ASC")
+    res.json(result.rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+app.post("/api/league-info", authenticate, adminOnly, async (req, res) => {
+  try {
+    const { title, content, sortOrder } = req.body
+    const result = await query(
+      "INSERT INTO league_info (title, content, sort_order) VALUES ($1,$2,$3) RETURNING *",
+      [title, content, sortOrder ?? 0]
+    )
+    res.status(201).json(result.rows[0])
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+app.patch("/api/league-info/:id", authenticate, adminOnly, async (req, res) => {
+  try {
+    const { title, content, sortOrder } = req.body
+    const result = await query(
+      "UPDATE league_info SET title=$1, content=$2, sort_order=$3 WHERE id=$4 RETURNING *",
+      [title, content, sortOrder ?? 0, req.params.id]
+    )
+    res.json(result.rows[0])
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+app.delete("/api/league-info/:id", authenticate, adminOnly, async (req, res) => {
+  try {
+    await query("DELETE FROM league_info WHERE id=$1", [req.params.id])
+    res.json({ deleted: true })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // 404 handler
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }))
 

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -14,6 +14,31 @@ export const QK = {
 
 export const useSettings = () =>
   useQuery({ queryKey: ["settings"], queryFn: settingsApi.get, staleTime: 60000 })
+
+export const useLeagueInfo = () =>
+  useQuery({ queryKey: ["league-info"], queryFn: leagueInfoApi.list })
+
+export const useCreateLeagueInfo = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: leagueInfoApi.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["league-info"] }),
+  })
+}
+export const useUpdateLeagueInfo = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => leagueInfoApi.update(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["league-info"] }),
+  })
+}
+export const useDeleteLeagueInfo = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => leagueInfoApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["league-info"] }),
+  })
+}
 
 export const useSeasonMatchRecords = (season) =>
   useQuery({

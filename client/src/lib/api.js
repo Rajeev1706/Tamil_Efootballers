@@ -58,6 +58,13 @@ export const playersApi = {
   unassign: (id)     => api.patch(`/players/${id}`, { teamId: null, teamIdProvided: true }).then(r => r.data),
 }
 
+export const leagueInfoApi = {
+  list:   ()        => api.get("/league-info").then(r => r.data),
+  create: (body)    => api.post("/league-info", body).then(r => r.data),
+  update: (id, body)=> api.patch(`/league-info/${id}`, body).then(r => r.data),
+  delete: (id)      => api.delete(`/league-info/${id}`).then(r => r.data),
+}
+
 export const settingsApi = {
   get:    ()           => api.get("/settings").then(r => r.data),
   update: (key, value) => api.patch("/settings", { key, value }).then(r => r.data),

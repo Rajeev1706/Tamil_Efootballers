@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Crown, ChevronDown, Trophy } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
-import { useSeasonRecords } from "../lib/queries"
+import { useSeasonRecords, useLeagueInfo } from "../lib/queries"
 import { cn } from "../lib/utils"
 import ballondorImg  from "../../images/ballondor.png"
 import teamLeagueImg from "../../images/Team League.png"
@@ -108,6 +108,7 @@ function SeasonDetail({ record }) {
 export default function HallOfFame() {
   const navigate = useNavigate()
   const { data: records = [], isLoading } = useSeasonRecords()
+  const { data: infoItems = [] }          = useLeagueInfo()
   const [selectedId, setSelectedId] = useState(null)
 
   const sorted = [...records].sort((a, b) => b.season_number - a.season_number)
@@ -149,7 +150,7 @@ export default function HallOfFame() {
         ) : (
           <>
             {/* Season selector dropdown */}
-            <div className="relative mb-2">
+            <div className="relative">
               <select
                 value={selectedId ?? ""}
                 onChange={e => setSelectedId(parseInt(e.target.value))}
@@ -165,6 +166,20 @@ export default function HallOfFame() {
               </select>
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
+
+            {/* League Info Board — admin-managed entries */}
+            {infoItems.length > 0 && (
+              <div className="card overflow-hidden mt-4">
+                <div className="divide-y divide-surface-border/50">
+                  {infoItems.map(item => (
+                    <div key={item.id} className="px-5 py-4">
+                      <p className="text-sm font-bold text-accent mb-1">{item.title}</p>
+                      <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Selected season detail */}
             {selected && <SeasonDetail record={selected} />}
