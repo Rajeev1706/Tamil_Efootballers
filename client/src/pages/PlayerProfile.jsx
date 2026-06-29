@@ -5,11 +5,13 @@ import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import { usePlayer } from "../lib/queries"
 import { cn } from "../lib/utils"
-import ballondorTrophy from "../../images/ballondor.png"
-import teamLeagueTrophy from "../../images/Team League.png"
-import weeklyTrophy from "../../images/Weekly.png"
-import uclTrophy from "../../images/ucl.png"
-import goldenBootTrophy from "../../images/Golden Boot.png"
+import ballondorTrophy    from "../../images/ballondor.png"
+import teamLeagueTrophy   from "../../images/Team League.png"
+import weeklyTrophy       from "../../images/Weekly.png"
+import uclTrophy          from "../../images/ucl.png"
+import goldenBootTrophy   from "../../images/Golden Boot.png"
+import teamLeagueGBTrophy from "../../images/team league_gb.png"
+import uclGBTrophy        from "../../images/ucl_gb.png"
 
 const MATCH_TYPE_OPTIONS = [
   { value: "all",    label: "Total matches" },
@@ -190,11 +192,13 @@ function HeadToHead({ matchHistory = [] }) {
 
 function TrophyCase({ player }) {
   const trophies = [
-    { image: ballondorTrophy,  label: "Ballon d'Or", count: player.trophy1Count ?? 0 },
-    { image: teamLeagueTrophy, label: "Team League", count: player.trophy2Count ?? 0 },
-    { image: uclTrophy,        label: "UCL",          count: player.trophy4Count ?? 0 },
-    { image: weeklyTrophy,     label: "Weekly",      count: player.trophy3Count ?? 0 },
-    { image: goldenBootTrophy, label: "Golden Boot", count: player.trophy5Count ?? 0 },
+    { image: ballondorTrophy,    label: "Ballon d'Or",             count: player.trophy1Count ?? 0 },
+    { image: teamLeagueTrophy,   label: "Team League",             count: player.trophy2Count ?? 0 },
+    { image: uclTrophy,          label: "UCL",                     count: player.trophy4Count ?? 0 },
+    { image: weeklyTrophy,       label: "Weekly",                  count: player.trophy3Count ?? 0 },
+    { image: goldenBootTrophy,   label: "Weekly Golden Boot",      count: player.trophy5Count ?? 0 },
+    { image: teamLeagueGBTrophy, label: "Team League Golden Boot", count: player.trophy6Count ?? 0 },
+    { image: uclGBTrophy,        label: "UCL Golden Boot",         count: player.trophy7Count ?? 0 },
   ]
 
   return (

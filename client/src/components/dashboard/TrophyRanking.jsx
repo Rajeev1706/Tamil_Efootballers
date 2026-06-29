@@ -1,18 +1,22 @@
 import { useState } from "react"
 import { Trophy } from "lucide-react"
 import { cn } from "../../lib/utils"
-import ballondorTrophy  from "../../../images/ballondor.png"
-import teamLeagueTrophy from "../../../images/Team League.png"
-import weeklyTrophy     from "../../../images/Weekly.png"
-import uclTrophy        from "../../../images/ucl.png"
-import goldenBootTrophy from "../../../images/Golden Boot.png"
+import ballondorTrophy    from "../../../images/ballondor.png"
+import teamLeagueTrophy   from "../../../images/Team League.png"
+import weeklyTrophy       from "../../../images/Weekly.png"
+import uclTrophy          from "../../../images/ucl.png"
+import goldenBootTrophy   from "../../../images/Golden Boot.png"
+import teamLeagueGBTrophy from "../../../images/team league_gb.png"
+import uclGBTrophy        from "../../../images/ucl_gb.png"
 
 const TROPHY_OPTIONS = [
-  { value: "trophy1Count", label: "Ballon d'Or",  image: ballondorTrophy  },
-  { value: "trophy2Count", label: "Team League",  image: teamLeagueTrophy },
-  { value: "trophy4Count", label: "UCL",          image: uclTrophy        },
-  { value: "trophy3Count", label: "Weekly",       image: weeklyTrophy     },
-  { value: "trophy5Count", label: "Golden Boot",  image: goldenBootTrophy },
+  { value: "trophy1Count", label: "Ballon d'Or",           image: ballondorTrophy    },
+  { value: "trophy2Count", label: "Team League",           image: teamLeagueTrophy   },
+  { value: "trophy4Count", label: "UCL",                   image: uclTrophy          },
+  { value: "trophy3Count", label: "Weekly",                image: weeklyTrophy       },
+  { value: "trophy5Count", label: "Weekly Golden Boot",    image: goldenBootTrophy   },
+  { value: "trophy6Count", label: "Team League Golden Boot", image: teamLeagueGBTrophy },
+  { value: "trophy7Count", label: "UCL Golden Boot",       image: uclGBTrophy        },
 ]
 
 export default function TrophyRanking({ players, onPlayerClick }) {

@@ -99,6 +99,8 @@ const createSchema = z.object({
   trophy3Count:  z.number().int().min(0).optional().default(0),
   trophy4Count:  z.number().int().min(0).optional().default(0),
   trophy5Count:  z.number().int().min(0).optional().default(0),
+  trophy6Count:  z.number().int().min(0).optional().default(0),
+  trophy7Count:  z.number().int().min(0).optional().default(0),
 }).refine(d => d.isCaptain || d.auctionPrice !== undefined, {
   message: "Auction price is required unless the player is a captain",
   path: ["auctionPrice"],
@@ -158,6 +160,8 @@ const updateSchema = z.object({
   trophy3Count:  z.number().int().min(0).optional(),
   trophy4Count:  z.number().int().min(0).optional(),
   trophy5Count:  z.number().int().min(0).optional(),
+  trophy6Count:  z.number().int().min(0).optional(),
+  trophy7Count:  z.number().int().min(0).optional(),
 }).refine(d => Object.values(d).some(v => v !== undefined), {
   message: "Provide at least one field to update",
 })
@@ -166,7 +170,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
       name, alias, grade, bdrDelta, isCaptain, auctionPrice, teamId, imageUrl,
-      trophy1Count, trophy2Count, trophy3Count, trophy4Count, trophy5Count,
+      trophy1Count, trophy2Count, trophy3Count, trophy4Count, trophy5Count, trophy6Count, trophy7Count,
     } = updateSchema.parse(req.body)
 
     // teamId needs special handling: undefined = don't change, null = remove team
@@ -185,14 +189,16 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         bdr_points    = GREATEST(0, bdr_points + COALESCE($4, 0)),
         is_captain    = COALESCE($5, is_captain),
         auction_price = COALESCE($6, auction_price),
-        team_id       = CASE WHEN $15 THEN $7 ELSE team_id END,
+        team_id       = CASE WHEN $17 THEN $7 ELSE team_id END,
         image_url     = COALESCE($8, image_url),
-        trophy1_count = COALESCE($9, trophy1_count),
+        trophy1_count = COALESCE($9,  trophy1_count),
         trophy2_count = COALESCE($10, trophy2_count),
         trophy3_count = COALESCE($11, trophy3_count),
         trophy4_count = COALESCE($12, trophy4_count),
-        trophy5_count = COALESCE($13, trophy5_count)
-      WHERE id = $14
+        trophy5_count = COALESCE($13, trophy5_count),
+        trophy6_count = COALESCE($14, trophy6_count),
+        trophy7_count = COALESCE($15, trophy7_count)
+      WHERE id = $16
       RETURNING id, name, alias, grade,
                 image_url     AS "imageUrl",
                 is_captain    AS "isCaptain",
@@ -204,13 +210,16 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
                 trophy2_count AS "trophy2Count",
                 trophy3_count AS "trophy3Count",
                 trophy4_count AS "trophy4Count",
-                trophy5_count AS "trophy5Count"
+                trophy5_count AS "trophy5Count",
+                trophy6_count AS "trophy6Count",
+                trophy7_count AS "trophy7Count"
     `, [
       name ?? null, alias ?? null, grade ?? null,
       bdrDelta ?? null, isCaptain ?? null, auctionPriceValue,
       teamIdValue ?? null, imageUrl ?? null,
       trophy1Count ?? null, trophy2Count ?? null, trophy3Count ?? null,
       trophy4Count ?? null, trophy5Count ?? null,
+      trophy6Count ?? null, trophy7Count ?? null,
       req.params.id, teamIdProvided,
     ])
 

@@ -15,11 +15,13 @@ function EditableRow({ player, onPlayerClick }) {
   const [bdrDelta, setBdrDelta]       = useState("")
   const [isCaptain, setIsCaptain]     = useState(player.isCaptain ?? false)
   const [auctionPrice, setAuctionPrice] = useState(player.auctionPrice ?? "")
-  const [trophy1, setTrophy1]         = useState(player.trophy1Count ?? 0)
-  const [trophy2, setTrophy2]         = useState(player.trophy2Count ?? 0)
-  const [trophy3, setTrophy3]         = useState(player.trophy3Count ?? 0)
-  const [trophy4, setTrophy4]         = useState(player.trophy4Count ?? 0)
-  const [trophy5, setTrophy5]         = useState(player.trophy5Count ?? 0)
+  const [trophy1, setTrophy1] = useState(player.trophy1Count ?? 0)
+  const [trophy2, setTrophy2] = useState(player.trophy2Count ?? 0)
+  const [trophy3, setTrophy3] = useState(player.trophy3Count ?? 0)
+  const [trophy4, setTrophy4] = useState(player.trophy4Count ?? 0)
+  const [trophy5, setTrophy5] = useState(player.trophy5Count ?? 0)
+  const [trophy6, setTrophy6] = useState(player.trophy6Count ?? 0)
+  const [trophy7, setTrophy7] = useState(player.trophy7Count ?? 0)
   const [confirmDel, setConfirmDel]   = useState(false)
   const updatePlayer                  = useUpdatePlayer()
   const deletePlayer                  = useDeletePlayer()
@@ -43,6 +45,8 @@ function EditableRow({ player, onPlayerClick }) {
     if (trophy3 !== (player.trophy3Count ?? 0)) body.trophy3Count = trophy3
     if (trophy4 !== (player.trophy4Count ?? 0)) body.trophy4Count = trophy4
     if (trophy5 !== (player.trophy5Count ?? 0)) body.trophy5Count = trophy5
+    if (trophy6 !== (player.trophy6Count ?? 0)) body.trophy6Count = trophy6
+    if (trophy7 !== (player.trophy7Count ?? 0)) body.trophy7Count = trophy7
     if (!Object.keys(body).length) return setEditing(false)
     updatePlayer.mutate({ id: player.id, ...body }, {
       onSuccess: () => { setEditing(false); setBdrDelta("") },
@@ -62,6 +66,8 @@ function EditableRow({ player, onPlayerClick }) {
     setTrophy3(player.trophy3Count ?? 0)
     setTrophy4(player.trophy4Count ?? 0)
     setTrophy5(player.trophy5Count ?? 0)
+    setTrophy6(player.trophy6Count ?? 0)
+    setTrophy7(player.trophy7Count ?? 0)
   }
 
   const handleDelete = () => {
@@ -257,11 +263,13 @@ function EditableRow({ player, onPlayerClick }) {
                 <span className="text-xs text-slate-400">Trophies</span>
               </div>
               {[
-                { label: "Ballon d'Or", value: trophy1, onChange: setTrophy1 },
-                { label: "Team League", value: trophy2, onChange: setTrophy2 },
-                { label: "UCL",         value: trophy4, onChange: setTrophy4 },
-                { label: "Weekly",      value: trophy3, onChange: setTrophy3 },
-                { label: "Golden Boot", value: trophy5, onChange: setTrophy5 },
+                { label: "Ballon d'Or",             value: trophy1, onChange: setTrophy1 },
+                { label: "Team League",             value: trophy2, onChange: setTrophy2 },
+                { label: "UCL",                     value: trophy4, onChange: setTrophy4 },
+                { label: "Weekly",                  value: trophy3, onChange: setTrophy3 },
+                { label: "Weekly Golden Boot",      value: trophy5, onChange: setTrophy5 },
+                { label: "Team League Golden Boot", value: trophy6, onChange: setTrophy6 },
+                { label: "UCL Golden Boot",         value: trophy7, onChange: setTrophy7 },
               ].map(t => (
                 <div key={t.label} className="flex items-center gap-2">
                   <span className="text-xs text-slate-500">{t.label}</span>
