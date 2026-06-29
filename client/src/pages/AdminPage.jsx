@@ -9,6 +9,7 @@ import FixtureResults from "../components/admin/FixtureResults"
 import TradeApproval from "../components/admin/TradeApproval"
 import CreateTeam from "../components/admin/CreateTeam"
 import CreatePlayer from "../components/admin/CreatePlayer"
+import TeamLeagueResults from "../components/admin/TeamLeagueResults"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
 import { teamsApi } from "../lib/api"
@@ -97,7 +98,8 @@ const TABS = [
   { id: "setup",    label: "Setup",        icon: Settings        },
   { id: "overview", label: "Overview",     icon: LayoutDashboard },
   { id: "players",  label: "Players",      icon: Users           },
-  { id: "records",  label: "Match records",icon: Activity        },
+  { id: "records",     label: "Match records",  icon: Activity        },
+  { id: "teamresults", label: "Team Results",   icon: Users           },
   { id: "fixtures", label: "Fixtures",     icon: Calendar        },
   { id: "trades",   label: "Trades",       icon: ArrowLeftRight  },
 ]
@@ -216,6 +218,9 @@ export default function AdminPage() {
         )}
         {activeTab === "records" && !isLoading && (
           <MatchRecordEntry players={players} initialRecords={records} />
+        )}
+        {activeTab === "teamresults" && !isLoading && (
+          <TeamLeagueResults />
         )}
         {activeTab === "fixtures" && !isLoading && (
           <FixtureResults fixtures={fixtures} />
