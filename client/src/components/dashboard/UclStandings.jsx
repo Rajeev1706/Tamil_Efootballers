@@ -91,9 +91,9 @@ export default function UclStandings({ onPlayerClick }) {
         </table>
       </div>
 
-      {group?.players.length >= 2 && (
+      {group?.players.length >= 4 && (
         <div className="px-5 py-3 border-t border-surface-border/60 flex items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 2 advance</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 4 advance</span>
         </div>
       )}
     </div>
