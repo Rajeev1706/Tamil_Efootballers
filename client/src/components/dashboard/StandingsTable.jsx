@@ -5,8 +5,10 @@ import { useTopScorers } from "../../lib/queries"
 import teamLeagueTrophy from "../../../images/Team League.png"
 import goldenBoot from "../../../images/Golden Boot.png"
 
-export default function StandingsTable({ teams, players, onPlayerClick }) {
-  const [view, setView]       = useState("table")
+export default function StandingsTable({ teams, players, onPlayerClick, view: controlledView, onViewChange }) {
+  const [internalView, setInternalView] = useState("table")
+  const view    = controlledView || internalView
+  const setView = onViewChange || setInternalView
   const { data: scorers = [] } = useTopScorers()
 
   return (

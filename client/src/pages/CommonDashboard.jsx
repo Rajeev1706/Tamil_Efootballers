@@ -42,6 +42,7 @@ export default function CommonDashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const activePanel    = searchParams.get("view") || "players"
   const trophyKey      = searchParams.get("trophy") || undefined
+  const standingsView  = searchParams.get("standingsView") || undefined
   const urlYear        = searchParams.get("year")
   const urlSeason      = searchParams.get("season")
 
@@ -49,12 +50,19 @@ export default function CommonDashboard() {
     const next = new URLSearchParams(searchParams)
     next.set("view", val)
     next.delete("trophy") // reset trophy sub-selection when switching panel
+    next.delete("standingsView")
     setSearchParams(next, { replace: false })
   }
 
   const setTrophyKey = (val) => {
     const next = new URLSearchParams(searchParams)
     next.set("trophy", val)
+    setSearchParams(next, { replace: true })
+  }
+
+  const setStandingsView = (val) => {
+    const next = new URLSearchParams(searchParams)
+    next.set("standingsView", val)
     setSearchParams(next, { replace: true })
   }
 
@@ -220,7 +228,7 @@ export default function CommonDashboard() {
               </div>
 
               {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
-              {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} />}
+              {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} view={standingsView} onViewChange={setStandingsView} />}
               {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}

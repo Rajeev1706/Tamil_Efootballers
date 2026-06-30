@@ -7,13 +7,15 @@ import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["All","S","A","B","C"]
 
-export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTradeSuccess }) {
+export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTradeSuccess, view: controlledView, onViewChange }) {
   const [gradeFilter, setGradeFilter] = useState("All")
   const [teamFilter, setTeamFilter]   = useState("All")
   const [search, setSearch]           = useState("")
   const [tradeTarget, setTradeTarget] = useState(null)
   const [requested, setRequested]     = useState(new Set())
-  const [view, setView]               = useState("favorites") // "favorites" | "all"
+  const [internalView, setInternalView] = useState("favorites") // "favorites" | "all"
+  const view    = controlledView || internalView
+  const setView = onViewChange || setInternalView
 
   const requestTrade   = useRequestTrade()
   const { data: favoriteIds = [] } = useFavorites()

@@ -120,6 +120,12 @@ export default function TeamDashboard() {
               myTeamName={myTeamName}
               onPlayerClick={handlePlayer}
               onTradeSuccess={() => setActiveTab("trades")}
+              view={searchParams.get("scoutView") || undefined}
+              onViewChange={(val) => {
+                const next = new URLSearchParams(searchParams)
+                next.set("scoutView", val)
+                setSearchParams(next, { replace: true })
+              }}
             />
           )}
           {activeTab === "fixtures" && (
