@@ -65,6 +65,17 @@ export const leagueInfoApi = {
   delete: (id)      => api.delete(`/league-info/${id}`).then(r => r.data),
 }
 
+export const uclApi = {
+  groups:        ()              => api.get("/ucl/groups").then(r => r.data),
+  unassigned:    ()              => api.get("/ucl/unassigned").then(r => r.data),
+  standings:     ()              => api.get("/ucl/standings").then(r => r.data),
+  createGroup:   (name)          => api.post("/ucl/groups", { name }).then(r => r.data),
+  renameGroup:   (id, name)      => api.patch(`/ucl/groups/${id}`, { name }).then(r => r.data),
+  deleteGroup:   (id)            => api.delete(`/ucl/groups/${id}`).then(r => r.data),
+  assignPlayer:  (groupId, playerId) => api.post(`/ucl/groups/${groupId}/players`, { playerId }).then(r => r.data),
+  unassignPlayer:(playerId)      => api.delete(`/ucl/players/${playerId}/group`).then(r => r.data),
+}
+
 export const settingsApi = {
   get:    ()           => api.get("/settings").then(r => r.data),
   update: (key, value) => api.patch("/settings", { key, value }).then(r => r.data),

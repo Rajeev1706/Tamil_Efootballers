@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -14,6 +14,62 @@ export const QK = {
 
 export const useSettings = () =>
   useQuery({ queryKey: ["settings"], queryFn: settingsApi.get, staleTime: 60000 })
+
+export const useUclGroups = () =>
+  useQuery({ queryKey: ["ucl-groups"], queryFn: uclApi.groups })
+
+export const useUclUnassigned = () =>
+  useQuery({ queryKey: ["ucl-unassigned"], queryFn: uclApi.unassigned })
+
+export const useUclStandings = () =>
+  useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings })
+
+export const useCreateUclGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name) => uclApi.createGroup(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-groups"] }),
+  })
+}
+export const useRenameUclGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }) => uclApi.renameGroup(id, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-groups"] }),
+  })
+}
+export const useDeleteUclGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => uclApi.deleteGroup(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-unassigned"] })
+      qc.invalidateQueries({ queryKey: ["ucl-standings"] })
+    },
+  })
+}
+export const useAssignUclPlayer = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, playerId }) => uclApi.assignPlayer(groupId, playerId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-unassigned"] })
+    },
+  })
+}
+export const useUnassignUclPlayer = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (playerId) => uclApi.unassignPlayer(playerId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-unassigned"] })
+      qc.invalidateQueries({ queryKey: ["ucl-standings"] })
+    },
+  })
+}
 
 export const useLeagueInfo = () =>
   useQuery({ queryKey: ["league-info"], queryFn: leagueInfoApi.list })
