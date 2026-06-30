@@ -171,9 +171,14 @@ function ScoreInput({ value, onChange, disabled }) {
     <input
       type="number" min={0} max={20}
       value={value ?? ""}
-      onChange={e => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+      placeholder="0"
+      onChange={e => {
+        const raw = e.target.value
+        if (raw === "") { onChange(""); return }
+        onChange(Math.max(0, parseInt(raw) || 0))
+      }}
       disabled={disabled}
-      className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-2 text-lg font-bold font-mono text-white focus:outline-none focus:border-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
+      className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-2 text-lg font-bold font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
     />
   )
 }
@@ -187,10 +192,10 @@ function FixtureCard({ fixture }) {
 
   const isCompleted = fixture.status === "completed"
 
-  const [hs, setHs]       = useState(fixture.homeScore ?? "")
-  const [as_, setAs]      = useState(fixture.awayScore ?? "")
-  const [hg, setHg]       = useState(fixture.homeGoals ?? "")
-  const [ag, setAg]       = useState(fixture.awayGoals ?? "")
+  const [hs, setHs]       = useState(isCompleted ? (fixture.homeScore ?? "") : "")
+  const [as_, setAs]      = useState(isCompleted ? (fixture.awayScore ?? "") : "")
+  const [hg, setHg]       = useState(isCompleted ? (fixture.homeGoals ?? "") : "")
+  const [ag, setAg]       = useState(isCompleted ? (fixture.awayGoals ?? "") : "")
   const [saved, setSaved] = useState(isCompleted)
 
   const [editing, setEditing]     = useState(false)

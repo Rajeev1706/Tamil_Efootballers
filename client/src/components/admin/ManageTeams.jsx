@@ -57,6 +57,7 @@ function RosterPlayerRow({ player }) {
 function TeamRow({ team, players }) {
   const [editing, setEditing]           = useState(false)
   const [name, setName]                 = useState(team.name)
+  const [budget, setBudget]             = useState(team.budget ?? 1000)
   const [confirmDel, setConfirmDel]     = useState(false)
   const [expanded, setExpanded]         = useState(false)
   const [changingPwd, setChangingPwd]   = useState(false)
@@ -71,7 +72,7 @@ function TeamRow({ team, players }) {
 
   const handleSave = () => {
     if (!name.trim()) return
-    updateTeam.mutate({ id: team.id, name }, {
+    updateTeam.mutate({ id: team.id, name, budget: Number(budget) }, {
       onSuccess: () => setEditing(false),
       onError: (err) => alert(err.response?.data?.error || "Update failed"),
     })
@@ -132,14 +133,21 @@ function TeamRow({ team, players }) {
         {/* Name */}
         <div className="flex-1 min-w-0">
           {editing ? (
-            <input value={name} onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSave()}
-              className="bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none focus:border-accent/40 w-full max-w-xs" />
+            <div className="flex items-center gap-2">
+              <input value={name} onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSave()}
+                className="bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none focus:border-accent/40 w-full max-w-xs" />
+              <input type="number" value={budget} onChange={e => setBudget(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSave()}
+                placeholder="Budget"
+                className="bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1 text-sm text-emerald-400 font-mono focus:outline-none focus:border-accent/40 w-24" />
+            </div>
           ) : (
             <p className="text-sm font-medium text-white truncate">{team.name}</p>
           )}
           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
             <Users className="w-3 h-3" /> {roster.length} player{roster.length !== 1 ? "s" : ""} · {team.points} pts
+            <span className="text-emerald-400/80 font-mono ml-1">· Purse: {team.purse ?? team.budget ?? 1000} <span className="text-slate-600">(budget {team.budget ?? 1000})</span></span>
           </p>
         </div>
 

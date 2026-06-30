@@ -119,7 +119,7 @@ export default function AdminPage() {
   const { data: fixtures = [], isLoading: fLoading } = useFixtures()
   const { data: trades   = [] }                      = useTrades()
 
-  const pendingTrades = trades.filter(t => t.status === "pending")
+  const pendingTrades = trades.filter(t => t.status === "pending_admin")
   const isLoading     = pLoading || rLoading || fLoading
 
   const stats = {

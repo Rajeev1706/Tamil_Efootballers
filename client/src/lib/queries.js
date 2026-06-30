@@ -213,7 +213,15 @@ export const useTrades = (params) =>
 export const useRequestTrade = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ playerId, toTeamId }) => tradesApi.request(playerId, toTeamId),
+    mutationFn: (body) => tradesApi.request(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["trades"] }),
+  })
+}
+
+export const useTeamReviewTrade = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action, reason }) => tradesApi.teamReview(id, action, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trades"] }),
   })
 }

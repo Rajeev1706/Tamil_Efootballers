@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Target } from "lucide-react"
+import { Target, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers } from "../../lib/queries"
 import teamLeagueTrophy from "../../../images/Team League.png"
@@ -60,7 +60,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
             </thead>
             <tbody>
               {teams.map((team) => {
-                const pos     = team.position
+                const pos     = Number(team.position)
                 const isFirst = pos === 1
                 return (
                   <tr
@@ -68,24 +68,24 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                     className={cn(
                       "border-b border-surface-border/50 transition-colors",
                       "table-row-hover",
-                      isFirst && "gold-border bg-gold/5"
+                      isFirst && "bg-gold/5 border-l-2 border-l-gold/60"
                     )}
                   >
                     <td className="py-3 px-3 text-center">
                       {isFirst
-                        ? <span className="rank-gold text-sm">1</span>
+                        ? <Crown className="w-4 h-4 text-gold mx-auto" fill="currentColor" />
                         : <span className={cn("text-sm font-medium", pos <= 3 ? "text-slate-300" : "text-slate-500")}>{pos}</span>
                       }
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <div className={cn(
-                          "w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold",
-                          isFirst ? "bg-gold/20 text-gold" : "bg-surface-border text-slate-400"
+                          "w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0",
+                          isFirst ? "bg-gold/25 text-gold" : "bg-surface-border text-slate-400"
                         )}>
                           {team.name.charAt(0)}
                         </div>
-                        <span className={cn("font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                        <span className={cn("font-medium", isFirst ? "text-gold" : "text-slate-300")}>
                           {team.name}
                         </span>
                       </div>

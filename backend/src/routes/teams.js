@@ -266,15 +266,16 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 // PATCH /api/teams/:id — admin edits team name or stats
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { name, played, won, drawn, lost, gf, ga } = req.body
+    const { name, played, won, drawn, lost, gf, ga, budget } = req.body
     const result = await query(`
       UPDATE teams SET
         name   = COALESCE($1, name),
         played = COALESCE($2, played), won   = COALESCE($3, won),
         drawn  = COALESCE($4, drawn),  lost  = COALESCE($5, lost),
-        gf     = COALESCE($6, gf),     ga    = COALESCE($7, ga)
-      WHERE id = $8 RETURNING *
-    `, [name ?? null, played, won, drawn, lost, gf, ga, req.params.id])
+        gf     = COALESCE($6, gf),     ga    = COALESCE($7, ga),
+        budget = COALESCE($8, budget)
+      WHERE id = $9 RETURNING *
+    `, [name ?? null, played, won, drawn, lost, gf, ga, budget ?? null, req.params.id])
     if (!result.rows[0]) return res.status(404).json({ error: "Team not found" })
     res.json(result.rows[0])
   } catch (err) { next(err) }

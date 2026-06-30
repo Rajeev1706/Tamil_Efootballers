@@ -7,7 +7,7 @@ import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["All","S","A","B","C"]
 
-export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTradeSuccess, view: controlledView, onViewChange }) {
+export default function Scouting({ allPlayers, myTeamName, myPlayers = [], myPurse = 0, onPlayerClick, onTradeSuccess, view: controlledView, onViewChange }) {
   const [gradeFilter, setGradeFilter] = useState("All")
   const [teamFilter, setTeamFilter]   = useState("All")
   const [search, setSearch]           = useState("")
@@ -35,18 +35,17 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
     return matchGrade && matchTeam && matchName
   })
 
-  const handleConfirm = (player) => {
+  const handleConfirm = (body) => {
     requestTrade.mutate(
-      { playerId: player.id, toTeamId: player.teamId },
+      body,
       {
         onSuccess: () => {
-          setRequested(prev => new Set([...prev, player.id]))
+          setRequested(prev => new Set([...prev, body.playerId]))
           setTradeTarget(null)
           onTradeSuccess?.()
         },
         onError: (err) => {
           alert(err.response?.data?.error || "Trade request failed")
-          setTradeTarget(null)
         },
       }
     )
@@ -180,6 +179,8 @@ export default function Scouting({ allPlayers, myTeamName, onPlayerClick, onTrad
 
       <TradeModal
         player={tradeTarget}
+        myPlayers={myPlayers}
+        myPurse={myPurse}
         onConfirm={handleConfirm}
         onClose={() => setTradeTarget(null)}
         isLoading={requestTrade.isPending}

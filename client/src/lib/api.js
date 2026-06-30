@@ -89,11 +89,11 @@ export const fixturesApi = {
 }
 
 export const tradesApi = {
-  list:    (params)             => api.get("/trades", { params }).then(r => r.data),
-  request: (playerId, toTeamId) =>
-    api.post("/trades", { playerId, toTeamId }).then(r => r.data),
-  review:  (id, action)         => api.patch(`/trades/${id}/review`, { action }).then(r => r.data),
-  cancel:  (id)                 => api.patch(`/trades/${id}/cancel`).then(r => r.data),
+  list:       (params)                  => api.get("/trades", { params }).then(r => r.data),
+  request:    (body)                     => api.post("/trades", body).then(r => r.data),
+  teamReview: (id, action, reason)       => api.patch(`/trades/${id}/team-review`, { action, reason }).then(r => r.data),
+  review:     (id, action)               => api.patch(`/trades/${id}/review`, { action }).then(r => r.data),
+  cancel:     (id)                       => api.patch(`/trades/${id}/cancel`).then(r => r.data),
 }
 
 export const lineupsApi = {

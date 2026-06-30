@@ -49,7 +49,8 @@ export default function TeamDashboard() {
 
   const myPlayers     = teamData?.players || []
   const myTeamName    = teamData?.name || ""
-  const pendingTrades = trades.filter(t => t.direction === "received" && t.status === "pending").length
+  const myPurse       = teamData?.purse ?? teamData?.budget ?? 0
+  const pendingReceived = trades.filter(t => t.direction === "received" && t.status === "pending_team").length
 
   if (teamLoading) return <Layout><Loading /></Layout>
 
@@ -78,7 +79,7 @@ export default function TeamDashboard() {
         >
           {TABS.map(({ id, label, icon: Icon }) => {
             const isActive  = activeTab === id
-            const showAlert = id === "trades" && pendingTrades > 0
+            const showAlert = id === "trades" && pendingReceived > 0
             return (
               <button
                 key={id}
@@ -118,6 +119,8 @@ export default function TeamDashboard() {
             <Scouting
               allPlayers={allPlayers}
               myTeamName={myTeamName}
+              myPlayers={myPlayers}
+              myPurse={myPurse}
               onPlayerClick={handlePlayer}
               onTradeSuccess={() => setActiveTab("trades")}
               view={searchParams.get("scoutView") || undefined}
@@ -148,7 +151,7 @@ export default function TeamDashboard() {
               teamLogoUrl={teamData?.logoUrl}
             />
           )}
-          {activeTab === "trades" && <Trades trades={trades} />}
+          {activeTab === "trades" && <Trades trades={trades} myPurse={myPurse} />}
           {activeTab === "settings" && <TeamSettings team={teamData} />}
         </div>
       </div>
