@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { ChevronDown, Trophy, Users, TrendingUp, Activity } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import StandingsTable from "../components/dashboard/StandingsTable"
@@ -38,11 +38,43 @@ export default function CommonDashboard() {
   const { data: players = [], isLoading: playersLoading } = usePlayers()
   const { data: seasonRecords = [] }                      = useSeasonRecords()
   const { data: settings = {} }                          = useSettings()
-  const [activePanel, setActivePanel]       = useState("players")
-  const [selectedYear, setSelectedYear]     = useState(new Date().getFullYear())
-  const [selectedSeason, setSelectedSeason] = useState(null)
 
-  const handlePlayer = (player) => navigate(`/player/${player.id}`)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activePanel    = searchParams.get("view") || "players"
+  const trophyKey      = searchParams.get("trophy") || undefined
+  const urlYear        = searchParams.get("year")
+  const urlSeason      = searchParams.get("season")
+
+  const setActivePanel = (val) => {
+    const next = new URLSearchParams(searchParams)
+    next.set("view", val)
+    next.delete("trophy") // reset trophy sub-selection when switching panel
+    setSearchParams(next, { replace: false })
+  }
+
+  const setTrophyKey = (val) => {
+    const next = new URLSearchParams(searchParams)
+    next.set("trophy", val)
+    setSearchParams(next, { replace: true })
+  }
+
+  const [selectedYear, setSelectedYearState] = useState(urlYear ? parseInt(urlYear) : new Date().getFullYear())
+  const [selectedSeason, setSelectedSeasonState] = useState(urlSeason ? parseInt(urlSeason) : null)
+
+  const setSelectedYear = (yr) => {
+    setSelectedYearState(yr)
+    const next = new URLSearchParams(searchParams)
+    next.set("year", yr)
+    setSearchParams(next, { replace: false })
+  }
+  const setSelectedSeason = (s) => {
+    setSelectedSeasonState(s)
+    const next = new URLSearchParams(searchParams)
+    if (s) next.set("season", s); else next.delete("season")
+    setSearchParams(next, { replace: false })
+  }
+
+  const handlePlayer = (player) => navigate(`/player/${player.id}?${searchParams.toString()}`)
   const isLoading    = teamsLoading || playersLoading
 
   const currentSeason = parseInt(settings.current_season || "6")
@@ -191,7 +223,7 @@ export default function CommonDashboard() {
               {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
-              {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} />}
+              {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
             </>
           )}
         </>

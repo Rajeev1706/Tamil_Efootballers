@@ -19,8 +19,10 @@ const TROPHY_OPTIONS = [
   { value: "trophy7Count", label: "UCL Golden Boot",       image: uclGBTrophy        },
 ]
 
-export default function TrophyRanking({ players, onPlayerClick }) {
-  const [trophyKey, setTrophyKey] = useState("trophy1Count")
+export default function TrophyRanking({ players, onPlayerClick, trophyKey: controlledKey, onTrophyChange }) {
+  const [internalKey, setInternalKey] = useState("trophy1Count")
+  const trophyKey    = controlledKey || internalKey
+  const setTrophyKey = onTrophyChange || setInternalKey
 
   const sorted = [...players]
     .filter(p => (p[trophyKey] ?? 0) > 0)

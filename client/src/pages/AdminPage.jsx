@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { LayoutDashboard, Users, Activity, Calendar, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
@@ -106,7 +106,13 @@ const TABS = [
 
 export default function AdminPage() {
   const navigate      = useNavigate()
-  const [activeTab, setActiveTab] = useState("setup")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get("tab") || "setup"
+  const setActiveTab = (tab) => {
+    const next = new URLSearchParams(searchParams)
+    next.set("tab", tab)
+    setSearchParams(next, { replace: false })
+  }
 
   const { data: players  = [], isLoading: pLoading } = usePlayers()
   const { data: records  = [], isLoading: rLoading } = useRecords()
@@ -214,7 +220,7 @@ export default function AdminPage() {
           <AdminOverview stats={stats} activity={adminActivity} onNavigate={setActiveTab} />
         )}
 {activeTab === "players" && !isLoading && (
-          <PlayerManagement players={players} onPlayerClick={p => navigate(`/player/${p.id}?ctx=admin`)} />
+          <PlayerManagement players={players} onPlayerClick={p => navigate(`/player/${p.id}?ctx=admin&${searchParams.toString()}`)} />
         )}
         {activeTab === "records" && !isLoading && (
           <MatchRecordEntry players={players} initialRecords={records} />

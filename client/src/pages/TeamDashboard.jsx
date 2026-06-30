@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import TeamHeader from "../components/team/TeamHeader"
@@ -29,7 +29,13 @@ const TABS = [
 export default function TeamDashboard() {
   const navigate                  = useNavigate()
   const user                      = useAuthStore(s => s.user)
-  const [activeTab, setActiveTab] = useState("squad")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get("tab") || "squad"
+  const setActiveTab = (tab) => {
+    const next = new URLSearchParams(searchParams)
+    next.set("tab", tab)
+    setSearchParams(next, { replace: false })
+  }
 
   const { data: teamData, isLoading: teamLoading } = useTeam(user?.teamId)
   const { data: allPlayers = [] }                  = usePlayers()
@@ -39,7 +45,7 @@ export default function TeamDashboard() {
   // Extract dominant color from team logo
   const teamColor = useTeamColor(teamData?.logoUrl)
 
-  const handlePlayer = (player) => navigate(`/player/${player.id}?ctx=team`)
+  const handlePlayer = (player) => navigate(`/player/${player.id}?ctx=team&${searchParams.toString()}`)
 
   const myPlayers     = teamData?.players || []
   const myTeamName    = teamData?.name || ""
