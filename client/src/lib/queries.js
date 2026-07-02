@@ -18,6 +18,9 @@ export const useSettings = () =>
 export const useUclGroups = () =>
   useQuery({ queryKey: ["ucl-groups"], queryFn: uclApi.groups })
 
+export const useUclAdminGroups = () =>
+  useQuery({ queryKey: ["ucl-admin-groups"], queryFn: uclApi.adminGroups })
+
 export const useWeeklyTournaments = () =>
   useQuery({ queryKey: ["weekly-tournaments"], queryFn: weeklyApi.list })
 
@@ -86,6 +89,27 @@ export const useCreateUclGroup = () => {
   return useMutation({
     mutationFn: (name) => uclApi.createGroup(name),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-groups"] }),
+  })
+}
+
+export const useGenerateUclGroups = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (playerIds) => uclApi.generate(playerIds),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-admin-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-unassigned"] })
+      qc.invalidateQueries({ queryKey: ["ucl-standings"] })
+    },
+  })
+}
+
+export const useResetGroupFixtures = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => uclApi.resetGroupFixtures(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-standings"] }),
   })
 }
 export const useRenameUclGroup = () => {

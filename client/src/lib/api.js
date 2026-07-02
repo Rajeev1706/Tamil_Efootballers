@@ -78,15 +78,19 @@ export const weeklyApi = {
 }
 
 export const uclApi = {
-  groups:        ()              => api.get("/ucl/groups").then(r => r.data),
-  unassigned:    ()              => api.get("/ucl/unassigned").then(r => r.data),
-  standings:     ()              => api.get("/ucl/standings").then(r => r.data),
-  topScorers:    ()              => api.get("/ucl/top-scorers").then(r => r.data),
-  createGroup:   (name)          => api.post("/ucl/groups", { name }).then(r => r.data),
-  renameGroup:   (id, name)      => api.patch(`/ucl/groups/${id}`, { name }).then(r => r.data),
-  deleteGroup:   (id)            => api.delete(`/ucl/groups/${id}`).then(r => r.data),
-  assignPlayer:  (groupId, playerId) => api.post(`/ucl/groups/${groupId}/players`, { playerId }).then(r => r.data),
-  unassignPlayer:(playerId)      => api.delete(`/ucl/players/${playerId}/group`).then(r => r.data),
+  groups:            ()              => api.get("/ucl/groups").then(r => r.data),
+  adminGroups:       ()              => api.get("/ucl/admin-groups").then(r => r.data),
+  unassigned:        ()              => api.get("/ucl/unassigned").then(r => r.data),
+  standings:         ()              => api.get("/ucl/standings").then(r => r.data),
+  topScorers:        ()              => api.get("/ucl/top-scorers").then(r => r.data),
+  generate:          (playerIds)     => api.post("/ucl/generate", { playerIds }).then(r => r.data),
+  activate:          ()              => api.post("/ucl/activate").then(r => r.data),
+  resetGroupFixtures:(id)            => api.post(`/ucl/groups/${id}/reset-fixtures`).then(r => r.data),
+  createGroup:       (name)          => api.post("/ucl/groups", { name }).then(r => r.data),
+  renameGroup:       (id, name)      => api.patch(`/ucl/groups/${id}`, { name }).then(r => r.data),
+  deleteGroup:       (id)            => api.delete(`/ucl/groups/${id}`).then(r => r.data),
+  assignPlayer:      (groupId, playerId) => api.post(`/ucl/groups/${groupId}/players`, { playerId }).then(r => r.data),
+  unassignPlayer:    (playerId)      => api.delete(`/ucl/players/${playerId}/group`).then(r => r.data),
 }
 
 export const settingsApi = {
