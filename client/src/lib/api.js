@@ -65,10 +65,23 @@ export const leagueInfoApi = {
   delete: (id)      => api.delete(`/league-info/${id}`).then(r => r.data),
 }
 
+export const weeklyApi = {
+  list:         ()            => api.get("/weekly").then(r => r.data),
+  get:          (id)          => api.get(`/weekly/${id}`).then(r => r.data),
+  create:       (name)        => api.post("/weekly", { name }).then(r => r.data),
+  setPlayers:   (id, playerIds) => api.post(`/weekly/${id}/players`, { playerIds }).then(r => r.data),
+  start:        (id)          => api.post(`/weekly/${id}/start`).then(r => r.data),
+  saveResult:   (matchId, player1Score, player2Score, tieWinnerId) =>
+    api.patch(`/weekly/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId }).then(r => r.data),
+  reset:        (id)          => api.post(`/weekly/${id}/reset`).then(r => r.data),
+  deleteTournament: (id)      => api.delete(`/weekly/${id}`).then(r => r.data),
+}
+
 export const uclApi = {
   groups:        ()              => api.get("/ucl/groups").then(r => r.data),
   unassigned:    ()              => api.get("/ucl/unassigned").then(r => r.data),
   standings:     ()              => api.get("/ucl/standings").then(r => r.data),
+  topScorers:    ()              => api.get("/ucl/top-scorers").then(r => r.data),
   createGroup:   (name)          => api.post("/ucl/groups", { name }).then(r => r.data),
   renameGroup:   (id, name)      => api.patch(`/ucl/groups/${id}`, { name }).then(r => r.data),
   deleteGroup:   (id)            => api.delete(`/ucl/groups/${id}`).then(r => r.data),

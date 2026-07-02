@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -18,11 +18,68 @@ export const useSettings = () =>
 export const useUclGroups = () =>
   useQuery({ queryKey: ["ucl-groups"], queryFn: uclApi.groups })
 
+export const useWeeklyTournaments = () =>
+  useQuery({ queryKey: ["weekly-tournaments"], queryFn: weeklyApi.list })
+
+export const useWeeklyTournament = (id) =>
+  useQuery({ queryKey: ["weekly-tournament", id], queryFn: () => weeklyApi.get(id), enabled: !!id })
+
+export const useCreateWeeklyTournament = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name) => weeklyApi.create(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["weekly-tournaments"] }),
+  })
+}
+
+export const useSetWeeklyPlayers = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, playerIds }) => weeklyApi.setPlayers(id, playerIds),
+    onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: ["weekly-tournament", id] }),
+  })
+}
+
+export const useSaveWeeklyResult = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId }) =>
+      weeklyApi.saveResult(matchId, player1Score, player2Score, tieWinnerId),
+    onSuccess: (_, { tournamentId }) => {
+      // Invalidate with both string and number forms to be safe
+      qc.invalidateQueries({ queryKey: ["weekly-tournament"] })
+      qc.invalidateQueries({ queryKey: ["players"] })
+    },
+  })
+}
+
+export const useDeleteWeeklyTournament = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => weeklyApi.deleteTournament(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["weekly-tournaments"] }),
+  })
+}
+
+export const useResetWeeklyTournament = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => weeklyApi.reset(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["weekly-tournaments"] })
+      qc.invalidateQueries({ queryKey: ["weekly-tournament", String(id)] })
+    },
+  })
+}
+
 export const useUclUnassigned = () =>
   useQuery({ queryKey: ["ucl-unassigned"], queryFn: uclApi.unassigned })
 
 export const useUclStandings = () =>
   useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings })
+
+export const useUclTopScorers = () =>
+  useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers })
 
 export const useCreateUclGroup = () => {
   const qc = useQueryClient()

@@ -6,6 +6,8 @@ import AdminPage        from "./pages/AdminPage"
 import Login            from "./pages/Login"
 import PlayerProfile    from "./pages/PlayerProfile"
 import HallOfFame       from "./pages/HallOfFame"
+import WeeklyDraw       from "./pages/WeeklyDraw"
+import WeeklyBracket    from "./pages/WeeklyBracket"
 
 export default function App() {
   return (
@@ -14,7 +16,9 @@ export default function App() {
         <Route path="/"             element={<CommonDashboard />} />
         <Route path="/login"        element={<Login />} />
         <Route path="/player/:id"   element={<PlayerProfile />} />
-        <Route path="/hall-of-fame" element={<HallOfFame />} />
+        <Route path="/hall-of-fame"      element={<HallOfFame />} />
+        <Route path="/weekly/draw/:id"    element={<WeeklyDraw />} />
+        <Route path="/weekly/bracket/:id" element={<WeeklyBracket />} />
         <Route path="/team"         element={
           <ProtectedRoute><TeamDashboard /></ProtectedRoute>
         } />

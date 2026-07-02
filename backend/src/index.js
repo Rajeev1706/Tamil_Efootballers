@@ -12,6 +12,7 @@ import tradeRoutes    from "./routes/trades.js"
 import lineupRoutes   from "./routes/lineup.js"
 import favoriteRoutes from "./routes/favorites.js"
 import uclRoutes      from "./routes/ucl.js"
+import weeklyRoutes   from "./routes/weekly.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
 const app  = express()
@@ -41,7 +42,8 @@ app.use("/api/fixtures", fixtureRoutes)
 app.use("/api/trades",   tradeRoutes)
 app.use("/api/lineups",  lineupRoutes)
 app.use("/api/favorites", favoriteRoutes)
-app.use("/api/ucl",       uclRoutes)
+app.use("/api/ucl",    uclRoutes)
+app.use("/api/weekly", weeklyRoutes)
 
 // GET /api/settings — public app settings (current season etc.)
 app.get("/api/settings", async (_req, res) => {

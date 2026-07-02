@@ -12,6 +12,7 @@ import CreatePlayer from "../components/admin/CreatePlayer"
 import TeamLeagueResults from "../components/admin/TeamLeagueResults"
 import UclGroupsAdmin from "../components/admin/UclGroupsAdmin"
 import UclResults from "../components/admin/UclResults"
+import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
 import { teamsApi } from "../lib/api"
@@ -97,15 +98,16 @@ function ResetMVCard() {
 }
 
 const TABS = [
-  { id: "setup",    label: "Setup",        icon: Settings        },
-  { id: "overview", label: "Overview",     icon: LayoutDashboard },
-  { id: "players",  label: "Players",      icon: Users           },
-  { id: "records",     label: "Match records",  icon: Activity        },
-  { id: "teamresults", label: "Team Results",   icon: Users           },
-  { id: "uclgroups",   label: "UCL Groups",     icon: Trophy          },
-  { id: "uclresults",  label: "UCL Results",    icon: Trophy          },
-  { id: "fixtures", label: "Fixtures",     icon: Calendar        },
-  { id: "trades",   label: "Trades",       icon: ArrowLeftRight  },
+  { id: "setup",      label: "Setup",        icon: Settings        },
+  { id: "overview",   label: "Overview",     icon: LayoutDashboard },
+  { id: "players",    label: "Players",      icon: Users           },
+  { id: "records",    label: "Match records", icon: Activity       },
+  { id: "uclgroups",  label: "UCL Groups",   icon: Trophy          },
+  { id: "uclresults", label: "UCL Results",  icon: Trophy          },
+  { id: "weekly",     label: "Weekly",       icon: Trophy          },
+  { id: "fixtures",   label: "Fixtures",     icon: Calendar        },
+  { id: "teamresults",label: "Team Results", icon: Users           },
+  { id: "trades",     label: "Trades",       icon: ArrowLeftRight  },
 ]
 
 export default function AdminPage() {
@@ -237,6 +239,9 @@ export default function AdminPage() {
         )}
         {activeTab === "uclresults" && !isLoading && (
           <UclResults />
+        )}
+        {activeTab === "weekly" && (
+          <WeeklyAdmin />
         )}
         {activeTab === "fixtures" && !isLoading && (
           <FixtureResults fixtures={fixtures} />
