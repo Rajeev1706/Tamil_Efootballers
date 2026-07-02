@@ -105,14 +105,11 @@ router.get("/fixture/:fixtureId", authenticate, async (req, res, next) => {
       FROM match_records mr
       JOIN players p   ON mr.player_id   = p.id
       JOIN players opp ON mr.opponent_id = opp.id
+      JOIN fixtures f  ON f.id = $1
       WHERE mr.match_type = 'league'
-        AND (
-          (p.team_id IN (SELECT home_team_id FROM fixtures WHERE id = $1)
-            OR p.team_id IN (SELECT away_team_id FROM fixtures WHERE id = $1))
-          AND
-          (opp.team_id IN (SELECT home_team_id FROM fixtures WHERE id = $1)
-            OR opp.team_id IN (SELECT away_team_id FROM fixtures WHERE id = $1))
-        )
+        AND p.team_id   IN (f.home_team_id, f.away_team_id)
+        AND opp.team_id IN (f.home_team_id, f.away_team_id)
+        AND mr.recorded_at::date >= f.scheduled_date::date
       ORDER BY mr.recorded_at DESC, mr.id DESC
     `, [req.params.fixtureId])
     res.json(result.rows)
