@@ -13,7 +13,6 @@ const STATUS_CONFIG = {
 }
 
 function CreateForm({ onClose }) {
-  const navigate = useNavigate()
   const { data: players = [] } = usePlayers()
   const createTournament = useCreateWeeklyTournament()
   const setPlayers      = useSetWeeklyPlayers()
@@ -35,7 +34,7 @@ function CreateForm({ onClose }) {
     if (!name.trim() || selected.length < 2) return
     const t = await createTournament.mutateAsync(name.trim())
     await setPlayers.mutateAsync({ id: t.id, playerIds: selected })
-    navigate(`/weekly/draw/${t.id}`)
+    onClose() // return to admin list — View Draw button appears there
   }
 
   return (

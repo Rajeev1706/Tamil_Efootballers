@@ -19,21 +19,34 @@ function generateMatches(playerIds, tournamentId) {
   const totalRounds = Math.log2(slots)
   const matches = []
 
-  // Round 1: pair players sequentially (shuffled already), byes for empty slots
+  // Distribute players into slots so byes are spread out and never face each other.
+  // Strategy: alternate filling from top and bottom of the slot array.
+  // e.g. for 6 players in 8 slots: positions 0,7,2,5,4,3 get players, 1,6 are byes.
+  // This guarantees each bye is always paired with a real player.
+  const slotPositions = new Array(slots).fill(null)
+  let lo = 0, hi = slots - 1
+  for (let i = 0; i < playerIds.length; i++) {
+    if (i % 2 === 0) slotPositions[lo++] = playerIds[i]
+    else             slotPositions[hi--] = playerIds[i]
+  }
+
+  // Round 1: pair adjacent slots (0&1, 2&3, ...)
   const r1Count = slots / 2
   for (let m = 1; m <= r1Count; m++) {
-    const p1 = playerIds[(m - 1) * 2] ?? null
-    const p2 = playerIds[(m - 1) * 2 + 1] ?? null
+    const p1 = slotPositions[(m - 1) * 2]
+    const p2 = slotPositions[(m - 1) * 2 + 1]
+    // Skip if both null (bye vs bye — should never happen with above distribution)
+    if (!p1 && !p2) continue
     const isBye = !p1 || !p2
     matches.push({
       tournamentId, round: 1, matchNumber: m,
       player1Id: p1, player2Id: p2,
-      winnerId:   isBye ? (p1 || p2) : null,
-      status:     isBye ? "bye" : "pending",
+      winnerId:  isBye ? (p1 || p2) : null,
+      status:    isBye ? "bye" : "pending",
     })
   }
 
-  // Future rounds — empty slots filled when results come in
+  // Future rounds — empty slots filled as results come in
   for (let r = 2; r <= totalRounds; r++) {
     const count = slots / Math.pow(2, r)
     for (let m = 1; m <= count; m++) {
@@ -196,12 +209,16 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     const oppGradeRes = await query("SELECT grade FROM players WHERE id = $1", [match.player2_id])
     const oppGrade = oppGradeRes.rows[0]?.grade || "C"
 
-    // Log match record
+    // If match was already completed, delete the old match record first
+    if (match.match_record_id) {
+      await query("DELETE FROM match_records WHERE id = $1", [match.match_record_id])
+    }
+
+    // Log new match record
     const mrRes = await query(`
       INSERT INTO match_records
         (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
       VALUES ($1,$2,$3,$4,'weekly',$5,$6,NOW(),$7)
-      ON CONFLICT DO NOTHING
       RETURNING id
     `, [match.player1_id, match.player2_id, result, oppGrade, player1Score, player2Score, season])
     const mrId = mrRes.rows[0]?.id
