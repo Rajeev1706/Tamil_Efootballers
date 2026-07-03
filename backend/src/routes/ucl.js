@@ -2,6 +2,7 @@ import { Router } from "express"
 import { z } from "zod"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
+import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
@@ -185,6 +186,11 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
       WHERE id=$4
     `, [player1Score, player2Score, mrRes.rows[0].id, req.params.id])
 
+    // Recalc market value for both players — the DB trigger alone only
+    // handles the player_id side and skips the BDR swing (see marketValue.js).
+    await recalcMarketValue(fix.player1_id)
+    await recalcMarketValue(fix.player2_id)
+
     res.json({ updated: true })
   } catch (err) { next(err) }
 })
@@ -192,11 +198,15 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
 // DELETE /api/ucl/fixtures/:id/result — clear a fixture result
 router.delete("/fixtures/:id/result", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const fix = await query("SELECT match_record_id FROM ucl_fixtures WHERE id = $1", [req.params.id])
+    const fix = await query("SELECT match_record_id, player1_id, player2_id FROM ucl_fixtures WHERE id = $1", [req.params.id])
     if (fix.rows[0]?.match_record_id) {
       await query("DELETE FROM match_records WHERE id = $1", [fix.rows[0].match_record_id])
     }
     await query("UPDATE ucl_fixtures SET player1_score=NULL, player2_score=NULL, status='pending', match_record_id=NULL WHERE id=$1", [req.params.id])
+    if (fix.rows[0]) {
+      await recalcMarketValue(fix.rows[0].player1_id)
+      await recalcMarketValue(fix.rows[0].player2_id)
+    }
     res.json({ cleared: true })
   } catch (err) { next(err) }
 })
@@ -207,10 +217,14 @@ router.post("/groups/:id/regenerate-fixtures", authenticate, adminOnly, async (r
     const groupId = parseInt(req.params.id)
 
     // Delete existing fixtures and their match records
-    const mrRes = await query("SELECT match_record_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [groupId])
-    const mrIds = mrRes.rows.map(r => r.match_record_id)
+    const oldFixRes = await query("SELECT match_record_id, player1_id, player2_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [groupId])
+    const mrIds = oldFixRes.rows.map(r => r.match_record_id)
     if (mrIds.length > 0) await query("DELETE FROM match_records WHERE id = ANY($1::int[])", [mrIds])
     await query("DELETE FROM ucl_fixtures WHERE group_id=$1", [groupId])
+
+    // Recalc market value for every player whose match record was just removed
+    const affectedIds = [...new Set(oldFixRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
+    for (const pid of affectedIds) await recalcMarketValue(pid)
 
     // Regenerate with current players
     const playersRes = await query("SELECT id FROM players WHERE ucl_group_id = $1", [groupId])
@@ -235,12 +249,16 @@ router.post("/groups/:id/regenerate-fixtures", authenticate, adminOnly, async (r
 // POST /api/ucl/groups/:id/reset-fixtures — delete fixtures + match records for a group
 router.post("/groups/:id/reset-fixtures", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const mrRes = await query("SELECT match_record_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [req.params.id])
+    const mrRes = await query("SELECT match_record_id, player1_id, player2_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [req.params.id])
     const mrIds = mrRes.rows.map(r => r.match_record_id)
     if (mrIds.length > 0) {
       await query(`DELETE FROM match_records WHERE id = ANY($1::int[])`, [mrIds])
     }
     await query("DELETE FROM ucl_fixtures WHERE group_id=$1", [req.params.id])
+
+    const affectedIds = [...new Set(mrRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
+    for (const pid of affectedIds) await recalcMarketValue(pid)
+
     res.json({ reset: true })
   } catch (err) { next(err) }
 })
@@ -301,11 +319,34 @@ router.patch("/groups/:id", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// DELETE /api/ucl/groups/:id — delete group (players become unassigned)
+// DELETE /api/ucl/groups/:id — delete group, fixtures, and unassign players
 router.delete("/groups/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
-    await query("UPDATE players SET ucl_group_id = NULL WHERE ucl_group_id = $1", [req.params.id])
-    await query("DELETE FROM ucl_groups WHERE id = $1", [req.params.id])
+    const id = req.params.id
+
+    // Delete match records for fixtures in this group
+    const mrRes = await query(
+      "SELECT match_record_id, player1_id, player2_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [id]
+    )
+    const mrIds = mrRes.rows.map(r => r.match_record_id)
+    if (mrIds.length > 0) await query("DELETE FROM match_records WHERE id = ANY($1::int[])", [mrIds])
+
+    // Delete fixtures for this group
+    await query("DELETE FROM ucl_fixtures WHERE group_id=$1", [id])
+
+    // Null out any knockout player references to this group
+    await query("UPDATE ucl_knockout_players SET group_id = NULL WHERE group_id = $1", [id])
+
+    // Unassign players from this group
+    await query("UPDATE players SET ucl_group_id = NULL WHERE ucl_group_id = $1", [id])
+
+    // Delete the group
+    await query("DELETE FROM ucl_groups WHERE id = $1", [id])
+
+    // Recalc market value for every player whose match record was just removed
+    const affectedIds = [...new Set(mrRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
+    for (const pid of affectedIds) await recalcMarketValue(pid)
+
     res.json({ deleted: true })
   } catch (err) { next(err) }
 })

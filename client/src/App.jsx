@@ -9,6 +9,8 @@ import HallOfFame       from "./pages/HallOfFame"
 import WeeklyDraw       from "./pages/WeeklyDraw"
 import WeeklyBracket    from "./pages/WeeklyBracket"
 import UclDraw          from "./pages/UclDraw"
+import UclKODraw    from "./pages/UclKODraw"
+import UclKOBracket from "./pages/UclKOBracket"
 
 export default function App() {
   return (
@@ -20,7 +22,9 @@ export default function App() {
         <Route path="/hall-of-fame"      element={<HallOfFame />} />
         <Route path="/weekly/draw/:id"    element={<WeeklyDraw />} />
         <Route path="/weekly/bracket/:id" element={<WeeklyBracket />} />
-        <Route path="/ucl/draw"           element={<UclDraw />} />
+        <Route path="/ucl/draw"                element={<UclDraw />} />
+        <Route path="/ucl-knockout/draw/:id"    element={<UclKODraw />} />
+        <Route path="/ucl-knockout/bracket/:id" element={<UclKOBracket />} />
         <Route path="/team"         element={
           <ProtectedRoute><TeamDashboard /></ProtectedRoute>
         } />

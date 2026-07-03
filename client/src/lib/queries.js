@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -87,10 +87,10 @@ export const useUclUnassigned = () =>
   useQuery({ queryKey: ["ucl-unassigned"], queryFn: uclApi.unassigned })
 
 export const useUclStandings = () =>
-  useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings })
+  useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings, staleTime: 0 })
 
 export const useUclFixtures = () =>
-  useQuery({ queryKey: ["ucl-fixtures"], queryFn: uclApi.fixtures, refetchOnMount: "always" })
+  useQuery({ queryKey: ["ucl-fixtures"], queryFn: uclApi.fixtures, refetchOnMount: "always", staleTime: 0 })
 
 export const useUclTopScorers = () =>
   useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers })
@@ -135,9 +135,12 @@ export const useDeleteUclGroup = () => {
   return useMutation({
     mutationFn: (id) => uclApi.deleteGroup(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
-      qc.invalidateQueries({ queryKey: ["ucl-unassigned"] })
-      qc.invalidateQueries({ queryKey: ["ucl-standings"] })
+      qc.refetchQueries({ queryKey: ["ucl-groups"] })
+      qc.refetchQueries({ queryKey: ["ucl-admin-groups"] })
+      qc.refetchQueries({ queryKey: ["ucl-unassigned"] })
+      qc.refetchQueries({ queryKey: ["ucl-standings"] })
+      qc.refetchQueries({ queryKey: ["ucl-fixtures"] })
+      qc.refetchQueries({ queryKey: ["ucl-top-scorers"] })
     },
   })
 }
@@ -514,5 +517,52 @@ export const useToggleFavorite = () => {
     mutationFn: ({ playerId, isFavorited }) =>
       isFavorited ? favoritesApi.remove(playerId) : favoritesApi.add(playerId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["favorites"] }),
+  })
+}
+// UCL Knockout hooks
+export const useUclKnockoutList = () =>
+  useQuery({ queryKey: ["ucl-knockout-list"], queryFn: uclKnockoutApi.list })
+
+export const useUclKnockout = (id) =>
+  useQuery({ queryKey: ["ucl-knockout", id], queryFn: () => uclKnockoutApi.get(id), enabled: !!id })
+
+export const useCreateUclKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name) => uclKnockoutApi.create(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout-list"] }),
+  })
+}
+
+export const useSaveUclKnockoutResult = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId }) =>
+      uclKnockoutApi.saveResult(matchId, player1Score, player2Score, tieWinnerId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout"] }),
+  })
+}
+
+export const useUpdateUclKnockoutMatchPlayers = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, ...body }) => uclKnockoutApi.updateMatchPlayers(matchId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout"] }),
+  })
+}
+
+export const useResetUclKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => uclKnockoutApi.reset(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout-list"] }),
+  })
+}
+
+export const useDeleteUclKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => uclKnockoutApi.deleteTournament(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout-list"] }),
   })
 }

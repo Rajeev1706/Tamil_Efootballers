@@ -12,6 +12,7 @@ import CreatePlayer from "../components/admin/CreatePlayer"
 import TeamLeagueResults from "../components/admin/TeamLeagueResults"
 import UclGroupsAdmin from "../components/admin/UclGroupsAdmin"
 import UclResults from "../components/admin/UclResults"
+import UclKnockoutAdmin from "../components/admin/UclKnockoutAdmin"
 import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
@@ -102,8 +103,9 @@ const TABS = [
   { id: "overview",   label: "Overview",     icon: LayoutDashboard },
   { id: "players",    label: "Players",      icon: Users           },
   { id: "records",    label: "Match records", icon: Activity       },
-  { id: "uclgroups",  label: "UCL Groups",   icon: Trophy          },
-  { id: "uclresults", label: "UCL Results",  icon: Trophy          },
+  { id: "uclgroups",    label: "UCL Groups",    icon: Trophy },
+  { id: "uclresults",   label: "UCL Results",   icon: Trophy },
+  { id: "uclknockout",  label: "UCL Knockout",  icon: Trophy },
   { id: "weekly",     label: "Weekly",       icon: Trophy          },
   { id: "fixtures",   label: "Fixtures",     icon: Calendar        },
   { id: "teamresults",label: "Team Results", icon: Users           },
@@ -237,9 +239,8 @@ export default function AdminPage() {
         {activeTab === "uclgroups" && !isLoading && (
           <UclGroupsAdmin />
         )}
-        {activeTab === "uclresults" && !isLoading && (
-          <UclResults />
-        )}
+        {activeTab === "uclresults" && !isLoading && <UclResults />}
+        {activeTab === "uclknockout" && <UclKnockoutAdmin />}
         {activeTab === "weekly" && (
           <WeeklyAdmin />
         )}
