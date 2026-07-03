@@ -174,6 +174,40 @@ router.post("/:id/start", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// PATCH /api/weekly/matches/:matchId/players — update who plays in a match
+router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { player1Id, player2Id } = z.object({
+      player1Id: z.number().int().positive().nullable().optional(),
+      player2Id: z.number().int().positive().nullable().optional(),
+    }).parse(req.body)
+
+    const matchRes = await query("SELECT * FROM weekly_tournament_matches WHERE id = $1", [req.params.matchId])
+    if (!matchRes.rows[0]) return res.status(404).json({ error: "Match not found" })
+
+    // Reset match status if it was completed (since players changed)
+    await query(`
+      UPDATE weekly_tournament_matches
+      SET player1_id = COALESCE($1, player1_id),
+          player2_id = COALESCE($2, player2_id),
+          status = CASE WHEN $3 THEN 'pending' ELSE status END,
+          winner_id = CASE WHEN $3 THEN NULL ELSE winner_id END,
+          player1_score = CASE WHEN $3 THEN NULL ELSE player1_score END,
+          player2_score = CASE WHEN $3 THEN NULL ELSE player2_score END
+      WHERE id = $4
+    `, [player1Id ?? null, player2Id ?? null, (player1Id !== undefined || player2Id !== undefined), req.params.matchId])
+
+    const fresh = await query(`
+      SELECT wtm.*, p1.name AS "player1Name", p2.name AS "player2Name"
+      FROM weekly_tournament_matches wtm
+      LEFT JOIN players p1 ON wtm.player1_id = p1.id
+      LEFT JOIN players p2 ON wtm.player2_id = p2.id
+      WHERE wtm.id = $1
+    `, [req.params.matchId])
+    res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
 // PATCH /api/weekly/matches/:matchId/result — save match result
 router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, res, next) => {
   try {

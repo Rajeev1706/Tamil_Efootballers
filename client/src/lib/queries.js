@@ -64,6 +64,14 @@ export const useDeleteWeeklyTournament = () => {
   })
 }
 
+export const useUpdateMatchPlayers = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, ...body }) => weeklyApi.updateMatchPlayers(matchId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["weekly-tournament"] }),
+  })
+}
+
 export const useResetWeeklyTournament = () => {
   const qc = useQueryClient()
   return useMutation({

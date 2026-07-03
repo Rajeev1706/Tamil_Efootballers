@@ -8,14 +8,19 @@ export default function WeeklyDraw() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: tournament } = useWeeklyTournament(id)
-  const [phase, setPhase]         = useState("intro")   // intro | revealing | done
-  const [matchIdx, setMatchIdx]   = useState(0)
-  const [revealStep, setRevealStep] = useState(0)       // 0=none 1=home 2=vs 3=away 4=pause
-  const [starting, setStarting]   = useState(false)
+  const [phase, setPhase]           = useState("intro")
+  const [matchIdx, setMatchIdx]     = useState(0)
+  const [revealStep, setRevealStep] = useState(0)
+  const [starting, setStarting]     = useState(false)
+  const [fadingOut, setFadingOut]   = useState(false)
 
   const r1Matches = (tournament?.matches || []).filter(m => m.round === 1)
 
-  const [fadingOut, setFadingOut] = useState(false)
+  // If already started, redirect straight to bracket
+  if (tournament && (tournament.status === "active" || tournament.status === "completed")) {
+    navigate(`/weekly/bracket/${id}`, { replace: true })
+    return null
+  }
 
   // Auto-progress through reveal steps
   useEffect(() => {
@@ -157,7 +162,11 @@ export default function WeeklyDraw() {
               </div>
             ))}
           </div>
-          <button onClick={handleStart} disabled={starting}
+          <button
+            onClick={async () => {
+              await weeklyApi.start(id)
+              navigate(`/weekly/bracket/${id}`)
+            }}
             className="flex items-center gap-2 px-8 py-3 rounded-xl bg-accent text-white font-bold text-lg mx-auto hover:bg-accent-dim transition-all disabled:opacity-50">
             {starting ? "Starting…" : "Start Tournament →"}
           </button>

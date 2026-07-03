@@ -71,8 +71,10 @@ export const weeklyApi = {
   create:       (name)        => api.post("/weekly", { name }).then(r => r.data),
   setPlayers:   (id, playerIds) => api.post(`/weekly/${id}/players`, { playerIds }).then(r => r.data),
   start:        (id)          => api.post(`/weekly/${id}/start`).then(r => r.data),
-  saveResult:   (matchId, player1Score, player2Score, tieWinnerId) =>
+  saveResult:    (matchId, player1Score, player2Score, tieWinnerId) =>
     api.patch(`/weekly/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId }).then(r => r.data),
+  updateMatchPlayers: (matchId, body) =>
+    api.patch(`/weekly/matches/${matchId}/players`, body).then(r => r.data),
   reset:        (id)          => api.post(`/weekly/${id}/reset`).then(r => r.data),
   deleteTournament: (id)      => api.delete(`/weekly/${id}`).then(r => r.data),
 }

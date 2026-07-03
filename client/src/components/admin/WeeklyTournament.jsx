@@ -181,7 +181,7 @@ export default function WeeklyAdmin() {
                         className="w-7 h-7 rounded-lg hover:bg-rose-400/10 flex items-center justify-center text-slate-500 hover:text-rose-400">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                      {t.status === "draw" && (
+                  {t.status === "draw" && (
                         <button onClick={() => navigate(`/weekly/draw/${t.id}`)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-400 border border-amber-400/30 text-xs font-semibold">
                           View Draw <ChevronRight className="w-3.5 h-3.5" />

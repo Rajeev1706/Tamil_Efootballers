@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2 } from "lucide-react"
-import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament } from "../lib/queries"
+import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament, useUpdateMatchPlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
 
 const CARD_H   = 120   // fixed card height px
@@ -22,12 +22,16 @@ function getRoundLabel(round, totalRounds) {
   return `Round ${round}`
 }
 
-function MatchCard({ match, totalRounds, tournamentId, onSaved, style }) {
-  const saveResult = useSaveWeeklyResult()
+function MatchCard({ match, totalRounds, tournamentId, allPlayers, onSaved, style }) {
+  const saveResult         = useSaveWeeklyResult()
+  const updatePlayers      = useUpdateMatchPlayers()
   const [score1, setScore1] = useState("")
   const [score2, setScore2] = useState("")
-  const [tieWinner, setTieWinner] = useState("") // "p1" | "p2"
-  const [editing, setEditing] = useState(false)
+  const [tieWinner, setTieWinner] = useState("")
+  const [editing, setEditing]     = useState(false)
+  const [editingPlayers, setEditingPlayers] = useState(false)
+  const [p1Id, setP1Id]   = useState(match.player1_id || "")
+  const [p2Id, setP2Id]   = useState(match.player2_id || "")
 
   const isCompleted    = match.status === "completed" || match.status === "bye"
   const isBye          = match.status === "bye"
@@ -65,7 +69,7 @@ function MatchCard({ match, totalRounds, tournamentId, onSaved, style }) {
 
   return (
     <div
-      style={{ ...style, minHeight: CARD_H, height: editing ? "auto" : CARD_H, position: "absolute", zIndex: editing ? 50 : 1 }}
+      style={{ ...style, minHeight: CARD_H, height: (editing || editingPlayers) ? "auto" : CARD_H, position: "absolute", zIndex: (editing || editingPlayers) ? 50 : 1 }}
       className={cn(
         "w-full rounded-xl border overflow-hidden flex flex-col",
         isFinal     ? "border-gold/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]" :
@@ -183,11 +187,70 @@ function MatchCard({ match, totalRounds, tournamentId, onSaved, style }) {
         </div>
       )}
 
-      {!isCompleted && !hasBothPlayers && !editing && (
+      {/* Edit players mode */}
+      {editingPlayers && (
+        <div className="bg-pitch-900 border-t border-surface-border/30 px-2 py-2 space-y-1.5 flex-shrink-0">
+          <p className="text-xs text-slate-500 mb-1">Edit players</p>
+          <div>
+            <p className="text-xs text-slate-600 mb-0.5">Home</p>
+            <select value={p1Id} onChange={e => setP1Id(e.target.value)}
+              className="w-full bg-pitch-800 border border-surface-border rounded text-xs text-white py-1.5 px-2 focus:outline-none focus:border-accent/40">
+              <option value="">— Bye —</option>
+              {allPlayers.filter(p => !p2Id || String(p.id) !== String(p2Id)).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="text-xs text-slate-600 mb-0.5">Away</p>
+            <select value={p2Id} onChange={e => setP2Id(e.target.value)}
+              className="w-full bg-pitch-800 border border-surface-border rounded text-xs text-white py-1.5 px-2 focus:outline-none focus:border-accent/40">
+              <option value="">— Bye —</option>
+              {allPlayers.filter(p => !p1Id || String(p.id) !== String(p1Id)).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-1.5 pt-1">
+            <button onClick={() => setEditingPlayers(false)}
+              className="flex-1 text-xs py-1.5 rounded border border-surface-border text-slate-400">Cancel</button>
+            <button
+              onClick={async () => {
+                await updatePlayers.mutateAsync({
+                  matchId: match.id,
+                  player1Id: p1Id ? Number(p1Id) : null,
+                  player2Id: p2Id ? Number(p2Id) : null,
+                })
+                setEditingPlayers(false)
+                onSaved?.()
+              }}
+              disabled={updatePlayers.isPending}
+              className="flex-1 text-xs py-1.5 rounded bg-accent/20 text-accent border border-accent/30 font-semibold disabled:opacity-40">
+              {updatePlayers.isPending ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Awaiting / Bye labels */}
+      {!isCompleted && !hasBothPlayers && !isBye && !editing && !editingPlayers && (
         <div className="text-center text-xs text-slate-700 py-0.5 bg-pitch-900/40 border-t border-surface-border/30 flex-shrink-0">Awaiting</div>
       )}
-      {isBye && (
-        <div className="text-center text-xs text-slate-600 py-0.5 bg-pitch-900/40 border-t border-surface-border/30 flex-shrink-0">Bye — auto advance</div>
+      {isBye && !editingPlayers && (
+        <div className="text-center text-xs text-slate-600 py-0.5 bg-pitch-900/20 border-t border-surface-border/20 flex-shrink-0">Bye — auto advance</div>
+      )}
+
+      {/* Edit players button — show for ALL matches */}
+      {!editingPlayers && !editing && (
+        <button
+          onClick={() => {
+            setP1Id(match.player1_id ? String(match.player1_id) : "")
+            setP2Id(match.player2_id ? String(match.player2_id) : "")
+            setEditingPlayers(true)
+          }}
+          className="text-xs text-slate-600 hover:text-accent py-1 bg-pitch-900/20 border-t border-surface-border/20 transition-colors flex-shrink-0 w-full">
+          ✎ Edit players
+        </button>
       )}
     </div>
   )
@@ -329,6 +392,7 @@ export default function WeeklyBracket() {
                         match={match}
                         totalRounds={totalRounds}
                         tournamentId={parseInt(id)}
+                        allPlayers={tournament.players || []}
                         onSaved={refetch}
                         style={{ top: getCardTop(round, idx), left: 0, right: 0 }}
                       />
