@@ -1,294 +1,361 @@
-import { useState, useEffect } from "react"
-import { ChevronDown, ChevronUp, CheckCircle, Loader2, Trophy, RotateCcw } from "lucide-react"
+import { useState, useRef } from "react"
+import { Trophy, Pencil, Trash2, Download } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useUclGroups, useResetGroupFixtures } from "../../lib/queries"
-import { recordsApi } from "../../lib/api"
+import { useUclFixtures } from "../../lib/queries"
+import { uclApi } from "../../lib/api"
 import { useQueryClient } from "@tanstack/react-query"
+import { toPng } from "html-to-image"
+import logoUrl from "../../../images/logo.png"
 
-const RESULT_COLOR = {
-  win:  "bg-emerald-400/10 text-emerald-400 border-emerald-400/25",
-  draw: "bg-amber-400/10  text-amber-400  border-amber-400/25",
-  loss: "bg-rose-400/10   text-rose-400   border-rose-400/25",
-}
-
-function buildPairings(players) {
-  // Round robin — every player plays every other player exactly once
-  const pairs = []
-  for (let i = 0; i < players.length; i++) {
-    for (let j = i + 1; j < players.length; j++) {
-      pairs.push([players[i], players[j]])
-    }
-  }
-  return pairs
-}
-
-function PairRow({ pair, existing, onLogged }) {
-  const [p1, p2] = pair
-  const logged = existing.find(r =>
-    (r.playerId === p1.id && r.opponentId === p2.id) ||
-    (r.playerId === p2.id && r.opponentId === p1.id)
-  )
-
-  const [score1, setScore1] = useState("")
-  const [score2, setScore2] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-
-  async function submit() {
-    if (score1 === "" || score2 === "") return
-    setSubmitting(true)
-    const s1 = Number(score1), s2 = Number(score2)
-    const result = s1 > s2 ? "win" : s1 < s2 ? "loss" : "draw"
-    try {
-      await recordsApi.create({
-        playerId: p1.id,
-        opponentId: p2.id,
-        result,
-        matchType: "ucl",
-        playerScore: s1,
-        opponentScore: s2,
-      })
-      onLogged()
-    } catch (err) {
-      alert(err?.response?.data?.error || "Failed to log result")
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  if (logged) {
-    return <LoggedRow r={logged} group={{ players: [p1, p2] }} onChanged={onLogged} />
-  }
-
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-pitch-800/40 border border-surface-border rounded-lg">
-      <span className="text-sm text-white flex-1 truncate">{p1.name}</span>
-      <input type="number" min="0" placeholder="0" value={score1}
-        onChange={e => setScore1(e.target.value)}
-        className="w-12 text-center bg-pitch-900 border border-surface-border rounded-md py-1.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
-      <span className="text-slate-600 text-xs">–</span>
-      <input type="number" min="0" placeholder="0" value={score2}
-        onChange={e => setScore2(e.target.value)}
-        className="w-12 text-center bg-pitch-900 border border-surface-border rounded-md py-1.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
-      <span className="text-sm text-white flex-1 text-right truncate">{p2.name}</span>
-      <button onClick={submit} disabled={score1 === "" || score2 === "" || submitting}
-        className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0",
-          score1 !== "" && score2 !== "" ? "bg-accent/15 text-accent border border-accent/25 hover:bg-accent/25"
-                                          : "bg-pitch-900 text-slate-600 border border-surface-border cursor-not-allowed")}>
-        {submitting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Log"}
-      </button>
-    </div>
-  )
-}
-
-function LoggedRow({ r, group, players, onChanged }) {
-  const [editing, setEditing]   = useState(false)
-  const [score1, setScore1]     = useState(r.playerScore ?? "")
-  const [score2, setScore2]     = useState(r.opponentScore ?? "")
-  const [saving, setSaving]     = useState(false)
-  const [confirmDel, setConfirmDel] = useState(false)
+function FixtureCard({ fix, onChanged }) {
   const qc = useQueryClient()
+  const [score1, setScore1]       = useState(fix.player1Score ?? "")
+  const [score2, setScore2]       = useState(fix.player2Score ?? "")
+  const [editing, setEditing]     = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
 
-  const isHome    = group.players.some(p => p.id === r.playerId)
-  const homeName  = isHome ? r.playerName  : r.opponentName
-  const awayName  = isHome ? r.opponentName : r.playerName
-  const homeScore = isHome ? r.playerScore : r.opponentScore
-  const awayScore = isHome ? r.opponentScore : r.playerScore
-  const result    = isHome ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw")
-  const chip      = RESULT_COLOR[result]
+  const isCompleted = fix.status === "completed"
+  const s1 = Number(score1), s2 = Number(score2)
+  const preview = score1 !== "" && score2 !== ""
+    ? s1 > s2 ? `${fix.player1Name} wins` : s1 < s2 ? `${fix.player2Name} wins` : "Draw"
+    : null
+
+  function openEdit() {
+    setScore1(fix.player1Score ?? "")
+    setScore2(fix.player2Score ?? "")
+    setEditing(true)
+  }
 
   async function handleSave() {
-    const s1 = Number(score1), s2 = Number(score2)
-    const newResult = s1 > s2 ? "win" : s1 < s2 ? "loss" : "draw"
+    if (score1 === "" || score2 === "") return
     setSaving(true)
     try {
-      await recordsApi.update(r.id, {
-        result: isHome ? newResult : (newResult === "win" ? "loss" : newResult === "loss" ? "win" : "draw"),
-        playerScore: isHome ? s1 : s2,
-        opponentScore: isHome ? s2 : s1,
-      })
-      setEditing(false)
+      await uclApi.saveFixture(fix.id, Number(score1), Number(score2))
+      qc.invalidateQueries({ queryKey: ["ucl-fixtures"] })
       qc.invalidateQueries({ queryKey: ["ucl-standings"] })
-      onChanged()
+      setEditing(false)
+      onChanged?.()
     } catch (err) {
-      alert(err?.response?.data?.error || "Failed to update")
+      alert(err?.response?.data?.error || "Failed to save")
     } finally { setSaving(false) }
   }
 
-  async function handleDelete() {
+  async function handleClear() {
     try {
-      await recordsApi.delete(r.id)
+      await uclApi.clearFixture(fix.id)
+      qc.invalidateQueries({ queryKey: ["ucl-fixtures"] })
       qc.invalidateQueries({ queryKey: ["ucl-standings"] })
-      onChanged()
+      setConfirmDel(false)
+      onChanged?.()
     } catch (err) {
-      alert(err?.response?.data?.error || "Failed to delete")
+      alert(err?.response?.data?.error || "Failed to clear")
     }
+  }
+
+  const resultChip = isCompleted
+    ? fix.player1Score > fix.player2Score
+      ? { label: "HOME WIN", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/25" }
+      : fix.player1Score < fix.player2Score
+        ? { label: "AWAY WIN", color: "text-rose-400 bg-rose-400/10 border-rose-400/25" }
+        : { label: "DRAW",     color: "text-amber-400 bg-amber-400/10 border-amber-400/25" }
+    : null
+
+  if (confirmDel) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 bg-rose-500/5 border border-rose-400/20 rounded-xl">
+        <p className="text-sm text-rose-400 flex-1">Clear result for {fix.player1Name} vs {fix.player2Name}?</p>
+        <button onClick={() => setConfirmDel(false)} className="text-xs px-3 py-1.5 border border-surface-border rounded-lg text-slate-400">Cancel</button>
+        <button onClick={handleClear} className="text-xs px-3 py-1.5 bg-rose-500 text-white rounded-lg font-semibold">Clear</button>
+      </div>
+    )
   }
 
   if (editing) {
     return (
-      <div className="flex items-center gap-2 bg-pitch-800 rounded-lg px-3 py-2">
-        <span className="text-sm text-white flex-1 truncate">{homeName}</span>
-        <input type="number" min="0" value={score1} onChange={e => setScore1(e.target.value)}
-          className="w-10 text-center bg-pitch-900 border border-surface-border rounded text-xs text-white py-1 focus:outline-none focus:border-accent/40" />
-        <span className="text-slate-600 text-xs">–</span>
-        <input type="number" min="0" value={score2} onChange={e => setScore2(e.target.value)}
-          className="w-10 text-center bg-pitch-900 border border-surface-border rounded text-xs text-white py-1 focus:outline-none focus:border-accent/40" />
-        <span className="text-sm text-white flex-1 text-right truncate">{awayName}</span>
-        <button onClick={() => setEditing(false)} className="text-xs text-slate-500 px-1">✕</button>
-        <button onClick={handleSave} disabled={saving}
-          className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded disabled:opacity-40">
-          {saving ? "…" : "✓"}
-        </button>
-      </div>
-    )
-  }
-
-  if (confirmDel) {
-    return (
-      <div className="flex items-center gap-2 bg-rose-500/5 border border-rose-400/20 rounded-lg px-3 py-2">
-        <span className="text-xs text-rose-400 flex-1">Delete {homeName} vs {awayName}?</span>
-        <button onClick={() => setConfirmDel(false)} className="text-xs px-2 py-0.5 border border-surface-border rounded text-slate-400">Cancel</button>
-        <button onClick={handleDelete} className="text-xs px-2 py-0.5 bg-rose-500 text-white rounded font-semibold">Delete</button>
+      <div className="px-4 py-3 bg-pitch-800 border border-accent/20 rounded-xl space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-white flex-1 truncate font-medium">{fix.player1Name}</span>
+          <input type="number" min="0" placeholder="0" value={score1}
+            onChange={e => setScore1(e.target.value)}
+            className="w-12 text-center bg-pitch-900 border border-surface-border rounded-lg py-1.5 text-sm text-white font-mono focus:outline-none focus:border-accent/40" />
+          <span className="text-slate-600 text-xs">–</span>
+          <input type="number" min="0" placeholder="0" value={score2}
+            onChange={e => setScore2(e.target.value)}
+            className="w-12 text-center bg-pitch-900 border border-surface-border rounded-lg py-1.5 text-sm text-white font-mono focus:outline-none focus:border-accent/40" />
+          <span className="text-sm text-white flex-1 text-right truncate font-medium">{fix.player2Name}</span>
+        </div>
+        {preview && (
+          <p className={cn("text-xs text-center font-semibold",
+            s1 > s2 ? "text-emerald-400" : s1 < s2 ? "text-rose-400" : "text-amber-400"
+          )}>{preview}</p>
+        )}
+        <div className="flex gap-2">
+          <button onClick={() => setEditing(false)} className="flex-1 text-xs py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
+          <button onClick={handleSave} disabled={score1 === "" || score2 === "" || saving}
+            className="flex-1 text-xs py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 font-semibold disabled:opacity-40">
+            {saving ? "Saving…" : "Save result"}
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex items-center gap-2 bg-pitch-800 rounded-lg px-3 py-2 group">
-      <span className="text-sm text-slate-300 flex-1 truncate">{homeName}</span>
-      {homeScore != null && (
-        <span className="text-xs font-mono text-slate-400 flex-shrink-0">{homeScore}–{awayScore}</span>
+    <div className={cn(
+      "flex items-center gap-3 px-4 py-3 rounded-xl border group transition-colors",
+      isCompleted ? "bg-pitch-800/50 border-surface-border/40 hover:border-surface-border" : "bg-pitch-800/30 border-surface-border hover:border-accent/20"
+    )}>
+      <span className={cn("text-sm flex-1 truncate font-medium",
+        isCompleted && fix.player1Score > fix.player2Score ? "text-emerald-400 font-bold" : "text-white"
+      )}>{fix.player1Name}</span>
+
+      {isCompleted ? (
+        <span className="text-sm font-bold font-mono text-slate-300 flex-shrink-0">{fix.player1Score} – {fix.player2Score}</span>
+      ) : (
+        <button onClick={openEdit}
+          className="text-xs px-3 py-1 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors flex-shrink-0">
+          + Score
+        </button>
       )}
-      <span className={cn("text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0", chip)}>
-        {result === "win" ? "WIN" : result === "loss" ? "LOSS" : "DRAW"}
-      </span>
-      <span className="text-sm text-slate-300 flex-1 text-right truncate">{awayName}</span>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => { setScore1(homeScore ?? ""); setScore2(awayScore ?? ""); setEditing(true) }}
-          className="text-xs text-slate-500 hover:text-accent px-1">✎</button>
-        <button onClick={() => setConfirmDel(true)}
-          className="text-xs text-slate-500 hover:text-rose-400 px-1">✕</button>
+
+      <span className={cn("text-sm flex-1 text-right truncate font-medium",
+        isCompleted && fix.player2Score > fix.player1Score ? "text-emerald-400 font-bold" : "text-white"
+      )}>{fix.player2Name}</span>
+
+      {isCompleted && resultChip && (
+        <span className={cn("text-xs font-bold px-2 py-0.5 rounded-lg border flex-shrink-0", resultChip.color)}>
+          {resultChip.label}
+        </span>
+      )}
+
+      {isCompleted && (
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <button onClick={openEdit} className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-accent">
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button onClick={() => setConfirmDel(true)} className="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-rose-400">
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GroupSection({ groupName, fixtures, onChanged }) {
+  const completed = fixtures.filter(f => f.status === "completed").length
+  const total     = fixtures.length
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-xs font-bold text-accent uppercase tracking-wide">{groupName}</p>
+        <span className={cn("text-xs px-2 py-0.5 rounded-full font-semibold",
+          completed === total && total > 0 ? "bg-emerald-400/10 text-emerald-400"
+          : completed > 0 ? "bg-amber-400/10 text-amber-400"
+          : "bg-slate-700 text-slate-500"
+        )}>{completed}/{total}</span>
+      </div>
+      <div className="space-y-1.5">
+        {fixtures.map(f => <FixtureCard key={f.id} fix={f} onChanged={onChanged} />)}
       </div>
     </div>
   )
 }
 
-function GroupResultsCard({ group, uclRecords, onRefresh }) {
-  const [expanded, setExpanded]       = useState(true)
-  const [confirmReset, setConfirmReset] = useState(false)
-  const qc = useQueryClient()
-  const resetFixtures = useResetGroupFixtures()
-
-  const pairings = buildPairings(group.players)
-  const groupRecords = uclRecords.filter(r =>
-    group.players.some(p => p.id === r.playerId) && group.players.some(p => p.id === r.opponentId)
-  )
-  const loggedCount = groupRecords.length
-  const totalCount  = pairings.length
-  const isComplete  = loggedCount >= totalCount && totalCount > 0
-
-  function refresh() {
-    qc.invalidateQueries({ queryKey: ["ucl-standings"] })
-    qc.invalidateQueries({ queryKey: ["players"] })
-    onRefresh()
-  }
-
-  if (group.players.length < 2) {
-    return (
-      <div className="card px-5 py-4">
-        <p className="text-sm font-semibold text-white">{group.name}</p>
-        <p className="text-xs text-slate-500 mt-1">Needs at least 2 players to generate fixtures</p>
-      </div>
-    )
-  }
+// Hidden export card — rendered off-screen, captured as image
+function RoundExportCard({ round, byGroup, exportRef, visible }) {
+  const groupCount = Object.keys(byGroup).length
+  // 2 rows for 8 groups (4 cols), 1 row for fewer
+  const cols = Math.min(4, groupCount)
 
   return (
-    <div className="card overflow-hidden">
-      <button onClick={() => setExpanded(v => !v)}
-        className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-        <div className="flex items-center gap-3">
-          <div className={cn("w-2 h-2 rounded-full flex-shrink-0",
-            isComplete ? "bg-emerald-400" : loggedCount > 0 ? "bg-amber-400" : "bg-slate-600")} />
-          <p className="text-sm font-semibold text-white">{group.name}</p>
-          <span className="text-xs text-slate-500">({group.players.length} players)</span>
+    <div
+      ref={exportRef}
+      style={{
+        position: "fixed",
+        left: visible ? 0 : "-9999px",
+        top: visible ? 0 : 0,
+        width: 960,
+        background: "#050810",
+        padding: 32,
+        fontFamily: "system-ui, sans-serif",
+        overflow: "visible",
+        zIndex: visible ? 9999 : -1,
+        opacity: visible ? 1 : 0,
+        pointerEvents: "none",
+      }}
+    >
+      {/* Background logo watermark */}
+      <img
+        src={logoUrl}
+        alt=""
+        style={{
+          position: "absolute", top: "50%", left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 320, height: 320, objectFit: "contain",
+          opacity: 0.04, pointerEvents: "none", userSelect: "none",
+        }}
+      />
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, position: "relative" }}>
+        <img src={logoUrl} alt="TEC" style={{ width: 44, height: 44, objectFit: "contain" }} />
+        <div>
+          <p style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>Tamil Efootballers · UCL Group Stage</p>
+          <p style={{ color: "#ffffff", fontSize: 20, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full",
-            isComplete ? "bg-emerald-400/10 text-emerald-400"
-            : loggedCount > 0 ? "bg-amber-400/10 text-amber-400"
-            : "bg-slate-700 text-slate-500")}>
-            {loggedCount}/{totalCount} logged
-          </span>
-          {loggedCount > 0 && !confirmReset && (
-            <button onClick={e => { e.stopPropagation(); setConfirmReset(true) }}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-rose-400 transition-colors">
-              <RotateCcw className="w-3 h-3" /> Reset
-            </button>
-          )}
-          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
-        </div>
-      </button>
+      </div>
 
-      {confirmReset && (
-        <div className="border-b border-surface-border px-5 py-3 bg-rose-500/5 flex items-center gap-3">
-          <p className="text-sm text-rose-400 flex-1">Delete all logged results for {group.name}?</p>
-          <button onClick={() => setConfirmReset(false)} className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
-          <button onClick={async () => {
-            await resetFixtures.mutateAsync(group.id)
-            setConfirmReset(false)
-            onRefresh()
-          }} className="text-xs px-3 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">
-            Reset fixtures
-          </button>
-        </div>
-      )}
+      {/* Groups grid — 4 cols, wraps to 2 rows for 8 groups */}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 16 }}>
+        {Object.entries(byGroup).sort(([a], [b]) => a.localeCompare(b)).map(([groupName, groupFixtures]) => (
+          <div key={groupName} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 16 }}>
+            <p style={{ color: "#10b981", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 12, margin: "0 0 12px 0" }}>{groupName}</p>
+            {groupFixtures.map(f => (
+              <div key={f.id} style={{ marginBottom: 8, padding: "8px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <p style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600, margin: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.player1Name}</p>
+                  <span style={{ color: "#475569", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                    {f.status === "completed" ? `${f.player1Score} – ${f.player2Score}` : "vs"}
+                  </span>
+                  <p style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600, margin: 0, flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.player2Name}</p>
+                </div>
+                {f.status === "completed" && (
+                  <p style={{
+                    margin: "4px 0 0 0", fontSize: 10, fontWeight: 700, textAlign: "center",
+                    color: f.player1Score > f.player2Score ? "#10b981" : f.player1Score < f.player2Score ? "#f87171" : "#f59e0b"
+                  }}>
+                    {f.player1Score > f.player2Score ? `${f.player1Name} wins` : f.player1Score < f.player2Score ? `${f.player2Name} wins` : "Draw"}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
 
-      {expanded && (
-        <div className="border-t border-surface-border px-5 py-4 space-y-2">
-          {pairings.map((pair, i) => (
-            <PairRow key={i} pair={pair} existing={groupRecords} onLogged={refresh} />
-          ))}
-          {isComplete && (
-            <div className="flex items-center gap-2 text-emerald-400 text-sm pt-2">
-              <CheckCircle className="w-4 h-4" />
-              <span>All fixtures logged for {group.name}</span>
-            </div>
-          )}
-        </div>
-      )}
+      <p style={{ color: "#1e293b", fontSize: 10, textAlign: "right", marginTop: 16, margin: "16px 0 0 0" }}>
+        tamil-efootballers.vercel.app
+      </p>
     </div>
   )
 }
 
 export default function UclResults() {
-  const { data: groups = [], isLoading } = useUclGroups()
-  const [uclRecords, setUclRecords] = useState([])
+  const { data: fixtures = [], isLoading, refetch } = useUclFixtures()
+  const [activeRound, setActiveRound] = useState("all")
+  const [exporting, setExporting]     = useState(false)
+  const exportRef = useRef(null)
 
-  const fetchUclRecords = async () => {
-    const all = await recordsApi.list()
-    setUclRecords(all.filter(r => r.matchType === "ucl"))
+  const maxRound = fixtures.length > 0 ? Math.max(...fixtures.map(f => f.roundNumber)) : 0
+  const rounds   = Array.from({ length: maxRound }, (_, i) => i + 1)
+
+  const filtered = activeRound === "all"
+    ? fixtures
+    : fixtures.filter(f => f.roundNumber === Number(activeRound))
+
+  // Group fixtures by group name
+  const byGroup = {}
+  for (const f of filtered) {
+    if (!byGroup[f.groupName]) byGroup[f.groupName] = []
+    byGroup[f.groupName].push(f)
   }
 
-  useEffect(() => { fetchUclRecords() }, [])
+  const [showExportCard, setShowExportCard] = useState(false)
 
-  if (isLoading) return <p className="text-sm text-slate-500 text-center py-6">Loading…</p>
+  async function handleExport() {
+    if (!exportRef.current || activeRound === "all") return
+    setShowExportCard(true)
+    setExporting(true)
+    // Wait for DOM to fully render
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      const el = exportRef.current
+      const dataUrl = await toPng(el, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: "#050810",
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+      })
+      const link = document.createElement("a")
+      link.download = `UCL-Round-${activeRound}-Fixtures.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      alert("Export failed: " + err.message)
+    } finally {
+      setExporting(false)
+      setShowExportCard(false)
+    }
+  }
 
-  if (groups.length === 0) {
+  if (isLoading) return <p className="text-sm text-slate-500 text-center py-8">Loading…</p>
+
+  if (fixtures.length === 0) {
     return (
       <div className="card px-6 py-12 text-center">
         <Trophy className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 font-medium">No UCL groups created yet</p>
-        <p className="text-sm text-slate-600 mt-1">Create groups first in the UCL Groups tab</p>
+        <p className="text-slate-400 font-medium">No UCL fixtures generated yet</p>
+        <p className="text-sm text-slate-600 mt-1">Complete the group draw first — fixtures are auto-generated on Done</p>
       </div>
     )
   }
 
+  const totalCompleted = fixtures.filter(f => f.status === "completed").length
+  const roundFixtures  = activeRound !== "all"
+    ? fixtures.filter(f => f.roundNumber === Number(activeRound))
+    : []
+  const roundByGroup   = {}
+  for (const f of roundFixtures) {
+    if (!roundByGroup[f.groupName]) roundByGroup[f.groupName] = []
+    roundByGroup[f.groupName].push(f)
+  }
+
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-400">Log UCL group-stage results — each group plays round-robin within itself, each pair meeting once.</p>
-      {groups.map(g => (
-        <GroupResultsCard key={g.id} group={g} uclRecords={uclRecords} onRefresh={fetchUclRecords} />
-      ))}
+    <div className="space-y-5">
+      {/* Export card — visible only during export capture */}
+      {activeRound !== "all" && (
+        <RoundExportCard
+          round={activeRound}
+          byGroup={roundByGroup}
+          exportRef={exportRef}
+          visible={showExportCard}
+        />
+      )}
+
+      {/* Summary + round tabs + export */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-sm text-slate-400">{totalCompleted}/{fixtures.length} fixtures logged</p>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
+            <button onClick={() => setActiveRound("all")}
+              className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+              )}>All</button>
+            {rounds.map(r => (
+              <button key={r} onClick={() => setActiveRound(r)}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                  activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                )}>Round {r}</button>
+            ))}
+          </div>
+          {activeRound !== "all" && (
+            <button onClick={handleExport} disabled={exporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? "Exporting…" : "Export PNG"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Fixtures by group */}
+      <div className="space-y-6">
+        {Object.entries(byGroup).sort(([a], [b]) => a.localeCompare(b)).map(([groupName, groupFixtures]) => (
+          <GroupSection key={groupName} groupName={groupName} fixtures={groupFixtures} onChanged={refetch} />
+        ))}
+      </div>
     </div>
   )
 }

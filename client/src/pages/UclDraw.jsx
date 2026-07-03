@@ -6,12 +6,15 @@ import { uclApi } from "../lib/api"
 
 export default function UclDraw() {
   const navigate = useNavigate()
-  const { data: groups = [], isLoading } = useUclAdminGroups()
+  const { data: allGroups = [], isLoading } = useUclAdminGroups()
 
-  const [groupIdx, setGroupIdx]    = useState(0)   // which group we're on
-  const [playerIdx, setPlayerIdx]  = useState(0)   // how many players revealed so far
-  const [phase, setPhase]          = useState("revealing") // revealing | fading | done
+  const [groupIdx, setGroupIdx]         = useState(0)
+  const [playerIdx, setPlayerIdx]       = useState(0)
+  const [phase, setPhase]               = useState("intro") // intro | revealing | fading | done
   const [groupVisible, setGroupVisible] = useState(true)
+
+  // Only animate pending_draw groups
+  const groups = allGroups.filter(g => g.status === "pending_draw")
 
   const currentGroup = groups[groupIdx]
   const isLastGroup  = groupIdx >= groups.length - 1
@@ -50,9 +53,9 @@ export default function UclDraw() {
     </div>
   )
 
-  if (groups.length === 0) return (
+  if (!isLoading && groups.length === 0) return (
     <div className="min-h-screen bg-pitch-900 flex items-center justify-center">
-      <p className="text-slate-500 text-sm">No UCL groups found</p>
+      <p className="text-slate-500 text-sm">No pending groups found — draw may already be complete</p>
     </div>
   )
 
@@ -70,8 +73,22 @@ export default function UclDraw() {
         </div>
       </div>
 
-      {/* Group card */}
-      {phase !== "done" && currentGroup && (
+      {/* Intro screen */}
+      {phase === "intro" && (
+        <div className="text-center">
+          <p className="text-slate-400 mb-2 text-sm">{groups.length} groups · {groups.reduce((s, g) => s + g.players.length, 0)} players</p>
+          <p className="text-slate-500 text-sm mb-8">Players will be revealed group by group</p>
+          <button
+            onClick={() => setPhase("revealing")}
+            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-accent text-white font-bold text-lg shadow-lg hover:bg-accent-dim transition-all mx-auto"
+          >
+            🎲 Start Draw
+          </button>
+        </div>
+      )}
+
+      {/* Group card — only during reveal/fading */}
+      {(phase === "revealing" || phase === "fading") && currentGroup && (
         <div
           className="w-full max-w-sm"
           style={{

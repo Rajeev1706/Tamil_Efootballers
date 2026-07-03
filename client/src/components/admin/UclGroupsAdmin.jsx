@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useQueryClient } from "@tanstack/react-query"
 import { Plus, Trash2, Pencil, Check, X, Users, ChevronDown, ChevronUp, Zap } from "lucide-react"
 import {
   useUclAdminGroups, useUclUnassigned,
@@ -8,6 +9,7 @@ import {
   useAssignUclPlayer, useUnassignUclPlayer,
 } from "../../lib/queries"
 import { usePlayers } from "../../lib/queries"
+import { uclApi } from "../../lib/api"
 import { cn } from "../../lib/utils"
 
 // Auto-generate form: select players → auto-create 8 groups
@@ -103,12 +105,15 @@ function GroupCard({ group, unassigned }) {
   const [editing, setEditing]         = useState(false)
   const [name, setName]               = useState(group.name)
   const [confirmDel, setConfirmDel]   = useState(false)
+  const [confirmRegen, setConfirmRegen] = useState(false)
   const [addPlayerId, setAddPlayerId] = useState("")
+  const [regenerating, setRegenerating] = useState(false)
 
   const renameGroup    = useRenameUclGroup()
   const deleteGroup    = useDeleteUclGroup()
   const assignPlayer   = useAssignUclPlayer()
   const unassignPlayer = useUnassignUclPlayer()
+  const qc = useQueryClient()
 
   const handleRename = () => {
     if (!name.trim() || name === group.name) { setEditing(false); return }
@@ -120,6 +125,23 @@ function GroupCard({ group, unassigned }) {
     assignPlayer.mutate({ groupId: group.id, playerId: Number(addPlayerId) }, {
       onSuccess: () => setAddPlayerId(""),
     })
+  }
+
+  async function handleRegenerate() {
+    setRegenerating(true)
+    try {
+      await uclApi.regenerateGroupFixtures(group.id)
+      // Invalidate all UCL-related queries
+      qc.invalidateQueries({ queryKey: ["ucl-fixtures"] })
+      qc.invalidateQueries({ queryKey: ["ucl-standings"] })
+      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-admin-groups"] })
+      setConfirmRegen(false)
+    } catch (err) {
+      alert(err?.response?.data?.error || "Failed to regenerate")
+    } finally {
+      setRegenerating(false)
+    }
   }
 
   return (
@@ -190,6 +212,25 @@ function GroupCard({ group, unassigned }) {
               Add
             </button>
           </div>
+
+          {/* Regenerate fixtures */}
+          <div className="pt-2 border-t border-surface-border/50">
+            {confirmRegen ? (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-amber-400 flex-1">Delete all results & regenerate fixtures?</p>
+                <button onClick={() => setConfirmRegen(false)} className="text-xs px-2 py-1 border border-surface-border rounded text-slate-400">Cancel</button>
+                <button onClick={handleRegenerate} disabled={regenerating}
+                  className="text-xs px-3 py-1 bg-amber-400 text-black rounded font-bold disabled:opacity-50">
+                  {regenerating ? "…" : "Regenerate"}
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmRegen(true)}
+                className="text-xs text-slate-500 hover:text-amber-400 transition-colors flex items-center gap-1">
+                ↺ Regenerate fixtures for this group
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -197,6 +238,7 @@ function GroupCard({ group, unassigned }) {
 }
 
 export default function UclGroupsAdmin() {
+  const navigate = useNavigate()
   const { data: groups = [], isLoading } = useUclAdminGroups()
   const { data: unassigned = [] }        = useUclUnassigned()
   const createGroup = useCreateUclGroup()
@@ -209,6 +251,9 @@ export default function UclGroupsAdmin() {
     createGroup.mutate(newGroupName.trim(), { onSuccess: () => setNewGroupName("") })
     setShowCreate(false)
   }
+
+  const pendingGroups = groups.filter(g => g.status === "pending_draw")
+  const activeGroups  = groups.filter(g => g.status === "active" || !g.status)
 
   return (
     <div className="space-y-4">
@@ -234,12 +279,14 @@ export default function UclGroupsAdmin() {
 
       {showGenerate && <GenerateForm onClose={() => setShowGenerate(false)} />}
 
-      {/* View Draw button — shown when groups exist */}
-      {groups.length > 0 && !showGenerate && (
-        <div className="card px-5 py-4 flex items-center justify-between">
+      {/* View Draw button — shown only when pending_draw groups exist */}
+      {pendingGroups.length > 0 && !showGenerate && (
+        <div className="card px-5 py-4 flex items-center justify-between border-amber-400/20">
           <div>
-            <p className="text-sm font-semibold text-white">UCL Group Draw</p>
-            <p className="text-xs text-slate-500 mt-0.5">{groups.length} groups · {groups.reduce((s, g) => s + g.players.length, 0)} players</p>
+            <p className="text-sm font-semibold text-white">UCL Group Draw Ready</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {pendingGroups.length} groups · {pendingGroups.reduce((s, g) => s + g.players.length, 0)} players · Draw not started yet
+            </p>
           </div>
           <button
             onClick={() => navigate("/ucl/draw")}
@@ -266,17 +313,17 @@ export default function UclGroupsAdmin() {
 
       {isLoading ? (
         <p className="text-sm text-slate-500 text-center py-6">Loading…</p>
-      ) : groups.length === 0 && !showGenerate ? (
+      ) : activeGroups.length === 0 && pendingGroups.length === 0 && !showGenerate ? (
         <div className="card px-5 py-10 text-center">
           <Users className="w-8 h-8 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-400 text-sm">No UCL groups yet</p>
           <p className="text-slate-600 text-xs mt-1">Use Auto-generate to create 8 groups instantly, or add manually</p>
         </div>
-      ) : (
+      ) : activeGroups.length > 0 ? (
         <div className="space-y-3">
-          {groups.map(g => <GroupCard key={g.id} group={g} unassigned={unassigned} />)}
+          {activeGroups.map(g => <GroupCard key={g.id} group={g} unassigned={unassigned} />)}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

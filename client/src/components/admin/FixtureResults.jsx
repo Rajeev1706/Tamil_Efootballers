@@ -1,10 +1,12 @@
-import { useState } from "react"
-import { Check, Lock, Pencil, Trash2, X, Save, Plus, Calendar } from "lucide-react"
+import { useState, useRef } from "react"
+import { Check, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
   useCreateFixture, useTeams
 } from "../../lib/queries"
 import { cn } from "../../lib/utils"
+import { toPng } from "html-to-image"
+import logoUrl from "../../../images/logo.png"
 
 // ── Create Fixture Form ───────────────────────────────────────────────────────
 function CreateFixtureForm({ teams }) {
@@ -403,38 +405,197 @@ function FixtureCard({ fixture }) {
   )
 }
 
+// ── Export Card ───────────────────────────────────────────────────────────────
+function FixtureExportCard({ round, fixtures, exportRef, visible }) {
+  return (
+    <div
+      ref={exportRef}
+      style={{
+        position: "fixed",
+        left: visible ? 0 : "-9999px",
+        top: 0,
+        width: 800,
+        background: "#050810",
+        padding: 36,
+        fontFamily: "system-ui, sans-serif",
+        overflow: "visible",
+        zIndex: visible ? 9999 : -1,
+        opacity: visible ? 1 : 0,
+        pointerEvents: "none",
+      }}
+    >
+      {/* Background watermark */}
+      <img src={logoUrl} alt="" style={{
+        position: "absolute", top: "50%", left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: 280, height: 280, objectFit: "contain",
+        opacity: 0.04, pointerEvents: "none",
+      }} />
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, position: "relative" }}>
+        <img src={logoUrl} alt="TEC" style={{ width: 44, height: 44, objectFit: "contain" }} />
+        <div>
+          <p style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>Tamil Efootballers · Team League</p>
+          <p style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
+        </div>
+      </div>
+
+      {/* Fixtures */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative" }}>
+        {fixtures.map(f => (
+          <div key={f.id} style={{
+            display: "flex", alignItems: "center",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 12, padding: "14px 20px",
+          }}>
+            {/* Home team */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-end" }}>
+              <p style={{ color: "#f1f5f9", fontSize: 15, fontWeight: 700, margin: 0 }}>{f.home}</p>
+              {f.homeLogo
+                ? <img src={f.homeLogo} alt="" style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 4 }} />
+                : <div style={{ width: 32, height: 32, borderRadius: 4, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ color: "#475569", fontSize: 12, fontWeight: 700 }}>{f.home?.[0]}</span>
+                  </div>
+              }
+            </div>
+
+            {/* Score / vs */}
+            <div style={{ padding: "0 18px", textAlign: "center", flexShrink: 0 }}>
+              {f.status === "completed"
+                ? <span style={{ color: "#94a3b8", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{f.homeScore ?? 0} – {f.awayScore ?? 0}</span>
+                : <span style={{ color: "#475569", fontSize: 13, fontWeight: 700 }}>vs</span>
+              }
+              <p style={{ color: "#334155", fontSize: 10, margin: "2px 0 0 0" }}>
+                {f.date ? new Date(f.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}
+              </p>
+            </div>
+
+            {/* Away team */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+              {f.awayLogo
+                ? <img src={f.awayLogo} alt="" style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 4 }} />
+                : <div style={{ width: 32, height: 32, borderRadius: 4, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ color: "#475569", fontSize: 12, fontWeight: 700 }}>{f.away?.[0]}</span>
+                  </div>
+              }
+              <p style={{ color: "#f1f5f9", fontSize: 15, fontWeight: 700, margin: 0 }}>{f.away}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ color: "#1e293b", fontSize: 10, textAlign: "right", marginTop: 20 }}>tamil-efootballers.vercel.app</p>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function FixtureResults({ fixtures }) {
   const { data: teams = [] } = useTeams()
+  const [activeRound, setActiveRound]     = useState("all")
+  const [exporting, setExporting]         = useState(false)
+  const [showExportCard, setShowExportCard] = useState(false)
+  const exportRef = useRef(null)
+
   const upcoming  = fixtures.filter(f => f.status === "upcoming")
   const completed = fixtures.filter(f => f.status === "completed")
 
+  // Get unique rounds
+  const rounds = [...new Set(fixtures.map(f => f.round))].filter(Boolean).sort((a, b) => a - b)
+
+  const filteredUpcoming  = activeRound === "all" ? upcoming  : upcoming.filter(f => f.round === Number(activeRound))
+  const filteredCompleted = activeRound === "all" ? completed : completed.filter(f => f.round === Number(activeRound))
+  const roundFixtures     = fixtures.filter(f => f.round === Number(activeRound))
+
+  async function handleExport() {
+    if (!exportRef.current || activeRound === "all") return
+    setShowExportCard(true)
+    setExporting(true)
+    await new Promise(r => setTimeout(r, 500))
+    try {
+      const el = exportRef.current
+      const dataUrl = await toPng(el, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: "#050810",
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+      })
+      const link = document.createElement("a")
+      link.download = `Round-${activeRound}-Fixtures.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      alert("Export failed: " + err.message)
+    } finally {
+      setExporting(false)
+      setShowExportCard(false)
+    }
+  }
+
   return (
-    <div className="space-y-8">
-      {/* Create fixture form always at top */}
+    <div className="space-y-6">
+      {/* Hidden export card */}
+      {activeRound !== "all" && (
+        <FixtureExportCard
+          round={activeRound}
+          fixtures={roundFixtures}
+          exportRef={exportRef}
+          visible={showExportCard}
+        />
+      )}
+
+      {/* Create fixture form */}
       <CreateFixtureForm teams={teams} />
 
-      {upcoming.length > 0 && (
+      {/* Round filter + export */}
+      {rounds.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
+            <button onClick={() => setActiveRound("all")}
+              className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+              )}>All</button>
+            {rounds.map(r => (
+              <button key={r} onClick={() => setActiveRound(r)}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                  activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                )}>Round {r}</button>
+            ))}
+          </div>
+          {activeRound !== "all" && (
+            <button onClick={handleExport} disabled={exporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? "Exporting…" : "Export PNG"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {filteredUpcoming.length > 0 && (
         <div>
           <p className="section-label mb-4">Upcoming fixtures</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {upcoming.map(f => <FixtureCard key={f.id} fixture={f} />)}
+            {filteredUpcoming.map(f => <FixtureCard key={f.id} fixture={f} />)}
           </div>
         </div>
       )}
 
-      {completed.length > 0 && (
+      {filteredCompleted.length > 0 && (
         <div>
           <p className="section-label mb-4">Completed fixtures</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {completed.map(f => <FixtureCard key={f.id} fixture={f} />)}
+            {filteredCompleted.map(f => <FixtureCard key={f.id} fixture={f} />)}
           </div>
         </div>
       )}
 
-      {fixtures.length === 0 && upcoming.length === 0 && (
+      {filteredUpcoming.length === 0 && filteredCompleted.length === 0 && (
         <div className="card py-16 text-center text-slate-500 text-sm">
-          No fixtures yet — create one above.
+          {activeRound === "all" ? "No fixtures yet — create one above." : `No fixtures for Round ${activeRound}.`}
         </div>
       )}
     </div>

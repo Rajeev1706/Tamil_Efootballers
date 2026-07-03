@@ -89,6 +89,9 @@ export const useUclUnassigned = () =>
 export const useUclStandings = () =>
   useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings })
 
+export const useUclFixtures = () =>
+  useQuery({ queryKey: ["ucl-fixtures"], queryFn: uclApi.fixtures, refetchOnMount: "always" })
+
 export const useUclTopScorers = () =>
   useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers })
 

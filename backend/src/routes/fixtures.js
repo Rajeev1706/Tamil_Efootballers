@@ -11,8 +11,8 @@ const FIXTURE_SELECT = `
     f.scheduled_date AS date,
     f.home_score AS "homeScore", f.away_score AS "awayScore",
     f.home_goals AS "homeGoals", f.away_goals AS "awayGoals",
-    ht.id AS "homeTeamId", ht.name AS home,
-    at.id AS "awayTeamId", at.name AS away
+    ht.id AS "homeTeamId", ht.name AS home, ht.logo_url AS "homeLogo",
+    at.id AS "awayTeamId", at.name AS away, at.logo_url AS "awayLogo"
   FROM fixtures f
   JOIN teams ht ON f.home_team_id = ht.id
   JOIN teams at ON f.away_team_id = at.id

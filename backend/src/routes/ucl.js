@@ -41,28 +41,8 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /api/ucl/groups/:id/reset-fixtures — delete all UCL match records for a group
-router.post("/groups/:id/reset-fixtures", authenticate, adminOnly, async (req, res, next) => {
-  try {
-    // Get all players in this group
-    const playersRes = await query(
-      "SELECT id FROM players WHERE ucl_group_id = $1", [req.params.id]
-    )
-    const playerIds = playersRes.rows.map(p => p.id)
-    if (playerIds.length < 2) return res.json({ deleted: 0 })
 
-    // Delete all UCL match records where both players are in this group
-    const result = await query(`
-      DELETE FROM match_records
-      WHERE match_type = 'ucl'
-        AND player_id   = ANY($1::int[])
-        AND opponent_id = ANY($1::int[])
-      RETURNING id
-    `, [playerIds])
 
-    res.json({ deleted: result.rowCount })
-  } catch (err) { next(err) }
-})
 
 // GET /api/ucl/admin-groups — all groups including pending_draw (admin only)
 router.get("/admin-groups", authenticate, adminOnly, async (req, res, next) => {
@@ -83,15 +63,189 @@ router.get("/admin-groups", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /api/ucl/activate — mark all pending_draw groups as active (called after draw done)
+// Helper: generate round-robin schedule using circle method
+function generateRoundRobin(playerIds) {
+  const list = [...playerIds]
+  if (list.length % 2 !== 0) list.push(null) // bye for odd count
+  const total = list.length
+  const rounds = []
+  const seen = new Set() // track pairs to prevent duplicates
+
+  for (let r = 0; r < total - 1; r++) {
+    const round = []
+    for (let i = 0; i < total / 2; i++) {
+      const p1 = list[i]
+      const p2 = list[total - 1 - i]
+      if (!p1 || !p2) continue
+      // Deduplicate — key is always smaller id first
+      const key = [p1, p2].sort().join("-")
+      if (!seen.has(key)) {
+        seen.add(key)
+        round.push({ p1, p2 })
+      }
+    }
+    if (round.length > 0) rounds.push(round)
+    // Rotate: keep first fixed, rotate the rest clockwise
+    list.splice(1, 0, list.pop())
+  }
+  return rounds
+}
+
+// POST /api/ucl/activate — mark all pending_draw groups as active and generate fixtures
 router.post("/activate", authenticate, adminOnly, async (req, res, next) => {
   try {
     await query("UPDATE ucl_groups SET status = 'active' WHERE status = 'pending_draw'")
+
+    // Generate round-robin fixtures for every active group
+    const groupsRes = await query("SELECT id FROM ucl_groups WHERE status = 'active'")
+    for (const group of groupsRes.rows) {
+      // Skip if fixtures already exist for this group
+      const existing = await query("SELECT id FROM ucl_fixtures WHERE group_id = $1 LIMIT 1", [group.id])
+      if (existing.rows.length > 0) continue
+
+      const playersRes = await query("SELECT id FROM players WHERE ucl_group_id = $1", [group.id])
+      const playerIds = playersRes.rows.map(p => p.id)
+      if (playerIds.length < 2) continue
+
+      const rounds = generateRoundRobin(playerIds)
+      for (let r = 0; r < rounds.length; r++) {
+        for (const { p1, p2 } of rounds[r]) {
+          await query(
+            "INSERT INTO ucl_fixtures (group_id, round_number, player1_id, player2_id) VALUES ($1,$2,$3,$4)",
+            [group.id, r + 1, p1, p2]
+          )
+        }
+      }
+    }
     res.json({ activated: true })
   } catch (err) { next(err) }
 })
 
-// GET /api/ucl/groups — all groups with their assigned players (public)
+// GET /api/ucl/fixtures — all fixtures with player and group info (admin)
+router.get("/fixtures", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        f.id, f.group_id AS "groupId", f.round_number AS "roundNumber",
+        f.player1_score AS "player1Score", f.player2_score AS "player2Score",
+        f.status, f.match_record_id AS "matchRecordId",
+        g.name AS "groupName",
+        p1.id AS "player1Id", p1.name AS "player1Name",
+        p2.id AS "player2Id", p2.name AS "player2Name"
+      FROM ucl_fixtures f
+      JOIN ucl_groups g ON f.group_id = g.id
+      LEFT JOIN players p1 ON f.player1_id = p1.id
+      LEFT JOIN players p2 ON f.player2_id = p2.id
+      ORDER BY f.round_number ASC, g.name ASC
+    `)
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
+// PATCH /api/ucl/fixtures/:id — save or update result
+router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { player1Score, player2Score } = z.object({
+      player1Score: z.number().int().min(0),
+      player2Score: z.number().int().min(0),
+    }).parse(req.body)
+
+    const fixRes = await query(`
+      SELECT f.*, g.season_number
+      FROM ucl_fixtures f
+      JOIN ucl_groups g ON f.group_id = g.id
+      WHERE f.id = $1
+    `, [req.params.id])
+    const fix = fixRes.rows[0]
+    if (!fix) return res.status(404).json({ error: "Fixture not found" })
+
+    const result = player1Score > player2Score ? "win"
+                 : player2Score > player1Score ? "loss" : "draw"
+
+    // Delete old match record if editing
+    if (fix.match_record_id) {
+      await query("DELETE FROM match_records WHERE id = $1", [fix.match_record_id])
+    }
+
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "6")
+    const oppGradeRes = await query("SELECT grade FROM players WHERE id = $1", [fix.player2_id])
+    const oppGrade = oppGradeRes.rows[0]?.grade || "C"
+
+    const mrRes = await query(`
+      INSERT INTO match_records
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
+      VALUES ($1,$2,$3,$4,'ucl',$5,$6,NOW(),$7)
+      RETURNING id
+    `, [fix.player1_id, fix.player2_id, result, oppGrade, player1Score, player2Score, season])
+
+    await query(`
+      UPDATE ucl_fixtures
+      SET player1_score=$1, player2_score=$2, status='completed', match_record_id=$3
+      WHERE id=$4
+    `, [player1Score, player2Score, mrRes.rows[0].id, req.params.id])
+
+    res.json({ updated: true })
+  } catch (err) { next(err) }
+})
+
+// DELETE /api/ucl/fixtures/:id/result — clear a fixture result
+router.delete("/fixtures/:id/result", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const fix = await query("SELECT match_record_id FROM ucl_fixtures WHERE id = $1", [req.params.id])
+    if (fix.rows[0]?.match_record_id) {
+      await query("DELETE FROM match_records WHERE id = $1", [fix.rows[0].match_record_id])
+    }
+    await query("UPDATE ucl_fixtures SET player1_score=NULL, player2_score=NULL, status='pending', match_record_id=NULL WHERE id=$1", [req.params.id])
+    res.json({ cleared: true })
+  } catch (err) { next(err) }
+})
+
+// POST /api/ucl/groups/:id/regenerate-fixtures — regenerate fixtures for one group
+router.post("/groups/:id/regenerate-fixtures", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const groupId = parseInt(req.params.id)
+
+    // Delete existing fixtures and their match records
+    const mrRes = await query("SELECT match_record_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [groupId])
+    const mrIds = mrRes.rows.map(r => r.match_record_id)
+    if (mrIds.length > 0) await query("DELETE FROM match_records WHERE id = ANY($1::int[])", [mrIds])
+    await query("DELETE FROM ucl_fixtures WHERE group_id=$1", [groupId])
+
+    // Regenerate with current players
+    const playersRes = await query("SELECT id FROM players WHERE ucl_group_id = $1", [groupId])
+    const playerIds = playersRes.rows.map(p => p.id)
+    if (playerIds.length < 2) return res.json({ generated: 0 })
+
+    const rounds = generateRoundRobin(playerIds)
+    let count = 0
+    for (let r = 0; r < rounds.length; r++) {
+      for (const { p1, p2 } of rounds[r]) {
+        await query(
+          "INSERT INTO ucl_fixtures (group_id, round_number, player1_id, player2_id) VALUES ($1,$2,$3,$4)",
+          [groupId, r + 1, p1, p2]
+        )
+        count++
+      }
+    }
+    res.json({ generated: count })
+  } catch (err) { next(err) }
+})
+
+// POST /api/ucl/groups/:id/reset-fixtures — delete fixtures + match records for a group
+router.post("/groups/:id/reset-fixtures", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const mrRes = await query("SELECT match_record_id FROM ucl_fixtures WHERE group_id=$1 AND match_record_id IS NOT NULL", [req.params.id])
+    const mrIds = mrRes.rows.map(r => r.match_record_id)
+    if (mrIds.length > 0) {
+      await query(`DELETE FROM match_records WHERE id = ANY($1::int[])`, [mrIds])
+    }
+    await query("DELETE FROM ucl_fixtures WHERE group_id=$1", [req.params.id])
+    res.json({ reset: true })
+  } catch (err) { next(err) }
+})
+
+// GET /api/ucl/groups
 router.get("/groups", async (req, res, next) => {
   try {
     const groupsRes = await query("SELECT * FROM ucl_groups WHERE status = 'active' ORDER BY name ASC")
@@ -129,7 +283,7 @@ router.post("/groups", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { name } = z.object({ name: z.string().min(1) }).parse(req.body)
     const result = await query(
-      "INSERT INTO ucl_groups (name) VALUES ($1) RETURNING *", [name]
+      "INSERT INTO ucl_groups (name, status) VALUES ($1, 'active') RETURNING *", [name]
     )
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
@@ -251,7 +405,7 @@ router.get("/top-scorers", async (req, res, next) => {
         AND mr.match_type = 'ucl'
       LEFT JOIN teams t      ON p.team_id      = t.id
       LEFT JOIN ucl_groups g ON p.ucl_group_id = g.id
-      WHERE p.ucl_group_id IS NOT NULL
+      WHERE p.ucl_group_id IS NOT NULL AND g.status = 'active'
       GROUP BY p.id, p.name, t.name, g.name
       ORDER BY goals DESC, p.name ASC
       LIMIT 10
