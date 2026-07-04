@@ -1,12 +1,17 @@
 import { Router } from "express"
 import { z } from "zod"
-import { query } from "../db/pool.js"
+import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 
 const router = Router()
 
-// POST /api/ucl/generate — auto-create 8 groups and distribute players evenly
+// POST /api/ucl/generate — wipe any existing UCL group stage and recreate 8 fresh
+// groups with the given players. Safe to click more than once: previously this
+// blindly INSERTed 8 new "Group A".."Group H" rows every call, which produced
+// duplicate same-named groups (one empty, one populated) whenever it was run
+// more than once — leaving stale groups/fixtures behind that looked like
+// "deleted" data reappearing. Now it's a full wipe-and-recreate, like a reset.
 router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { playerIds } = z.object({
@@ -19,24 +24,48 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
     // Shuffle players randomly
     const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
 
-    // Create 8 groups with pending_draw status
-    const groups = []
-    for (const name of GROUP_NAMES) {
-      const res = await query(
-        "INSERT INTO ucl_groups (name, status) VALUES ($1, 'pending_draw') RETURNING *", [name]
-      )
-      groups.push(res.rows[0])
-    }
+    let affectedPlayerIds = []
+    let groups = []
 
-    // Distribute players round-robin across groups
-    // This ensures extras go 1-per-group starting from Group A
-    for (let i = 0; i < shuffled.length; i++) {
-      const groupId = groups[i % GROUP_COUNT].id
-      await query(
-        "UPDATE players SET ucl_group_id = $1 WHERE id = $2",
-        [groupId, shuffled[i]]
-      )
-    }
+    await withTransaction(async ({ query: q }) => {
+      const existingGroups = await q("SELECT id FROM ucl_groups")
+      const existingGroupIds = existingGroups.rows.map(g => g.id)
+
+      if (existingGroupIds.length > 0) {
+        // Collect players whose match value needs recalculating once their
+        // UCL match records are wiped (both sides of every fixture).
+        const mrRes = await q(
+          "SELECT match_record_id, player1_id, player2_id FROM ucl_fixtures WHERE group_id = ANY($1::int[]) AND match_record_id IS NOT NULL",
+          [existingGroupIds]
+        )
+        affectedPlayerIds = [...new Set(mrRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
+        const mrIds = mrRes.rows.map(r => r.match_record_id)
+        if (mrIds.length > 0) await q("DELETE FROM match_records WHERE id = ANY($1::int[])", [mrIds])
+
+        await q("DELETE FROM ucl_fixtures WHERE group_id = ANY($1::int[])", [existingGroupIds])
+        await q("UPDATE ucl_knockout_players SET group_id = NULL WHERE group_id = ANY($1::int[])", [existingGroupIds])
+        await q("UPDATE players SET ucl_group_id = NULL WHERE ucl_group_id = ANY($1::int[])", [existingGroupIds])
+        await q("DELETE FROM ucl_groups WHERE id = ANY($1::int[])", [existingGroupIds])
+      }
+
+      // Create 8 fresh groups with pending_draw status
+      for (const name of GROUP_NAMES) {
+        const res = await q(
+          "INSERT INTO ucl_groups (name, status) VALUES ($1, 'pending_draw') RETURNING *", [name]
+        )
+        groups.push(res.rows[0])
+      }
+
+      // Distribute players round-robin across groups
+      // This ensures extras go 1-per-group starting from Group A
+      for (let i = 0; i < shuffled.length; i++) {
+        const groupId = groups[i % GROUP_COUNT].id
+        await q("UPDATE players SET ucl_group_id = $1 WHERE id = $2", [groupId, shuffled[i]])
+      }
+    })
+
+    // Recalc market value for anyone whose old UCL match records were just wiped
+    for (const pid of affectedPlayerIds) await recalcMarketValue(pid)
 
     res.status(201).json({ groups, distributed: shuffled.length })
   } catch (err) { next(err) }
@@ -300,6 +329,8 @@ router.get("/unassigned", authenticate, adminOnly, async (req, res, next) => {
 router.post("/groups", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { name } = z.object({ name: z.string().min(1) }).parse(req.body)
+    const existing = await query("SELECT id FROM ucl_groups WHERE name = $1", [name])
+    if (existing.rows[0]) return res.status(400).json({ error: `A group named "${name}" already exists` })
     const result = await query(
       "INSERT INTO ucl_groups (name, status) VALUES ($1, 'active') RETURNING *", [name]
     )
@@ -311,6 +342,8 @@ router.post("/groups", authenticate, adminOnly, async (req, res, next) => {
 router.patch("/groups/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { name } = z.object({ name: z.string().min(1) }).parse(req.body)
+    const existing = await query("SELECT id FROM ucl_groups WHERE name = $1 AND id != $2", [name, req.params.id])
+    if (existing.rows[0]) return res.status(400).json({ error: `A group named "${name}" already exists` })
     const result = await query(
       "UPDATE ucl_groups SET name = $1 WHERE id = $2 RETURNING *", [name, req.params.id]
     )
@@ -365,9 +398,41 @@ router.post("/groups/:id/players", authenticate, adminOnly, async (req, res, nex
 })
 
 // DELETE /api/ucl/players/:playerId/group — unassign player from any group
+// Also cleans up any fixtures (and their match records) this player already
+// had within that group — otherwise their old fixtures kept showing up in
+// UCL Results with their name, even though the group correctly showed them
+// as no longer a member.
 router.delete("/players/:playerId/group", authenticate, adminOnly, async (req, res, next) => {
   try {
-    await query("UPDATE players SET ucl_group_id = NULL WHERE id = $1", [req.params.playerId])
+    const playerId = parseInt(req.params.playerId)
+    const playerRes = await query("SELECT ucl_group_id FROM players WHERE id = $1", [playerId])
+    const groupId = playerRes.rows[0]?.ucl_group_id
+
+    let affectedOpponentIds = []
+
+    if (groupId) {
+      const fixRes = await query(
+        `SELECT id, match_record_id, player1_id, player2_id FROM ucl_fixtures
+         WHERE group_id = $1 AND (player1_id = $2 OR player2_id = $2)`,
+        [groupId, playerId]
+      )
+
+      const mrIds = fixRes.rows.map(f => f.match_record_id).filter(Boolean)
+      if (mrIds.length > 0) await query("DELETE FROM match_records WHERE id = ANY($1::int[])", [mrIds])
+
+      affectedOpponentIds = fixRes.rows.map(f => f.player1_id === playerId ? f.player2_id : f.player1_id)
+
+      const fixIds = fixRes.rows.map(f => f.id)
+      if (fixIds.length > 0) await query("DELETE FROM ucl_fixtures WHERE id = ANY($1::int[])", [fixIds])
+    }
+
+    await query("UPDATE players SET ucl_group_id = NULL WHERE id = $1", [playerId])
+
+    // Recalc market value for the removed player and anyone they had a
+    // (now-deleted) fixture against.
+    await recalcMarketValue(playerId)
+    for (const oppId of affectedOpponentIds) await recalcMarketValue(oppId)
+
     res.json({ removed: true })
   } catch (err) { next(err) }
 })
