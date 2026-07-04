@@ -3,6 +3,7 @@ import { z } from "zod"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
+import { recalcForm } from "../services/form.js"
 
 const router = Router()
 const TOTAL_ROUNDS = 5   // R32 → R16 → QF → SF → Final
@@ -238,7 +239,10 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
                    : player2Score > player1Score ? match.player2_id
                    : (tieWinnerId || match.player1_id)
 
-    const result = player1Score > player2Score ? "win" : player2Score > player1Score ? "loss" : "draw"
+    // Result for match_records/player-profile must reflect who actually
+    // advanced (winnerId), not just the raw score — otherwise a tie broken
+    // in one player's favor still logs as a "draw" on both profiles.
+    const result = winnerId === match.player1_id ? "win" : "loss"
 
     const oldMatchRecordId = match.match_record_id
 
@@ -272,6 +276,8 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // handles the player_id side and skips the BDR swing (see marketValue.js).
     await recalcMarketValue(match.player1_id)
     await recalcMarketValue(match.player2_id)
+    await recalcForm(match.player1_id)
+    await recalcForm(match.player2_id)
 
     // Advance winner to next round
     if (winnerId && match.round < TOTAL_ROUNDS) {

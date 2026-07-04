@@ -3,6 +3,7 @@ import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
+import { recalcForm } from "../services/form.js"
 
 const router = Router()
 
@@ -66,6 +67,7 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
 
     // Recalc market value for anyone whose old UCL match records were just wiped
     for (const pid of affectedPlayerIds) await recalcMarketValue(pid)
+    for (const pid of affectedPlayerIds) await recalcForm(pid)
 
     res.status(201).json({ groups, distributed: shuffled.length })
   } catch (err) { next(err) }
@@ -224,6 +226,8 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
     // handles the player_id side and skips the BDR swing (see marketValue.js).
     await recalcMarketValue(fix.player1_id)
     await recalcMarketValue(fix.player2_id)
+    await recalcForm(fix.player1_id)
+    await recalcForm(fix.player2_id)
 
     res.json({ updated: true })
   } catch (err) { next(err) }
@@ -240,6 +244,8 @@ router.delete("/fixtures/:id/result", authenticate, adminOnly, async (req, res, 
     if (fix.rows[0]) {
       await recalcMarketValue(fix.rows[0].player1_id)
       await recalcMarketValue(fix.rows[0].player2_id)
+      await recalcForm(fix.rows[0].player1_id)
+      await recalcForm(fix.rows[0].player2_id)
     }
     res.json({ cleared: true })
   } catch (err) { next(err) }
@@ -259,6 +265,7 @@ router.post("/groups/:id/regenerate-fixtures", authenticate, adminOnly, async (r
     // Recalc market value for every player whose match record was just removed
     const affectedIds = [...new Set(oldFixRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
     for (const pid of affectedIds) await recalcMarketValue(pid)
+    for (const pid of affectedIds) await recalcForm(pid)
 
     // Regenerate with current players
     const playersRes = await query("SELECT id FROM players WHERE ucl_group_id = $1", [groupId])
@@ -292,6 +299,7 @@ router.post("/groups/:id/reset-fixtures", authenticate, adminOnly, async (req, r
 
     const affectedIds = [...new Set(mrRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
     for (const pid of affectedIds) await recalcMarketValue(pid)
+    for (const pid of affectedIds) await recalcForm(pid)
 
     res.json({ reset: true })
   } catch (err) { next(err) }
@@ -384,6 +392,7 @@ router.delete("/groups/:id", authenticate, adminOnly, async (req, res, next) => 
     // Recalc market value for every player whose match record was just removed
     const affectedIds = [...new Set(mrRes.rows.flatMap(r => [r.player1_id, r.player2_id]))]
     for (const pid of affectedIds) await recalcMarketValue(pid)
+    for (const pid of affectedIds) await recalcForm(pid)
 
     res.json({ deleted: true })
   } catch (err) { next(err) }
@@ -437,6 +446,8 @@ router.delete("/players/:playerId/group", authenticate, adminOnly, async (req, r
     // (now-deleted) fixture against.
     await recalcMarketValue(playerId)
     for (const oppId of affectedOpponentIds) await recalcMarketValue(oppId)
+    await recalcForm(playerId)
+    for (const oppId of affectedOpponentIds) await recalcForm(oppId)
 
     res.json({ removed: true })
   } catch (err) { next(err) }

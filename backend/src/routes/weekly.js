@@ -3,6 +3,7 @@ import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
+import { recalcForm } from "../services/form.js"
 
 const router = Router()
 
@@ -301,9 +302,11 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
                    : player2Score > player1Score ? match.player2_id
                    : (tieWinnerId || match.player1_id) // tied: use admin pick or default p1
 
-    const result = player1Score > player2Score ? "win"
-                 : player2Score > player1Score ? "loss"
-                 : "draw" // draw in record but one advances
+    // Result for the match_records/player-profile side must reflect who
+    // actually advanced, not just the raw score — otherwise a tie broken in
+    // MR.D's favor still logged as a "draw" on both players' profiles even
+    // though MR.D won the tie-breaker and advanced in the bracket.
+    const result = winnerId === match.player1_id ? "win" : "loss"
 
     // Get current season
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
@@ -341,6 +344,8 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // handles the player_id side and skips the BDR swing (see marketValue.js).
     await recalcMarketValue(match.player1_id)
     await recalcMarketValue(match.player2_id)
+    await recalcForm(match.player1_id)
+    await recalcForm(match.player2_id)
 
     // Advance winner to next round
     const totalRounds = match.total_rounds
