@@ -2,6 +2,8 @@ import { useState } from "react"
 import { Trophy, Target, Calendar } from "lucide-react"
 import { useWeeklyCurrent, useWeeklyTopScorers } from "../../lib/queries"
 import { cn } from "../../lib/utils"
+import weeklyLogo from "../../../images/Weekly.png"
+import goldenBootLogo from "../../../images/Golden Boot.png"
 
 // Same stage-naming logic as the admin bracket view (WeeklyBracket.jsx),
 // so "Round 1" for a 32-player bracket shows as "Round of 32", etc.,
@@ -45,11 +47,11 @@ export default function WeeklyDashboard({ onPlayerClick }) {
     <div className="card overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-            {view === "fixtures"
-              ? <Calendar className="w-4 h-4 text-accent" />
-              : <Target className="w-4 h-4 text-emerald-400" />}
-          </div>
+          <img
+            src={view === "fixtures" ? weeklyLogo : goldenBootLogo}
+            alt={view === "fixtures" ? "Weekly Tournament" : "Golden Boot"}
+            className="w-9 h-9 object-contain flex-shrink-0"
+          />
           <div>
             <p className="section-label mb-0.5">Weekly Tournament</p>
             <h2 className="text-base font-semibold text-white">
