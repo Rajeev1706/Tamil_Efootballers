@@ -244,7 +244,11 @@ router.post("/:id/start", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /api/weekly/matches/:matchId/players — update who plays in a match
+// PATCH /api/weekly/matches/:matchId/players — update who plays in a match.
+// If this leaves exactly one side filled and the other empty ("Bye"), the
+// match is marked as a bye and that player is automatically advanced into
+// the next round — mirroring the same propagation used when the initial
+// draw creates byes for an odd player count.
 router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { player1Id, player2Id } = z.object({
@@ -252,20 +256,52 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
       player2Id: z.number().int().positive().nullable().optional(),
     }).parse(req.body)
 
-    const matchRes = await query("SELECT * FROM weekly_tournament_matches WHERE id = $1", [req.params.matchId])
-    if (!matchRes.rows[0]) return res.status(404).json({ error: "Match not found" })
+    const matchRes = await query(`
+      SELECT wtm.*, wt.total_rounds
+      FROM weekly_tournament_matches wtm
+      JOIN weekly_tournaments wt ON wt.id = wtm.tournament_id
+      WHERE wtm.id = $1
+    `, [req.params.matchId])
+    const match = matchRes.rows[0]
+    if (!match) return res.status(404).json({ error: "Match not found" })
 
-    // Reset match status if it was completed (since players changed)
+    // Explicit `null` really means null (Bye) here — only fall back to the
+    // existing value when the field wasn't sent at all.
+    const newP1 = player1Id !== undefined ? player1Id : match.player1_id
+    const newP2 = player2Id !== undefined ? player2Id : match.player2_id
+    const isBye = Boolean(newP1) !== Boolean(newP2) // exactly one side filled
+    const winnerId = isBye ? (newP1 || newP2) : null
+
     await query(`
       UPDATE weekly_tournament_matches
-      SET player1_id = COALESCE($1, player1_id),
-          player2_id = COALESCE($2, player2_id),
-          status = CASE WHEN $3 THEN 'pending' ELSE status END,
-          winner_id = CASE WHEN $3 THEN NULL ELSE winner_id END,
-          player1_score = CASE WHEN $3 THEN NULL ELSE player1_score END,
-          player2_score = CASE WHEN $3 THEN NULL ELSE player2_score END
-      WHERE id = $4
-    `, [player1Id ?? null, player2Id ?? null, (player1Id !== undefined || player2Id !== undefined), req.params.matchId])
+      SET player1_id = $1, player2_id = $2,
+          status = $3, winner_id = $4,
+          player1_score = NULL, player2_score = NULL, match_record_id = NULL
+      WHERE id = $5
+    `, [newP1, newP2, isBye ? "bye" : "pending", winnerId, req.params.matchId])
+
+    // Clean up the old match record and recalc stats for whoever was
+    // previously in this match, since their result is being wiped out.
+    if (match.match_record_id) {
+      await query("DELETE FROM match_records WHERE id = $1", [match.match_record_id])
+    }
+    for (const oldId of [match.player1_id, match.player2_id]) {
+      if (oldId) {
+        await recalcMarketValue(oldId)
+        await recalcForm(oldId)
+      }
+    }
+
+    // Propagate the bye winner into the next round, if there is one
+    if (isBye && match.round < match.total_rounds) {
+      const nextRound = match.round + 1
+      const nextMatchNum = Math.ceil(match.match_number / 2)
+      const col = match.match_number % 2 !== 0 ? "player1_id" : "player2_id"
+      await query(`
+        UPDATE weekly_tournament_matches SET ${col} = $1
+        WHERE tournament_id = $2 AND round = $3 AND match_number = $4
+      `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
+    }
 
     const fresh = await query(`
       SELECT wtm.*, p1.name AS "player1Name", p2.name AS "player2Name"
