@@ -312,10 +312,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     const oppGradeRes = await query("SELECT grade FROM players WHERE id = $1", [match.player2_id])
     const oppGrade = oppGradeRes.rows[0]?.grade || "C"
 
-    // If match was already completed, delete the old match record first
-    if (match.match_record_id) {
-      await query("DELETE FROM match_records WHERE id = $1", [match.match_record_id])
-    }
+    const oldMatchRecordId = match.match_record_id
 
     // Log new match record
     const mrRes = await query(`
@@ -326,12 +323,19 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     `, [match.player1_id, match.player2_id, result, oppGrade, player1Score, player2Score, season])
     const mrId = mrRes.rows[0]?.id
 
-    // Update the match result
+    // Update the match result to point at the new record BEFORE deleting the
+    // old one — deleting first would violate the match_record_id foreign key
+    // while weekly_tournament_matches still referenced that row.
     await query(`
       UPDATE weekly_tournament_matches
       SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4
       WHERE id=$5
     `, [player1Score, player2Score, winnerId, mrId, req.params.matchId])
+
+    // Now safe to delete the old match record, if this was an edit
+    if (oldMatchRecordId) {
+      await query("DELETE FROM match_records WHERE id = $1", [oldMatchRecordId])
+    }
 
     // Recalc market value for both players — the DB trigger alone only
     // handles the player_id side and skips the BDR swing (see marketValue.js).
