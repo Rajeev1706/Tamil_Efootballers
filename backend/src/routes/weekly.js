@@ -60,6 +60,74 @@ function generateMatches(playerIds, tournamentId) {
   return { matches, totalRounds }
 }
 
+// GET /api/weekly/public/current — latest non-setup tournament, for the public
+// dashboard (fixtures grouped by round, not the bracket visualization)
+router.get("/public/current", async (req, res, next) => {
+  try {
+    const t = await query(
+      "SELECT * FROM weekly_tournaments WHERE status != 'setup' ORDER BY created_at DESC LIMIT 1"
+    )
+    if (!t.rows[0]) return res.json(null)
+
+    const matches = await query(`
+      SELECT
+        wtm.round, wtm.match_number AS "matchNumber", wtm.status,
+        wtm.player1_score AS "player1Score", wtm.player2_score AS "player2Score",
+        p1.id AS "player1Id", p1.name AS "player1Name",
+        p2.id AS "player2Id", p2.name AS "player2Name",
+        w.id  AS "winnerId"
+      FROM weekly_tournament_matches wtm
+      LEFT JOIN players p1 ON wtm.player1_id = p1.id
+      LEFT JOIN players p2 ON wtm.player2_id = p2.id
+      LEFT JOIN players w  ON wtm.winner_id  = w.id
+      WHERE wtm.tournament_id = $1
+      ORDER BY wtm.round ASC, wtm.match_number ASC
+    `, [t.rows[0].id])
+
+    res.json({ ...t.rows[0], matches: matches.rows })
+  } catch (err) { next(err) }
+})
+
+// GET /api/weekly/public/top-scorers — top 10 by goals in the CURRENT Weekly
+// tournament only (not cumulative across past tournaments).
+router.get("/public/top-scorers", async (req, res, next) => {
+  try {
+    const t = await query(
+      "SELECT id FROM weekly_tournaments WHERE status != 'setup' ORDER BY created_at DESC LIMIT 1"
+    )
+    if (!t.rows[0]) return res.json([])
+
+    const result = await query(`
+      SELECT
+        p.id, p.name, t.name AS team,
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
+            WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
+            ELSE 0
+          END
+        ), 0) AS goals,
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN COALESCE(mr.opponent_score, 0)
+            WHEN mr.opponent_id = p.id THEN COALESCE(mr.player_score, 0)
+            ELSE 0
+          END
+        ), 0) AS conceded
+      FROM players p
+      JOIN match_records mr
+        ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.match_type = 'weekly'
+      JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
+      LEFT JOIN teams t ON p.team_id = t.id
+      WHERE wtm.tournament_id = $1
+      GROUP BY p.id, p.name, t.name
+      ORDER BY goals DESC, conceded ASC, p.name ASC
+      LIMIT 10
+    `, [t.rows[0].id])
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
 // GET /api/weekly — list all tournaments
 router.get("/", authenticate, adminOnly, async (req, res, next) => {
   try {

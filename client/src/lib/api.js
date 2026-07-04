@@ -68,6 +68,8 @@ export const leagueInfoApi = {
 export const weeklyApi = {
   list:         ()            => api.get("/weekly").then(r => r.data),
   get:          (id)          => api.get(`/weekly/${id}`).then(r => r.data),
+  current:      ()            => api.get("/weekly/public/current").then(r => r.data),
+  topScorers:   ()            => api.get("/weekly/public/top-scorers").then(r => r.data),
   create:       (name)        => api.post("/weekly", { name }).then(r => r.data),
   setPlayers:   (id, playerIds) => api.post(`/weekly/${id}/players`, { playerIds }).then(r => r.data),
   start:        (id)          => api.post(`/weekly/${id}/start`).then(r => r.data),

@@ -95,6 +95,12 @@ export const useUclFixtures = () =>
 export const useUclTopScorers = () =>
   useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers })
 
+export const useWeeklyCurrent = () =>
+  useQuery({ queryKey: ["weekly-current"], queryFn: weeklyApi.current })
+
+export const useWeeklyTopScorers = () =>
+  useQuery({ queryKey: ["weekly-top-scorers"], queryFn: weeklyApi.topScorers })
+
 export const useCreateUclGroup = () => {
   const qc = useQueryClient()
   return useMutation({

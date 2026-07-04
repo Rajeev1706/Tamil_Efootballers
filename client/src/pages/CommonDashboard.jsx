@@ -7,6 +7,7 @@ import BDRRanking from "../components/dashboard/BDRRanking"
 import MarketValues from "../components/dashboard/MarketValues"
 import TrophyRanking from "../components/dashboard/TrophyRanking"
 import UclStandings from "../components/dashboard/UclStandings"
+import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import Loading from "../components/common/Loading"
@@ -29,6 +30,7 @@ const PANEL_OPTIONS = [
   { value: "players",   label: "Total players" },
   { value: "standings", label: "League table"  },
   { value: "ucl",       label: "UCL"           },
+  { value: "weekly",    label: "Weekly"        },
   { value: "bdr",       label: "BDR ranking"   },
   { value: "market",    label: "Market values" },
   { value: "trophies",  label: "Trophies"      },
@@ -232,6 +234,7 @@ export default function CommonDashboard() {
               {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} view={standingsView} onViewChange={setStandingsView} />}
               {activePanel === "ucl"       && <UclStandings onPlayerClick={handlePlayer} />}
+              {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
               {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
               {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
