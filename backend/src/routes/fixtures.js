@@ -19,7 +19,9 @@ const FIXTURE_SELECT = `
 `
 
 // GET /api/fixtures  — all fixtures; optional ?teamId= or ?status=
-router.get("/", authenticate, async (req, res, next) => {
+// GET /api/fixtures — public read (matches standings/players/records being public);
+// only creating/editing/deleting fixtures requires admin login (see routes below)
+router.get("/", async (req, res, next) => {
   try {
     const { teamId, status } = req.query
     let sql = FIXTURE_SELECT
