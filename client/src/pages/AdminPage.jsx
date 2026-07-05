@@ -98,6 +98,162 @@ function ResetMVCard() {
   )
 }
 
+function SeasonResetCard() {
+  const [confirm, setConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(false)
+  const [error, setError]     = useState(null)
+
+  async function handleReset() {
+    setLoading(true)
+    setError(null)
+    try {
+      await teamsApi.seasonReset()
+      setDone(true)
+      setConfirm(false)
+    } catch (err) {
+      setError(err?.response?.data?.error || "Season reset failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+        <p className="text-emerald-400 font-semibold text-lg mb-1">✅ New season started!</p>
+        <p className="text-sm text-slate-400">Team stats, fixtures, trades, and the UCL competition were cleared. Player records and trophies are untouched.</p>
+        <button onClick={() => setDone(false)} className="mt-3 text-xs text-slate-500 hover:text-white transition-colors">Dismiss</button>
+      </div>
+    )
+  }
+
+  if (confirm) {
+    return (
+      <div className="card p-6 border-rose-500/30 bg-rose-500/5 space-y-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-rose-400 font-semibold mb-1">Start a new season?</p>
+            <p className="text-sm text-slate-400">
+              This will reset every team's played/won/drawn/lost/points to 0, reset all player market values and recent form,
+              and permanently <strong>delete every fixture, lineup, pending trade, and the entire UCL competition</strong>
+              (groups, fixtures, and knockout bracket). The season number will advance by one. Player records, trophies,
+              and match history stay intact.
+            </p>
+          </div>
+        </div>
+        {error && <p className="text-sm text-rose-400">{error}</p>}
+        <div className="flex gap-3">
+          <button onClick={() => setConfirm(false)}
+            className="flex-1 py-2 rounded-lg border border-surface-border text-slate-400 hover:text-white text-sm transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleReset} disabled={loading}
+            className="flex-1 py-2 rounded-lg bg-rose-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-rose-600 transition-colors">
+            {loading ? "Starting…" : "Yes, Start New Season"}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <Trophy className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Start New Season</p>
+          <p className="text-sm text-slate-500 mt-0.5">Archive the current season: reset team stats, clear fixtures/trades/UCL, and advance the season number.</p>
+        </div>
+      </div>
+      <button onClick={() => setConfirm(true)}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-sm font-semibold transition-colors">
+        Start New Season
+      </button>
+    </div>
+  )
+}
+
+function DeleteSeasonCard() {
+  const [confirm, setConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError]     = useState(null)
+
+  async function handleDelete() {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await teamsApi.seasonDelete()
+      setMessage(result.message)
+      setDone(true)
+      setConfirm(false)
+    } catch (err) {
+      setError(err?.response?.data?.error || "Season delete failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+        <p className="text-emerald-400 font-semibold text-lg mb-1">✅ Season deleted</p>
+        <p className="text-sm text-slate-400">{message}</p>
+        <button onClick={() => setDone(false)} className="mt-3 text-xs text-slate-500 hover:text-white transition-colors">Dismiss</button>
+      </div>
+    )
+  }
+
+  if (confirm) {
+    return (
+      <div className="card p-6 border-rose-500/30 bg-rose-500/5 space-y-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-rose-400 font-semibold mb-1">Delete the current season?</p>
+            <p className="text-sm text-slate-400">
+              This clears the current season's team stats, fixtures, trades, and UCL competition, then moves the season
+              number back by one. <strong>This does not restore the previous season's actual data</strong> — that was
+              already permanently deleted the moment this season started. The previous season will begin fresh, not
+              as it was before. Player records and trophies are unaffected either way.
+            </p>
+          </div>
+        </div>
+        {error && <p className="text-sm text-rose-400">{error}</p>}
+        <div className="flex gap-3">
+          <button onClick={() => setConfirm(false)}
+            className="flex-1 py-2 rounded-lg border border-surface-border text-slate-400 hover:text-white text-sm transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleDelete} disabled={loading}
+            className="flex-1 py-2 rounded-lg bg-rose-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-rose-600 transition-colors">
+            {loading ? "Deleting…" : "Yes, Delete Season"}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <RotateCcw className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Delete Current Season</p>
+          <p className="text-sm text-slate-500 mt-0.5">Undo starting this season: clear its data and move the season number back by one.</p>
+        </div>
+      </div>
+      <button onClick={() => setConfirm(true)}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-sm font-semibold transition-colors">
+        Delete Season
+      </button>
+    </div>
+  )
+}
+
 const TABS = [
   { id: "setup",      label: "Setup",        icon: Settings        },
   { id: "overview",   label: "Overview",     icon: LayoutDashboard },
@@ -220,6 +376,15 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Market Value</p>
       <ResetMVCard />
+    </div>
+
+    {/* Season Reset */}
+    <div>
+      <p className="section-label mb-3">Season</p>
+      <div className="space-y-3">
+        <SeasonResetCard />
+        <DeleteSeasonCard />
+      </div>
     </div>
   </div>
 )}

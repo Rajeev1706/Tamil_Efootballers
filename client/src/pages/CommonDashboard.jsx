@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ChevronDown, Trophy, Users, TrendingUp, Activity } from "lucide-react"
 import Layout from "../components/layout/Layout"
@@ -11,7 +11,13 @@ import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import Loading from "../components/common/Loading"
-import { useTeams, usePlayers, useSeasonRecords, useSettings } from "../lib/queries"
+import CountUp from "../components/common/CountUp"
+import ChampionCelebration from "../components/common/ChampionCelebration"
+import weeklyTrophyLogo from "../../images/Weekly.png"
+import teamLeagueTrophyLogo from "../../images/Team League.png"
+import uclTrophyLogo from "../../images/ucl.png"
+import goldenBootLogo from "../../images/Golden Boot.png"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers } from "../lib/queries"
 
 const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
   <div className="card p-4 flex items-start gap-3">
@@ -20,9 +26,19 @@ const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
     </div>
     <div>
       <p className="text-xs text-slate-500 font-medium mb-0.5">{label}</p>
-      <p className="text-xl font-bold text-white font-mono">{value}</p>
+      <p className="text-xl font-bold text-white font-mono"><CountUp value={value} /></p>
       {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
     </div>
+  </div>
+)
+
+const GoldenBootBadge = ({ scorer }) => (
+  <div className="mt-4 pt-4 border-t border-surface-border/50 flex items-center justify-center gap-2.5">
+    <img src={goldenBootLogo} alt="Golden Boot" className="w-6 h-6 object-contain flex-shrink-0" />
+    <p className="text-sm text-slate-300">
+      Golden Boot: <span className="font-semibold text-white">{scorer.name}</span>
+      <span className="text-slate-500"> ({scorer.goals} goals)</span>
+    </p>
   </div>
 )
 
@@ -42,6 +58,160 @@ export default function CommonDashboard() {
   const { data: players = [], isLoading: playersLoading } = usePlayers()
   const { data: seasonRecords = [] }                      = useSeasonRecords()
   const { data: settings = {} }                          = useSettings()
+  const { data: weeklyTournament }                        = useWeeklyCurrent()
+  const { data: fixtures = [] }                           = useFixtures()
+  const { data: uclKnockout }                             = useUclKnockoutCurrent()
+  const { data: teamTopScorers = [] }                     = useTopScorers()
+  const { data: uclTopScorers = [] }                      = useUclTopScorers()
+  const { data: weeklyTopScorers = [] }                   = useWeeklyTopScorers()
+
+  const urlParams = new URLSearchParams(window.location.search)
+
+  // ── Weekly Tournament champion celebration ──────────────────────────────
+  // Site-wide, once-per-visitor — fires on whatever page/view the visitor
+  // lands on, tracked in localStorage per tournament so it doesn't replay
+  // on repeat visits from the same browser.
+  const [showWeeklyCelebration, setShowWeeklyCelebration] = useState(false)
+  const weeklyFinalMatch = weeklyTournament?.matches?.find(
+    m => m.round === weeklyTournament.total_rounds && m.status === "completed"
+  )
+  const weeklyChampion = weeklyFinalMatch
+    ? (weeklyFinalMatch.winnerId === weeklyFinalMatch.player1Id ? weeklyFinalMatch.player1Name : weeklyFinalMatch.player2Name)
+    : null
+
+  // TEST-ONLY: ?testCelebration=SomePlayerName previews this instantly.
+  const testWeeklyActive = urlParams.has("testCelebration")
+  const testWeeklyParam  = urlParams.get("testCelebration")
+  const testWeeklyName   = testWeeklyActive
+    ? (testWeeklyParam && !["1", "true"].includes(testWeeklyParam) ? testWeeklyParam : "Test Player")
+    : null
+  const displayWeeklyChampion = testWeeklyName || weeklyChampion
+
+  useEffect(() => {
+    if (!testWeeklyActive) return
+    setShowWeeklyCelebration(true)
+    const dismiss = () => setShowWeeklyCelebration(false)
+    const timer = setTimeout(dismiss, 7000)
+    document.addEventListener("click", dismiss)
+    return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testWeeklyActive])
+
+  useEffect(() => {
+    if (testWeeklyActive) return
+    if (!weeklyChampion || !weeklyTournament?.id) return
+    const key = `weekly_champion_seen_${weeklyTournament.id}`
+    if (!localStorage.getItem(key)) {
+      setShowWeeklyCelebration(true)
+      localStorage.setItem(key, "1")
+      const dismiss = () => setShowWeeklyCelebration(false)
+      const timer = setTimeout(dismiss, 7000)
+      document.addEventListener("click", dismiss)
+      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weeklyChampion, weeklyTournament?.id])
+
+  // ── Team League champion celebration ────────────────────────────────────
+  // Fires once the last league fixture is completed. `teams` is already
+  // sorted by the league_standings view (points, then GD, then GF), so
+  // teams[0] is the table topper the moment the season is fully played out.
+  const [showTeamCelebration, setShowTeamCelebration] = useState(false)
+  const teamCelebrationSeason = settings.current_season
+  const leagueComplete = fixtures.length > 0 && fixtures.every(f => f.status === "completed")
+  const teamChampion    = leagueComplete ? teams[0] : null
+  const teamChampionPlayers = teamChampion
+    ? players.filter(p => p.teamId === teamChampion.id)
+    : []
+
+  // TEST-ONLY: ?testTeamCelebration=SomeTeamName previews this instantly.
+  const testTeamActive = urlParams.has("testTeamCelebration")
+  const testTeamParam  = urlParams.get("testTeamCelebration")
+  const testTeamName   = testTeamActive
+    ? (testTeamParam && !["1", "true"].includes(testTeamParam) ? testTeamParam : "Test FC")
+    : null
+  const displayTeamChampion = testTeamName || teamChampion?.name
+
+  // If the test name happens to match a real team (e.g. ?testTeamCelebration=Germany),
+  // show that team's actual current players instead of an empty roster —
+  // otherwise fall back to no players for a genuinely made-up test name.
+  const testTeamMatch = testTeamName
+    ? teams.find(t => t.name.toLowerCase() === testTeamName.toLowerCase())
+    : null
+  const displayTeamPlayers = testTeamMatch
+    ? players.filter(p => p.teamId === testTeamMatch.id)
+    : (testTeamName ? [] : teamChampionPlayers)
+
+  useEffect(() => {
+    if (!testTeamActive) return
+    if (teamsLoading || playersLoading) return // wait for real data before showing, so player chips don't pop in late
+    setShowTeamCelebration(true)
+    const dismiss = () => setShowTeamCelebration(false)
+    const timer = setTimeout(dismiss, 7000)
+    document.addEventListener("click", dismiss)
+    return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testTeamActive, teamsLoading, playersLoading])
+
+  useEffect(() => {
+    if (testTeamActive) return
+    if (teamsLoading || playersLoading) return // wait for real data before showing, so player chips don't pop in late
+    if (!teamChampion || !teamCelebrationSeason) return
+    const key = `team_league_champion_seen_${teamCelebrationSeason}_${teamChampion.id}`
+    if (!localStorage.getItem(key)) {
+      setShowTeamCelebration(true)
+      localStorage.setItem(key, "1")
+      const dismiss = () => setShowTeamCelebration(false)
+      const timer = setTimeout(dismiss, 7000)
+      document.addEventListener("click", dismiss)
+      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamChampion?.id, teamCelebrationSeason, teamsLoading, playersLoading])
+
+  // ── UCL Knockout champion celebration ───────────────────────────────────
+  // Fires once the UCL Knockout Final is completed — mirrors the Weekly
+  // Tournament celebration exactly, just reading from ucl-knockout instead.
+  const [showUclCelebration, setShowUclCelebration] = useState(false)
+  const uclFinalMatch = uclKnockout?.matches?.find(
+    m => m.round === uclKnockout.totalRounds && m.status === "completed"
+  )
+  const uclChampion = uclFinalMatch
+    ? (uclFinalMatch.winnerId === uclFinalMatch.player1Id ? uclFinalMatch.player1Name : uclFinalMatch.player2Name)
+    : null
+
+  // TEST-ONLY: ?testUclCelebration=SomePlayerName previews this instantly.
+  const testUclActive = urlParams.has("testUclCelebration")
+  const testUclParam  = urlParams.get("testUclCelebration")
+  const testUclName   = testUclActive
+    ? (testUclParam && !["1", "true"].includes(testUclParam) ? testUclParam : "Test Player")
+    : null
+  const displayUclChampion = testUclName || uclChampion
+
+  useEffect(() => {
+    if (!testUclActive) return
+    setShowUclCelebration(true)
+    const dismiss = () => setShowUclCelebration(false)
+    const timer = setTimeout(dismiss, 7000)
+    document.addEventListener("click", dismiss)
+    return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testUclActive])
+
+  useEffect(() => {
+    if (testUclActive) return
+    if (!uclChampion || !uclKnockout?.id) return
+    const key = `ucl_champion_seen_${uclKnockout.id}`
+    if (!localStorage.getItem(key)) {
+      setShowUclCelebration(true)
+      localStorage.setItem(key, "1")
+      const dismiss = () => setShowUclCelebration(false)
+      const timer = setTimeout(dismiss, 7000)
+      document.addEventListener("click", dismiss)
+      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uclChampion, uclKnockout?.id])
 
   const [searchParams, setSearchParams] = useSearchParams()
   const activePanel    = searchParams.get("view") || "players"
@@ -114,8 +284,53 @@ export default function CommonDashboard() {
 
   const currentSeasonRecord = seasonRecords.find(r => r.season_number === currentSeason)
 
+  // Golden Boot winners for each celebration — each list is already sorted
+  // goals DESC by its endpoint, so [0] is the top scorer. Only shown if
+  // someone has actually scored (goals > 0), so an empty/fresh competition
+  // doesn't show a misleading "0 goals" winner.
+  const teamGoldenBoot   = teamTopScorers[0]?.goals > 0   ? teamTopScorers[0]   : null
+  const uclGoldenBoot    = uclTopScorers[0]?.goals > 0    ? uclTopScorers[0]    : null
+  const weeklyGoldenBoot = weeklyTopScorers[0]?.goals > 0 ? weeklyTopScorers[0] : null
+
   return (
     <Layout>
+      {showWeeklyCelebration && displayWeeklyChampion ? (
+        <ChampionCelebration
+          trophyImage={weeklyTrophyLogo}
+          eyebrow="Weekly Tournament"
+          title={displayWeeklyChampion}
+          subtitle="is the Weekly Champion! 🎉"
+        >
+          {weeklyGoldenBoot && <GoldenBootBadge scorer={weeklyGoldenBoot} />}
+        </ChampionCelebration>
+      ) : showTeamCelebration && displayTeamChampion ? (
+        <ChampionCelebration
+          trophyImage={teamLeagueTrophyLogo}
+          eyebrow="Team League"
+          title={displayTeamChampion}
+          subtitle="are the Team League Champions! 🏆"
+        >
+          {displayTeamPlayers.length > 0 && (
+            <div className="mt-4 flex flex-wrap justify-center gap-1.5 max-h-32 overflow-y-auto">
+              {displayTeamPlayers.map(p => (
+                <span key={p.id} className="text-xs text-slate-300 bg-pitch-800 border border-surface-border px-2 py-1 rounded-lg">
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          )}
+          {teamGoldenBoot && <GoldenBootBadge scorer={teamGoldenBoot} />}
+        </ChampionCelebration>
+      ) : showUclCelebration && displayUclChampion ? (
+        <ChampionCelebration
+          trophyImage={uclTrophyLogo}
+          eyebrow="UCL"
+          title={displayUclChampion}
+          subtitle="is the UCL Champion! 🏆"
+        >
+          {uclGoldenBoot && <GoldenBootBadge scorer={uclGoldenBoot} />}
+        </ChampionCelebration>
+      ) : null}
       {/* Hero */}
       <div className="relative mb-8 rounded-2xl overflow-hidden border border-surface-border">
         <div className="absolute inset-0 bg-gradient-to-r from-pitch-800 via-pitch-800 to-pitch-700" />
@@ -211,7 +426,7 @@ export default function CommonDashboard() {
             <>
               {/* Stat cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                <StatCard label="BDR Leader"  value={leader?.bdrPoints?.toLocaleString() ?? "—"} sub={leader?.name}    icon={Trophy}    accent="bg-gold/15 text-gold"              />
+                <StatCard label="BDR Leader"  value={leader?.bdrPoints ?? "—"} sub={leader?.name}    icon={Trophy}    accent="bg-gold/15 text-gold"              />
                 <StatCard label="Highest MV"  value={topMV?.marketValue ?? "—"}                   sub={topMV?.name}     icon={TrendingUp} accent="bg-accent/15 text-accent"        />
                 <StatCard label="Teams"       value={teams.length}                                 sub="in the league"   icon={Users}      accent="bg-violet-400/15 text-violet-400" />
                 <StatCard label="Players"     value={players.length}                               sub="registered"      icon={Activity}   accent="bg-blue-400/15 text-blue-400"    />
@@ -231,13 +446,15 @@ export default function CommonDashboard() {
                 </select>
               </div>
 
-              {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
-              {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} view={standingsView} onViewChange={setStandingsView} />}
-              {activePanel === "ucl"       && <UclStandings onPlayerClick={handlePlayer} />}
-              {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
-              {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
-              {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
-              {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
+              <div key={activePanel} className="animate-panel-in">
+                {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
+                {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} view={standingsView} onViewChange={setStandingsView} />}
+                {activePanel === "ucl"       && <UclStandings onPlayerClick={handlePlayer} />}
+                {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
+                {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
+                {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
+                {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
+              </div>
             </>
           )}
         </>

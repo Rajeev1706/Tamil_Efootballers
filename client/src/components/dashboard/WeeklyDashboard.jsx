@@ -26,6 +26,16 @@ export default function WeeklyDashboard({ onPlayerClick }) {
   const [view, setView] = useState("fixtures") // "fixtures" | "scorers"
   const [activeRound, setActiveRound] = useState(1)
 
+  // The confetti celebration itself is handled once, site-wide, in
+  // CommonDashboard.jsx (so it fires regardless of which panel a visitor
+  // lands on). This just shows the plain, always-visible champion line.
+  const finalMatch = tournament?.matches?.find(
+    m => m.round === tournament.total_rounds && m.status === "completed"
+  )
+  const champion = finalMatch
+    ? (finalMatch.winnerId === finalMatch.player1Id ? finalMatch.player1Name : finalMatch.player2Name)
+    : null
+
   if (isLoading) return <p className="text-sm text-slate-500 text-center py-8">Loading…</p>
 
   if (!tournament) {
@@ -44,7 +54,7 @@ export default function WeeklyDashboard({ onPlayerClick }) {
   const roundMatches = tournament.matches.filter(m => m.round === currentRound)
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-hidden relative">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
@@ -57,6 +67,11 @@ export default function WeeklyDashboard({ onPlayerClick }) {
             <h2 className="text-base font-semibold text-white">
               {view === "fixtures" ? tournament.name : "Top Scorers"}
             </h2>
+            {champion && (
+              <p className="text-xs text-gold mt-0.5">
+                <span className="font-semibold">{champion}</span> won this tournament
+              </p>
+            )}
           </div>
         </div>
         <select

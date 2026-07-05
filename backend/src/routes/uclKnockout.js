@@ -9,6 +9,31 @@ const router = Router()
 const TOTAL_ROUNDS = 5   // R32 → R16 → QF → SF → Final
 const BRACKET_SIZE = 32  // fixed
 
+// GET /api/ucl-knockout/public/current — latest non-setup tournament, for
+// the public dashboard's champion celebration (mirrors weekly's equivalent).
+router.get("/public/current", async (req, res, next) => {
+  try {
+    const t = await query(
+      "SELECT * FROM ucl_knockout_tournaments WHERE status != 'setup' ORDER BY created_at DESC LIMIT 1"
+    )
+    if (!t.rows[0]) return res.json(null)
+
+    const matches = await query(`
+      SELECT
+        km.round, km.match_number AS "matchNumber", km.status,
+        km.player1_id AS "player1Id", km.player2_id AS "player2Id", km.winner_id AS "winnerId",
+        p1.name AS "player1Name", p2.name AS "player2Name"
+      FROM ucl_knockout_matches km
+      LEFT JOIN players p1 ON km.player1_id = p1.id
+      LEFT JOIN players p2 ON km.player2_id = p2.id
+      WHERE km.tournament_id = $1
+      ORDER BY km.round ASC, km.match_number ASC
+    `, [t.rows[0].id])
+
+    res.json({ ...t.rows[0], totalRounds: TOTAL_ROUNDS, matches: matches.rows })
+  } catch (err) { next(err) }
+})
+
 // Helper: get top 4 from each active UCL group by standings
 async function getGroupStandings() {
   const result = await query(`

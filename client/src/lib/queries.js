@@ -98,6 +98,9 @@ export const useUclTopScorers = () =>
 export const useWeeklyCurrent = () =>
   useQuery({ queryKey: ["weekly-current"], queryFn: weeklyApi.current })
 
+export const useUclKnockoutCurrent = () =>
+  useQuery({ queryKey: ["ucl-knockout-current"], queryFn: uclKnockoutApi.current })
+
 export const useWeeklyTopScorers = () =>
   useQuery({ queryKey: ["weekly-top-scorers"], queryFn: weeklyApi.topScorers })
 

@@ -275,9 +275,21 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
 // DELETE /api/records/:id — admin only
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
+    const mrId = req.params.id
+
+    // This match_records row may be referenced by a UCL fixture, UCL
+    // knockout match, or Weekly tournament match — Postgres blocks deleting
+    // it while any of those still point to it via match_record_id. Reset
+    // the referencing row back to "pending" (no score/winner) first, so the
+    // delete succeeds and that fixture just goes back to awaiting a result,
+    // the same state as using "Edit result" > clearing it would leave it in.
+    await query(`UPDATE ucl_fixtures SET match_record_id = NULL, status = 'pending', player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
+    await query(`UPDATE ucl_knockout_matches SET match_record_id = NULL, status = 'pending', winner_id = NULL, player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
+    await query(`UPDATE weekly_tournament_matches SET match_record_id = NULL, status = 'pending', winner_id = NULL, player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
+
     const result = await query(
       "DELETE FROM match_records WHERE id = $1 RETURNING player_id, opponent_id",
-      [req.params.id]
+      [mrId]
     )
     if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })
 

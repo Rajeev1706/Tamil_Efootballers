@@ -43,6 +43,7 @@ export const teamsApi = {
   topScorers:   ()   => api.get("/teams/top-scorers").then(r => r.data),
   hallOfFame:      ()        => api.get("/teams/hall-of-fame").then(r => r.data),
   seasonReset:     ()        => api.post("/teams/season-reset").then(r => r.data),
+  seasonDelete:    ()        => api.post("/teams/season-delete").then(r => r.data),
   seasonRecords:   ()        => api.get("/teams/season-records").then(r => r.data),
   createSeasonRecord: (body) => api.post("/teams/season-records", body).then(r => r.data),
   updateSeasonRecord: (id, body) => api.patch(`/teams/season-records/${id}`, body).then(r => r.data),
@@ -147,6 +148,7 @@ export const favoritesApi = {
 export const uclKnockoutApi = {
   list:         ()             => api.get("/ucl-knockout").then(r => r.data),
   get:          (id)           => api.get(`/ucl-knockout/${id}`).then(r => r.data),
+  current:      ()             => api.get("/ucl-knockout/public/current").then(r => r.data),
   create:       (name)         => api.post("/ucl-knockout", { name }).then(r => r.data),
   start:        (id)           => api.post(`/ucl-knockout/${id}/start`).then(r => r.data),
   saveResult:   (matchId, player1Score, player2Score, tieWinnerId) =>

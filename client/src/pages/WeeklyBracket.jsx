@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2 } from "lucide-react"
 import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament, useUpdateMatchPlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
+import Confetti from "../components/common/Confetti"
 
 function getRoundLabel(round, totalRounds) {
   const fromEnd = totalRounds - round
@@ -26,6 +27,7 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   const [editingPlayers, setEditingPlayers] = useState(false)
   const [p1Id, setP1Id] = useState(match.player1_id || "")
   const [p2Id, setP2Id] = useState(match.player2_id || "")
+  const [justSaved, setJustSaved] = useState(false)
 
   const isCompleted    = match.status === "completed" || match.status === "bye"
   const isBye          = match.status === "bye"
@@ -53,6 +55,7 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
       tournamentId,
     })
     setEditing(false)
+    setJustSaved(true)
     onSaved?.()
   }
 
@@ -60,7 +63,7 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   const p2IsWinner = match.winner_id === match.player2_id
 
   return (
-    <div className="border-b border-surface-border/50">
+    <div className={cn("border-b border-surface-border/50", justSaved && "animate-result-flash")}>
       <div className="flex items-center justify-between px-5 py-3.5">
         <span className={cn("font-medium text-left flex-1 truncate",
           !match.player1_id ? "text-slate-600 italic" :
@@ -257,9 +260,14 @@ export default function WeeklyBracket() {
               <Clock className="w-3 h-3" /> In Progress
             </span>
           )}
-          {champion && <p className="text-sm text-gold">🏆 <span className="font-bold">{champion}</span></p>}
+          {champion && (
+            <p className="text-sm text-gold animate-champion-pop">
+              🏆 <span className="font-bold">{champion}</span>
+            </p>
+          )}
         </div>
 
+        {champion && <Confetti fixed />}
         {tournament.status !== "completed" && (
           confirmReset ? (
             <div className="flex items-center gap-2">

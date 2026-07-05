@@ -7,11 +7,14 @@ import { recalcForm } from "../services/form.js"
 
 const router = Router()
 
-// Tiered bracket sizes: ≤32 → 32, 33-64 → 64, 65-128 → 128
+// Bracket size = the smallest power of 2 that fits the player count.
+// This guarantees byeCount (slots - n) is always strictly less than half
+// the slots, which is what makes it mathematically possible to guarantee
+// no two byes ever land in the same round-1 match (see generateMatches).
 function getBracketSize(n) {
-  if (n <= 32)  return 32
-  if (n <= 64)  return 64
-  return 128
+  let size = 2
+  while (size < n) size *= 2
+  return size
 }
 
 // Helper: generate bracket matches after draw
@@ -21,24 +24,32 @@ function generateMatches(playerIds, tournamentId) {
   const totalRounds = Math.log2(slots)
   const matches = []
 
-  // Distribute players into slots so byes are spread out and never face each other.
-  // Strategy: alternate filling from top and bottom of the slot array.
-  // e.g. for 6 players in 8 slots: positions 0,7,2,5,4,3 get players, 1,6 are byes.
-  // This guarantees each bye is always paired with a real player.
-  const slotPositions = new Array(slots).fill(null)
-  let lo = 0, hi = slots - 1
-  for (let i = 0; i < playerIds.length; i++) {
-    if (i % 2 === 0) slotPositions[lo++] = playerIds[i]
-    else             slotPositions[hi--] = playerIds[i]
+  const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
+  const r1Count  = slots / 2
+  const byeCount = slots - n // always < r1Count, guaranteed by getBracketSize
+
+  // Build each round-1 pair explicitly: the first `byeCount` matches each
+  // get exactly one real player + one bye (never two byes); every remaining
+  // match gets two real players. Since byeCount < r1Count is guaranteed,
+  // there's always at least one all-real match, and a bye can never end up
+  // paired with another bye.
+  let playerIdx = 0
+  const pairs = []
+  for (let m = 0; m < r1Count; m++) {
+    if (m < byeCount) {
+      pairs.push([shuffled[playerIdx++], null])
+    } else {
+      pairs.push([shuffled[playerIdx++], shuffled[playerIdx++]])
+    }
+  }
+  // Shuffle match order so the byes aren't all clustered at the start of the bracket
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[pairs[i], pairs[j]] = [pairs[j], pairs[i]]
   }
 
-  // Round 1: pair adjacent slots (0&1, 2&3, ...)
-  const r1Count = slots / 2
-  for (let m = 1; m <= r1Count; m++) {
-    const p1 = slotPositions[(m - 1) * 2]
-    const p2 = slotPositions[(m - 1) * 2 + 1]
-    // Skip if both null (bye vs bye — should never happen with above distribution)
-    if (!p1 && !p2) continue
+  pairs.forEach(([p1, p2], idx) => {
+    const m = idx + 1
     const isBye = !p1 || !p2
     matches.push({
       tournamentId, round: 1, matchNumber: m,
@@ -46,7 +57,7 @@ function generateMatches(playerIds, tournamentId) {
       winnerId:  isBye ? (p1 || p2) : null,
       status:    isBye ? "bye" : "pending",
     })
-  }
+  })
 
   // Future rounds — empty slots filled as results come in
   for (let r = 2; r <= totalRounds; r++) {

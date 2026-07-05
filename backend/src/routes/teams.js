@@ -351,22 +351,35 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Shared by season-reset (advance) and season-delete (undo) — clears
+// everything tied to the CURRENT season's fixtures/UCL/team-stats, without
+// ever touching match_records (trophies, BDR points, match history stay
+// intact either way, since those tables are only ever referenced BY
+// ucl_fixtures/ucl_knockout_matches, never the reverse).
+async function clearCurrentSeasonData(q) {
+  await q(`UPDATE teams SET played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, score_points = 0`)
+  await q(`UPDATE players SET market_value = 0, form = '{}'`)
+  await q(`DELETE FROM fixtures`)
+  await q(`DELETE FROM fixture_lineups`)
+  await q(`DELETE FROM trade_requests`)
+
+  // Clear the entire UCL competition — child tables first to respect FKs
+  await q(`DELETE FROM ucl_knockout_matches`)
+  await q(`DELETE FROM ucl_knockout_players`)
+  await q(`DELETE FROM ucl_knockout_tournaments`)
+  await q(`UPDATE players SET ucl_group_id = NULL`) // before deleting ucl_groups, since players reference it
+  await q(`DELETE FROM ucl_fixtures`)
+  await q(`DELETE FROM ucl_groups`)
+}
+
 // POST /api/teams/season-reset — admin only
-// Archives current season by resetting team stats, player MVs, fixtures
-// but KEEPS all player records, trophies, match history intact
+// Archives current season by clearing its fixtures/UCL/team-stats, then
+// ADVANCES the season number by one.
 router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { withTransaction: tx } = await import("../db/pool.js")
     await tx(async ({ query: q }) => {
-      // Reset all team season stats
-      await q(`UPDATE teams SET played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, score_points = 0`)
-      // Reset all player market values to 0 (fresh start)
-      await q(`UPDATE players SET market_value = 0, form = '{}'`)
-      // Delete all fixtures and lineups and trades
-      await q(`DELETE FROM fixtures`)
-      await q(`DELETE FROM fixture_lineups`)
-      await q(`DELETE FROM trade_requests`)
-      // Increment current season number
+      await clearCurrentSeasonData(q)
       await q(`
         INSERT INTO app_settings (key, value)
         VALUES ('current_season', (
@@ -377,7 +390,34 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         )
       `)
     })
-    res.json({ success: true, message: "Season reset complete. Team stats, fixtures and trades cleared. Player records and trophies preserved." })
+    res.json({ success: true, message: "Season reset complete. Team stats, fixtures, trades, and the entire UCL competition were cleared. Player records and trophies are preserved." })
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/season-delete — admin only
+// Undoes "Start New Season": clears whatever fixtures/UCL/team-stats exist
+// in the CURRENT season (there's no way to restore the previous season's
+// actual data — it was already permanently deleted when that season was
+// advanced past), then DECREMENTS the season number by one, floored at 1.
+router.post("/season-delete", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const current = parseInt(seasonRes.rows[0]?.value || "6")
+    if (current <= 1) {
+      return res.status(400).json({ error: "Already at Season 1 — nothing to go back to" })
+    }
+
+    const { withTransaction: tx } = await import("../db/pool.js")
+    await tx(async ({ query: q }) => {
+      await clearCurrentSeasonData(q)
+      await q(`
+        UPDATE app_settings SET value = $1 WHERE key = 'current_season'
+      `, [String(current - 1)])
+    })
+    res.json({
+      success: true,
+      message: `Season ${current} deleted. Now back on Season ${current - 1} — its fixtures, team stats, and UCL data were already cleared when Season ${current} started, so Season ${current - 1} begins fresh, not restored.`,
+    })
   } catch (err) { next(err) }
 })
 
