@@ -347,6 +347,14 @@ export const useUpdateFixture = () => {
   })
 }
 
+export const useUpdateRoundDate = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ round, date }) => fixturesApi.updateRoundDate(round, date),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fixtures"] }),
+  })
+}
+
 export const useDeleteFixture = () => {
   const qc = useQueryClient()
   return useMutation({

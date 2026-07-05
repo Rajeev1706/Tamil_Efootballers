@@ -155,6 +155,22 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// PATCH /api/fixtures/round/:round/date — admin sets one date for every
+// fixture in a round at once, instead of editing each fixture individually.
+router.patch("/round/:round/date", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { date } = z.object({ date: z.string().min(1) }).parse(req.body)
+    const round = parseInt(req.params.round)
+    if (isNaN(round)) return res.status(400).json({ error: "Invalid round" })
+
+    const result = await query(
+      "UPDATE fixtures SET scheduled_date = $1 WHERE round = $2 RETURNING id",
+      [date, round]
+    )
+    res.json({ updated: result.rows.length, round, date })
+  } catch (err) { next(err) }
+})
+
 // PATCH /api/fixtures/:id  — admin edits fixture date/round (upcoming only)
 const editSchema = z.object({
   round: z.number().int().positive().optional(),

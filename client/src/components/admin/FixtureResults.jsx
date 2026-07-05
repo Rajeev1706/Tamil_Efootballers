@@ -2,7 +2,7 @@ import { useState, useRef } from "react"
 import { Check, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
-  useCreateFixture, useTeams
+  useCreateFixture, useTeams, useUpdateRoundDate
 } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { toPng } from "html-to-image"
@@ -202,9 +202,6 @@ function FixtureCard({ fixture }) {
 
   const [editing, setEditing]     = useState(false)
   const [editRound, setEditRound] = useState(fixture.round)
-  const [editDate, setEditDate]   = useState(
-    fixture.date ? new Date(fixture.date).toISOString().slice(0, 10) : ""
-  )
   const [editHome, setEditHome] = useState(fixture.homeTeamId)
   const [editAway, setEditAway] = useState(fixture.awayTeamId)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -230,7 +227,6 @@ function FixtureCard({ fixture }) {
     updateFixture.mutate({
       id: fixture.id,
       round:      parseInt(editRound),
-      date:       editDate,
       homeTeamId: parseInt(editHome),
       awayTeamId: parseInt(editAway),
     }, {
@@ -313,12 +309,6 @@ function FixtureCard({ fixture }) {
                 className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Date</label>
-              <input type="date" value={editDate}
-                onChange={e => setEditDate(e.target.value)}
-                className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
-            </div>
-            <div>
               <label className="text-xs text-slate-500 mb-1 block">Home team</label>
               <select value={editHome} onChange={e => setEditHome(e.target.value)}
                 className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
@@ -333,6 +323,7 @@ function FixtureCard({ fixture }) {
               </select>
             </div>
           </div>
+          <p className="text-xs text-slate-600">Date is set per round now — use "Set date for Round {fixture.round}" above the fixture list.</p>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setEditing(false)}
               className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white transition-colors">
@@ -491,6 +482,38 @@ function FixtureExportCard({ round, fixtures, exportRef, visible }) {
   )
 }
 
+// ── Round Date Editor — sets one date for every fixture in a round ────────────
+function RoundDateEditor({ round, roundFixtures }) {
+  const updateRoundDate = useUpdateRoundDate()
+  // Pre-fill with the round's existing date if every fixture already shares one
+  const existingDates = [...new Set(roundFixtures.map(f => f.date ? new Date(f.date).toISOString().slice(0, 10) : null))]
+  const initialDate = existingDates.length === 1 && existingDates[0] ? existingDates[0] : ""
+  const [date, setDate]     = useState(initialDate)
+  const [saved, setSaved]   = useState(false)
+
+  function handleSave() {
+    if (!date) return
+    updateRoundDate.mutate({ round: Number(round), date }, {
+      onSuccess: () => { setSaved(true); setTimeout(() => setSaved(false), 2000) },
+      onError:   (err) => alert(err.response?.data?.error || "Failed to update round date"),
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Calendar className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+      <span className="text-xs text-slate-400">Set date for Round {round}:</span>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)}
+        className="bg-pitch-800 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
+      <button onClick={handleSave} disabled={!date || updateRoundDate.isPending}
+        className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50 transition-colors">
+        <Save className="w-3 h-3" /> {updateRoundDate.isPending ? "Saving…" : "Apply to all fixtures in round"}
+      </button>
+      {saved && <span className="text-xs font-semibold text-accent flex items-center gap-1"><Check className="w-3 h-3" /> Updated {roundFixtures.length} fixture(s)</span>}
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function FixtureResults({ fixtures }) {
   const { data: teams = [] } = useTeams()
@@ -573,6 +596,10 @@ export default function FixtureResults({ fixtures }) {
             </button>
           )}
         </div>
+      )}
+
+      {activeRound !== "all" && (
+        <RoundDateEditor round={activeRound} roundFixtures={roundFixtures} />
       )}
 
       {filteredUpcoming.length > 0 && (

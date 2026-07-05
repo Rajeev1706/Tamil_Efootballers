@@ -121,6 +121,9 @@ export const fixturesApi = {
   list:       (params)                  => api.get("/fixtures", { params }).then(r => r.data),
   recent:     ()                        => api.get("/fixtures/recent").then(r => r.data),
   create:     (body)                    => api.post("/fixtures", body).then(r => r.data),
+  update:     (id, body)                => api.patch(`/fixtures/${id}`, body).then(r => r.data),
+  updateRoundDate: (round, date)        => api.patch(`/fixtures/round/${round}/date`, { date }).then(r => r.data),
+  delete:     (id)                      => api.delete(`/fixtures/${id}`).then(r => r.data),
   saveResult: (id, homeScore, awayScore, homeGoals, awayGoals) =>
     api.patch(`/fixtures/${id}/result`, { homeScore, awayScore, homeGoals, awayGoals }).then(r => r.data),
 }
