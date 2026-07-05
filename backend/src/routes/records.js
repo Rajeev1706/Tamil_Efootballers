@@ -183,6 +183,77 @@ router.post("/team", authenticate, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// PATCH /api/records/team/:id — team owner edits a Team League result they
+// logged themselves. Scoped strictly to their own team's player — a team
+// can never edit a result belonging to another team's player.
+router.patch("/team/:id", authenticate, async (req, res, next) => {
+  try {
+    if (!req.user.teamId) {
+      return res.status(403).json({ error: "No team associated with your account" })
+    }
+
+    const { result, playerScore, opponentScore } = z.object({
+      result:        z.enum(["win", "draw", "loss"]),
+      playerScore:   z.number().int().min(0).optional(),
+      opponentScore: z.number().int().min(0).optional(),
+    }).parse(req.body)
+
+    const existing = await query(`
+      SELECT mr.id, mr.player_id, mr.opponent_id, p.team_id AS player_team_id
+      FROM match_records mr
+      JOIN players p ON mr.player_id = p.id
+      WHERE mr.id = $1 AND mr.match_type = 'league'
+    `, [req.params.id])
+    const record = existing.rows[0]
+    if (!record) return res.status(404).json({ error: "Record not found" })
+    if (record.player_team_id !== req.user.teamId) {
+      return res.status(403).json({ error: "You can only edit your own team's logged results" })
+    }
+
+    await query(
+      `UPDATE match_records SET result = $1, player_score = $2, opponent_score = $3 WHERE id = $4`,
+      [result, playerScore ?? null, opponentScore ?? null, req.params.id]
+    )
+
+    await recalcMarketValue(record.player_id)
+    await recalcMarketValue(record.opponent_id)
+    await recalcForm(record.player_id)
+    await recalcForm(record.opponent_id)
+
+    res.json({ updated: true })
+  } catch (err) { next(err) }
+})
+
+// DELETE /api/records/team/:id — team owner deletes a result they logged
+// themselves. Same ownership check as the edit endpoint above.
+router.delete("/team/:id", authenticate, async (req, res, next) => {
+  try {
+    if (!req.user.teamId) {
+      return res.status(403).json({ error: "No team associated with your account" })
+    }
+
+    const existing = await query(`
+      SELECT mr.player_id, mr.opponent_id, p.team_id AS player_team_id
+      FROM match_records mr
+      JOIN players p ON mr.player_id = p.id
+      WHERE mr.id = $1 AND mr.match_type = 'league'
+    `, [req.params.id])
+    const record = existing.rows[0]
+    if (!record) return res.status(404).json({ error: "Record not found" })
+    if (record.player_team_id !== req.user.teamId) {
+      return res.status(403).json({ error: "You can only delete your own team's logged results" })
+    }
+
+    await query("DELETE FROM match_records WHERE id = $1", [req.params.id])
+    await recalcMarketValue(record.player_id)
+    await recalcMarketValue(record.opponent_id)
+    await recalcForm(record.player_id)
+    await recalcForm(record.opponent_id)
+
+    res.json({ deleted: true })
+  } catch (err) { next(err) }
+})
+
 // POST /api/records — admin logs any result
 router.post("/", authenticate, adminOnly, async (req, res, next) => {
   try {

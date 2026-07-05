@@ -303,6 +303,30 @@ export const useFixtureRecords = (fixtureId) =>
     refetchInterval: 30000, // poll every 30s so both teams see each other's updates
   })
 
+export const useEditTeamRecord = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => recordsApi.updateTeam(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fixture-records"] })
+      qc.invalidateQueries({ queryKey: ["players"] })
+      qc.invalidateQueries({ queryKey: QK.records })
+    },
+  })
+}
+
+export const useDeleteTeamRecord = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => recordsApi.deleteTeam(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fixture-records"] })
+      qc.invalidateQueries({ queryKey: ["players"] })
+      qc.invalidateQueries({ queryKey: QK.records })
+    },
+  })
+}
+
 export const useEditRecord = () => {
   const qc = useQueryClient()
   return useMutation({

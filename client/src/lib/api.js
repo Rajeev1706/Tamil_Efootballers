@@ -114,6 +114,8 @@ export const recordsApi = {
   update:        (id, body) => api.patch(`/records/${id}`, body).then(r => r.data),
   delete:        (id)       => api.delete(`/records/${id}`).then(r => r.data),
   createTeam:    (body)     => api.post("/records/team", body).then(r => r.data),
+  updateTeam:    (id, body) => api.patch(`/records/team/${id}`, body).then(r => r.data),
+  deleteTeam:    (id)       => api.delete(`/records/team/${id}`).then(r => r.data),
   byFixture:     (id)       => api.get(`/records/fixture/${id}`).then(r => r.data),
 }
 

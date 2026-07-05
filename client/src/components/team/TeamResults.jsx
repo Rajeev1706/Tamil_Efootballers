@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { CheckCircle, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import { CheckCircle, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Save } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useLogTeamRecord, useFixtureRecords } from "../../lib/queries"
+import { useLogTeamRecord, useFixtureRecords, useEditTeamRecord, useDeleteTeamRecord } from "../../lib/queries"
 
 const RESULTS = [
   { value: "win",  label: "Win",  color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -146,27 +146,9 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
             <div className="space-y-2">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Logged results</p>
               {existingRecords.map(r => {
-                const isMine   = myPlayers.some(p => p.id === r.playerId)
-                const myName   = isMine ? r.playerName  : r.opponentName
-                const oppName_ = isMine ? r.opponentName : r.playerName
-                const result   = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw")
-                const myScore  = isMine ? r.playerScore : r.opponentScore
-                const oppScore_ = isMine ? r.opponentScore : r.playerScore
-                const chip = RESULTS.find(x => x.value === result)
+                const isMine = myPlayers.some(p => p.id === r.playerId)
                 return (
-                  <div key={r.id} className="flex items-center justify-between bg-pitch-800 rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm text-slate-300 truncate">{myName}</span>
-                      {myScore != null && oppScore_ != null && (
-                        <span className="text-xs text-slate-500 font-mono flex-shrink-0">{myScore}–{oppScore_}</span>
-                      )}
-                      <span className="text-slate-600 text-xs flex-shrink-0">vs</span>
-                      <span className="text-sm text-slate-300 truncate">{oppName_}</span>
-                    </div>
-                    <span className={cn("text-xs font-semibold px-2 py-0.5 rounded border flex-shrink-0 ml-2", chip?.color)}>
-                      {chip?.label}
-                    </span>
-                  </div>
+                  <LoggedResultRow key={r.id} record={r} isMine={isMine} onChanged={refetch} />
                 )
               })}
             </div>
@@ -193,6 +175,118 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function LoggedResultRow({ record: r, isMine, onChanged }) {
+  const editRecord   = useEditTeamRecord()
+  const deleteRecord = useDeleteTeamRecord()
+  const [editing, setEditing]       = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
+
+  const myName    = isMine ? r.playerName  : r.opponentName
+  const oppName_  = isMine ? r.opponentName : r.playerName
+  const result    = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw")
+  const myScore   = isMine ? r.playerScore : r.opponentScore
+  const oppScore_ = isMine ? r.opponentScore : r.playerScore
+  const chip = RESULTS.find(x => x.value === result)
+
+  const [editResult, setEditResult]     = useState(result)
+  const [editMyScore, setEditMyScore]   = useState(myScore ?? "")
+  const [editOppScore, setEditOppScore] = useState(oppScore_ ?? "")
+
+  function handleSave() {
+    editRecord.mutate({
+      id: r.id,
+      result:         editResult,
+      playerScore:    Number(editMyScore),
+      opponentScore:  Number(editOppScore),
+    }, {
+      onSuccess: () => { setEditing(false); onChanged?.() },
+      onError:   (err) => alert(err?.response?.data?.error || "Failed to update result"),
+    })
+  }
+
+  function handleDelete() {
+    deleteRecord.mutate(r.id, {
+      onSuccess: () => onChanged?.(),
+      onError:   (err) => alert(err?.response?.data?.error || "Failed to delete result"),
+    })
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-pitch-800 rounded-lg px-3 py-2.5 space-y-2 border border-accent/25">
+        <p className="text-xs text-slate-500">{myName} vs {oppName_}</p>
+        <div className="flex items-center gap-2">
+          <select value={editResult} onChange={e => setEditResult(e.target.value)}
+            className="flex-1 bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
+            {RESULTS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+          <input type="number" min="0" placeholder="0" value={editMyScore}
+            onChange={e => setEditMyScore(e.target.value)}
+            className="w-12 text-center bg-pitch-900 border border-surface-border rounded-md py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
+          <span className="text-slate-600 text-xs flex-shrink-0">—</span>
+          <input type="number" min="0" placeholder="0" value={editOppScore}
+            onChange={e => setEditOppScore(e.target.value)}
+            className="w-12 text-center bg-pitch-900 border border-surface-border rounded-md py-1.5 text-sm text-white focus:outline-none focus:border-accent/40" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setEditing(false)}
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white text-xs transition-colors">
+            <X className="w-3 h-3" /> Cancel
+          </button>
+          <button onClick={handleSave} disabled={editRecord.isPending}
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-accent text-white font-semibold text-xs disabled:opacity-50 transition-colors">
+            <Save className="w-3 h-3" /> {editRecord.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between bg-pitch-800 rounded-lg px-3 py-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-sm text-slate-300 truncate">{myName}</span>
+        {myScore != null && oppScore_ != null && (
+          <span className="text-xs text-slate-500 font-mono flex-shrink-0">{myScore}–{oppScore_}</span>
+        )}
+        <span className="text-slate-600 text-xs flex-shrink-0">vs</span>
+        <span className="text-sm text-slate-300 truncate">{oppName_}</span>
+      </div>
+      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+        <span className={cn("text-xs font-semibold px-2 py-0.5 rounded border", chip?.color)}>
+          {chip?.label}
+        </span>
+        {isMine && !confirmDel && (
+          <>
+            <button onClick={() => setEditing(true)}
+              className="w-6 h-6 rounded-md hover:bg-surface flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+              title="Edit result">
+              <Pencil className="w-3 h-3" />
+            </button>
+            <button onClick={() => setConfirmDel(true)}
+              className="w-6 h-6 rounded-md hover:bg-rose-400/10 flex items-center justify-center text-slate-500 hover:text-rose-400 transition-colors"
+              title="Delete result">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </>
+        )}
+        {isMine && confirmDel && (
+          <div className="flex items-center gap-1">
+            <button onClick={() => setConfirmDel(false)}
+              className="text-xs px-2 py-1 rounded-lg border border-surface-border text-slate-400 hover:text-white">
+              No
+            </button>
+            <button onClick={handleDelete} disabled={deleteRecord.isPending}
+              className="text-xs px-2 py-1 rounded-lg bg-rose-500 text-white font-semibold disabled:opacity-50">
+              {deleteRecord.isPending ? "…" : "Yes"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

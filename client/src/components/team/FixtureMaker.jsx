@@ -111,7 +111,7 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H 
   const oppP = oppPlayers.find(p => p.id === matchup?.oppPlayerId) || null
 
   return (
-    <div className="grid grid-cols-[1fr_32px_1fr_80px] gap-3 items-center px-5 py-3 border-b border-surface-border/50 last:border-b-0">
+    <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_32px_1fr_80px] sm:gap-3 sm:items-center px-5 py-3 border-b border-surface-border/50 last:border-b-0">
       {/* My player select */}
       <select
         value={matchup?.myPlayerId || ""}
@@ -144,7 +144,7 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H 
         onClick={() => myP && oppP && onViewH2H(myP, oppP)}
         disabled={!myP || !oppP}
         className={cn(
-          "flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-xl border transition-all",
+          "flex items-center justify-center gap-1 text-xs font-semibold px-3 py-2 rounded-xl border transition-all w-full sm:w-auto",
           myP && oppP
             ? "text-violet-400 bg-violet-400/10 border-violet-400/25 hover:bg-violet-400/20"
             : "text-slate-600 bg-surface-border border-surface-border cursor-not-allowed"
