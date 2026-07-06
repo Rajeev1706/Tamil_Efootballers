@@ -128,6 +128,7 @@ export const fixturesApi = {
   delete:     (id)                      => api.delete(`/fixtures/${id}`).then(r => r.data),
   saveResult: (id, homeScore, awayScore, homeGoals, awayGoals) =>
     api.patch(`/fixtures/${id}/result`, { homeScore, awayScore, homeGoals, awayGoals }).then(r => r.data),
+  close:      (id)                      => api.post(`/fixtures/${id}/close`).then(r => r.data),
 }
 
 export const tradesApi = {

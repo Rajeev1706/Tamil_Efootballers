@@ -89,9 +89,19 @@ router.get("/fixture/:fixtureId", authenticate, async (req, res, next) => {
       JOIN players opp ON mr.opponent_id = opp.id
       JOIN fixtures f  ON f.id = $1
       WHERE mr.match_type = 'league'
-        AND p.team_id   IN (f.home_team_id, f.away_team_id)
-        AND opp.team_id IN (f.home_team_id, f.away_team_id)
-        AND mr.recorded_at::date >= f.scheduled_date::date
+        AND (
+          -- New records: reliably linked by fixture_id
+          mr.fixture_id = $1
+          OR (
+            -- Old records from before this link existed: fall back to the
+            -- previous heuristic (team membership + date) so they don't
+            -- disappear from an in-progress fixture during the transition.
+            mr.fixture_id IS NULL
+            AND p.team_id   IN (f.home_team_id, f.away_team_id)
+            AND opp.team_id IN (f.home_team_id, f.away_team_id)
+            AND mr.recorded_at::date >= f.scheduled_date::date
+          )
+        )
       ORDER BY mr.recorded_at DESC, mr.id DESC
     `, [req.params.fixtureId])
     res.json(result.rows)
@@ -158,22 +168,33 @@ router.post("/team", authenticate, async (req, res, next) => {
     const seasonNumber = await getCurrentSeason()
     const ins = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number)
-      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number, fixture_id)
+      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9,$10)
       RETURNING *
     `, [
       playerId, opponentId, result, oppCheck.rows[0].grade,
       playerScore ?? null, opponentScore ?? null,
       new Date().toISOString().slice(0, 10),
-      req.user.id, seasonNumber,
+      req.user.id, seasonNumber, fixtureId,
     ])
 
-    const letter    = result === "win" ? "W" : result === "draw" ? "D" : "L"
-    const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
-    await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [letter, playerId])
-    await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
     await recalcMarketValue(playerId)
     await recalcMarketValue(opponentId)
+    await recalcForm(playerId)
+    await recalcForm(opponentId)
+
+    // Live team points/goals — added immediately as each player result comes
+    // in, not waiting for the fixture to be closed. Player's own team gets
+    // 3/1/0 based on their result; the opponent's team gets the mirrored
+    // 3/1/0. Goals for/against accumulate the same way.
+    const playerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
+    const oppPts    = result === "win" ? 0 : result === "draw" ? 1 : 3
+    const pScore = playerScore ?? 0
+    const oScore = opponentScore ?? 0
+    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
+      [playerPts, pScore, oScore, playerCheck.rows[0].team_id])
+    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
+      [oppPts, oScore, pScore, oppTeamId])
 
     const fresh = await query(
       `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
@@ -199,9 +220,11 @@ router.patch("/team/:id", authenticate, async (req, res, next) => {
     }).parse(req.body)
 
     const existing = await query(`
-      SELECT mr.id, mr.player_id, mr.opponent_id, p.team_id AS player_team_id
+      SELECT mr.id, mr.player_id, mr.opponent_id, mr.result, mr.player_score, mr.opponent_score,
+             p.team_id AS player_team_id, opp.team_id AS opponent_team_id
       FROM match_records mr
-      JOIN players p ON mr.player_id = p.id
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
       WHERE mr.id = $1 AND mr.match_type = 'league'
     `, [req.params.id])
     const record = existing.rows[0]
@@ -210,10 +233,30 @@ router.patch("/team/:id", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "You can only edit your own team's logged results" })
     }
 
+    // Reverse this record's OLD contribution to both teams' live totals
+    const oldPlayerPts = record.result === "win" ? 3 : record.result === "draw" ? 1 : 0
+    const oldOppPts    = record.result === "win" ? 0 : record.result === "loss" ? 3 : 1
+    const oldPScore = record.player_score ?? 0
+    const oldOScore = record.opponent_score ?? 0
+    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
+      [oldPlayerPts, oldPScore, oldOScore, record.player_team_id])
+    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
+      [oldOppPts, oldOScore, oldPScore, record.opponent_team_id])
+
     await query(
       `UPDATE match_records SET result = $1, player_score = $2, opponent_score = $3 WHERE id = $4`,
       [result, playerScore ?? null, opponentScore ?? null, req.params.id]
     )
+
+    // Apply the NEW contribution
+    const newPlayerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
+    const newOppPts    = result === "win" ? 0 : result === "loss" ? 3 : 1
+    const newPScore = playerScore ?? 0
+    const newOScore = opponentScore ?? 0
+    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
+      [newPlayerPts, newPScore, newOScore, record.player_team_id])
+    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
+      [newOppPts, newOScore, newPScore, record.opponent_team_id])
 
     await recalcMarketValue(record.player_id)
     await recalcMarketValue(record.opponent_id)
@@ -233,9 +276,11 @@ router.delete("/team/:id", authenticate, async (req, res, next) => {
     }
 
     const existing = await query(`
-      SELECT mr.player_id, mr.opponent_id, p.team_id AS player_team_id
+      SELECT mr.player_id, mr.opponent_id, mr.result, mr.player_score, mr.opponent_score,
+             p.team_id AS player_team_id, opp.team_id AS opponent_team_id
       FROM match_records mr
-      JOIN players p ON mr.player_id = p.id
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
       WHERE mr.id = $1 AND mr.match_type = 'league'
     `, [req.params.id])
     const record = existing.rows[0]
@@ -244,7 +289,18 @@ router.delete("/team/:id", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "You can only delete your own team's logged results" })
     }
 
+    const playerPts = record.result === "win" ? 3 : record.result === "draw" ? 1 : 0
+    const oppPts    = record.result === "win" ? 0 : record.result === "loss" ? 3 : 1
+    const pScore = record.player_score ?? 0
+    const oScore = record.opponent_score ?? 0
+
     await query("DELETE FROM match_records WHERE id = $1", [req.params.id])
+
+    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
+      [playerPts, pScore, oScore, record.player_team_id])
+    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
+      [oppPts, oScore, pScore, record.opponent_team_id])
+
     await recalcMarketValue(record.player_id)
     await recalcMarketValue(record.opponent_id)
     await recalcForm(record.player_id)

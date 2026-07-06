@@ -12,7 +12,72 @@ const FIXTURE_SELECT = `
     f.home_score AS "homeScore", f.away_score AS "awayScore",
     f.home_goals AS "homeGoals", f.away_goals AS "awayGoals",
     ht.id AS "homeTeamId", ht.name AS home, ht.logo_url AS "homeLogo",
-    at.id AS "awayTeamId", at.name AS away, at.logo_url AS "awayLogo"
+    at.id AS "awayTeamId", at.name AS away, at.logo_url AS "awayLogo",
+
+    -- Live tally from player results already logged for this fixture in the
+    -- Team Dashboard — same math "Close Fixture" uses, just read-only here so
+    -- admin can see progress before actually closing.
+    COALESCE((
+      SELECT SUM(
+        CASE
+          WHEN p.team_id   = f.home_team_id THEN (CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END)
+          WHEN opp.team_id = f.home_team_id THEN (CASE mr.result WHEN 'win' THEN 0 WHEN 'draw' THEN 1 ELSE 3 END)
+          ELSE 0
+        END
+      )
+      FROM match_records mr
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
+      WHERE mr.fixture_id = f.id AND mr.match_type = 'league'
+    ), 0) AS "liveHomePts",
+
+    COALESCE((
+      SELECT SUM(
+        CASE
+          WHEN p.team_id   = f.away_team_id THEN (CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END)
+          WHEN opp.team_id = f.away_team_id THEN (CASE mr.result WHEN 'win' THEN 0 WHEN 'draw' THEN 1 ELSE 3 END)
+          ELSE 0
+        END
+      )
+      FROM match_records mr
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
+      WHERE mr.fixture_id = f.id AND mr.match_type = 'league'
+    ), 0) AS "liveAwayPts",
+
+    COALESCE((
+      SELECT SUM(
+        CASE
+          WHEN p.team_id   = f.home_team_id THEN COALESCE(mr.player_score, 0)
+          WHEN opp.team_id = f.home_team_id THEN COALESCE(mr.opponent_score, 0)
+          ELSE 0
+        END
+      )
+      FROM match_records mr
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
+      WHERE mr.fixture_id = f.id AND mr.match_type = 'league'
+    ), 0) AS "liveHomeGoals",
+
+    COALESCE((
+      SELECT SUM(
+        CASE
+          WHEN p.team_id   = f.away_team_id THEN COALESCE(mr.player_score, 0)
+          WHEN opp.team_id = f.away_team_id THEN COALESCE(mr.opponent_score, 0)
+          ELSE 0
+        END
+      )
+      FROM match_records mr
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
+      WHERE mr.fixture_id = f.id AND mr.match_type = 'league'
+    ), 0) AS "liveAwayGoals",
+
+    COALESCE((
+      SELECT COUNT(*) FROM match_records mr
+      WHERE mr.fixture_id = f.id AND mr.match_type = 'league'
+    ), 0) AS "liveResultsLogged"
+
   FROM fixtures f
   JOIN teams ht ON f.home_team_id = ht.id
   JOIN teams at ON f.away_team_id = at.id
@@ -157,8 +222,73 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /api/fixtures/round/:round/date — admin sets one date for every
-// fixture in a round at once, instead of editing each fixture individually.
+// POST /api/fixtures/:id/close — admin closes a fixture once player results
+// are done being logged. Points/goals were already added LIVE to each team
+// as every individual player result was logged (see records.js POST/PATCH/
+// DELETE /team) — this endpoint does NOT touch score_points/gf/ga again.
+// It only:
+//   1. Sums each team's points earned from THIS fixture's player results
+//   2. Compares those two fixture-scoped totals to decide win/draw/loss
+//   3. Increments played/won/drawn/lost by 1 accordingly
+//   4. Stores the derived totals on the fixture itself, so the existing
+//      manual "edit result" endpoint can still correctly reverse/override
+//      them later exactly like it already does today
+//   5. Marks the fixture completed, which is what moves the Team Dashboard
+//      on to the next round
+router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const fixRes = await query("SELECT * FROM fixtures WHERE id = $1", [req.params.id])
+    if (!fixRes.rows[0]) return res.status(404).json({ error: "Fixture not found" })
+    const fix = fixRes.rows[0]
+    if (fix.status === "completed") {
+      return res.status(400).json({ error: "Fixture is already closed" })
+    }
+
+    const recordsRes = await query(`
+      SELECT mr.result, mr.player_score, mr.opponent_score, p.team_id AS player_team_id
+      FROM match_records mr
+      JOIN players p ON mr.player_id = p.id
+      WHERE mr.fixture_id = $1 AND mr.match_type = 'league'
+    `, [req.params.id])
+
+    let homePts = 0, awayPts = 0, homeGoals = 0, awayGoals = 0
+    for (const r of recordsRes.rows) {
+      const pts       = r.result === "win" ? 3 : r.result === "draw" ? 1 : 0
+      const scored    = r.player_score ?? 0
+      const conceded  = r.opponent_score ?? 0
+      if (r.player_team_id === fix.home_team_id) {
+        homePts += pts; homeGoals += scored; awayGoals += conceded
+      } else if (r.player_team_id === fix.away_team_id) {
+        awayPts += pts; awayGoals += scored; homeGoals += conceded
+      }
+    }
+
+    const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
+    const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
+
+    await withTransaction(async ({ query: q }) => {
+      await q(`
+        UPDATE fixtures
+        SET status = 'completed', home_score = $1, away_score = $2, home_goals = $3, away_goals = $4
+        WHERE id = $5
+      `, [homePts, awayPts, homeGoals, awayGoals, req.params.id])
+
+      for (const [teamId, r] of [[fix.home_team_id, homeResult], [fix.away_team_id, awayResult]]) {
+        await q(`
+          UPDATE teams SET
+            played = played + 1,
+            won    = won   + $1,
+            drawn  = drawn + $2,
+            lost   = lost  + $3
+          WHERE id = $4
+        `, [r === "win" ? 1 : 0, r === "draw" ? 1 : 0, r === "loss" ? 1 : 0, teamId])
+      }
+    })
+
+    const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [req.params.id])
+    res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
 router.patch("/round/:round/date", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { date } = z.object({ date: z.string().min(1) }).parse(req.body)

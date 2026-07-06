@@ -1,8 +1,8 @@
 import { useState, useRef } from "react"
-import { Check, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download } from "lucide-react"
+import { Check, CheckCircle, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
-  useCreateFixture, useTeams, useUpdateRoundDate
+  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture
 } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { toPng } from "html-to-image"
@@ -189,6 +189,7 @@ function ScoreInput({ value, onChange, disabled }) {
 function FixtureCard({ fixture }) {
   const { data: teams = [] } = useTeams()
   const saveResult    = useSaveFixtureResult()
+  const closeFixture  = useCloseFixture()
   const updateFixture = useUpdateFixture()
   const deleteFixture = useDeleteFixture()
 
@@ -208,6 +209,19 @@ function FixtureCard({ fixture }) {
 
   const winner  = saved ? (hs > as_ ? "home" : hs < as_ ? "away" : "draw") : null
   const canSave = hs !== "" && as_ !== "" && hg !== "" && ag !== "" && !saved
+
+  const handleClose = () => {
+    closeFixture.mutate(fixture.id, {
+      onSuccess: (fresh) => {
+        setHs(fresh.homeScore ?? "")
+        setAs(fresh.awayScore ?? "")
+        setHg(fresh.homeGoals ?? "")
+        setAg(fresh.awayGoals ?? "")
+        setSaved(true)
+      },
+      onError: (err) => alert(err.response?.data?.error || "Failed to close fixture"),
+    })
+  }
 
   const handleSaveResult = () => {
     saveResult.mutate({
@@ -335,6 +349,47 @@ function FixtureCard({ fixture }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Live tally — reflects player results already logged in the Team
+          Dashboard for this fixture, same numbers already live on the
+          League table. Purely informational, updates as captains log more. */}
+      {!saved && (
+        fixture.liveResultsLogged > 0 ? (
+          <div className="mb-3 flex items-center justify-center gap-4 bg-pitch-800 rounded-lg py-2.5 px-3">
+            <div className="text-center flex-1">
+              <p className="text-lg font-bold text-white font-mono">{fixture.liveHomePts}<span className="text-xs text-slate-500 font-normal"> pts</span></p>
+              <p className="text-xs text-slate-500 mt-0.5">{fixture.liveHomeGoals} goals</p>
+            </div>
+            <div className="text-center flex-shrink-0">
+              <p className="text-xs text-emerald-400 font-semibold">LIVE</p>
+              <p className="text-xs text-slate-600 mt-0.5">{fixture.liveResultsLogged} logged</p>
+            </div>
+            <div className="text-center flex-1">
+              <p className="text-lg font-bold text-white font-mono">{fixture.liveAwayPts}<span className="text-xs text-slate-500 font-normal"> pts</span></p>
+              <p className="text-xs text-slate-500 mt-0.5">{fixture.liveAwayGoals} goals</p>
+            </div>
+          </div>
+        ) : (
+          <p className="mb-3 text-xs text-slate-600 text-center">No player results logged yet for this fixture</p>
+        )
+      )}
+
+      {/* Close Fixture — primary action: derives points/goals from whatever
+          player results captains have already logged for this fixture live.
+          Manual entry below stays available as an override, same as before. */}
+      {!saved && (
+        <button onClick={handleClose} disabled={closeFixture.isPending}
+          className="w-full mb-3 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold
+                     bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25
+                     transition-colors disabled:opacity-50">
+          <CheckCircle className="w-4 h-4" /> {closeFixture.isPending ? "Closing…" : "Close Fixture"}
+        </button>
+      )}
+      {!saved && (
+        <p className="text-xs text-slate-600 text-center -mt-1.5 mb-3">
+          Closing uses the player results already logged in the Team Dashboard. Or enter a score manually below to override.
+        </p>
       )}
 
       {/* Match score (points) row */}
