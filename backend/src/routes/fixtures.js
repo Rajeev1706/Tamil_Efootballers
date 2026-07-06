@@ -253,12 +253,12 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       WHERE mr.fixture_id = $1 AND mr.match_type = 'league'
     `, [req.params.id])
 
-    // Each record only ever stores ONE side's own perspective (whichever
-    // captain logged it) — the opponent's team was never checked here
-    // before, so if every result for a fixture happened to be logged from
-    // the same team's side, the other team's points/goals never got
-    // credited at all. Now credits BOTH the player's side AND the
-    // opponent's (mirrored) side, same as the live tally already does.
+    // Each record represents one match between whichever side is "player"
+    // and whichever side is "opponent" — checking player_team_id ALONE is
+    // enough to fully determine both sides, since the opponent is always
+    // on the other team of this same fixture. (A previous version of this
+    // fix checked player and opponent independently, which double-counted
+    // every goal since both checks fired for every normal record.)
     let homePts = 0, awayPts = 0, homeGoals = 0, awayGoals = 0
     for (const r of recordsRes.rows) {
       const playerPts = r.result === "win" ? 3 : r.result === "draw" ? 1 : 0
@@ -267,16 +267,16 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       const oScore = r.opponent_score ?? 0
 
       if (r.player_team_id === fix.home_team_id) {
-        homePts += playerPts; homeGoals += pScore; awayGoals += oScore
+        // player is home, opponent is away
+        homePts += playerPts; awayPts += oppPts
+        homeGoals += pScore;  awayGoals += oScore
       } else if (r.player_team_id === fix.away_team_id) {
-        awayPts += playerPts; awayGoals += pScore; homeGoals += oScore
+        // player is away, opponent is home
+        awayPts += playerPts; homePts += oppPts
+        awayGoals += pScore;  homeGoals += oScore
       }
-
-      if (r.opponent_team_id === fix.home_team_id) {
-        homePts += oppPts; homeGoals += oScore; awayGoals += pScore
-      } else if (r.opponent_team_id === fix.away_team_id) {
-        awayPts += oppPts; awayGoals += oScore; homeGoals += pScore
-      }
+      // If player_team_id matches neither side, this record doesn't
+      // belong to this fixture's two teams — skip it rather than guess.
     }
 
     const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
