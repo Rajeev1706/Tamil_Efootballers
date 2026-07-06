@@ -245,21 +245,37 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
     }
 
     const recordsRes = await query(`
-      SELECT mr.result, mr.player_score, mr.opponent_score, p.team_id AS player_team_id
+      SELECT mr.result, mr.player_score, mr.opponent_score,
+             p.team_id AS player_team_id, opp.team_id AS opponent_team_id
       FROM match_records mr
-      JOIN players p ON mr.player_id = p.id
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
       WHERE mr.fixture_id = $1 AND mr.match_type = 'league'
     `, [req.params.id])
 
+    // Each record only ever stores ONE side's own perspective (whichever
+    // captain logged it) — the opponent's team was never checked here
+    // before, so if every result for a fixture happened to be logged from
+    // the same team's side, the other team's points/goals never got
+    // credited at all. Now credits BOTH the player's side AND the
+    // opponent's (mirrored) side, same as the live tally already does.
     let homePts = 0, awayPts = 0, homeGoals = 0, awayGoals = 0
     for (const r of recordsRes.rows) {
-      const pts       = r.result === "win" ? 3 : r.result === "draw" ? 1 : 0
-      const scored    = r.player_score ?? 0
-      const conceded  = r.opponent_score ?? 0
+      const playerPts = r.result === "win" ? 3 : r.result === "draw" ? 1 : 0
+      const oppPts    = r.result === "win" ? 0 : r.result === "loss" ? 3 : 1
+      const pScore = r.player_score ?? 0
+      const oScore = r.opponent_score ?? 0
+
       if (r.player_team_id === fix.home_team_id) {
-        homePts += pts; homeGoals += scored; awayGoals += conceded
+        homePts += playerPts; homeGoals += pScore; awayGoals += oScore
       } else if (r.player_team_id === fix.away_team_id) {
-        awayPts += pts; awayGoals += scored; homeGoals += conceded
+        awayPts += playerPts; awayGoals += pScore; homeGoals += oScore
+      }
+
+      if (r.opponent_team_id === fix.home_team_id) {
+        homePts += oppPts; homeGoals += oScore; awayGoals += pScore
+      } else if (r.opponent_team_id === fix.away_team_id) {
+        awayPts += oppPts; awayGoals += oScore; homeGoals += pScore
       }
     }
 
