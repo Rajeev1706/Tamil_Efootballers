@@ -59,10 +59,13 @@ const GoldenBootBadge = ({ scorer }) => {
 // visibly transition into their highlighted gold/emerald styling, as a
 // distinct "reveal" moment rather than being static from the start.
 function TeamRosterChips({ players, bestPerformerId, delay = 1700 }) {
-  const [highlightsReady, setHighlightsReady] = useState(false)
+  const sweepDuration = 700 // ms, how long the left-to-right wipe itself takes
+  const [captainRevealed, setCaptainRevealed] = useState(false)
+  const [bestRevealed, setBestRevealed]       = useState(false)
   useEffect(() => {
-    const t = setTimeout(() => setHighlightsReady(true), delay)
-    return () => clearTimeout(t)
+    const t1 = setTimeout(() => setCaptainRevealed(true), delay)
+    const t2 = setTimeout(() => setBestRevealed(true), delay + sweepDuration)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [delay])
 
   // Order: captain first, best performer 2nd (unless they're the same
@@ -78,21 +81,44 @@ function TeamRosterChips({ players, bestPerformerId, delay = 1700 }) {
     <div className="mt-4 p-1.5 flex flex-wrap justify-center gap-1.5 max-h-40 overflow-y-auto">
       {orderedPlayers.map(p => {
         const isBest = bestPerformerId && p.id === bestPerformerId
-        const highlight = highlightsReady && (p.isCaptain || isBest)
+        const revealed = p.isCaptain ? captainRevealed : isBest ? bestRevealed : false
+        const highlightColor = p.isCaptain ? "gold" : "emerald"
         return (
           <span
             key={p.id}
-            className={cn(
-              "text-xs px-2 py-1 rounded-lg border flex items-center justify-center gap-1 transition-all duration-500 w-[5.75rem] whitespace-nowrap overflow-hidden text-ellipsis flex-shrink-0",
-              highlight && p.isCaptain
-                ? "text-gold bg-gold/10 border-gold/40 font-semibold scale-105"
-                : highlight && isBest
-                ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/40 font-semibold scale-105"
-                : "text-slate-300 bg-pitch-800 border-surface-border"
-            )}
+            className="relative w-[5.75rem] flex-shrink-0 rounded-lg border overflow-hidden flex items-center justify-center"
+            style={{
+              borderColor: revealed
+                ? (p.isCaptain ? "rgba(245,158,11,0.4)" : "rgba(52,211,153,0.4)")
+                : "var(--surface-border)",
+              transition: `border-color ${sweepDuration}ms ease-out`,
+            }}
           >
-            {highlight && isBest && <Star className="w-3 h-3 flex-shrink-0" />}
-            {p.name}
+            {/* Background fill sweeps left to right — a plain color rectangle,
+                never contains text, so there's nothing to visually overlap. */}
+            {(p.isCaptain || isBest) && (
+              <span
+                className="absolute inset-0"
+                style={{
+                  background: p.isCaptain ? "rgba(245,158,11,0.1)" : "rgba(52,211,153,0.1)",
+                  clipPath: revealed ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)",
+                  transition: `clip-path ${sweepDuration}ms ease-out`,
+                }}
+              />
+            )}
+            {/* Single text layer — never duplicated, just its color transitions */}
+            <span
+              className="relative z-10 text-xs px-2 py-1 font-semibold whitespace-nowrap overflow-hidden text-ellipsis flex items-center gap-1"
+              style={{
+                color: revealed
+                  ? (p.isCaptain ? "#f5a623" : "#34d399")
+                  : "#cbd5e1",
+                transition: `color ${sweepDuration}ms ease-out`,
+              }}
+            >
+              {revealed && isBest && <Star className="w-3 h-3 flex-shrink-0" />}
+              {p.name}
+            </span>
           </span>
         )
       })}

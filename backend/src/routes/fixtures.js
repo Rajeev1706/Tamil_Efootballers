@@ -2,6 +2,7 @@ import { Router } from "express"
 import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
+import { claimAward, addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 
@@ -301,10 +302,31 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       }
     })
 
+    // Season-end BDR awards — only fires once the WHOLE league (every
+    // fixture, not just this one) is completed, and only ever once per
+    // season (claimAward guarantees that even if this runs concurrently
+    // from two closes at once).
+    const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
+    if (parseInt(remainingRes.rows[0].count) === 0) {
+      const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+      const season = parseInt(seasonRes.rows[0]?.value || "1")
+      if (await claimAward("team_league_season", season)) {
+        const standingsRes = await query(`SELECT id FROM teams ORDER BY score_points DESC LIMIT 4`)
+        const tierPoints = [12, 9, 7, 5]
+        for (let i = 0; i < standingsRes.rows.length; i++) {
+          const playersRes = await query(`SELECT id FROM players WHERE team_id = $1`, [standingsRes.rows[i].id])
+          for (const p of playersRes.rows) await addBdr(p.id, tierPoints[i])
+        }
+        // Team League Golden Boot BDR award: none (0 points) — placement
+        // awards above are unaffected.
+      }
+    }
+
     const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [req.params.id])
     res.json(fresh.rows[0])
   } catch (err) { next(err) }
 })
+
 router.patch("/round/:round/date", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { date } = z.object({ date: z.string().min(1) }).parse(req.body)

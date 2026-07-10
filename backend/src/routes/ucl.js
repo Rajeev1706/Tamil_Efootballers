@@ -4,6 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
+import { claimAward, addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 
@@ -228,6 +229,40 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
     await recalcMarketValue(fix.player2_id)
     await recalcForm(fix.player1_id)
     await recalcForm(fix.player2_id)
+
+    // Check if this specific group is now fully complete (every fixture
+    // in it played), and if so, award the group's 1st place player once.
+    const remainingRes = await query(
+      "SELECT COUNT(*) FROM ucl_fixtures WHERE group_id = $1 AND status != 'completed'",
+      [fix.group_id]
+    )
+    if (parseInt(remainingRes.rows[0].count) === 0) {
+      if (await claimAward("ucl_group", fix.group_id)) {
+        const standingsRes = await query(`
+          SELECT
+            p.id,
+            SUM(CASE WHEN (mr.player_id=p.id AND mr.result='win') OR (mr.opponent_id=p.id AND mr.result='loss') THEN 1 ELSE 0 END) AS won,
+            SUM(CASE WHEN mr.result='draw' THEN 1 ELSE 0 END) AS drawn,
+            SUM(CASE WHEN p.id=mr.player_id THEN COALESCE(mr.player_score,0) ELSE COALESCE(mr.opponent_score,0) END) AS gf,
+            SUM(CASE WHEN p.id=mr.player_id THEN COALESCE(mr.opponent_score,0) ELSE COALESCE(mr.player_score,0) END) AS ga
+          FROM players p
+          LEFT JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='ucl'
+          WHERE p.ucl_group_id = $1
+          GROUP BY p.id
+        `, [fix.group_id])
+
+        const ranked = standingsRes.rows
+          .map(r => ({
+            id: r.id,
+            points: parseInt(r.won) * 3 + parseInt(r.drawn),
+            gd: parseInt(r.gf) - parseInt(r.ga),
+            gf: parseInt(r.gf),
+          }))
+          .sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf)
+
+        if (ranked[0]) await addBdr(ranked[0].id, 2)
+      }
+    }
 
     res.json({ updated: true })
   } catch (err) { next(err) }

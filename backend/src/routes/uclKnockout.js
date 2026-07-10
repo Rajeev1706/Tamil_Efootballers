@@ -4,6 +4,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
+import { claimAward, addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 const TOTAL_ROUNDS = 5   // R32 → R16 → QF → SF → Final
@@ -322,6 +323,44 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     `, [match.tournament_id])
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE ucl_knockout_tournaments SET status='completed' WHERE id=$1", [match.tournament_id])
+
+      // BDR awards — winner/runner-up/semi-finalist/quarter-finalist, plus
+      // this specific knockout run's golden boot. Fixed round structure
+      // (R32→R16→QF→SF→Final = rounds 1-5), so QF=3, SF=4, Final=5 always.
+      // Only ever fires once per tournament (claimAward guards it).
+      if (await claimAward("ucl_knockout", match.tournament_id)) {
+        const allMatches = await query(`
+          SELECT round, player1_id, player2_id, winner_id
+          FROM ucl_knockout_matches
+          WHERE tournament_id = $1 AND status = 'completed'
+        `, [match.tournament_id])
+
+        for (const m of allMatches.rows) {
+          const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+          if (m.round === 5) {
+            if (m.winner_id) await addBdr(m.winner_id, 15)
+            if (loserId)      await addBdr(loserId, 12)
+          } else if (m.round === 4 && loserId) {
+            await addBdr(loserId, 8)
+          } else if (m.round === 3 && loserId) {
+            await addBdr(loserId, 4)
+          }
+        }
+
+        const goldenBootRes = await query(`
+          SELECT p.id,
+            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
+            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
+          FROM players p
+          JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='ucl'
+          JOIN ucl_knockout_matches km ON km.match_record_id = mr.id
+          WHERE km.tournament_id = $1
+          GROUP BY p.id
+          ORDER BY goals DESC, conceded ASC
+          LIMIT 1
+        `, [match.tournament_id])
+        if (goldenBootRes.rows[0]?.goals > 0) await addBdr(goldenBootRes.rows[0].id, 6)
+      }
     }
 
     res.json({ updated: true, winnerId })

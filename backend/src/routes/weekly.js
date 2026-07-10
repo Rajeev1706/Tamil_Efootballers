@@ -4,6 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
+import { claimAward, addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 
@@ -416,6 +417,48 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     `, [match.tournament_id])
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE weekly_tournaments SET status = 'completed' WHERE id = $1", [match.tournament_id])
+
+      // BDR awards — winner/runner-up/semi-finalist/quarter-finalist,
+      // based on furthest round each player actually reached, plus this
+      // specific tournament's golden boot. Only ever fires once per
+      // tournament (claimAward guards it).
+      if (await claimAward("weekly_tournament", match.tournament_id)) {
+        const allMatches = await query(`
+          SELECT round, player1_id, player2_id, winner_id
+          FROM weekly_tournament_matches
+          WHERE tournament_id = $1 AND status = 'completed'
+        `, [match.tournament_id])
+
+        const finalRound = totalRounds
+        const sfRound     = totalRounds - 1
+        const qfRound     = totalRounds - 2
+
+        for (const m of allMatches.rows) {
+          const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+          if (m.round === finalRound) {
+            if (m.winner_id) await addBdr(m.winner_id, 10)
+            if (loserId)      await addBdr(loserId, 8)
+          } else if (m.round === sfRound && loserId) {
+            await addBdr(loserId, 5)
+          } else if (m.round === qfRound && loserId) {
+            await addBdr(loserId, 3)
+          }
+        }
+
+        const goldenBootRes = await query(`
+          SELECT p.id,
+            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
+            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
+          FROM players p
+          JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='weekly'
+          JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
+          WHERE wtm.tournament_id = $1
+          GROUP BY p.id
+          ORDER BY goals DESC, conceded ASC
+          LIMIT 1
+        `, [match.tournament_id])
+        if (goldenBootRes.rows[0]?.goals > 0) await addBdr(goldenBootRes.rows[0].id, 4)
+      }
     }
 
     res.json({ updated: true, winnerId, nextRound: match.round + 1 })
