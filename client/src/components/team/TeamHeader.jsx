@@ -1,10 +1,15 @@
 import { Shield, TrendingUp, Award } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { useBestLeaguePerformer } from "../../lib/queries"
 
 export default function TeamHeader({ team, myPlayers, teamColor }) {
   const totalMV   = myPlayers.reduce((s, p) => s + p.marketValue, 0)
   const topPlayer = [...myPlayers].sort((a, b) => b.bdrPoints - a.bdrPoints)[0]
   const rgb       = teamColor?.css || null
+
+  // Best player = this season's League results only (separate from Top
+  // performer above, which is all-time BDR across every competition).
+  const { data: bestLeaguePlayer } = useBestLeaguePerformer(team?.id)
 
   return (
     <div
@@ -92,19 +97,31 @@ export default function TeamHeader({ team, myPlayers, teamColor }) {
           </div>
         </div>
 
-        {/* Top performer */}
-        {topPlayer && (
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-xs text-slate-400">Top performer</span>
-            <span
-              className="text-xs font-semibold text-white px-2.5 py-0.5 rounded-full"
-              style={rgb
-                ? { background: `rgba(${rgb},0.2)`, border: `1px solid rgba(${rgb},0.4)` }
-                : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }
-              }
-            >
-              {topPlayer.name} · {topPlayer.bdrPoints.toLocaleString()} BDR pts
-            </span>
+        {/* Top performer (all-time) + Best player (this season's League) */}
+        {(topPlayer || (bestLeaguePlayer && bestLeaguePlayer.points > 0)) && (
+          <div className="mt-4 flex items-center gap-3 flex-wrap">
+            {topPlayer && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Top performer</span>
+                <span
+                  className="text-xs font-semibold text-white px-2.5 py-0.5 rounded-full"
+                  style={rgb
+                    ? { background: `rgba(${rgb},0.2)`, border: `1px solid rgba(${rgb},0.4)` }
+                    : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }
+                  }
+                >
+                  {topPlayer.name} · {topPlayer.bdrPoints.toLocaleString()} BDR pts
+                </span>
+              </div>
+            )}
+            {bestLeaguePlayer && bestLeaguePlayer.points > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Best player</span>
+                <span className="text-xs font-semibold text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/30">
+                  {bestLeaguePlayer.name} · {bestLeaguePlayer.points} pts this season
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

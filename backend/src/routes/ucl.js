@@ -520,7 +520,14 @@ router.get("/top-scorers", async (req, res, next) => {
             WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
             ELSE 0
           END
-        ), 0) AS goals
+        ), 0) AS goals,
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN COALESCE(mr.opponent_score, 0)
+            WHEN mr.opponent_id = p.id THEN COALESCE(mr.player_score, 0)
+            ELSE 0
+          END
+        ), 0) AS conceded
       FROM players p
       LEFT JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
@@ -529,7 +536,7 @@ router.get("/top-scorers", async (req, res, next) => {
       LEFT JOIN ucl_groups g ON p.ucl_group_id = g.id
       WHERE p.ucl_group_id IS NOT NULL AND g.status = 'active'
       GROUP BY p.id, p.name, t.name, g.name
-      ORDER BY goals DESC, p.name ASC
+      ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
     `)
     res.json(result.rows)

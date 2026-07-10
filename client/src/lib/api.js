@@ -41,6 +41,7 @@ export const teamsApi = {
     api.patch(`/teams/${id}/password`, { newPassword }).then(r => r.data),
   delete:         (id)     => api.delete(`/teams/${id}`).then(r => r.data),
   topScorers:   ()   => api.get("/teams/top-scorers").then(r => r.data),
+  bestLeaguePerformer: (id) => api.get(`/teams/${id}/best-league-performer`).then(r => r.data),
   hallOfFame:      ()        => api.get("/teams/hall-of-fame").then(r => r.data),
   seasonReset:     ()        => api.post("/teams/season-reset").then(r => r.data),
   seasonDelete:    ()        => api.post("/teams/season-delete").then(r => r.data),

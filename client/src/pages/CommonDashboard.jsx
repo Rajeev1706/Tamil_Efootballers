@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { ChevronDown, Trophy, Users, TrendingUp, Activity } from "lucide-react"
+import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star } from "lucide-react"
+import { cn } from "../lib/utils"
 import Layout from "../components/layout/Layout"
 import StandingsTable from "../components/dashboard/StandingsTable"
 import BDRRanking from "../components/dashboard/BDRRanking"
@@ -17,7 +18,7 @@ import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
-import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers } from "../lib/queries"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer } from "../lib/queries"
 
 const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
   <div className="card p-4 flex items-start gap-3">
@@ -120,8 +121,13 @@ export default function CommonDashboard() {
   const teamCelebrationSeason = settings.current_season
   const leagueComplete = fixtures.length > 0 && fixtures.every(f => f.status === "completed")
   const teamChampion    = leagueComplete ? teams[0] : null
+
+  // Captain always shown first in the roster list, wherever it's used.
+  const sortCaptainFirst = (list) =>
+    [...list].sort((a, b) => (b.isCaptain ? 1 : 0) - (a.isCaptain ? 1 : 0))
+
   const teamChampionPlayers = teamChampion
-    ? players.filter(p => p.teamId === teamChampion.id)
+    ? sortCaptainFirst(players.filter(p => p.teamId === teamChampion.id))
     : []
 
   // TEST-ONLY: ?testTeamCelebration=SomeTeamName previews this instantly.
@@ -139,15 +145,18 @@ export default function CommonDashboard() {
     ? teams.find(t => t.name.toLowerCase() === testTeamName.toLowerCase())
     : null
   const displayTeamPlayers = testTeamMatch
-    ? players.filter(p => p.teamId === testTeamMatch.id)
+    ? sortCaptainFirst(players.filter(p => p.teamId === testTeamMatch.id))
     : (testTeamName ? [] : teamChampionPlayers)
+  const displayTeamLogo = testTeamMatch?.logoUrl || teamChampion?.logoUrl || null
+  const bestPerformerTeamId = testTeamMatch?.id || teamChampion?.id || null
+  const { data: displayBestPerformer } = useBestLeaguePerformer(bestPerformerTeamId)
 
   useEffect(() => {
     if (!testTeamActive) return
     if (teamsLoading || playersLoading) return // wait for real data before showing, so player chips don't pop in late
     setShowTeamCelebration(true)
     const dismiss = () => setShowTeamCelebration(false)
-    const timer = setTimeout(dismiss, 7000)
+    const timer = setTimeout(dismiss, 10000)
     document.addEventListener("click", dismiss)
     return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,7 +171,7 @@ export default function CommonDashboard() {
       setShowTeamCelebration(true)
       localStorage.setItem(key, "1")
       const dismiss = () => setShowTeamCelebration(false)
-      const timer = setTimeout(dismiss, 7000)
+      const timer = setTimeout(dismiss, 10000)
       document.addEventListener("click", dismiss)
       return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     }
@@ -309,16 +318,44 @@ export default function CommonDashboard() {
           eyebrow="Team League"
           title={displayTeamChampion}
           subtitle="are the Team League Champions! 🏆"
+          badgeImage={displayTeamLogo}
         >
-          {displayTeamPlayers.length > 0 && (
-            <div className="mt-4 flex flex-wrap justify-center gap-1.5 max-h-32 overflow-y-auto">
-              {displayTeamPlayers.map(p => (
-                <span key={p.id} className="text-xs text-slate-300 bg-pitch-800 border border-surface-border px-2 py-1 rounded-lg">
-                  {p.name}
-                </span>
-              ))}
-            </div>
-          )}
+          {displayTeamPlayers.length > 0 && (() => {
+            // Order: captain first, best performer 2nd (unless they're the
+            // same person, in which case no duplicate slot), then everyone
+            // else in their existing order.
+            const captain = displayTeamPlayers.find(p => p.isCaptain)
+            const bestId  = displayBestPerformer?.id
+            const best    = (bestId && bestId !== captain?.id)
+              ? displayTeamPlayers.find(p => p.id === bestId)
+              : null
+            const rest = displayTeamPlayers.filter(p => p.id !== captain?.id && p.id !== best?.id)
+            const orderedPlayers = [captain, best, ...rest].filter(Boolean)
+
+            return (
+              <div className="mt-4 flex flex-wrap justify-center gap-1.5 max-h-32 overflow-y-auto">
+                {orderedPlayers.map(p => {
+                  const isBest = displayBestPerformer && p.id === displayBestPerformer.id
+                  return (
+                    <span
+                      key={p.id}
+                      className={cn(
+                        "text-xs px-2 py-1 rounded-lg border flex items-center gap-1",
+                        p.isCaptain
+                          ? "text-gold bg-gold/10 border-gold/40 font-semibold"
+                          : isBest
+                          ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/40 font-semibold"
+                          : "text-slate-300 bg-pitch-800 border-surface-border"
+                      )}
+                    >
+                      {isBest && <Star className="w-3 h-3 flex-shrink-0" />}
+                      {p.name}
+                    </span>
+                  )
+                })}
+              </div>
+            )
+          })()}
           {teamGoldenBoot && <GoldenBootBadge scorer={teamGoldenBoot} />}
         </ChampionCelebration>
       ) : showUclCelebration && displayUclChampion ? (

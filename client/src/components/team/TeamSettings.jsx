@@ -92,8 +92,8 @@ export default function TeamSettings({ team }) {
           <div>
             <label className="text-xs font-medium text-slate-400 mb-2 block">Team logo</label>
             <div className="flex items-center gap-4">
-              <div
-                onClick={() => inputRef.current?.click()}
+              <label
+                htmlFor="team-logo-input"
                 className={cn(
                   "relative w-20 h-20 rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all group flex-shrink-0",
                   logoPreview ? "border-accent/30" : "border-surface-border hover:border-accent/40"
@@ -116,17 +116,17 @@ export default function TeamSettings({ team }) {
                     <Loader2 className="w-4 h-4 text-white animate-spin" />
                   </div>
                 )}
-              </div>
+              </label>
               <div>
-                <button
-                  onClick={() => inputRef.current?.click()}
-                  className="text-xs text-accent hover:text-accent-glow transition-colors font-medium"
+                <label
+                  htmlFor="team-logo-input"
+                  className="text-xs text-accent hover:text-accent-glow transition-colors font-medium cursor-pointer inline-block"
                 >
                   {logoPreview ? "Change logo" : "Upload logo"}
-                </button>
+                </label>
                 <p className="text-xs text-slate-600 mt-1">Square images work best</p>
               </div>
-              <input ref={inputRef} type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
+              <input id="team-logo-input" ref={inputRef} type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
             </div>
           </div>
 

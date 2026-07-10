@@ -204,24 +204,77 @@ router.get("/top-scorers", async (req, res, next) => {
             WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
             ELSE 0
           END
-        ), 0) AS goals
+        ), 0) AS goals,
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN COALESCE(mr.opponent_score, 0)
+            WHEN mr.opponent_id = p.id THEN COALESCE(mr.player_score, 0)
+            ELSE 0
+          END
+        ), 0) AS conceded
       FROM players p
       LEFT JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.match_type = 'league'
       LEFT JOIN teams t ON p.team_id = t.id
       GROUP BY p.id, p.name, t.name
-      ORDER BY goals DESC, p.name ASC
+      ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
     `)
     res.json(result.rows)
   } catch (err) { next(err) }
 })
 
+// GET /api/teams/:id/best-league-performer — public. Ranks a team's
+// players by THIS season's Team League performance only (points earned
+// from match_type='league' results this season, tiebreak by goals) — not
+// their all-time BDR points, which mixes in Weekly/UCL/past seasons too.
+router.get("/:id/best-league-performer", async (req, res, next) => {
+  try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "1")
+
+    const result = await query(`
+      SELECT
+        p.id, p.name,
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN (CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END)
+            WHEN mr.opponent_id = p.id THEN (CASE mr.result WHEN 'win' THEN 0 WHEN 'loss' THEN 3 ELSE 1 END)
+            ELSE 0
+          END
+        ), 0) AS points,
+        COALESCE(SUM(
+          CASE
+            WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
+            WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
+            ELSE 0
+          END
+        ), 0) AS goals
+      FROM players p
+      LEFT JOIN match_records mr
+        ON (mr.player_id = p.id OR mr.opponent_id = p.id)
+        AND mr.match_type = 'league'
+        AND mr.season_number = $2
+      WHERE p.team_id = $1
+      GROUP BY p.id, p.name
+      ORDER BY points DESC, goals DESC, p.name ASC
+      LIMIT 1
+    `, [req.params.id, season])
+
+    res.json(result.rows[0] || null)
+  } catch (err) { next(err) }
+})
+
 // GET /api/teams — public
 router.get("/", async (req, res, next) => {
   try {
-    const result = await query("SELECT * FROM league_standings ORDER BY position")
+    const result = await query(`
+      SELECT t.*, t.logo_url AS "logoUrl", ls.points, ls.position
+      FROM teams t
+      LEFT JOIN league_standings ls ON ls.id = t.id
+      ORDER BY ls.position
+    `)
     res.json(result.rows)
   } catch (err) { next(err) }
 })
@@ -229,7 +282,12 @@ router.get("/", async (req, res, next) => {
 // GET /api/teams/:id — single team with roster
 router.get("/:id", authenticate, async (req, res, next) => {
   try {
-    const teamRes = await query("SELECT * FROM league_standings WHERE id = $1", [req.params.id])
+    const teamRes = await query(`
+      SELECT t.*, t.logo_url AS "logoUrl", ls.points, ls.position
+      FROM teams t
+      LEFT JOIN league_standings ls ON ls.id = t.id
+      WHERE t.id = $1
+    `, [req.params.id])
     if (!teamRes.rows[0]) return res.status(404).json({ error: "Team not found" })
     const playersRes = await query(
       `SELECT * FROM players_full WHERE "teamId" = $1 ORDER BY "bdrPoints" DESC`,

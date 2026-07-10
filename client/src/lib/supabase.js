@@ -7,7 +7,11 @@ export const supabase = createClient(
 
 export async function uploadPlayerImage(playerId, file) {
   const ext  = file.name.split(".").pop().toLowerCase()
-  const path = `${playerId}.${ext}`
+  // Unique path per upload (not just a query string) — Supabase's storage
+  // CDN caches by path, so re-using the same path and only changing a
+  // ?t= query param does NOT reliably bust that upstream cache. A new
+  // path guarantees nothing can serve stale bytes for it.
+  const path = `${playerId}-${Date.now()}.${ext}`
 
   const { error } = await supabase.storage
     .from("player-images")
@@ -19,13 +23,15 @@ export async function uploadPlayerImage(playerId, file) {
     .from("player-images")
     .getPublicUrl(path)
 
-  // Add timestamp to bust browser cache on re-upload
-  return `${data.publicUrl}?t=${Date.now()}`
+  return data.publicUrl
 }
 
 export async function uploadTeamLogo(teamId, file) {
   const ext  = file.name.split(".").pop().toLowerCase()
-  const path = `team-${teamId}.${ext}`
+  // Same fix as uploadPlayerImage — unique path per upload, not a fixed
+  // path with a cache-busting query string, since Supabase's storage CDN
+  // caches by path and ignores query strings.
+  const path = `team-${teamId}-${Date.now()}.${ext}`
 
   const { error } = await supabase.storage
     .from("player-images")
@@ -37,6 +43,5 @@ export async function uploadTeamLogo(teamId, file) {
     .from("player-images")
     .getPublicUrl(path)
 
-  // Add timestamp to bust browser cache on re-upload
-  return `${data.publicUrl}?t=${Date.now()}`
+  return data.publicUrl
 }

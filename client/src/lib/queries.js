@@ -213,6 +213,13 @@ export const useTeams = () =>
 export const useTopScorers = () =>
   useQuery({ queryKey: ["top-scorers"], queryFn: teamsApi.topScorers })
 
+export const useBestLeaguePerformer = (teamId) =>
+  useQuery({
+    queryKey: ["best-league-performer", teamId],
+    queryFn: () => teamsApi.bestLeaguePerformer(teamId),
+    enabled: !!teamId,
+  })
+
 export const useHallOfFame = () =>
   useQuery({ queryKey: ["hall-of-fame"], queryFn: teamsApi.hallOfFame })
 
