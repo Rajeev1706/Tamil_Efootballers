@@ -10,6 +10,8 @@ const GRADES = ["S","A","B","C"]
 
 function EditableRow({ player, onPlayerClick }) {
   const [editing, setEditing]         = useState(false)
+  const [name, setName]               = useState(player.name)
+  const [alias, setAlias]             = useState(player.alias ?? "")
   const [grade, setGrade]             = useState(player.grade)
   const [teamId, setTeamId]           = useState(player.teamId ?? "")
   const [bdrDelta, setBdrDelta]       = useState("")
@@ -31,6 +33,8 @@ function EditableRow({ player, onPlayerClick }) {
 
   const handleSave = () => {
     const body = {}
+    if (name.trim() && name.trim() !== player.name) body.name = name.trim()
+    if (alias.trim() !== (player.alias ?? "")) body.alias = alias.trim()
     if (grade !== player.grade) body.grade = grade
     if (bdrDelta !== "") body.bdrDelta = deltaNum
     if (teamId !== String(player.teamId ?? "")) {
@@ -57,6 +61,8 @@ function EditableRow({ player, onPlayerClick }) {
   const handleCancel = () => {
     setEditing(false)
     setBdrDelta("")
+    setName(player.name)
+    setAlias(player.alias ?? "")
     setGrade(player.grade)
     setTeamId(player.teamId ?? "")
     setIsCaptain(player.isCaptain ?? false)
@@ -109,17 +115,36 @@ function EditableRow({ player, onPlayerClick }) {
         <td className="py-3.5 px-5">
           <div className="flex items-center gap-3">
             <PlayerAvatar player={player} size="sm" />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => onPlayerClick?.(player)}
-                  className="text-sm font-medium text-white hover:text-accent transition-colors text-left">
-                  {player.name}
-                </button>
-                {player.isCaptain && !editing && (
-                  <Crown className="w-3.5 h-3.5 text-gold flex-shrink-0" title="Captain" />
-                )}
-              </div>
+            <div className="flex-1 min-w-0">
+              {editing ? (
+                <div className="flex flex-col gap-1 mb-1">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Player name"
+                    className="bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none focus:border-accent/40 w-full max-w-[160px]"
+                  />
+                  <input
+                    type="text"
+                    value={alias}
+                    onChange={e => setAlias(e.target.value)}
+                    placeholder="In-game alias"
+                    className="bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-accent/40 w-full max-w-[160px]"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => onPlayerClick?.(player)}
+                    className="text-sm font-medium text-white hover:text-accent transition-colors text-left">
+                    {player.name}
+                  </button>
+                  {player.isCaptain && (
+                    <Crown className="w-3.5 h-3.5 text-gold flex-shrink-0" title="Captain" />
+                  )}
+                </div>
+              )}
               {editing ? (
                 <select
                   value={teamId}
