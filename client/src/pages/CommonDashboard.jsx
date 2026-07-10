@@ -33,15 +33,26 @@ const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
   </div>
 )
 
-const GoldenBootBadge = ({ scorer }) => (
-  <div className="mt-4 pt-4 border-t border-surface-border/50 flex items-center justify-center gap-2.5">
-    <img src={goldenBootLogo} alt="Golden Boot" className="w-6 h-6 object-contain flex-shrink-0" />
-    <p className="text-sm text-slate-300">
-      Golden Boot: <span className="font-semibold text-white">{scorer.name}</span>
-      <span className="text-slate-500"> ({scorer.goals} goals)</span>
-    </p>
-  </div>
-)
+const GoldenBootBadge = ({ scorer }) => {
+  // CountUp only animates CHANGES between renders, not the initial mount —
+  // so start at 0 and flip to the real value a beat later, forcing an
+  // actual transition it can animate through.
+  const [animatedGoals, setAnimatedGoals] = useState(0)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimatedGoals(scorer.goals), 50)
+    return () => clearTimeout(t)
+  }, [scorer.goals])
+
+  return (
+    <div className="mt-4 pt-4 border-t border-surface-border/50 flex items-center justify-center gap-2.5">
+      <img src={goldenBootLogo} alt="Golden Boot" className="w-6 h-6 object-contain flex-shrink-0" />
+      <p className="text-sm text-slate-300">
+        Golden Boot: <span className="font-semibold text-white">{scorer.name}</span>
+        <span className="text-slate-500"> (<CountUp value={animatedGoals} duration={5500} /> goals)</span>
+      </p>
+    </div>
+  )
+}
 
 const PANEL_OPTIONS = [
   { value: "players",   label: "Total players" },
