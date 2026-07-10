@@ -54,6 +54,52 @@ const GoldenBootBadge = ({ scorer }) => {
   )
 }
 
+// Player chips for the Team League celebration — captain and best performer
+// appear plain at first, then a beat after the card has landed, their chips
+// visibly transition into their highlighted gold/emerald styling, as a
+// distinct "reveal" moment rather than being static from the start.
+function TeamRosterChips({ players, bestPerformerId, delay = 1700 }) {
+  const [highlightsReady, setHighlightsReady] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setHighlightsReady(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+
+  // Order: captain first, best performer 2nd (unless they're the same
+  // person, in which case no duplicate slot), then everyone else.
+  const captain = players.find(p => p.isCaptain)
+  const best    = (bestPerformerId && bestPerformerId !== captain?.id)
+    ? players.find(p => p.id === bestPerformerId)
+    : null
+  const rest = players.filter(p => p.id !== captain?.id && p.id !== best?.id)
+  const orderedPlayers = [captain, best, ...rest].filter(Boolean)
+
+  return (
+    <div className="mt-4 p-1.5 flex flex-wrap justify-center gap-1.5 max-h-40 overflow-y-auto">
+      {orderedPlayers.map(p => {
+        const isBest = bestPerformerId && p.id === bestPerformerId
+        const highlight = highlightsReady && (p.isCaptain || isBest)
+        return (
+          <span
+            key={p.id}
+            className={cn(
+              "text-xs px-2 py-1 rounded-lg border flex items-center justify-center gap-1 transition-all duration-500 w-[5.75rem] whitespace-nowrap overflow-hidden text-ellipsis flex-shrink-0",
+              highlight && p.isCaptain
+                ? "text-gold bg-gold/10 border-gold/40 font-semibold scale-105"
+                : highlight && isBest
+                ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/40 font-semibold scale-105"
+                : "text-slate-300 bg-pitch-800 border-surface-border"
+            )}
+          >
+            {highlight && isBest && <Star className="w-3 h-3 flex-shrink-0" />}
+            {p.name}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 const PANEL_OPTIONS = [
   { value: "players",   label: "Total players" },
   { value: "standings", label: "League table"  },
@@ -331,42 +377,9 @@ export default function CommonDashboard() {
           subtitle="are the Team League Champions! 🏆"
           badgeImage={displayTeamLogo}
         >
-          {displayTeamPlayers.length > 0 && (() => {
-            // Order: captain first, best performer 2nd (unless they're the
-            // same person, in which case no duplicate slot), then everyone
-            // else in their existing order.
-            const captain = displayTeamPlayers.find(p => p.isCaptain)
-            const bestId  = displayBestPerformer?.id
-            const best    = (bestId && bestId !== captain?.id)
-              ? displayTeamPlayers.find(p => p.id === bestId)
-              : null
-            const rest = displayTeamPlayers.filter(p => p.id !== captain?.id && p.id !== best?.id)
-            const orderedPlayers = [captain, best, ...rest].filter(Boolean)
-
-            return (
-              <div className="mt-4 flex flex-wrap justify-center gap-1.5 max-h-32 overflow-y-auto">
-                {orderedPlayers.map(p => {
-                  const isBest = displayBestPerformer && p.id === displayBestPerformer.id
-                  return (
-                    <span
-                      key={p.id}
-                      className={cn(
-                        "text-xs px-2 py-1 rounded-lg border flex items-center gap-1",
-                        p.isCaptain
-                          ? "text-gold bg-gold/10 border-gold/40 font-semibold"
-                          : isBest
-                          ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/40 font-semibold"
-                          : "text-slate-300 bg-pitch-800 border-surface-border"
-                      )}
-                    >
-                      {isBest && <Star className="w-3 h-3 flex-shrink-0" />}
-                      {p.name}
-                    </span>
-                  )
-                })}
-              </div>
-            )
-          })()}
+          {displayTeamPlayers.length > 0 && (
+            <TeamRosterChips players={displayTeamPlayers} bestPerformerId={displayBestPerformer?.id} />
+          )}
           {teamGoldenBoot && <GoldenBootBadge scorer={teamGoldenBoot} />}
         </ChampionCelebration>
       ) : showUclCelebration && displayUclChampion ? (
