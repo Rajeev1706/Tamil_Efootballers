@@ -304,15 +304,35 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
       }
     }
 
-    // Propagate the bye winner into the next round, if there is one
-    if (isBye && match.round < match.total_rounds) {
+    // Retract any previous propagation this match may have already made
+    // to the next round (whether it was previously a bye, or a completed
+    // real result — match.winner_id tells us what got advanced either
+    // way), then propagate the new state if this edit results in a fresh
+    // bye. Without the retraction step, editing a former bye's players
+    // into a real match left the old bye-winner's name stuck in the next
+    // round even though nothing has actually been decided yet.
+    if (match.round < match.total_rounds) {
       const nextRound = match.round + 1
       const nextMatchNum = Math.ceil(match.match_number / 2)
       const col = match.match_number % 2 !== 0 ? "player1_id" : "player2_id"
-      await query(`
-        UPDATE weekly_tournament_matches SET ${col} = $1
-        WHERE tournament_id = $2 AND round = $3 AND match_number = $4
-      `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
+
+      if (match.winner_id && match.winner_id !== winnerId) {
+        // Only clear if the next-round match hasn't been played itself yet
+        // and still actually holds this stale value — never overwrite
+        // real progress that's already happened deeper in the bracket.
+        await query(`
+          UPDATE weekly_tournament_matches SET ${col} = NULL
+          WHERE tournament_id = $1 AND round = $2 AND match_number = $3
+            AND status = 'pending' AND ${col} = $4
+        `, [match.tournament_id, nextRound, nextMatchNum, match.winner_id])
+      }
+
+      if (isBye) {
+        await query(`
+          UPDATE weekly_tournament_matches SET ${col} = $1
+          WHERE tournament_id = $2 AND round = $3 AND match_number = $4
+        `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
+      }
     }
 
     const fresh = await query(`
