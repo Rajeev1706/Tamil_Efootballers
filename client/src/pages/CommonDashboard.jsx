@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star } from "lucide-react"
 import { cn } from "../lib/utils"
@@ -14,10 +14,12 @@ import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import Loading from "../components/common/Loading"
 import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
+import BallonDorCelebration from "../components/common/BallonDorCelebration"
 import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
+import ballonDorTrophy from "../../images/ballondor.png"
 import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer } from "../lib/queries"
 
 const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
@@ -58,7 +60,7 @@ const GoldenBootBadge = ({ scorer }) => {
 // appear plain at first, then a beat after the card has landed, their chips
 // visibly transition into their highlighted gold/emerald styling, as a
 // distinct "reveal" moment rather than being static from the start.
-function TeamRosterChips({ players, bestPerformerId, delay = 1700 }) {
+function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
   const sweepDuration = 700 // ms, how long the left-to-right wipe itself takes
   const [captainRevealed, setCaptainRevealed] = useState(false)
   const [bestRevealed, setBestRevealed]       = useState(false)
@@ -305,6 +307,59 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uclChampion, uclKnockout?.id])
 
+  // ── Ballon d'Or celebration ──────────────────────────────────────────────
+  // Fires immediately after the UCL Champion celebration finishes (whether
+  // dismissed by timeout or click) — a sequential "part 2" reveal, not a
+  // simultaneous one, since both trigger from the same UCL Final moment.
+  // Winner = whoever has the highest total BDR points at that instant,
+  // which already includes the UCL awards since those apply server-side
+  // before this data is ever fetched.
+  const [showBallonDorCelebration, setShowBallonDorCelebration] = useState(false)
+  const ballonDorWinner = players.length > 0
+    ? [...players].sort((a, b) => b.bdrPoints - a.bdrPoints)[0]
+    : null
+
+  // TEST-ONLY: ?testBallonDor=1 previews this instantly, skipping the
+  // UCL-first sequencing, for quick testing.
+  const testBallonDorActive = urlParams.has("testBallonDor")
+  useEffect(() => {
+    if (!testBallonDorActive) return
+    setShowBallonDorCelebration(true)
+    const dismiss = () => setShowBallonDorCelebration(false)
+    const timer = setTimeout(dismiss, 7000)
+    document.addEventListener("click", dismiss)
+    return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testBallonDorActive])
+
+  // Detect the exact moment the UCL celebration transitions from shown to
+  // dismissed (catches both the timeout path and the click-to-dismiss path,
+  // since both correctly flip showUclCelebration to false either way).
+  const prevShowUcl = useRef(false)
+  useEffect(() => {
+    if (testBallonDorActive) { prevShowUcl.current = showUclCelebration; return }
+    const dedupKey = uclKnockout?.id ?? (testUclActive ? "test" : null)
+    if (prevShowUcl.current && !showUclCelebration && ballonDorWinner && dedupKey != null) {
+      const key = `ballon_dor_seen_${dedupKey}`
+      if (testUclActive || !localStorage.getItem(key)) {
+        setShowBallonDorCelebration(true)
+        localStorage.setItem(key, "1")
+      }
+    }
+    prevShowUcl.current = showUclCelebration
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUclCelebration])
+
+  // Ballon d'Or's own dismiss cycle, once shown for real (non-test path)
+  useEffect(() => {
+    if (testBallonDorActive) return
+    if (!showBallonDorCelebration) return
+    const dismiss = () => setShowBallonDorCelebration(false)
+    const timer = setTimeout(dismiss, 7000)
+    document.addEventListener("click", dismiss)
+    return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+  }, [showBallonDorCelebration, testBallonDorActive])
+
   const [searchParams, setSearchParams] = useSearchParams()
   const activePanel    = searchParams.get("view") || "players"
   const trophyKey      = searchParams.get("trophy") || undefined
@@ -417,6 +472,12 @@ export default function CommonDashboard() {
         >
           {uclGoldenBoot && <GoldenBootBadge scorer={uclGoldenBoot} />}
         </ChampionCelebration>
+      ) : showBallonDorCelebration && ballonDorWinner ? (
+        <BallonDorCelebration
+          trophyImage={ballonDorTrophy}
+          winnerName={ballonDorWinner.name}
+          bdrPoints={ballonDorWinner.bdrPoints}
+        />
       ) : null}
       {/* Hero */}
       <div className="relative mb-8 rounded-2xl overflow-hidden border border-surface-border">

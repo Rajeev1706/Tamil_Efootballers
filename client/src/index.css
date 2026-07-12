@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Kaushan+Script&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -183,5 +183,59 @@
   @keyframes twinkle {
     0%, 100% { opacity: 0; transform: scale(0.4); }
     50%      { opacity: 1; transform: scale(1); }
+  }
+
+  .animate-ember-rise {
+    animation: ember-rise 3.5s ease-in infinite;
+  }
+  @keyframes ember-rise {
+    0%   { transform: translateY(0) translateX(0); opacity: 0; }
+    10%  { opacity: 1; }
+    100% { transform: translateY(-180px) translateX(var(--drift, 10px)); opacity: 0; }
+  }
+
+  .animate-border-sweep {
+    background-size: 300% 300%;
+    animation: border-sweep 4s ease-in-out infinite;
+  }
+  @keyframes border-sweep {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  .animate-wreath-glow {
+    animation: wreath-glow 2.8s ease-in-out infinite;
+  }
+  @keyframes wreath-glow {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+
+  .animate-firework-trail {
+    animation: firework-trail 2s ease-out infinite;
+  }
+  @keyframes firework-trail {
+    0%   { transform: translateY(0); opacity: 1; }
+    45%  { transform: translateY(var(--rise, -500px)); opacity: 1; }
+    46%, 100% { transform: translateY(var(--rise, -500px)); opacity: 0; }
+  }
+
+  .animate-firework-streak {
+    animation: firework-streak 2s ease-out infinite;
+  }
+  @keyframes firework-streak {
+    0%   { transform: translateY(0) scaleY(0.3); opacity: 0; height: 40px; }
+    20%  { opacity: 0.8; }
+    45%  { transform: translateY(var(--rise, -500px)) scaleY(1); opacity: 0; height: 40px; }
+    100% { transform: translateY(var(--rise, -500px)) scaleY(1); opacity: 0; }
+  }
+
+  .animate-firework-burst-ray {
+    animation: firework-burst-ray 2s ease-out infinite;
+  }
+  @keyframes firework-burst-ray {
+    0%, 44%   { transform: rotate(var(--angle)) translateX(0) scale(0); opacity: 0; }
+    48%       { transform: rotate(var(--angle)) translateX(0) scale(1); opacity: 1; }
+    100%      { transform: rotate(var(--angle)) translateX(var(--dist, 46px)) scale(1); opacity: 0; }
   }
 }

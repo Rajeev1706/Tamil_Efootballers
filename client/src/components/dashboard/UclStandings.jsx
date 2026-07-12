@@ -1,15 +1,27 @@
 import { useState } from "react"
-import { Trophy, Target } from "lucide-react"
-import { useUclStandings, useUclTopScorers } from "../../lib/queries"
+import { Trophy, Target, Swords } from "lucide-react"
+import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import uclTrophy from "../../../images/ucl.png"
 import goldenBootGB from "../../../images/ucl_gb.png"
 
+function getRoundLabel(round, totalRounds) {
+  const fromEnd = totalRounds - round
+  if (fromEnd === 0) return "Final"
+  if (fromEnd === 1) return "Semi-Final"
+  if (fromEnd === 2) return "Quarter-Final"
+  if (fromEnd === 3) return "Round of 16"
+  if (fromEnd === 4) return "Round of 32"
+  return `Round ${round}`
+}
+
 export default function UclStandings({ onPlayerClick }) {
   const { data: groups = [], isLoading } = useUclStandings()
   const { data: scorers = [] } = useUclTopScorers()
+  const { data: knockout } = useUclKnockoutCurrent()
   const [activeGroup, setActiveGroup] = useState(0)
-  const [view, setView] = useState("table") // "table" | "scorers"
+  const [activeKoRound, setActiveKoRound] = useState(1)
+  const [view, setView] = useState("table") // "table" | "scorers" | "knockout"
 
   if (isLoading) return <p className="text-sm text-slate-500 text-center py-8">Loading…</p>
 
@@ -24,15 +36,22 @@ export default function UclStandings({ onPlayerClick }) {
   }
 
   const group = groups[activeGroup] || groups[0]
+  const koTotalRounds = knockout?.totalRounds || 5
+  const koRounds = Array.from({ length: koTotalRounds }, (_, i) => i + 1)
+  const koCurrentRound = koRounds.includes(activeKoRound) ? activeKoRound : koRounds[0]
+  const koMatches = (knockout?.matches || []).filter(m => m.round === koCurrentRound)
+
+  const headerIcon  = view === "table" ? uclTrophy : view === "knockout" ? uclTrophy : goldenBootGB
+  const headerTitle = view === "table" ? group?.name : view === "knockout" ? "Knockout Stage" : "Golden Boot"
 
   return (
     <div className="card overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src={view === "table" ? uclTrophy : goldenBootGB} alt={view === "table" ? "UCL" : "Golden Boot"} className="w-9 h-9 object-contain flex-shrink-0" />
+          <img src={headerIcon} alt="UCL" className="w-9 h-9 object-contain flex-shrink-0" />
           <div>
-            <p className="section-label mb-0.5">UCL Group Stage</p>
-            <h2 className="text-base font-semibold text-white">{view === "table" ? group?.name : "Golden Boot"}</h2>
+            <p className="section-label mb-0.5">UCL</p>
+            <h2 className="text-base font-semibold text-white">{headerTitle}</h2>
           </div>
         </div>
         <select
@@ -41,6 +60,7 @@ export default function UclStandings({ onPlayerClick }) {
           className="bg-pitch-800 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
         >
           <option value="table">Group table</option>
+          <option value="knockout">Knockout</option>
           <option value="scorers">Golden Boot</option>
         </select>
       </div>
@@ -85,7 +105,7 @@ export default function UclStandings({ onPlayerClick }) {
                   )}
                 >
                   <td className="py-3 px-2 text-center">
-                    <span className={cn("text-sm font-medium", i < 2 ? "text-emerald-400" : "text-slate-500")}>{i + 1}</span>
+                    <span className={cn("text-sm font-medium", i < 4 ? "text-emerald-400" : "text-slate-500")}>{i + 1}</span>
                   </td>
                   <td className="py-3 px-4">
                     <span className={cn("font-medium", i === 0 ? "text-gold" : "text-slate-300")}>{p.name}</span>
@@ -106,6 +126,66 @@ export default function UclStandings({ onPlayerClick }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Knockout Stage — read-only round-tabs bracket view */}
+      {view === "knockout" && (
+        !knockout || (knockout.matches || []).length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <Swords className="w-6 h-6 text-slate-600 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">UCL Knockout hasn't started yet</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-1.5 px-5 py-3 overflow-x-auto border-b border-surface-border/60">
+              {koRounds.map(r => (
+                <button key={r} onClick={() => setActiveKoRound(r)}
+                  className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                    r === koCurrentRound ? "bg-accent text-white" : "bg-pitch-800 text-slate-500 hover:text-white"
+                  )}>
+                  {getRoundLabel(r, koTotalRounds)}
+                </button>
+              ))}
+            </div>
+
+            {koMatches.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <p className="text-sm text-slate-500">No fixtures in this round yet</p>
+              </div>
+            ) : (
+              <div>
+                {koMatches.map(m => {
+                  const isCompleted = m.status === "completed"
+                  const p1IsWinner = isCompleted && m.winnerId === m.player1Id
+                  const p2IsWinner = isCompleted && m.winnerId === m.player2Id
+                  return (
+                    <div key={`${m.round}-${m.matchNumber}`} className="flex items-center justify-between px-5 py-3.5 border-b border-surface-border/50">
+                      <span
+                        onClick={() => m.player1Id && onPlayerClick?.({ id: m.player1Id, name: m.player1Name })}
+                        className={cn("flex-1 min-w-0 truncate font-medium",
+                          m.player1Id ? "cursor-pointer hover:text-accent" : "",
+                          !m.player1Id ? "text-slate-600 italic" : p1IsWinner ? "text-emerald-400" : "text-white"
+                        )}>
+                        {m.player1Name ?? "TBD"}
+                      </span>
+                      <div className="px-4 flex-shrink-0">
+                        <span className="text-xs text-slate-600">vs</span>
+                      </div>
+                      <span
+                        onClick={() => m.player2Id && onPlayerClick?.({ id: m.player2Id, name: m.player2Name })}
+                        className={cn("flex-1 min-w-0 truncate font-medium text-right",
+                          m.player2Id ? "cursor-pointer hover:text-accent" : "",
+                          !m.player2Id ? "text-slate-600 italic" : p2IsWinner ? "text-emerald-400" : "text-white"
+                        )}>
+                        {m.player2Name ?? "TBD"}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )
       )}
 
       {/* Golden Boot — top scorers */}
@@ -168,7 +248,7 @@ export default function UclStandings({ onPlayerClick }) {
 
       {view === "table" && group?.players.length >= 2 && (
         <div className="px-5 py-3 border-t border-surface-border/60 flex items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 2 advance</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 4 advance</span>
         </div>
       )}
     </div>

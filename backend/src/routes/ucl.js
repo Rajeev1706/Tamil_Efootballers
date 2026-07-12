@@ -144,7 +144,7 @@ router.post("/activate", authenticate, adminOnly, async (req, res, next) => {
       for (let r = 0; r < rounds.length; r++) {
         for (const { p1, p2 } of rounds[r]) {
           await query(
-            "INSERT INTO ucl_fixtures (group_id, round_number, player1_id, player2_id) VALUES ($1,$2,$3,$4)",
+            "INSERT INTO ucl_fixtures (group_id, round_number, player1_id, player2_id) VALUES ($1,$2,$3,$4) ON CONFLICT (group_id, round_number, player1_id, player2_id) DO NOTHING",
             [group.id, r + 1, p1, p2]
           )
         }
@@ -312,7 +312,7 @@ router.post("/groups/:id/regenerate-fixtures", authenticate, adminOnly, async (r
     for (let r = 0; r < rounds.length; r++) {
       for (const { p1, p2 } of rounds[r]) {
         await query(
-          "INSERT INTO ucl_fixtures (group_id, round_number, player1_id, player2_id) VALUES ($1,$2,$3,$4)",
+          "INSERT INTO ucl_fixtures (group_id, round_number, player1_id, player2_id) VALUES ($1,$2,$3,$4) ON CONFLICT (group_id, round_number, player1_id, player2_id) DO NOTHING",
           [groupId, r + 1, p1, p2]
         )
         count++
