@@ -92,6 +92,14 @@ export const useUclStandings = () =>
 export const useUclFixtures = () =>
   useQuery({ queryKey: ["ucl-fixtures"], queryFn: uclApi.fixtures, refetchOnMount: "always", staleTime: 0 })
 
+export const useUclFixturesPublic = (groupId) =>
+  useQuery({
+    queryKey: ["ucl-fixtures-public", groupId],
+    queryFn: () => uclApi.fixturesPublic(groupId),
+    enabled: !!groupId,
+    staleTime: 0,
+  })
+
 export const useUclTopScorers = () =>
   useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers })
 

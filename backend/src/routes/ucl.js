@@ -155,6 +155,26 @@ router.post("/activate", authenticate, adminOnly, async (req, res, next) => {
 })
 
 // GET /api/ucl/fixtures — all fixtures with player and group info (admin)
+// GET /api/ucl/fixtures/public/:groupId — read-only fixture results for one group
+router.get("/fixtures/public/:groupId", async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        f.id, f.round_number AS "roundNumber",
+        f.player1_score AS "player1Score", f.player2_score AS "player2Score",
+        f.status,
+        p1.id AS "player1Id", p1.name AS "player1Name",
+        p2.id AS "player2Id", p2.name AS "player2Name"
+      FROM ucl_fixtures f
+      LEFT JOIN players p1 ON f.player1_id = p1.id
+      LEFT JOIN players p2 ON f.player2_id = p2.id
+      WHERE f.group_id = $1
+      ORDER BY f.round_number ASC
+    `, [req.params.groupId])
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
 router.get("/fixtures", authenticate, adminOnly, async (req, res, next) => {
   try {
     const result = await query(`

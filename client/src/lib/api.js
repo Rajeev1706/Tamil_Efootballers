@@ -92,6 +92,7 @@ export const uclApi = {
   generate:          (playerIds)     => api.post("/ucl/generate", { playerIds }).then(r => r.data),
   activate:          ()              => api.post("/ucl/activate").then(r => r.data),
   fixtures:          ()              => api.get("/ucl/fixtures").then(r => r.data),
+  fixturesPublic:    (groupId)       => api.get(`/ucl/fixtures/public/${groupId}`).then(r => r.data),
   saveFixture:       (id, s1, s2)   => api.patch(`/ucl/fixtures/${id}`, { player1Score: s1, player2Score: s2 }).then(r => r.data),
   clearFixture:      (id)           => api.delete(`/ucl/fixtures/${id}/result`).then(r => r.data),
   resetGroupFixtures:       (id) => api.post(`/ucl/groups/${id}/reset-fixtures`).then(r => r.data),

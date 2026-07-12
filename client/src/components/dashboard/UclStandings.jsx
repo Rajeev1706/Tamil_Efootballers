@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Trophy, Target, Swords } from "lucide-react"
-import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent } from "../../lib/queries"
+import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent, useUclFixturesPublic } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import uclTrophy from "../../../images/ucl.png"
 import goldenBootGB from "../../../images/ucl_gb.png"
@@ -20,6 +20,24 @@ export default function UclStandings({ onPlayerClick }) {
   const { data: scorers = [] } = useUclTopScorers()
   const { data: knockout } = useUclKnockoutCurrent()
   const [activeGroup, setActiveGroup] = useState(0)
+  const group = groups[activeGroup] || groups[0]
+  const { data: fixtures = [] } = useUclFixturesPublic(group?.id)
+  const [activeFixtureRound, setActiveFixtureRound] = useState(1)
+
+  // A round only "unlocks" once every fixture in every round before it is
+  // completed — so admins logging results progressively reveals rounds
+  // one at a time, rather than showing the whole group's schedule upfront.
+  const roundsByNumber = fixtures.reduce((acc, f) => {
+    (acc[f.roundNumber] ??= []).push(f)
+    return acc
+  }, {})
+  const allRoundNumbers = Object.keys(roundsByNumber).map(Number).sort((a, b) => a - b)
+  const firstIncompleteRound = allRoundNumbers.find(r => roundsByNumber[r].some(f => f.status !== "completed"))
+  const unlockedRounds = firstIncompleteRound != null
+    ? allRoundNumbers.filter(r => r <= firstIncompleteRound)
+    : allRoundNumbers // every round complete — show them all
+  const currentFixtureRound = unlockedRounds.includes(activeFixtureRound) ? activeFixtureRound : (unlockedRounds[unlockedRounds.length - 1] ?? 1)
+  const visibleFixtures = roundsByNumber[currentFixtureRound] || []
   const [activeKoRound, setActiveKoRound] = useState(1)
   const [view, setView] = useState("table") // "table" | "scorers" | "knockout"
 
@@ -35,14 +53,13 @@ export default function UclStandings({ onPlayerClick }) {
     )
   }
 
-  const group = groups[activeGroup] || groups[0]
   const koTotalRounds = knockout?.totalRounds || 5
   const koRounds = Array.from({ length: koTotalRounds }, (_, i) => i + 1)
   const koCurrentRound = koRounds.includes(activeKoRound) ? activeKoRound : koRounds[0]
   const koMatches = (knockout?.matches || []).filter(m => m.round === koCurrentRound)
 
-  const headerIcon  = view === "table" ? uclTrophy : view === "knockout" ? uclTrophy : goldenBootGB
-  const headerTitle = view === "table" ? group?.name : view === "knockout" ? "Knockout Stage" : "Golden Boot"
+  const headerIcon  = view === "knockout" ? uclTrophy : view === "scorers" ? goldenBootGB : uclTrophy
+  const headerTitle = view === "table" ? group?.name : view === "fixtures" ? `${group?.name} Fixtures` : view === "knockout" ? "Knockout Stage" : "Golden Boot"
 
   return (
     <div className="card overflow-hidden">
@@ -60,13 +77,14 @@ export default function UclStandings({ onPlayerClick }) {
           className="bg-pitch-800 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
         >
           <option value="table">Group table</option>
+          <option value="fixtures">Fixtures</option>
           <option value="knockout">Knockout</option>
           <option value="scorers">Golden Boot</option>
         </select>
       </div>
 
-      {/* Group tabs — only for table view */}
-      {view === "table" && (
+      {/* Group tabs — table and fixtures views are both scoped per group */}
+      {(view === "table" || view === "fixtures") && (
         <div className="flex gap-1.5 px-5 py-3 overflow-x-auto border-b border-surface-border/60">
           {groups.map((g, i) => (
             <button key={g.id} onClick={() => setActiveGroup(i)}
@@ -77,6 +95,66 @@ export default function UclStandings({ onPlayerClick }) {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Fixtures — round-by-round results for the selected group, only
+          revealing a round once every fixture in the round before it is
+          completed */}
+      {view === "fixtures" && (
+        fixtures.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-sm text-slate-500">No fixtures generated for this group yet</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-1.5 px-5 py-3 overflow-x-auto border-b border-surface-border/60">
+              {unlockedRounds.map(r => (
+                <button key={r} onClick={() => setActiveFixtureRound(r)}
+                  className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                    r === currentFixtureRound ? "bg-accent text-white" : "bg-pitch-800 text-slate-500 hover:text-white"
+                  )}>
+                  Round {r}
+                </button>
+              ))}
+            </div>
+            <div>
+              {visibleFixtures.map(f => {
+                const isCompleted = f.status === "completed"
+                const p1Won = isCompleted && f.player1Score > f.player2Score
+                const p2Won = isCompleted && f.player2Score > f.player1Score
+                return (
+                  <div key={f.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-border/50">
+                    <span
+                      onClick={() => f.player1Id && onPlayerClick?.({ id: f.player1Id, name: f.player1Name })}
+                      className={cn("flex-1 min-w-0 truncate font-medium text-right pr-3",
+                        f.player1Id ? "cursor-pointer hover:text-accent" : "",
+                        !f.player1Id ? "text-slate-600 italic" : p1Won ? "text-emerald-400" : "text-white"
+                      )}>
+                      {f.player1Name ?? "TBD"}
+                    </span>
+                    <span className="flex-shrink-0 text-xs px-2">
+                      {isCompleted ? (
+                        <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
+                          {f.player1Score} - {f.player2Score}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">vs</span>
+                      )}
+                    </span>
+                    <span
+                      onClick={() => f.player2Id && onPlayerClick?.({ id: f.player2Id, name: f.player2Name })}
+                      className={cn("flex-1 min-w-0 truncate font-medium pl-3",
+                        f.player2Id ? "cursor-pointer hover:text-accent" : "",
+                        !f.player2Id ? "text-slate-600 italic" : p2Won ? "text-emerald-400" : "text-white"
+                      )}>
+                      {f.player2Name ?? "TBD"}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )
       )}
 
       {/* Standings table */}
