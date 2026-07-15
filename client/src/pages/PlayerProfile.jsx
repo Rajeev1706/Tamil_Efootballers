@@ -1,6 +1,5 @@
-import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
-import { ArrowLeft, Trophy, Swords, ImageIcon, Crown } from "lucide-react"
+import { ArrowLeft, Trophy, ImageIcon, Crown } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import { usePlayer } from "../lib/queries"
@@ -12,13 +11,6 @@ import uclTrophy          from "../../images/ucl.png"
 import goldenBootTrophy   from "../../images/Golden Boot.png"
 import teamLeagueGBTrophy from "../../images/team league_gb.png"
 import uclGBTrophy        from "../../images/ucl_gb.png"
-
-const MATCH_TYPE_OPTIONS = [
-  { value: "all",    label: "Total matches" },
-  { value: "league", label: "Team league"   },
-  { value: "ucl",    label: "UCL"           },
-  { value: "weekly", label: "Weekly"        },
-]
 
 const FormDot = ({ result }) => {
   const cls = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
@@ -33,14 +25,6 @@ const FormDot = ({ result }) => {
   )
 }
 
-function SummaryRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-sm font-semibold font-mono text-white">{value}</span>
-    </div>
-  )
-}
 
 function PlayerSquadCard({ player }) {
   return (
@@ -83,112 +67,8 @@ function PlayerSquadCard({ player }) {
   )
 }
 
-function HeadToHead({ matchHistory = [] }) {
-  const [selectedOpp, setSelectedOpp] = useState("")
-
-  const opponents = [...new Set(matchHistory.map(m => m.opponentName))]
-  const records   = matchHistory.filter(m => m.opponentName === selectedOpp)
-  const wins      = records.filter(m => m.result === "win").length
-  const draws     = records.filter(m => m.result === "draw").length
-  const losses    = records.filter(m => m.result === "loss").length
-  const total     = wins + draws + losses
-
-  return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
-        <Swords className="w-4 h-4 text-violet-400" />
-        <h2 className="text-base font-semibold text-white">Head-to-head record</h2>
-      </div>
-
-      <div className="p-5">
-        <select
-          value={selectedOpp}
-          onChange={e => setSelectedOpp(e.target.value)}
-          className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors mb-4"
-        >
-          <option value="">Select opponent…</option>
-          {opponents.map(name => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-
-        {!selectedOpp && (
-          <div className="py-8 text-center">
-            <p className="text-slate-500 text-sm">Select an opponent to view head-to-head records</p>
-          </div>
-        )}
-
-        {selectedOpp && (
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-surface-border">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-surface-border flex items-center justify-center text-xs font-bold text-slate-400">
-                  {selectedOpp.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div>
-                  <span className="text-sm font-semibold text-white">{selectedOpp}</span>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {total} match{total !== 1 ? "es" : ""}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold font-mono text-white">
-                  {total ? Math.round((wins / total) * 100) : 0}%
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">win rate</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-emerald-400/10 border border-emerald-400/20 rounded-xl p-3 text-center">
-                <p className="text-2xl font-extrabold font-mono text-emerald-400">{wins}</p>
-                <p className="text-xs text-slate-500 mt-0.5">Wins</p>
-              </div>
-              <div className="bg-amber-400/10 border border-amber-400/20 rounded-xl p-3 text-center">
-                <p className="text-2xl font-extrabold font-mono text-amber-400">{draws}</p>
-                <p className="text-xs text-slate-500 mt-0.5">Draws</p>
-              </div>
-              <div className="bg-rose-400/10 border border-rose-400/20 rounded-xl p-3 text-center">
-                <p className="text-2xl font-extrabold font-mono text-rose-400">{losses}</p>
-                <p className="text-xs text-slate-500 mt-0.5">Losses</p>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              {records.map(m => (
-                <div key={m.id}
-                  className="flex items-center gap-3 bg-pitch-800 rounded-xl px-4 py-2.5 border border-surface-border">
-                  <span className="text-xs text-slate-600 w-14 flex-shrink-0">
-                    {m.date
-                      ? new Date(m.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-                      : "—"}
-                  </span>
-                  <span className={cn(
-                    "text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0",
-                    m.result === "win"  ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/25"
-                    : m.result === "draw" ? "bg-amber-400/10 text-amber-400 border-amber-400/25"
-                    : "bg-rose-400/10 text-rose-400 border-rose-400/25"
-                  )}>
-                    {m.result.toUpperCase()}
-                  </span>
-                  {m.playerScore !== null && m.playerScore !== undefined && (
-                    <span className="text-xs font-mono font-bold text-white">
-                      {m.playerScore}-{m.opponentScore}
-                    </span>
-                  )}
-                  {m.matchType && (
-                    <span className="text-xs text-slate-500 capitalize ml-auto">{m.matchType}</span>
-                  )}
-                </div>
-              ))}
-</div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+import HeadToHead from "../components/player/HeadToHead"
+import SeasonSummary from "../components/player/SeasonSummary"
 
 function TrophyCase({ player }) {
   const trophies = [
@@ -228,8 +108,6 @@ export default function PlayerProfile() {
   const showAuctionDelta = ["team", "admin"].includes(searchParams.get("ctx"))
   const { data: player, isLoading, isError } = usePlayer(id)
 
-  const [summaryFilter, setSummaryFilter] = useState("all")
-
   if (isLoading) return <Layout><Loading /></Layout>
   if (isError || !player) return (
     <Layout>
@@ -245,22 +123,6 @@ export default function PlayerProfile() {
   const delta = player.isCaptain ? 0 : player.marketValue - player.auctionPrice
 
   const allHistory = player.matchHistory || []
-
-  const filteredHistory = summaryFilter === "all"
-    ? allHistory
-    : allHistory.filter(m => m.matchType === summaryFilter)
-
-  const filteredWins   = filteredHistory.filter(m => m.result === "win").length
-  const filteredDraws  = filteredHistory.filter(m => m.result === "draw").length
-  const filteredLosses = filteredHistory.filter(m => m.result === "loss").length
-  const filteredTotal  = filteredWins + filteredDraws + filteredLosses
-
-  // Goals scored — sum playerScore from all filtered matches
-  const filteredGoals  = filteredHistory.reduce((sum, m) =>
-    sum + (m.playerScore != null ? m.playerScore : 0), 0)
-  const goalsPerMatch  = filteredTotal > 0
-    ? (filteredGoals / filteredTotal).toFixed(1)
-    : "—"
 
   return (
     <Layout>
@@ -413,48 +275,7 @@ export default function PlayerProfile() {
           <PlayerSquadCard player={player} />
 
           {/* Season summary */}
-          <div className="card overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
-              <Trophy className="w-4 h-4 text-gold" />
-              <h2 className="text-base font-semibold text-white">Season summary</h2>
-            </div>
-
-            <div className="px-5 pt-4">
-              <select
-                value={summaryFilter}
-                onChange={e => setSummaryFilter(e.target.value)}
-                className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
-              >
-                {MATCH_TYPE_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="p-5 grid grid-cols-3 gap-3">
-              {[
-                { label: "Wins",   value: filteredWins,   color: "text-emerald-400" },
-                { label: "Draws",  value: filteredDraws,  color: "text-amber-400"  },
-                { label: "Losses", value: filteredLosses, color: "text-rose-400"   },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="bg-pitch-800 rounded-xl p-3 text-center border border-surface-border">
-                  <p className={cn("text-2xl font-extrabold font-mono", color)}>{value}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="px-5 pb-5 space-y-2.5">
-              <SummaryRow label="Games played" value={filteredTotal} />
-              <SummaryRow
-                label="Win rate"
-                value={filteredTotal ? `${Math.round((filteredWins / filteredTotal) * 100)}%` : "—"}
-              />
-              <SummaryRow label="Goals scored" value={filteredGoals} />
-              <SummaryRow label="Goals per match" value={goalsPerMatch} />
-              <SummaryRow label="BDR points" value={player.bdrPoints?.toLocaleString() ?? "—"} />
-            </div>
-          </div>
+          <SeasonSummary player={player} />
 
         </div>
       </div>

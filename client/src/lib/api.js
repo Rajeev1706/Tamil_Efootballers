@@ -34,6 +34,7 @@ export const authApi = {
 export const teamsApi = {
   list:           ()       => api.get("/teams").then(r => r.data),
   get:            (id)     => api.get(`/teams/${id}`).then(r => r.data),
+  playoffsCurrent: ()      => api.get("/teams/playoffs/current").then(r => r.data),
   create:         (body)   => api.post("/teams", body).then(r => r.data),
   update:         (id, b)  => api.patch(`/teams/${id}`, b).then(r => r.data),
   updateSettings: (id, b)  => api.patch(`/teams/${id}/settings`, b).then(r => r.data),
@@ -125,6 +126,7 @@ export const fixturesApi = {
   list:       (params)                  => api.get("/fixtures", { params }).then(r => r.data),
   recent:     ()                        => api.get("/fixtures/recent").then(r => r.data),
   create:     (body)                    => api.post("/fixtures", body).then(r => r.data),
+  generateSeason: ()                    => api.post("/fixtures/generate").then(r => r.data),
   update:     (id, body)                => api.patch(`/fixtures/${id}`, body).then(r => r.data),
   updateRoundDate: (round, date)        => api.patch(`/fixtures/round/${round}/date`, { date }).then(r => r.data),
   delete:     (id)                      => api.delete(`/fixtures/${id}`).then(r => r.data),
@@ -165,4 +167,29 @@ export const uclKnockoutApi = {
     api.patch(`/ucl-knockout/matches/${matchId}/players`, body).then(r => r.data),
   reset:        (id)           => api.post(`/ucl-knockout/${id}/reset`).then(r => r.data),
   deleteTournament: (id)       => api.delete(`/ucl-knockout/${id}`).then(r => r.data),
+}
+
+export const auctionApi = {
+  current:      ()                              => api.get("/auction/current").then(r => r.data),
+  start:        (budgetPerTeam)                 => api.post("/auction/start", { budgetPerTeam }).then(r => r.data),
+  retain:       (sessionId, teamId, playerId, price) =>
+    api.post("/auction/retain", { sessionId, teamId, playerId, price }).then(r => r.data),
+  removeRetention: (id)                         => api.delete(`/auction/retain/${id}`).then(r => r.data),
+  addToPool:    (sessionId, playerId)           => api.post("/auction/pool/add", { sessionId, playerId }).then(r => r.data),
+  removeFromPool: (id)                          => api.delete(`/auction/pool/${id}`).then(r => r.data),
+  buildPool:    (sessionId)                     => api.post("/auction/build-pool", { sessionId }).then(r => r.data),
+  nextPlayer:   (sessionId, playerId)           => api.post("/auction/next-player", { sessionId, playerId }).then(r => r.data),
+  bid:          (sessionId, teamId, amount)     => api.post("/auction/bid", { sessionId, teamId, amount }).then(r => r.data),
+  quickBid:     (sessionId, teamId)              => api.post("/auction/bid/quick", { sessionId, teamId }).then(r => r.data),
+  sell:         (sessionId, opts)               => api.post("/auction/sell", { sessionId, ...opts }).then(r => r.data),
+  markUnsold:   (sessionId)                     => api.post("/auction/mark-unsold", { sessionId }).then(r => r.data),
+  advanceRound: (sessionId)                     => api.post("/auction/advance-round", { sessionId }).then(r => r.data),
+  complete:     (sessionId)                     => api.post("/auction/complete", { sessionId }).then(r => r.data),
+  setBidder:    (sessionId, teamId)              => api.post("/auction/set-bidder", { sessionId, teamId }).then(r => r.data),
+  reduceBid:    (sessionId)                      => api.post("/auction/reduce-bid", { sessionId }).then(r => r.data),
+  extraTime:    (sessionId)                      => api.post("/auction/extra-time", { sessionId }).then(r => r.data),
+  undoLastSale: (sessionId)                      => api.post("/auction/undo-last-sale", { sessionId }).then(r => r.data),
+  deleteSession: (sessionId)                     => api.delete(`/auction/${sessionId}`).then(r => r.data),
+  enter:        (sessionId)                      => api.post("/auction/enter", { sessionId }).then(r => r.data),
+  leave:        (sessionId)                      => api.post("/auction/leave", { sessionId }).then(r => r.data),
 }

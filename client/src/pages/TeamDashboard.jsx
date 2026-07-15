@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy } from "lucide-react"
+import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy, Gavel } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import TeamHeader from "../components/team/TeamHeader"
 import Squad from "../components/team/Squad"
@@ -12,7 +12,8 @@ import FixtureMaker from "../components/team/FixtureMaker"
 import TeamResults from "../components/team/TeamResults"
 import Loading from "../components/common/Loading"
 import { useAuthStore } from "../store/authStore"
-import { useTeam, usePlayers, useFixtures, useTrades } from "../lib/queries"
+import { useTeam, usePlayers, useFixtures, useTrades, useAuctionCurrent } from "../lib/queries"
+import { useAuctionSocket } from "../hooks/useAuctionSocket"
 import { useTeamColor } from "../lib/teamColor"
 import { cn } from "../lib/utils"
 
@@ -29,6 +30,8 @@ const TABS = [
 export default function TeamDashboard() {
   const navigate                  = useNavigate()
   const user                      = useAuthStore(s => s.user)
+  const { data: auctionData } = useAuctionCurrent()
+  useAuctionSocket()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get("tab") || "squad"
   const setActiveTab = (tab) => {
@@ -67,6 +70,27 @@ export default function TeamDashboard() {
   return (
     <Layout>
       <div style={colorStyle}>
+        {auctionData?.session?.status === "active" && auctionData?.session?.hasEntered && (
+          <button
+            onClick={() => navigate("/team/auction")}
+            className="w-full mb-6 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-gold/5 to-transparent px-6 py-4 flex items-center gap-3 hover:border-gold/60 transition-colors text-left animate-champion-pop"
+          >
+            <span className="relative flex-shrink-0">
+              <Gavel className="w-6 h-6 text-gold" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">Live Player Auction happening now</p>
+              <p className="text-xs text-slate-400">
+                {auctionData.session.currentPlayerName
+                  ? `${auctionData.session.currentPlayerName} — ₹${auctionData.session.currentBid} current bid`
+                  : "Tap to watch live"}
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-gold flex-shrink-0">Enter Auction →</span>
+          </button>
+        )}
+
         <TeamHeader team={myTeam} myPlayers={myPlayers} teamColor={teamColor} />
 
         {/* Tabs */}

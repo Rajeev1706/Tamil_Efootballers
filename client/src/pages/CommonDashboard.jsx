@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star } from "lucide-react"
+import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star, Gavel } from "lucide-react"
 import { cn } from "../lib/utils"
 import Layout from "../components/layout/Layout"
 import StandingsTable from "../components/dashboard/StandingsTable"
@@ -20,7 +20,8 @@ import teamLeagueTrophyLogo from "../../images/Team League.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
-import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer } from "../lib/queries"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useAuctionCurrent } from "../lib/queries"
+import { useAuctionSocket } from "../hooks/useAuctionSocket"
 
 const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
   <div className="card p-4 flex items-start gap-3">
@@ -140,6 +141,8 @@ const PANEL_OPTIONS = [
 
 export default function CommonDashboard() {
   const navigate = useNavigate()
+  const { data: auctionData } = useAuctionCurrent()
+  useAuctionSocket()
   const { data: teams   = [], isLoading: teamsLoading   } = useTeams()
   const { data: players = [], isLoading: playersLoading } = usePlayers()
   const { data: seasonRecords = [] }                      = useSeasonRecords()
@@ -479,6 +482,28 @@ export default function CommonDashboard() {
           bdrPoints={ballonDorWinner.bdrPoints}
         />
       ) : null}
+      {/* Live auction banner — only shows when an auction is actually active */}
+      {auctionData?.session?.status === "active" && auctionData?.session?.hasEntered && (
+        <button
+          onClick={() => navigate("/auction/live")}
+          className="w-full mb-6 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-gold/5 to-transparent px-6 py-4 flex items-center gap-3 hover:border-gold/60 transition-colors text-left animate-champion-pop"
+        >
+          <span className="relative flex-shrink-0">
+            <Gavel className="w-6 h-6 text-gold" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white">Live Player Auction happening now</p>
+            <p className="text-xs text-slate-400">
+              {auctionData.session.currentPlayerName
+                ? `${auctionData.session.currentPlayerName} — ₹${auctionData.session.currentBid} current bid`
+                : "Tap to watch live"}
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-gold flex-shrink-0">Watch Live →</span>
+        </button>
+      )}
+
       {/* Hero */}
       <div className="relative mb-8 rounded-2xl overflow-hidden border border-surface-border">
         <div className="absolute inset-0 bg-gradient-to-r from-pitch-800 via-pitch-800 to-pitch-700" />

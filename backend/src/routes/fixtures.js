@@ -2,9 +2,48 @@ import { Router } from "express"
 import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
-import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { generatePlayoffs } from "../services/playoffs.js"
 
 const router = Router()
+
+// Classic "circle method" round-robin: fix one team, rotate the rest each
+// round. Produces N-1 rounds (N/2 matches each) covering every pairing
+// exactly once — the first half of the season. The second half is derived
+// directly from the first half by simply flipping home/away for every
+// pairing, guaranteeing they're always exact mirrors of each other, never
+// independently generated (which could drift out of sync).
+function generateDoubleRoundRobin(teamIds) {
+  const teams = [...teamIds]
+  const hasBye = teams.length % 2 !== 0
+  if (hasBye) teams.push(null) // null = bye slot, that team sits out the round
+
+  const n = teams.length
+  const half = n / 2
+  const firstHalfRounds = []
+  let arr = [...teams]
+
+  for (let r = 0; r < n - 1; r++) {
+    const roundPairs = []
+    for (let i = 0; i < half; i++) {
+      const t1 = arr[i]
+      const t2 = arr[n - 1 - i]
+      if (t1 !== null && t2 !== null) {
+        // Alternate which side is "home" by round parity, purely to avoid
+        // one team always sitting on the same side within the first half.
+        roundPairs.push(r % 2 === 0 ? [t1, t2] : [t2, t1])
+      }
+    }
+    firstHalfRounds.push(roundPairs)
+
+    // Rotate: keep arr[0] fixed, shift everyone else one position
+    const last = arr[n - 1]
+    for (let i = n - 1; i > 1; i--) arr[i] = arr[i - 1]
+    arr[1] = last
+  }
+
+  const secondHalfRounds = firstHalfRounds.map(roundPairs => roundPairs.map(([h, a]) => [a, h]))
+  return [...firstHalfRounds, ...secondHalfRounds]
+}
 
 const FIXTURE_SELECT = `
   SELECT
@@ -126,6 +165,40 @@ const createSchema = z.object({
   awayTeamId: z.number().int().positive(),
   round:      z.number().int().positive(),
   date:       z.string(), // YYYY-MM-DD
+})
+
+// POST /api/fixtures/generate — auto-creates the full double round-robin
+// season schedule from every current team. Refuses to run if any fixtures
+// already exist, to avoid mixing with manually-created ones — reset first
+// if a fresh regeneration is actually wanted.
+router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const existingRes = await query("SELECT COUNT(*) FROM fixtures")
+    if (parseInt(existingRes.rows[0].count) > 0) {
+      return res.status(400).json({ error: "Fixtures already exist. Delete them first if you want to regenerate the schedule." })
+    }
+
+    const teamsRes = await query("SELECT id FROM teams ORDER BY id")
+    const teamIds = teamsRes.rows.map(r => r.id)
+    if (teamIds.length < 2) {
+      return res.status(400).json({ error: "Need at least 2 teams to generate a schedule." })
+    }
+
+    const rounds = generateDoubleRoundRobin(teamIds)
+    let fixturesCreated = 0
+    for (let i = 0; i < rounds.length; i++) {
+      const roundNumber = i + 1
+      for (const [homeId, awayId] of rounds[i]) {
+        await query(
+          "INSERT INTO fixtures (home_team_id, away_team_id, round) VALUES ($1, $2, $3)",
+          [homeId, awayId, roundNumber]
+        )
+        fixturesCreated++
+      }
+    }
+
+    res.json({ success: true, roundsGenerated: rounds.length, fixturesGenerated: fixturesCreated })
+  } catch (err) { next(err) }
 })
 
 router.post("/", authenticate, adminOnly, async (req, res, next) => {
@@ -302,24 +375,15 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       }
     })
 
-    // Season-end BDR awards — only fires once the WHOLE league (every
-    // fixture, not just this one) is completed, and only ever once per
-    // season (claimAward guarantees that even if this runs concurrently
-    // from two closes at once).
+    // Auto-generate the playoff bracket the instant the group stage
+    // finishes — replaces the old BDR-on-completion trigger. Season BDR
+    // now fires later, off the Playoff Final specifically (see
+    // routes/teams.js playoffs section).
     const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
     if (parseInt(remainingRes.rows[0].count) === 0) {
       const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
       const season = parseInt(seasonRes.rows[0]?.value || "1")
-      if (await claimAward("team_league_season", season)) {
-        const standingsRes = await query(`SELECT id FROM teams ORDER BY score_points DESC LIMIT 4`)
-        const tierPoints = [12, 9, 7, 5]
-        for (let i = 0; i < standingsRes.rows.length; i++) {
-          const playersRes = await query(`SELECT id FROM players WHERE team_id = $1`, [standingsRes.rows[i].id])
-          for (const p of playersRes.rows) await addBdr(p.id, tierPoints[i])
-        }
-        // Team League Golden Boot BDR award: none (0 points) — placement
-        // awards above are unaffected.
-      }
+      await generatePlayoffs(season)
     }
 
     const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [req.params.id])

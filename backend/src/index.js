@@ -1,6 +1,8 @@
 import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
+import { createServer } from "http"
+import { Server as SocketIOServer } from "socket.io"
 dotenv.config()
 
 import authRoutes     from "./routes/auth.js"
@@ -14,6 +16,8 @@ import favoriteRoutes from "./routes/favorites.js"
 import uclRoutes      from "./routes/ucl.js"
 import weeklyRoutes      from "./routes/weekly.js"
 import uclKnockoutRoutes from "./routes/uclKnockout.js"
+import auctionRoutes     from "./routes/auction.js"
+import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
 const app  = express()
@@ -46,6 +50,7 @@ app.use("/api/favorites", favoriteRoutes)
 app.use("/api/ucl",    uclRoutes)
 app.use("/api/weekly",       weeklyRoutes)
 app.use("/api/ucl-knockout", uclKnockoutRoutes)
+app.use("/api/auction",      auctionRoutes)
 
 // GET /api/settings — public app settings (current season etc.)
 app.get("/api/settings", async (_req, res) => {
@@ -268,8 +273,26 @@ app.use((_req, res) => res.status(404).json({ error: "Route not found" }))
 // Global error handler (must be last)
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+const httpServer = createServer(app)
+
+// Socket.IO — used specifically for real-time auction sync (bids, sales,
+// new players coming up) so every connected screen updates the instant
+// something happens, instead of waiting on a polling interval. Same CORS
+// origin as the REST API.
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  },
+})
+setSocketServer(io)
+io.on("connection", (socket) => {
+  if (process.env.NODE_ENV === "development") console.log(`[socket] client connected: ${socket.id}`)
+})
+
+httpServer.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`)
   console.log(`   Env: ${process.env.NODE_ENV || "development"}`)
   console.log(`   DB:  ${process.env.DATABASE_URL ? "connected" : "⚠️  DATABASE_URL not set"}`)
+  console.log(`   WebSocket: ready`)
 })

@@ -1,0 +1,635 @@
+/* ============================================================================
+   Vendored reveal animation CSS — ported directly from the original
+   standalone Tamil Efootballers Auction app's style.css, kept as close to
+   the original as possible for exact visual fidelity. Only change: image
+   url() paths point to ../../images/ instead of the original's relative
+   paths, since that's where the assets now live in this app.
+   ============================================================================ */
+
+.reveal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 999999;
+  overflow: hidden;
+}
+
+.reveal-bg-logo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  filter: blur(22px) brightness(0.25) saturate(1.4);
+  transition: opacity 1.2s ease;
+  pointer-events: none;
+}
+.reveal-bg-logo.visible { opacity: 1; }
+
+.reveal-stars-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.reveal-card {
+  width: 439px;
+  height: 648px;
+  perspective: 1600px;
+  background: none;
+  box-shadow: none;
+  position: relative;
+  z-index: 1;
+}
+
+.reveal-card-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  transition: transform 800ms cubic-bezier(.2, .9, .3, 1);
+}
+
+@keyframes cardDollyIn {
+  0%   { transform: scale(0.08) translateY(220px); opacity: 0; filter: blur(12px); }
+  20%  { transform: scale(0.25) translateY(150px); opacity: 1; filter: blur(7px); }
+  40%  { transform: scale(0.45) translateY(90px);  filter: blur(4px); }
+  60%  { transform: scale(0.65) translateY(45px);  filter: blur(2px); }
+  80%  { transform: scale(0.9)  translateY(10px);  filter: blur(0.5px); }
+  100% { transform: scale(1)    translateY(0);      filter: blur(0); }
+}
+.reveal-card.entering { animation: cardDollyIn 1600ms linear forwards; }
+
+.reveal-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.reveal-card-front {
+  background: url("../../images/outline.png") center/contain no-repeat;
+  transform: rotateY(180deg);
+  filter: brightness(1.1) saturate(1.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.reveal-card-back {
+  background: url("../../images/card-back.png") center/contain no-repeat;
+}
+
+.reveal-card.silver .reveal-card-back {
+  background-image: url("../../images/card-back-silver.png");
+}
+.reveal-card.silver .reveal-card-front {
+  background-image: url("../../images/outline-silver.png");
+  filter: brightness(1.05) saturate(0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reveal-card.purple .reveal-card-back {
+  background-image: url("../../images/pbackside.png");
+  filter: none;
+}
+.reveal-card.purple .reveal-card-front {
+  background-image: url("../../images/poutline.png");
+  filter: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reveal-card.captain .reveal-card-back {
+  background-image: url("../../images/cbackside.png");
+  filter: none;
+}
+.reveal-card.captain .reveal-card-front {
+  background-image: url("../../images/coutline.png");
+  filter: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reveal-card.flipped .reveal-card-inner { transform: rotateY(180deg); }
+
+.reveal-team-logo {
+  position: absolute;
+  left: 50%;
+  top: calc(40% + 48px);
+  transform: translateX(-50%) scale(0.85);
+  width: 125px;
+  height: 125px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-top: 16px;
+  opacity: 0;
+  transition: opacity 600ms ease, transform 600ms ease;
+}
+.reveal-team-logo.visible {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  box-shadow: 0 0 22px rgba(255, 215, 120, 0.9);
+}
+
+.reveal-player-name {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -58%) scale(0.9);
+  font-size: 58px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 600ms ease, transform 600ms ease;
+  text-shadow:
+    0 0 12px rgba(255, 215, 120, 0.9),
+    0 0 28px rgba(255, 180, 60, 0.6),
+    0 4px 18px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  z-index: 1;
+}
+.reveal-player-name.visible { opacity: 1; transform: translate(-50%, -58%) scale(1); }
+
+.gold-reveal-overlay {
+  position: absolute;
+  inset: 0;
+  background: url("../../images/outline.png") center/100% 100% no-repeat;
+  clip-path: inset(0 0 0 100%);
+  transition: clip-path 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
+  z-index: 0;
+  border-radius: 5px;
+}
+.purple-reveal-overlay {
+  position: absolute;
+  inset: 0;
+  background: url("../../images/poutline.png") center/100% 100% no-repeat;
+  filter: none;
+  clip-path: inset(0 0 0 100%);
+  transition: clip-path 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
+  z-index: 0;
+  border-radius: 5px;
+}
+
+.reveal-card.vanish { animation: revealVanish 900ms ease forwards; }
+@keyframes revealVanish { to { opacity: 0; } }
+
+/* ── SOLD full-screen summary ── */
+.sold-summary {
+  text-align: center;
+  animation: soldFadeIn 300ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+@keyframes soldFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sold-player-name {
+  font-size: 42px;
+  font-weight: 900;
+  color: #ffffff;
+  text-align: center;
+  letter-spacing: 2px;
+  margin-bottom: 18px;
+  text-shadow:
+    0 0 12px rgba(255, 255, 255, 0.6),
+    0 0 28px rgba(255, 215, 0, 0.45),
+    0 4px 18px rgba(0, 0, 0, 0.9);
+}
+
+.sold-transfer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.sold-logo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #000;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.35), 0 0 45px rgba(255, 215, 0, 0.35);
+}
+.sold-no-team {
+  background: rgba(255, 255, 255, 0.12);
+  border: 2.5px dashed rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sold-arrow { font-size: 26px; font-weight: 900; color: #fff; }
+
+.sold-price {
+  font-size: 24px;
+  font-weight: 900;
+  margin-top: 14px;
+  color: #ffffff;
+  transition: all 400ms ease;
+}
+
+.hidden { opacity: 0; transform: translateY(12px) scale(0.95); }
+.sold-player-name:not(.hidden),
+.sold-logo:not(.hidden),
+.sold-arrow:not(.hidden),
+.sold-price:not(.hidden) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 400ms ease, transform 400ms ease;
+}
+
+/* ── Pre-reveal banner ("Final 5", "Last Player Standing") ── */
+.pre-reveal-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.pre-reveal-banner.visible { opacity: 1; }
+.pre-reveal-banner.fade-out { opacity: 0; transition: opacity 0.6s ease; }
+
+.pre-reveal-title {
+  font-size: 42px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 2px;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  animation: preRevealBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+.pre-reveal-sub {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 12px;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  animation: preRevealBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.1s both;
+}
+@keyframes preRevealBounce {
+  0%   { transform: translateY(-20px) scale(0.8); opacity: 0; }
+  100% { transform: translateY(0) scale(1);        opacity: 1; }
+}
+
+/* ============================================================================
+   Live bidding UI — ported from the original app's team-row layout (one
+   row per team with a one-click "+₹5" quick-bid button, a custom amount
+   input, and a "Set Bid" button), colors adapted to this app's dark theme
+   instead of the original's light theme.
+   ============================================================================ */
+
+.auction-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+
+.auction-focus {
+  font-size: 18px; font-weight: 700; text-align: center;
+  margin-bottom: 12px; color: #e2e8f0;
+}
+.auction-focus .player-name { color: #f5a623; }
+
+.auction-stats {
+  background: rgba(245, 166, 35, 0.06);
+  border: 1px solid rgba(245, 166, 35, 0.2);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 14px;
+  text-align: center;
+  font-weight: 600;
+  color: #e2e8f0;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+.auction-timer { margin-top: 4px; margin-bottom: 14px; font-size: 26px; font-weight: 900; text-align: center; color: #94a3b8; }
+.auction-timer.red { color: #e53935; animation: auctionTimerPulse 1s infinite; }
+@keyframes auctionTimerPulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+@keyframes auctionShake {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  15%  { transform: translate(-5px, 1px) rotate(-0.4deg); }
+  30%  { transform: translate(5px, -1px) rotate(0.4deg); }
+  45%  { transform: translate(-4px, 2px) rotate(-0.3deg); }
+  60%  { transform: translate(4px, -2px) rotate(0.3deg); }
+  75%  { transform: translate(-3px, 1px) rotate(-0.2deg); }
+  90%  { transform: translate(3px, -1px) rotate(0.2deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+.auction-shake { animation: auctionShake 0.5s ease; }
+
+.bid-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1a2332;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.bid-row-war { border-color: #ff6b00 !important; background: rgba(255,107,0,0.08) !important; }
+
+.bid-row-header { flex: 0 0 auto; min-width: 90px; max-width: 150px; }
+.bid-captain-name {
+  font-size: 14px; font-weight: 800; color: #e2e8f0; display: block;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.bid-row-controls { display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: nowrap; }
+
+.bid-plus {
+  background: #28a745; color: #fff; font-weight: 700; border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; flex-shrink: 0; white-space: nowrap; border: none; cursor: pointer;
+}
+.bid-plus:disabled { background: #2d4a35; color: #6b8f77; cursor: not-allowed; }
+
+.bid-input {
+  padding: 8px; border-radius: 8px; border: 1px solid #334155; font-weight: 600;
+  background: #0f1522; color: #fff; flex: 1; min-width: 0;
+}
+
+.bid-set {
+  background: #007bff; color: #fff; font-weight: 700; border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; flex-shrink: 0; border: none; cursor: pointer;
+}
+
+/* ============================================================================
+   Left/right team panels — ported from the original's 3-column layout
+   (teams split across both sides, auction area in the middle), colors
+   adapted to this app's dark theme.
+   ============================================================================ */
+
+.auction-layout {
+  display: grid;
+  grid-template-columns: 1.3fr 2fr 1.3fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .auction-layout { grid-template-columns: 1fr; }
+}
+
+.side-panel {
+  background: #131a28;
+  border: 1px solid #334155;
+  padding: 16px;
+  border-radius: 12px;
+}
+.side-panel h2 { margin: 0 0 12px; text-align: center; font-size: 15px; color: #e2e8f0; }
+
+.team-leader {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #1a2332 0%, #161e2c 100%);
+  margin-bottom: 10px;
+  border: 1px solid #334155;
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.team-leader.low-budget { border-color: rgba(229, 57, 53, 0.5); }
+.team-leader:hover { border-color: #4a5b7d; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+
+.team-leader-top { display: flex; gap: 10px; align-items: flex-start; }
+
+.team-leader .circle-logo {
+  width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  border: 1px solid #334155;
+}
+
+.team-info h4 { margin: 0; font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 5px; }
+.team-info p { margin: 3px 0; font-size: 12px; color: #94a3b8; }
+
+/* Budget bar — a quick visual read on who's spent big vs who's holding
+   back, filling left-to-right as budget depletes, turning red near zero. */
+.team-budget-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: #0f1522;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.team-budget-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  transition: width 400ms ease;
+}
+.team-budget-bar-fill.low { background: linear-gradient(90deg, #dc2626, #ef4444); }
+
+.team-players { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.team-player-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border-radius: 20px;
+  background: #0f1522;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  transition: border-color 150ms ease;
+}
+.team-player-tag:hover { border-color: #4a5b7d; }
+.team-player-tag-name { font-weight: 600; }
+.team-player-tag-rtm {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.15);
+  padding: 2px 6px;
+  border-radius: 20px;
+}
+
+/* ============================================================================
+   Auction stage — the signature moment. A radial gold floodlight glow
+   behind the current player, like stepping into stadium spotlights.
+   One bold gesture, kept restrained everywhere else around it.
+   ============================================================================ */
+
+.auction-stage {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(245, 158, 11, 0.16), transparent 70%),
+    linear-gradient(180deg, #131a28 0%, #0f1522 100%);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+.auction-stage::before {
+  content: "";
+  position: absolute;
+  top: -40%; left: 50%;
+  width: 140%; height: 90%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse closest-side, rgba(245, 158, 11, 0.10), transparent 75%);
+  animation: stageGlow 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes stageGlow {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;   transform: translateX(-50%) scale(1.06); }
+}
+
+.auction-stage-name {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 24px rgba(245, 158, 11, 0.25);
+}
+
+.auction-stage-bid {
+  display: inline-block;
+  text-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+}
+.auction-stage-bid.bump { animation: bidBump 420ms ease-out; }
+@keyframes bidBump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* Team panel header — a gold underline for hierarchy, matching the
+   stage's accent instead of a plain flat label. */
+.side-panel h2 {
+  position: relative;
+  padding-bottom: 10px;
+  margin-bottom: 14px !important;
+  border-bottom: 1px solid #263248;
+}
+.side-panel h2::after {
+  content: "";
+  position: absolute;
+  left: 50%; bottom: -1px;
+  width: 36px; height: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+}
+
+/* ============================================================================
+   Tactile press feel — applied to every button on the auction pages via
+   the shared .auction-page wrapper, so the whole surface feels physically
+   pressable instead of just color-swapping on hover. One rule, covers
+   every button including any added later, rather than hand-tuning each
+   one individually.
+   ============================================================================ */
+.auction-page button:not(:disabled) {
+  transition: transform 100ms ease, filter 100ms ease, box-shadow 100ms ease;
+}
+.auction-page button:not(:disabled):active {
+  transform: scale(0.95);
+  filter: brightness(0.92);
+}
+.auction-page button:disabled {
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Pool panels — Remaining and Unsold player lists, shown below the main
+   layout on the public live view and team captain page.
+   ============================================================================ */
+
+.pool-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 24px auto 0;
+}
+
+.pool-panel {
+  background: #131a28;
+  border: 1px solid #263248;
+  border-radius: 14px;
+  padding: 16px;
+}
+.pool-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pool-panel-count {
+  margin-left: 2px;
+  font-family: monospace;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.pool-panel-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.pool-panel-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: #1a2332;
+  border: 1px solid #334155;
+  font-size: 12px;
+  font-family: inherit;
+  color: #e2e8f0;
+}
+.pool-panel-row-clickable {
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.pool-panel-row-clickable:hover {
+  border-color: #4a5b7d;
+  background: #202b40;
+}
+
+.pool-panel-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.pool-panel-dot-silver { background: #94a3b8; }
+.pool-panel-dot-gold { background: #f59e0b; }
+.pool-panel-dot-purple { background: #a78bfa; }
+
+.pool-panel-name { font-weight: 500; }
+.pool-panel-r2 {
+  font-size: 9px;
+  font-weight: 800;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 1px 5px;
+  border-radius: 20px;
+}

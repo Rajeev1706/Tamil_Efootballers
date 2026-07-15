@@ -4,14 +4,14 @@
   "description": "Backend API for Tamil EfootBallers esports league platform",
   "main": "src/index.js",
   "type": "module",
-"scripts": {
-  "dev":          "nodemon src/index.js",
-  "start":        "node src/index.js",
-  "db:migrate":   "node src/db/migrate.js",
-  "db:seed":      "node src/db/seed.js",
-  "db:reset":     "node src/db/migrate.js && node src/db/seed.js",
-  "create-admin": "node scripts/create-admin.js"
-},
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed": "node src/db/seed.js",
+    "db:reset": "node src/db/migrate.js && node src/db/seed.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -19,10 +19,10 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.12.0",
+    "socket.io": "^4.8.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
   }
-  
 }

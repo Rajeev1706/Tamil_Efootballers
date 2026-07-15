@@ -45,19 +45,13 @@ export default function Navbar() {
           )}
 
           {user && (
-            <div className="flex items-center gap-2 ml-1 sm:ml-2 pl-1 sm:pl-2 border-l border-surface-border">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-semibold text-white">{user.username}</p>
-                <p className="text-xs text-slate-500 capitalize">{user.role.replace("_", " ")}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-8 h-8 rounded-lg hover:bg-surface flex items-center justify-center text-slate-400 hover:text-rose-400 transition-colors flex-shrink-0"
-                title="Logout"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="w-8 h-8 rounded-lg hover:bg-surface flex items-center justify-center text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           )}
         </nav>
       </div>
@@ -77,7 +71,7 @@ function NavLink({ to, label, icon: Icon, active }) {
       )}
     >
       <Icon className="w-4 h-4 flex-shrink-0" />
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </Link>
   )
 }

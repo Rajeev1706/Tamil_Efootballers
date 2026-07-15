@@ -2,11 +2,69 @@ import { useState, useRef } from "react"
 import { Check, CheckCircle, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
-  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture
+  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture, useGenerateSeasonFixtures
 } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { toPng } from "html-to-image"
 import logoUrl from "../../../images/logo.png"
+
+// ── Generate Full Season ───────────────────────────────────────────────────
+function GenerateSeasonCard({ hasExistingFixtures }) {
+  const [confirming, setConfirming] = useState(false)
+  const [result, setResult]         = useState(null)
+  const generate = useGenerateSeasonFixtures()
+
+  const handleGenerate = () => {
+    generate.mutate(undefined, {
+      onSuccess: (data) => {
+        setResult(data)
+        setConfirming(false)
+      },
+      onError: (err) => alert(err.response?.data?.error || "Failed to generate fixtures"),
+    })
+  }
+
+  if (hasExistingFixtures) {
+    return (
+      <div className="card px-4 py-3 flex items-center gap-2 text-xs text-slate-500">
+        <Lock className="w-3.5 h-3.5 flex-shrink-0" />
+        Fixtures already exist for this season — delete them all first if you want to auto-generate a fresh double round-robin schedule instead.
+      </div>
+    )
+  }
+
+  return (
+    <div className="card px-4 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+      <div>
+        <p className="text-sm font-semibold text-white">Auto-generate full season</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Every team plays every other team twice — home and away — with the second half mirroring the first.
+        </p>
+        {result && (
+          <p className="text-xs text-emerald-400 mt-1">
+            ✓ Generated {result.roundsGenerated} rounds, {result.fixturesGenerated} fixtures
+          </p>
+        )}
+      </div>
+      {confirming ? (
+        <div className="flex items-center gap-2">
+          <button onClick={() => setConfirming(false)}
+            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
+          <button onClick={handleGenerate} disabled={generate.isPending}
+            className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50">
+            {generate.isPending ? "Generating…" : "Yes, Generate"}
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => setConfirming(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 text-xs font-semibold transition-colors">
+          <Plus className="w-3.5 h-3.5" /> Generate Season
+        </button>
+      )}
+    </div>
+  )
+}
+
 
 // ── Create Fixture Form ───────────────────────────────────────────────────────
 function CreateFixtureForm({ teams }) {
@@ -624,6 +682,9 @@ export default function FixtureResults({ fixtures }) {
           visible={showExportCard}
         />
       )}
+
+      {/* Auto-generate full season */}
+      <GenerateSeasonCard hasExistingFixtures={fixtures.length > 0} />
 
       {/* Create fixture form */}
       <CreateFixtureForm teams={teams} />

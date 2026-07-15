@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -266,6 +266,7 @@ const TABS = [
   { id: "fixtures",   label: "Fixtures",     icon: Calendar        },
   { id: "teamresults",label: "Team Results", icon: Users           },
   { id: "trades",     label: "Trades",       icon: ArrowLeftRight  },
+  { id: "auction",    label: "Auction",      icon: Gavel, href: "/admin/auction" },
 ]
 
 export default function AdminPage() {
@@ -318,11 +319,11 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-surface-border overflow-x-auto -mb-px mb-0">
-        {TABS.map(({ id, label, icon: Icon }) => {
+        {TABS.map(({ id, label, icon: Icon, href }) => {
           const isActive  = activeTab === id
           const showAlert = id === "trades" && pendingTrades.length > 0
           return (
-            <button key={id} onClick={() => setActiveTab(id)}
+            <button key={id} onClick={() => href ? navigate(href) : setActiveTab(id)}
               className={cn(
                 "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap",
                 isActive
