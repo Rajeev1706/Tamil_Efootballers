@@ -400,11 +400,31 @@ router.patch("/:id/password", authenticate, adminOnly, async (req, res, next) =>
   } catch (err) { next(err) }
 })
 
-// DELETE /api/teams/:id — admin deletes team
+// DELETE /api/teams/:id — admin deletes team. Players are NEVER deleted
+// by this — the database already sets players.team_id to NULL
+// automatically (they just become unassigned, remaining fully intact in
+// the system), same for the team owner's user account. Fixtures,
+// lineups, and trade requests involving this team cascade-delete
+// automatically too. What this explicitly cleans up first is everything
+// the database does NOT auto-handle for a team reference (auction bid
+// history, retentions, sales, live bidder state, and playoff records) —
+// without doing this first, the delete would fail outright.
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
+    const teamId = req.params.id
+
+    await query("DELETE FROM auction_bid_log WHERE team_id = $1", [teamId])
+    await query("UPDATE auction_pool SET prev_team_id = NULL WHERE prev_team_id = $1", [teamId])
+    await query("DELETE FROM auction_retentions WHERE team_id = $1", [teamId])
+    await query("DELETE FROM auction_sales WHERE team_id = $1", [teamId])
+    await query("UPDATE auction_sessions SET current_bidder_team_id = NULL WHERE current_bidder_team_id = $1", [teamId])
+    await query(
+      "DELETE FROM team_league_playoffs WHERE team1_id = $1 OR team2_id = $1 OR winner_team_id = $1",
+      [teamId]
+    )
+
     const result = await query(
-      "DELETE FROM teams WHERE id = $1 RETURNING id, name", [req.params.id]
+      "DELETE FROM teams WHERE id = $1 RETURNING id, name", [teamId]
     )
     if (!result.rows[0]) return res.status(404).json({ error: "Team not found" })
     res.json({ deleted: true, team: result.rows[0] })
