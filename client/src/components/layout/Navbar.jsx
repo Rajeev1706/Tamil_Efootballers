@@ -71,7 +71,7 @@ function NavLink({ to, label, icon: Icon, active }) {
       )}
     >
       <Icon className="w-4 h-4 flex-shrink-0" />
-      <span>{label}</span>
+      <span className="nav-label">{label}</span>
     </Link>
   )
 }
