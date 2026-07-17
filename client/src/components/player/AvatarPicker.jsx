@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { X, Check, UserRound, Upload, Loader2, ImageIcon } from "lucide-react"
+import { X, Check, UserRound, Upload, Loader2, ImageIcon, Ban } from "lucide-react"
 import { AVATARS } from "../../lib/avatars"
 import { uploadPlayerAvatarImage } from "../../lib/supabase"
 import { useSetPlayerAvatar } from "../../lib/queries"
@@ -50,13 +50,6 @@ export default function AvatarPicker({ player, onClose }) {
     else                   { setBgFile(file);     setBgPreview(url) }
   }
 
-  const handleRemoveCustom = () => {
-    setMode("preset")
-    setStagedPresetId(null) // explicit: clear to no avatar at all
-    setAvatarFile(null); setBgFile(null)
-    setAvatarPreview(null); setBgPreview(null)
-  }
-
   const handleSave = async () => {
     if (!hasChanges) return
     setError(null)
@@ -64,7 +57,7 @@ export default function AvatarPicker({ player, onClose }) {
     try {
       const body = {}
       if (mode === "preset") {
-        body.avatarId = stagedPresetId
+        body.avatarId = stagedPresetId // null = explicitly clear everything
       } else if (mode === "custom") {
         if (avatarFile) body.avatarUrl   = await uploadPlayerAvatarImage(player.id, avatarFile, "avatar")
         if (bgFile)     body.avatarBgUrl = await uploadPlayerAvatarImage(player.id, bgFile, "bg")
@@ -86,6 +79,11 @@ export default function AvatarPicker({ player, onClose }) {
   const displayAvatarUrl = mode === "custom" ? avatarPreview : mode === "unchanged" ? player.avatarUrl : null
   const displayBgUrl     = mode === "custom" ? bgPreview     : mode === "unchanged" ? player.avatarBgUrl : null
   const effectivePresetId = mode === "preset" ? stagedPresetId : (mode === "unchanged" && !showingCustom ? player.avatarId : null)
+
+  // "None" is active whenever nothing at all is currently set/staged —
+  // covers clearing a preset, clearing a custom upload, or just the
+  // player's natural starting state if they never had an avatar.
+  const noneActive = !showingCustom && effectivePresetId == null
 
   return (
     <div
@@ -153,29 +151,37 @@ export default function AvatarPicker({ player, onClose }) {
               ref={bgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => pickFileLocally(e.target.files?.[0], "bg")}
             />
-
-            {showingCustom && (
-              <button
-                onClick={handleRemoveCustom}
-                disabled={saving}
-                className="text-xs text-slate-500 hover:text-rose-400 transition-colors mt-3 disabled:opacity-50"
-              >
-                Remove custom images
-              </button>
-            )}
           </div>
 
-          {/* ── Preset characters ── */}
+          {/* ── Preset characters (includes a "None" option) ── */}
           <div>
             <p className="section-label mb-3">Or pick a character</p>
-            {AVATARS.length === 0 ? (
-              <div className="text-center py-8">
-                <UserRound className="w-7 h-7 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No preset characters available yet</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-                {AVATARS.map(a => {
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+              {/* None — clears whatever is currently set, custom or preset */}
+              <button
+                onClick={() => pickPresetLocally(null)}
+                disabled={saving}
+                className={cn(
+                  "relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50",
+                  noneActive ? "border-accent bg-accent/10" : "border-dashed border-surface-border hover:border-rose-400/40"
+                )}
+                title="No avatar"
+              >
+                <Ban className={cn("w-5 h-5", noneActive ? "text-accent" : "text-slate-500")} />
+                <span className={cn("text-[10px] font-medium", noneActive ? "text-accent" : "text-slate-500")}>None</span>
+                {noneActive && (
+                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 text-pitch-900" />
+                  </div>
+                )}
+              </button>
+
+              {AVATARS.length === 0 ? (
+                <div className="col-span-3 sm:col-span-4 flex items-center justify-center text-sm text-slate-500">
+                  No preset characters available yet
+                </div>
+              ) : (
+                AVATARS.map(a => {
                   const active = !showingCustom && a.id === effectivePresetId
                   return (
                     <button
@@ -198,9 +204,9 @@ export default function AvatarPicker({ player, onClose }) {
                       )}
                     </button>
                   )
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
         </div>
 

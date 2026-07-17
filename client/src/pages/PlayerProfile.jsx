@@ -150,7 +150,7 @@ export default function PlayerProfile() {
         {avatarBg && (
           <div className="sm:hidden">
             <div
-              className="absolute inset-0 bg-cover bg-center"
+              className="absolute inset-0 bg-cover bg-top"
               style={{ backgroundImage: `url(${avatarBg})` }}
             />
             <div className="absolute inset-0 bg-pitch-900/70" />
@@ -203,10 +203,6 @@ export default function PlayerProfile() {
                     boxShadow: `0 0 14px rgba(${teamColor.css},0.15)`,
                   } : undefined}
                 >
-                  <span
-                    className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", !teamColor && "bg-accent")}
-                    style={teamColor ? { background: teamTextColor } : undefined}
-                  />
                   {player.team}
                 </span>
               )}
