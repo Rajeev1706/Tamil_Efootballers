@@ -101,7 +101,7 @@ router.get("/current", async (req, res, next) => {
 // their real current team.
 router.post("/start", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { budgetPerTeam } = z.object({ budgetPerTeam: z.number().int().positive().default(1000) }).parse(req.body)
+    const { budgetPerTeam } = z.object({ budgetPerTeam: z.number().int().positive().default(1100) }).parse(req.body)
     const activeRes = await query("SELECT id FROM auction_sessions WHERE status != 'completed' LIMIT 1")
     if (activeRes.rows.length > 0) {
       return res.status(400).json({ error: "An auction is already in progress. Complete or delete it first." })

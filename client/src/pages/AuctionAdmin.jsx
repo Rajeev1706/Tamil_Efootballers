@@ -22,7 +22,7 @@ const CARD_COLORS = { silver: "border-slate-400 text-slate-300", gold: "border-g
 
 // ── Screen 0: no session yet ────────────────────────────────────────────
 function StartScreen() {
-  const [budget, setBudget] = useState(1000)
+  const [budget, setBudget] = useState(1100)
   const startAuction = useStartAuction()
   return (
     <div className="max-w-md mx-auto mt-20 card p-6 text-center">

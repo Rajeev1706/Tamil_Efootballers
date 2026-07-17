@@ -3,6 +3,7 @@ import { Pencil, Trash2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Use
 import { useTeams, useDeleteTeam, useUpdateTeam, useUnassignPlayer, useChangeTeamPassword } from "../../lib/queries"
 import PlayerAvatar from "../common/PlayerAvatar"
 import GradeBadge from "../common/GradeBadge"
+import { TeamAvatar } from "../common/TeamLogo"
 import { cn } from "../../lib/utils"
 
 function RosterPlayerRow({ player }) {
@@ -126,9 +127,14 @@ function TeamRow({ team, players }) {
         </button>
 
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-lg bg-surface-border flex items-center justify-center text-sm font-bold text-slate-400 flex-shrink-0">
-          {team.name.charAt(0)}
-        </div>
+        <TeamAvatar
+          logoUrl={team.logoUrl}
+          name={team.name}
+          size="w-8 h-8"
+          textSize="text-sm"
+          className="rounded-lg"
+          fallbackClassName="bg-surface-border text-slate-400 rounded-lg"
+        />
 
         {/* Name */}
         <div className="flex-1 min-w-0">

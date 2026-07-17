@@ -67,6 +67,9 @@ CREATE TABLE IF NOT EXISTS players (
   market_value  INT          NOT NULL DEFAULT 0,
   bdr_points    INT          NOT NULL DEFAULT 0,
   form          CHAR(1)[]    DEFAULT '{}',
+  avatar_id     VARCHAR(64),
+  avatar_url    TEXT,
+  avatar_bg_url TEXT,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -232,7 +235,11 @@ SELECT
   p.trophy3_count AS "trophy3Count",
   p.trophy4_count AS "trophy4Count",
   t.name          AS team,
-  p.team_id       AS "teamId"
+  p.team_id       AS "teamId",
+  t.logo_url      AS "teamLogo",
+  p.avatar_id     AS "avatarId",
+  p.avatar_url    AS "avatarUrl",
+  p.avatar_bg_url AS "avatarBgUrl"
 FROM players p
 LEFT JOIN teams t ON p.team_id = t.id;
 `

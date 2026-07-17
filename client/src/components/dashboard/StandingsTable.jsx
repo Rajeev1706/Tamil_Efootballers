@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Target, Trophy } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures } from "../../lib/queries"
+import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import teamLeagueTrophy from "../../../images/Team League.png"
 import goldenBoot from "../../../images/Golden Boot.png"
 
@@ -15,9 +16,10 @@ function PlayoffMatchCard({ label, match }) {
     <div className="bg-pitch-800 border border-surface-border rounded-xl px-4 py-3 w-full max-w-[15rem]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 text-center">{label}</p>
       <div className="flex items-center justify-between">
-        <span className={cn("text-sm font-medium truncate flex-1",
+        <span className={cn("text-sm font-medium truncate flex-1 inline-flex items-center gap-1.5",
           !match?.team1Name ? "text-slate-600 italic" : t1Won ? "text-emerald-400" : "text-white"
         )}>
+          <TeamLogoIcon logoUrl={match?.team1Logo} name={match?.team1Name} />
           {match?.team1Name ?? "TBD"}
         </span>
         <span className="text-xs font-mono text-slate-500 px-2 flex-shrink-0">
@@ -25,9 +27,10 @@ function PlayoffMatchCard({ label, match }) {
         </span>
       </div>
       <div className="flex items-center justify-between mt-1">
-        <span className={cn("text-sm font-medium truncate flex-1",
+        <span className={cn("text-sm font-medium truncate flex-1 inline-flex items-center gap-1.5",
           !match?.team2Name ? "text-slate-600 italic" : t2Won ? "text-emerald-400" : "text-white"
         )}>
+          <TeamLogoIcon logoUrl={match?.team2Logo} name={match?.team2Name} />
           {match?.team2Name ?? "TBD"}
         </span>
         <span className="text-xs font-mono text-slate-500 px-2 flex-shrink-0">
@@ -123,10 +126,11 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                   <div key={f.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-border/50">
                     <span
                       onClick={() => f.homeTeamId && onPlayerClick?.({ id: f.homeTeamId, name: f.home, isTeam: true })}
-                      className={cn("flex-1 min-w-0 truncate font-medium text-right pr-3",
+                      className={cn("flex-1 min-w-0 flex items-center justify-end gap-1.5 truncate font-medium text-right pr-3",
                         homeWon ? "text-emerald-400" : "text-white"
                       )}>
                       {f.home ?? "TBD"}
+                      <TeamLogoIcon logoUrl={f.homeLogo} name={f.home} />
                     </span>
                     <span className="flex-shrink-0 text-xs px-2">
                       {isCompleted ? (
@@ -138,9 +142,10 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                       )}
                     </span>
                     <span
-                      className={cn("flex-1 min-w-0 truncate font-medium pl-3",
+                      className={cn("flex-1 min-w-0 flex items-center gap-1.5 truncate font-medium pl-3",
                         awayWon ? "text-emerald-400" : "text-white"
                       )}>
+                      <TeamLogoIcon logoUrl={f.awayLogo} name={f.away} />
                       {f.away ?? "TBD"}
                     </span>
                   </div>
@@ -243,12 +248,11 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0",
-                          isFirst ? "bg-gold/25 text-gold" : "bg-surface-border text-slate-400"
-                        )}>
-                          {team.name.charAt(0)}
-                        </div>
+                        <TeamAvatar
+                          logoUrl={team.logoUrl}
+                          name={team.name}
+                          fallbackClassName={isFirst ? "bg-gold/25 text-gold" : "bg-surface-border text-slate-400"}
+                        />
                         <span className={cn("font-medium", isFirst ? "text-gold" : "text-slate-300")}>
                           {team.name}
                         </span>
@@ -324,7 +328,12 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                           {scorer.name}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-400 text-xs">{scorer.team ?? "—"}</td>
+                      <td className="py-3 px-4 text-slate-400 text-xs">
+                        <span className="inline-flex items-center gap-1.5">
+                          <TeamLogoIcon logoUrl={scorer.teamLogo} name={scorer.team} />
+                          {scorer.team ?? "—"}
+                        </span>
+                      </td>
                       <td className="py-3 px-3 text-center">
                         <span className={cn("font-bold font-mono text-sm", isFirst ? "text-emerald-400" : "text-white")}>
                           {scorer.goals}

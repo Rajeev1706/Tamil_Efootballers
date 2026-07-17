@@ -166,6 +166,54 @@ const updateSchema = z.object({
   message: "Provide at least one field to update",
 })
 
+// PATCH /api/players/:id/avatar — public, no auth. Anyone on the Player
+// Profile page can set/clear a player's avatar — either a preset character
+// (avatarId, looked up from the bundled images/ folder) or a custom
+// upload (avatarUrl / avatarBgUrl, stored in Supabase). The two are
+// mutually exclusive: choosing a preset clears any custom upload, and
+// uploading a custom image clears the preset selection, so the hero
+// background is never ambiguous about which one to show.
+router.patch("/:id/avatar", async (req, res, next) => {
+  try {
+    const schema = z.object({
+      avatarId:    z.string().max(64).regex(/^[a-zA-Z0-9_-]+$/).nullable().optional(),
+      avatarUrl:   z.string().url().nullable().optional(),
+      avatarBgUrl: z.string().url().nullable().optional(),
+    })
+    const body = schema.parse(req.body)
+
+    const avatarIdProvided    = "avatarId" in req.body
+    const avatarUrlProvided   = "avatarUrl" in req.body
+    const avatarBgUrlProvided = "avatarBgUrl" in req.body
+
+    if (!avatarIdProvided && !avatarUrlProvided && !avatarBgUrlProvided) {
+      return res.status(400).json({ error: "Nothing to update" })
+    }
+
+    // Uploading either custom image switches this player into "custom"
+    // mode (clears the preset). Setting avatarId switches back into
+    // "preset" mode (clears both custom fields).
+    const switchingToCustom = avatarUrlProvided || avatarBgUrlProvided
+
+    const result = await query(`
+      UPDATE players SET
+        avatar_id     = CASE WHEN $1 THEN $2 WHEN $3 THEN NULL ELSE avatar_id END,
+        avatar_url    = CASE WHEN $4 THEN $5 WHEN $1 THEN NULL ELSE avatar_url END,
+        avatar_bg_url = CASE WHEN $6 THEN $7 WHEN $1 THEN NULL ELSE avatar_bg_url END
+      WHERE id = $8
+      RETURNING id, avatar_id AS "avatarId", avatar_url AS "avatarUrl", avatar_bg_url AS "avatarBgUrl"
+    `, [
+      avatarIdProvided, body.avatarId ?? null,
+      switchingToCustom,
+      avatarUrlProvided, body.avatarUrl ?? null,
+      avatarBgUrlProvided, body.avatarBgUrl ?? null,
+      req.params.id,
+    ])
+    if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })
+    res.json(result.rows[0])
+  } catch (err) { next(err) }
+})
+
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {

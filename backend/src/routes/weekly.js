@@ -112,7 +112,7 @@ router.get("/public/top-scorers", async (req, res, next) => {
 
     const result = await query(`
       SELECT
-        p.id, p.name, t.name AS team,
+        p.id, p.name, t.name AS team, t.logo_url AS "teamLogo",
         COALESCE(SUM(
           CASE
             WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
@@ -133,7 +133,7 @@ router.get("/public/top-scorers", async (req, res, next) => {
       JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
       LEFT JOIN teams t ON p.team_id = t.id
       WHERE wtm.tournament_id = $1
-      GROUP BY p.id, p.name, t.name
+      GROUP BY p.id, p.name, t.name, t.logo_url
       ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
     `, [t.rows[0].id])
@@ -156,7 +156,7 @@ router.get("/:id", async (req, res, next) => {
     if (!t.rows[0]) return res.status(404).json({ error: "Tournament not found" })
 
     const players = await query(`
-      SELECT wtp.seed, p.id, p.name, t.name AS team
+      SELECT wtp.seed, p.id, p.name, t.name AS team, t.logo_url AS "teamLogo"
       FROM weekly_tournament_players wtp
       JOIN players p ON p.id = wtp.player_id
       LEFT JOIN teams t ON p.team_id = t.id

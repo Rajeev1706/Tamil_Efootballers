@@ -3,9 +3,9 @@ import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, f
 
 export const QK = {
   teams:    ["teams"],
-  team:     (id)     => ["teams", id],
+  team:     (id)     => ["teams", String(id)],
   players:  (params) => ["players", params ?? {}],
-  player:   (id)     => ["players", id],
+  player:   (id)     => ["players", String(id)],
   records:  ["records"],
   fixtures: (params) => ["fixtures", params ?? {}],
   recent:   ["fixtures", "recent"],
@@ -282,6 +282,17 @@ export const useUpdatePlayer = () => {
   return useMutation({
     mutationFn: ({ id, ...body }) => playersApi.update(id, body),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["players"] })
+    },
+  })
+}
+
+export const useSetPlayerAvatar = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => playersApi.setAvatar(id, body),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: QK.player(id) })
       qc.invalidateQueries({ queryKey: ["players"] })
     },
   })

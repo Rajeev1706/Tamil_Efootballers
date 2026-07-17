@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import { Search, Users, X } from "lucide-react"
+import { TeamLogoIcon } from "../common/TeamLogo"
 
 export default function PlayersDirectory({ players, onPlayerClick }) {
   const [query, setQuery] = useState("")
@@ -77,7 +78,12 @@ export default function PlayersDirectory({ players, onPlayerClick }) {
                       <span className="text-xs text-slate-500 ml-2">"{player.alias}"</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-slate-400 text-xs">{player.team ?? "—"}</td>
+                  <td className="py-3 px-4 text-slate-400 text-xs">
+                    <span className="inline-flex items-center gap-2">
+                      <TeamLogoIcon logoUrl={player.teamLogo} name={player.team} />
+                      {player.team ?? "—"}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

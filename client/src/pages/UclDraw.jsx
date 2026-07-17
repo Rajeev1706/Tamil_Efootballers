@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Trophy } from "lucide-react"
 import { useUclAdminGroups } from "../lib/queries"
 import { uclApi } from "../lib/api"
+import { TeamLogoIcon } from "../components/common/TeamLogo"
 
 export default function UclDraw() {
   const navigate = useNavigate()
@@ -125,7 +126,12 @@ export default function UclDraw() {
                     {i + 1}
                   </div>
                   <span className="text-base font-semibold text-white">{p.name}</span>
-                  {p.team && <span className="text-xs text-slate-500 ml-auto">{p.team}</span>}
+                  {p.team && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
+                      <TeamLogoIcon logoUrl={p.teamLogo} name={p.team} />
+                      {p.team}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

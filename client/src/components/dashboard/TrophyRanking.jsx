@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Trophy } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { TeamLogoIcon } from "../common/TeamLogo"
 import ballondorTrophy    from "../../../images/ballondor.png"
 import teamLeagueTrophy   from "../../../images/Team League.png"
 import weeklyTrophy       from "../../../images/Weekly.png"
@@ -105,7 +106,12 @@ export default function TrophyRanking({ players, onPlayerClick, trophyKey: contr
                         {player.name}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-400 text-xs">{player.team}</td>
+                    <td className="py-3 px-4 text-slate-400 text-xs">
+                      <span className="inline-flex items-center gap-2">
+                        <TeamLogoIcon logoUrl={player.teamLogo} name={player.team} />
+                        {player.team}
+                      </span>
+                    </td>
                     <td className="py-3 px-3 text-center">
                       <span className={cn("font-bold font-mono text-sm", isFirst ? "text-gold" : "text-white")}>
                         {count}

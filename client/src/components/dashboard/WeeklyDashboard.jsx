@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Trophy, Target, Calendar } from "lucide-react"
 import { useWeeklyCurrent, useWeeklyTopScorers } from "../../lib/queries"
 import { cn } from "../../lib/utils"
+import { TeamLogoIcon } from "../common/TeamLogo"
 import weeklyLogo from "../../../images/Weekly.png"
 import goldenBootLogo from "../../../images/Golden Boot.png"
 
@@ -192,7 +193,12 @@ export default function WeeklyDashboard({ onPlayerClick }) {
                           {scorer.name}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-400 text-xs">{scorer.team ?? "—"}</td>
+                      <td className="py-3 px-4 text-slate-400 text-xs">
+                        <span className="inline-flex items-center gap-1.5">
+                          <TeamLogoIcon logoUrl={scorer.teamLogo} name={scorer.team} />
+                          {scorer.team ?? "—"}
+                        </span>
+                      </td>
                       <td className="py-3 px-3 text-center text-slate-400 text-sm">{scorer.conceded}</td>
                       <td className="py-3 px-3 text-center">
                         <span className={cn("font-bold font-mono text-sm", isFirst ? "text-emerald-400" : "text-white")}>

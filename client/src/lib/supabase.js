@@ -26,6 +26,25 @@ export async function uploadPlayerImage(playerId, file) {
   return data.publicUrl
 }
 
+export async function uploadPlayerAvatarImage(playerId, file, kind) {
+  const ext  = file.name.split(".").pop().toLowerCase()
+  // kind is "avatar" or "bg" — kept in the path so both images for the
+  // same player never collide with each other.
+  const path = `avatar-${kind}-${playerId}-${Date.now()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from("player-images")
+    .upload(path, file, { upsert: true, contentType: file.type })
+
+  if (error) throw new Error(error.message)
+
+  const { data } = supabase.storage
+    .from("player-images")
+    .getPublicUrl(path)
+
+  return data.publicUrl
+}
+
 export async function uploadTeamLogo(teamId, file) {
   const ext  = file.name.split(".").pop().toLowerCase()
   // Same fix as uploadPlayerImage — unique path per upload, not a fixed

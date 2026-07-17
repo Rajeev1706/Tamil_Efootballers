@@ -200,6 +200,7 @@ router.get("/top-scorers", async (req, res, next) => {
         p.id,
         p.name,
         t.name AS team,
+        t.logo_url AS "teamLogo",
         COALESCE(SUM(
           CASE
             WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
@@ -219,7 +220,7 @@ router.get("/top-scorers", async (req, res, next) => {
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.match_type = 'league'
       LEFT JOIN teams t ON p.team_id = t.id
-      GROUP BY p.id, p.name, t.name
+      GROUP BY p.id, p.name, t.name, t.logo_url
       ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
     `)

@@ -1,5 +1,6 @@
 import { TrendingUp } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { TeamLogoIcon } from "../common/TeamLogo"
 
 export default function MarketValues({ players, onPlayerClick }) {
   const sorted = [...players].sort((a, b) =>
@@ -58,7 +59,12 @@ export default function MarketValues({ players, onPlayerClick }) {
                       {player.name}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-slate-400 text-xs">{player.team}</td>
+                  <td className="py-3 px-4 text-slate-400 text-xs">
+                    <span className="inline-flex items-center gap-2">
+                      <TeamLogoIcon logoUrl={player.teamLogo} name={player.team} />
+                      {player.team}
+                    </span>
+                  </td>
                   <td className="py-3 px-3 text-center">
                     <span className={cn("font-bold font-mono text-sm", isFirst ? "text-gold" : "text-white")}>
                       {player.marketValue}

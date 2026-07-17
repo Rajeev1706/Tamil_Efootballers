@@ -4,6 +4,7 @@ import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2 } from "lucide-react"
 import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament, useUpdateMatchPlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
 import Confetti from "../components/common/Confetti"
+import { TeamLogoIcon } from "../components/common/TeamLogo"
 
 function getRoundLabel(round, totalRounds) {
   const fromEnd = totalRounds - round
@@ -326,7 +327,8 @@ export default function WeeklyBracket() {
         <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">{tournament.player_count} Players</p>
         <div className="flex flex-wrap gap-2">
           {tournament.players?.map(p => (
-            <span key={p.player_id} className="px-2.5 py-1 bg-pitch-800 border border-surface-border rounded-lg text-xs text-slate-300">
+            <span key={p.player_id} className="px-2.5 py-1 bg-pitch-800 border border-surface-border rounded-lg text-xs text-slate-300 inline-flex items-center gap-1.5">
+              <TeamLogoIcon logoUrl={p.teamLogo} name={p.team} size="w-4 h-4" />
               {p.name}{p.team && <span className="text-slate-600 ml-1">({p.team})</span>}
             </span>
           ))}

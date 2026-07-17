@@ -82,7 +82,7 @@ router.get("/admin-groups", authenticate, adminOnly, async (req, res, next) => {
   try {
     const groupsRes = await query("SELECT * FROM ucl_groups ORDER BY name ASC")
     const playersRes = await query(`
-      SELECT p.id, p.name, p.ucl_group_id AS "groupId", t.name AS team
+      SELECT p.id, p.name, p.ucl_group_id AS "groupId", t.name AS team, t.logo_url AS "teamLogo"
       FROM players p
       LEFT JOIN teams t ON p.team_id = t.id
       WHERE p.ucl_group_id IS NOT NULL
@@ -365,7 +365,7 @@ router.get("/groups", async (req, res, next) => {
   try {
     const groupsRes = await query("SELECT * FROM ucl_groups WHERE status = 'active' ORDER BY name ASC")
     const playersRes = await query(`
-      SELECT p.id, p.name, p.ucl_group_id AS "groupId", t.name AS team
+      SELECT p.id, p.name, p.ucl_group_id AS "groupId", t.name AS team, t.logo_url AS "teamLogo"
       FROM players p
       LEFT JOIN teams t ON p.team_id = t.id
       WHERE p.ucl_group_id IS NOT NULL
@@ -383,7 +383,7 @@ router.get("/groups", async (req, res, next) => {
 router.get("/unassigned", authenticate, adminOnly, async (req, res, next) => {
   try {
     const result = await query(`
-      SELECT p.id, p.name, t.name AS team
+      SELECT p.id, p.name, t.name AS team, t.logo_url AS "teamLogo"
       FROM players p
       LEFT JOIN teams t ON p.team_id = t.id
       WHERE p.ucl_group_id IS NULL
@@ -515,7 +515,7 @@ router.get("/standings", async (req, res, next) => {
 
     const statsRes = await query(`
       SELECT
-        p.id, p.name, p.ucl_group_id AS "groupId", t.name AS team,
+        p.id, p.name, p.ucl_group_id AS "groupId", t.name AS team, t.logo_url AS "teamLogo",
         COUNT(mr.id) AS played,
         SUM(CASE
           WHEN (mr.player_id = p.id AND mr.result = 'win') OR (mr.opponent_id = p.id AND mr.result = 'loss') THEN 1 ELSE 0
@@ -531,7 +531,7 @@ router.get("/standings", async (req, res, next) => {
       LEFT JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.match_type = 'ucl'
       WHERE p.ucl_group_id IS NOT NULL
-      GROUP BY p.id, p.name, p.ucl_group_id, t.name
+      GROUP BY p.id, p.name, p.ucl_group_id, t.name, t.logo_url
     `)
 
     const groups = groupsRes.rows.map(g => {
@@ -568,6 +568,7 @@ router.get("/top-scorers", async (req, res, next) => {
         p.id,
         p.name,
         t.name AS team,
+        t.logo_url AS "teamLogo",
         g.name AS "groupName",
         COALESCE(SUM(
           CASE
@@ -590,7 +591,7 @@ router.get("/top-scorers", async (req, res, next) => {
       LEFT JOIN teams t      ON p.team_id      = t.id
       LEFT JOIN ucl_groups g ON p.ucl_group_id = g.id
       WHERE p.ucl_group_id IS NOT NULL AND g.status = 'active'
-      GROUP BY p.id, p.name, t.name, g.name
+      GROUP BY p.id, p.name, t.name, t.logo_url, g.name
       ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
     `)

@@ -97,3 +97,45 @@ export function useTeamColor(logoUrl) {
 
   return color
 }
+
+/**
+ * Some crests are dominated by a dark navy/maroon/black — fine as a subtle
+ * background wash, but unreadable as text on a dark UI. This returns a
+ * lightness-floored version of the same hue, safe to use for text/icons.
+ */
+export function readableTeamColor(color) {
+  if (!color) return null
+  const { r, g, b } = color
+  const max = Math.max(r, g, b) / 255
+  const min = Math.min(r, g, b) / 255
+  const l = (max + min) / 2
+
+  if (l >= 0.55) return color.hex
+
+  const d = max - min
+  if (d < 0.02) return "#cbd5e1" // achromatic (black/white/grey) crest — neutral light grey, no arbitrary hue
+
+  let h = 0
+  if (max === r / 255) h = ((g / 255 - b / 255) / d) % 6
+  else if (max === g / 255) h = (b / 255 - r / 255) / d + 2
+  else h = (r / 255 - g / 255) / d + 4
+  h *= 60
+  if (h < 0) h += 360
+
+  const s = d / (1 - Math.abs(2 * l - 1))
+  const targetL = 0.62
+  const targetS = Math.max(s, 0.55)
+
+  const c = (1 - Math.abs(2 * targetL - 1)) * targetS
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = targetL - c / 2
+  let [r2, g2, b2] = h < 60 ? [c, x, 0]
+    : h < 120 ? [x, c, 0]
+    : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c]
+    : h < 300 ? [x, 0, c]
+    : [c, 0, x]
+
+  const toHex = v => Math.round((v + m) * 255).toString(16).padStart(2, "0")
+  return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`
+}

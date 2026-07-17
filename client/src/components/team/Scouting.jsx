@@ -4,6 +4,7 @@ import GradeBadge from "../common/GradeBadge"
 import TradeModal from "./TradeModal"
 import { useRequestTrade, useFavorites, useToggleFavorite } from "../../lib/queries"
 import { getMVTier, cn } from "../../lib/utils"
+import { TeamLogoIcon } from "../common/TeamLogo"
 
 const GRADES = ["All","S","A","B","C"]
 
@@ -147,11 +148,17 @@ export default function Scouting({ allPlayers, myTeamName, myPlayers = [], myPur
                       <span className="text-sm font-medium text-white hover:text-accent transition-colors">{player.name}</span>
                       {player.isCaptain && <Crown className="w-3 h-3 text-gold flex-shrink-0" />}
                     </div>
-                    <p className="text-xs text-slate-600 sm:hidden">{player.team}</p>
+                    <p className="text-xs text-slate-600 sm:hidden inline-flex items-center gap-1.5">
+                      <TeamLogoIcon logoUrl={player.teamLogo} name={player.team} size="w-3 h-3" />
+                      {player.team}
+                    </p>
                   </div>
                 </button>
                 <div><GradeBadge grade={player.grade} /></div>
-                <p className="hidden sm:block text-sm text-slate-400 truncate">{player.team}</p>
+                <p className="hidden sm:flex items-center gap-2 text-sm text-slate-400 truncate">
+                  <TeamLogoIcon logoUrl={player.teamLogo} name={player.team} />
+                  {player.team}
+                </p>
                 <p className={cn("text-sm font-mono text-right", player.isCaptain ? "font-bold text-gold" : "text-slate-400")}>
                   {player.isCaptain ? "CAP" : player.auctionPrice}
                 </p>

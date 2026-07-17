@@ -1,8 +1,12 @@
+import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
-import { ArrowLeft, Trophy, ImageIcon, Crown } from "lucide-react"
+import { ArrowLeft, Trophy, ImageIcon, Crown, UserRound, Pencil } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
+import AvatarPicker from "../components/player/AvatarPicker"
 import { usePlayer } from "../lib/queries"
+import { useTeamColor, readableTeamColor } from "../lib/teamColor"
+import { getAvatarById } from "../lib/avatars"
 import { cn } from "../lib/utils"
 import ballondorTrophy    from "../../images/ballondor.png"
 import teamLeagueTrophy   from "../../images/Team League.png"
@@ -107,6 +111,12 @@ export default function PlayerProfile() {
   const [searchParams] = useSearchParams()
   const showAuctionDelta = ["team", "admin"].includes(searchParams.get("ctx"))
   const { data: player, isLoading, isError } = usePlayer(id)
+  const teamColor = useTeamColor(player?.teamLogo)
+  const teamTextColor = readableTeamColor(teamColor)
+  const presetAvatar = getAvatarById(player?.avatarId)
+  const avatarThumb  = player?.avatarUrl    || presetAvatar?.thumb || null
+  const avatarBg     = player?.avatarBgUrl  || presetAvatar?.bg    || null
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   if (isLoading) return <Layout><Loading /></Layout>
   if (isError || !player) return (
@@ -125,7 +135,7 @@ export default function PlayerProfile() {
   const allHistory = player.matchHistory || []
 
   return (
-    <Layout>
+    <Layout backgroundImage={avatarBg}>
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium mb-5 transition-colors"
@@ -135,7 +145,20 @@ export default function PlayerProfile() {
 
       {/* ── Hero ── */}
       <div className="relative rounded-2xl overflow-hidden border border-surface-border mb-6">
-        <div className="absolute inset-0 bg-gradient-to-br from-pitch-800 via-pitch-800 to-pitch-700" />
+        {/* Mobile only — full-page bg is hidden below sm, so the hero gets
+            its own boxed-in copy of the character image instead */}
+        {avatarBg && (
+          <div className="sm:hidden">
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${avatarBg})` }}
+            />
+            <div className="absolute inset-0 bg-pitch-900/70" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-br from-pitch-800 via-pitch-800 to-pitch-700"
+          style={avatarBg ? { opacity: 0.45 } : undefined}
+        />
         <div className={cn("absolute inset-0",
           player.grade === "S"
             ? "bg-[radial-gradient(ellipse_at_top_right,rgba(245,158,11,0.12),transparent_60%)]"
@@ -144,7 +167,22 @@ export default function PlayerProfile() {
 
         <div className="relative px-6 py-8 sm:px-10">
           <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-            <div>
+            <div className="flex items-start gap-4">
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="group relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex-shrink-0 overflow-hidden border border-surface-border bg-pitch-800 flex items-center justify-center"
+                title="Choose avatar"
+              >
+                {avatarThumb ? (
+                  <img src={avatarThumb} alt={player.name} className="w-full h-full object-cover" />
+                ) : (
+                  <UserRound className="w-7 h-7 text-slate-600" />
+                )}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Pencil className="w-5 h-5 text-white" />
+                </div>
+              </button>
+              <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-extrabold text-white mb-1">{player.name}</h1>
                 {player.isCaptain && <Crown className="w-5 h-5 text-gold flex-shrink-0" />}
@@ -152,7 +190,27 @@ export default function PlayerProfile() {
               {player.alias && (
                 <p className="text-slate-400 text-sm mb-1">"{player.alias}"</p>
               )}
-              <p className="text-slate-500 text-sm">{player.team}</p>
+              {player.team && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 text-xs font-bold tracking-wide rounded-lg px-3 py-1.5 mt-1 border",
+                    !teamColor && "text-accent bg-accent/10 border-accent/25"
+                  )}
+                  style={teamColor ? {
+                    color: teamTextColor,
+                    background: `linear-gradient(90deg, rgba(${teamColor.css},0.16), rgba(${teamColor.css},0.05))`,
+                    borderColor: `rgba(${teamColor.css},0.4)`,
+                    boxShadow: `0 0 14px rgba(${teamColor.css},0.15)`,
+                  } : undefined}
+                >
+                  <span
+                    className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", !teamColor && "bg-accent")}
+                    style={teamColor ? { background: teamTextColor } : undefined}
+                  />
+                  {player.team}
+                </span>
+              )}
+            </div>
             </div>
 
             {player.form?.length > 0 && (
@@ -284,6 +342,13 @@ export default function PlayerProfile() {
       <div className="mt-6">
         <TrophyCase player={player} />
       </div>
+
+      {pickerOpen && (
+        <AvatarPicker
+          player={player}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </Layout>
   )
 }
