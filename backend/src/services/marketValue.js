@@ -12,13 +12,16 @@
  * Formula:
  *   1. Sum weighted "effective wins" (ewRaw) from the player's own match_records
  *      (as player_id), based on result + opponent grade.
- *   2. No ceiling — ew scales directly with ewRaw, uncapped, so continuing to
- *      win keeps growing market value indefinitely instead of plateauing.
- *   3. pp = ew * 3, winPct = ew / 14 (scaling reference only, not a cap)
- *   4. matchValue = pp * 5 + winPct * 85
- *   5. BDR swing — scaled by the player's current bdr_points, also uncapped —
+ *   2. ew scales directly with ewRaw, uncapped.
+ *   3. pp = ew * 3, winPct = ew / 14 (scaling reference only)
+ *   4. matchValue = min(pp * 5 + winPct * 85, MATCH_VALUE_CEILING) — the
+ *      match-performance component alone is capped at 450, so pure win
+ *      grinding tops out there.
+ *   5. BDR swing — scaled by the player's current bdr_points, uncapped —
  *      only applies once the player has a positive effective-win score
  *      (ewRaw > 0), i.e. they've actually won or drawn at least something.
+ *      This is added AFTER the match-value cap, so a player with enough BDR
+ *      points can legitimately push their total market value past 450.
  *   6. mvRaw = matchValue + bdrSwing
  *   7. Final value = max(50, round to nearest 5) — but ONLY if the player has
  *      ANY match involvement at all (as player_id or opponent_id). A player
@@ -31,7 +34,8 @@ const WIN_WEIGHT  = { S: 1.5,  "A+": 1.2,  A: 0.9,  B: 0.7,  C: 0.6  }
 const DRAW_WEIGHT = { S: 0.75, "A+": 0.60, A: 0.45, B: 0.35, C: 0.30 }
 const LOSS_WEIGHT = { S: -0.5, "A+": -0.6, A: -0.7, B: -0.8, C: -1.0 }
 
-const BDR_SWING_RATE = 36 / 120 // same per-point rate as the old 120-point-cap/36-point-swing, just uncapped now
+const BDR_SWING_RATE   = 36 / 120 // same per-point rate as before, uncapped
+const MATCH_VALUE_CEILING = 450   // ceiling on match-performance only, not the final total
 
 function resultWeight(result, grade) {
   if (result === "win")  return WIN_WEIGHT[grade]  ?? 0
@@ -70,13 +74,14 @@ export async function calculateMarketValue(playerId) {
     ewRaw += resultWeight(m.result, m.grade)
   }
 
-  const ew     = Math.max(ewRaw, 0) // no upper cap — keeps growing with more wins
-  const pp     = ew * 3
-  const winPct = Math.max(ew / 14, 0) // scaling reference, not a cap — can exceed 1
-  const matchValue = pp * 5 + winPct * 85
+  const ew          = Math.max(ewRaw, 0)
+  const pp          = ew * 3
+  const winPct      = Math.max(ew / 14, 0)
+  const matchValueRaw = pp * 5 + winPct * 85
+  const matchValue  = Math.min(matchValueRaw, MATCH_VALUE_CEILING) // ceiling here only
 
   const bdrPoints = playerRes.rows[0]?.bdr ?? 0
-  const bdrSwing  = ewRaw > 0 ? bdrPoints * BDR_SWING_RATE : 0 // no cap here either
+  const bdrSwing  = ewRaw > 0 ? bdrPoints * BDR_SWING_RATE : 0 // uncapped, added after the ceiling
 
   const mvRaw = matchValue + bdrSwing
   return Math.max(50, Math.round(mvRaw / 5) * 5)

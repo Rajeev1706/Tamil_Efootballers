@@ -170,7 +170,7 @@ BEGIN
   ew       := GREATEST(ew_raw, 0);
   pp       := ew * 3;
   win_pct  := GREATEST(ew / 14.0, 0);
-  mv_raw   := pp * 5 + win_pct * 85;
+  mv_raw   := LEAST(pp * 5 + win_pct * 85, 450);
   final_mv := GREATEST(50, ROUND(mv_raw / 5.0) * 5);
 
   RETURN final_mv;
