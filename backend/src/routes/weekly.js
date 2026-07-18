@@ -87,9 +87,9 @@ router.get("/public/current", async (req, res, next) => {
         wtm.round, wtm.match_number AS "matchNumber", wtm.status,
         wtm.player1_score AS "player1Score", wtm.player2_score AS "player2Score",
         p1.id AS "player1Id", p1.name AS "player1Name",
-        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl",
+        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
         p2.id AS "player2Id", p2.name AS "player2Name",
-        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl",
+        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl",
         w.id  AS "winnerId"
       FROM weekly_tournament_matches wtm
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
@@ -171,9 +171,9 @@ router.get("/:id", async (req, res, next) => {
       SELECT
         wtm.*,
         p1.name AS "player1Name",
-        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl",
+        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
         p2.name AS "player2Name",
-        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl",
+        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl",
         w.name  AS "winnerName"
       FROM weekly_tournament_matches wtm
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
@@ -342,9 +342,8 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
 
     const fresh = await query(`
       SELECT wtm.*, p1.name AS "player1Name", p2.name AS "player2Name",
-        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl",
-        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl"
-      FROM weekly_tournament_matches wtm
+        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
+        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl"
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
       LEFT JOIN players p2 ON wtm.player2_id = p2.id
       WHERE wtm.id = $1

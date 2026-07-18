@@ -55,7 +55,7 @@ function FireworkBurst({ bottom, left, delay = "0s", rise = "-500px", color = "#
 // Season's pinnacle award — black card, gold brush-stroke corners, a
 // circular star-flanked medallion, and the winner's name in a bold
 // brush-script font, matching the reference style directly.
-export default function BallonDorCelebration({ trophyImage, winnerName, bdrPoints }) {
+export default function BallonDorCelebration({ trophyImage, winnerName, bdrPoints, avatarImage, bgImage }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-celebration-backdrop overflow-hidden">
       <FireworkBurst bottom="0" left="15%" delay="0s" rise="-620px" />
@@ -68,13 +68,32 @@ export default function BallonDorCelebration({ trophyImage, winnerName, bdrPoint
                        px-7 py-10 sm:px-10 sm:py-12 mx-4 w-[min(26rem,calc(100vw-2rem))] text-center overflow-hidden"
         style={{ borderColor: "#D9A441", boxShadow: "0 0 60px rgba(217,164,65,0.25)" }}
       >
+        {bgImage && (
+          <>
+            <div className="absolute inset-0 bg-cover bg-top" style={{ backgroundImage: `url(${bgImage})` }} />
+            <div className="absolute inset-0 bg-black/50" />
+          </>
+        )}
         <BrushStrokes />
 
         <div className="relative z-10">
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-5 animate-trophy-float">
-            <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
-            <img src={trophyImage} alt="Ballon d'Or" className="relative w-24 h-24 sm:w-28 sm:h-28 object-contain animate-trophy-reveal" />
-          </div>
+          {avatarImage ? (
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-5 animate-trophy-float">
+              <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
+              <img
+                src={avatarImage}
+                alt=""
+                className="relative w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-full border-2"
+                style={{ borderColor: "#D9A441" }}
+              />
+              <img src={trophyImage} alt="Ballon d'Or" className="absolute -bottom-2 -right-2 w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-lg" />
+            </div>
+          ) : (
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-5 animate-trophy-float">
+              <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
+              <img src={trophyImage} alt="Ballon d'Or" className="relative w-24 h-24 sm:w-28 sm:h-28 object-contain animate-trophy-reveal" />
+            </div>
+          )}
 
           <p className="text-sm sm:text-base font-bold uppercase tracking-[0.15em] mb-3" style={{ color: "#F2C766" }}>
             Ballon d'Or

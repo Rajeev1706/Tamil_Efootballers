@@ -6,7 +6,7 @@ import TrophySparkles from "./TrophySparkles"
 // trophy with a 3D landing animation + idle float + twinkling sparkles,
 // and the champion's name revealed letter by letter. `children` renders
 // extra content below the subtitle (e.g. a team's player roster).
-export default function ChampionCelebration({ trophyImage, eyebrow, title, subtitle, badgeImage, children }) {
+export default function ChampionCelebration({ trophyImage, eyebrow, title, subtitle, badgeImage, bgImage, children }) {
   const audioRef = useRef(null)
 
   useEffect(() => {
@@ -23,7 +23,14 @@ export default function ChampionCelebration({ trophyImage, eyebrow, title, subti
       <div className="relative animate-champion-pop animate-shine-sweep
                        bg-gradient-to-b from-pitch-800 to-pitch-900 border-2 border-gold/50
                        shadow-[0_0_80px_rgba(245,158,11,0.3)] rounded-2xl
-                       px-6 py-8 sm:px-14 sm:py-14 mx-4 max-w-[26rem] text-center">
+                       px-6 py-8 sm:px-14 sm:py-14 mx-4 max-w-[26rem] text-center overflow-hidden">
+        {bgImage && (
+          <>
+            <div className="absolute inset-0 bg-cover bg-top" style={{ backgroundImage: `url(${bgImage})` }} />
+            <div className="absolute inset-0 bg-pitch-900/50" />
+          </>
+        )}
+        <div className="relative">
         <div className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 sm:mb-6 animate-trophy-float">
           <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
           <TrophySparkles />
@@ -39,6 +46,7 @@ export default function ChampionCelebration({ trophyImage, eyebrow, title, subti
         />
         <p className="text-slate-300 text-sm">{subtitle}</p>
         {children}
+        </div>
       </div>
     </div>
   )

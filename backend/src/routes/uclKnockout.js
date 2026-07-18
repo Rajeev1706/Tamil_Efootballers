@@ -23,7 +23,8 @@ router.get("/public/current", async (req, res, next) => {
       SELECT
         km.round, km.match_number AS "matchNumber", km.status,
         km.player1_id AS "player1Id", km.player2_id AS "player2Id", km.winner_id AS "winnerId",
-        p1.name AS "player1Name", p2.name AS "player2Name"
+        p1.name AS "player1Name", p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
+        p2.name AS "player2Name", p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl"
       FROM ucl_knockout_matches km
       LEFT JOIN players p1 ON km.player1_id = p1.id
       LEFT JOIN players p2 ON km.player2_id = p2.id
@@ -160,8 +161,8 @@ router.get("/:id", async (req, res, next) => {
     const matches = await query(`
       SELECT
         km.*,
-        p1.name AS "player1Name", p1g.name AS "player1Group",
-        p2.name AS "player2Name", p2g.name AS "player2Group",
+        p1.name AS "player1Name", p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl", p1g.name AS "player1Group",
+        p2.name AS "player2Name", p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl", p2g.name AS "player2Group",
         w.name  AS "winnerName"
       FROM ucl_knockout_matches km
       LEFT JOIN players p1 ON km.player1_id = p1.id

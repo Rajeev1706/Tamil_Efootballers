@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star, Gavel } from "lucide-react"
 import { cn } from "../lib/utils"
+import { getAvatarById } from "../lib/avatars"
 import Layout from "../components/layout/Layout"
 import StandingsTable from "../components/dashboard/StandingsTable"
 import BDRRanking from "../components/dashboard/BDRRanking"
@@ -22,6 +23,17 @@ import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
 import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useAuctionCurrent } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
+
+// Resolves a player's chosen avatar — custom upload takes priority,
+// falls back to their picked preset character, then to nothing at all.
+function resolveAvatar(obj) {
+  if (!obj) return { thumb: null, bg: null }
+  const preset = getAvatarById(obj.avatarId)
+  return {
+    thumb: obj.avatarUrl || preset?.thumb || null,
+    bg: obj.avatarBgUrl || preset?.bg || null,
+  }
+}
 
 const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
   <div className="card p-4 flex items-start gap-3">
@@ -167,20 +179,36 @@ export default function CommonDashboard() {
   const weeklyChampion = weeklyFinalMatch
     ? (weeklyFinalMatch.winnerId === weeklyFinalMatch.player1Id ? weeklyFinalMatch.player1Name : weeklyFinalMatch.player2Name)
     : null
+  const weeklyChampionAvatar = weeklyFinalMatch
+    ? resolveAvatar(
+        weeklyFinalMatch.winnerId === weeklyFinalMatch.player1Id
+          ? { avatarId: weeklyFinalMatch.player1AvatarId, avatarUrl: weeklyFinalMatch.player1AvatarUrl, avatarBgUrl: weeklyFinalMatch.player1AvatarBgUrl }
+          : { avatarId: weeklyFinalMatch.player2AvatarId, avatarUrl: weeklyFinalMatch.player2AvatarUrl, avatarBgUrl: weeklyFinalMatch.player2AvatarBgUrl }
+      )
+    : { thumb: null, bg: null }
 
   // TEST-ONLY: ?testCelebration=SomePlayerName previews this instantly.
+  // If the name matches a real player, their real avatar/background shows
+  // too — type a player who actually has one set (e.g. ?testCelebration=Sidhu)
+  // to preview that. Otherwise it's just a fake name with no avatar.
   const testWeeklyActive = urlParams.has("testCelebration")
   const testWeeklyParam  = urlParams.get("testCelebration")
+  const testWeeklyMatchedPlayer = testWeeklyParam
+    ? players.find(p => p.name.toLowerCase() === testWeeklyParam.toLowerCase())
+    : null
   const testWeeklyName   = testWeeklyActive
-    ? (testWeeklyParam && !["1", "true"].includes(testWeeklyParam) ? testWeeklyParam : "Test Player")
+    ? (testWeeklyMatchedPlayer?.name || (testWeeklyParam && !["1", "true"].includes(testWeeklyParam) ? testWeeklyParam : "Test Player"))
     : null
   const displayWeeklyChampion = testWeeklyName || weeklyChampion
+  const displayWeeklyChampionAvatar = testWeeklyActive
+    ? resolveAvatar(testWeeklyMatchedPlayer)
+    : weeklyChampionAvatar
 
   useEffect(() => {
     if (!testWeeklyActive) return
     setShowWeeklyCelebration(true)
     const dismiss = () => setShowWeeklyCelebration(false)
-    const timer = setTimeout(dismiss, 7000)
+    const timer = setTimeout(dismiss, 10000)
     document.addEventListener("click", dismiss)
     return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,7 +222,7 @@ export default function CommonDashboard() {
       setShowWeeklyCelebration(true)
       localStorage.setItem(key, "1")
       const dismiss = () => setShowWeeklyCelebration(false)
-      const timer = setTimeout(dismiss, 7000)
+      const timer = setTimeout(dismiss, 10000)
       document.addEventListener("click", dismiss)
       return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     }
@@ -276,20 +304,33 @@ export default function CommonDashboard() {
   const uclChampion = uclFinalMatch
     ? (uclFinalMatch.winnerId === uclFinalMatch.player1Id ? uclFinalMatch.player1Name : uclFinalMatch.player2Name)
     : null
+  const uclChampionAvatar = uclFinalMatch
+    ? resolveAvatar(
+        uclFinalMatch.winnerId === uclFinalMatch.player1Id
+          ? { avatarId: uclFinalMatch.player1AvatarId, avatarUrl: uclFinalMatch.player1AvatarUrl, avatarBgUrl: uclFinalMatch.player1AvatarBgUrl }
+          : { avatarId: uclFinalMatch.player2AvatarId, avatarUrl: uclFinalMatch.player2AvatarUrl, avatarBgUrl: uclFinalMatch.player2AvatarBgUrl }
+      )
+    : { thumb: null, bg: null }
 
   // TEST-ONLY: ?testUclCelebration=SomePlayerName previews this instantly.
   const testUclActive = urlParams.has("testUclCelebration")
   const testUclParam  = urlParams.get("testUclCelebration")
+  const testUclMatchedPlayer = testUclParam
+    ? players.find(p => p.name.toLowerCase() === testUclParam.toLowerCase())
+    : null
   const testUclName   = testUclActive
-    ? (testUclParam && !["1", "true"].includes(testUclParam) ? testUclParam : "Test Player")
+    ? (testUclMatchedPlayer?.name || (testUclParam && !["1", "true"].includes(testUclParam) ? testUclParam : "Test Player"))
     : null
   const displayUclChampion = testUclName || uclChampion
+  const displayUclChampionAvatar = testUclActive
+    ? resolveAvatar(testUclMatchedPlayer)
+    : uclChampionAvatar
 
   useEffect(() => {
     if (!testUclActive) return
     setShowUclCelebration(true)
     const dismiss = () => setShowUclCelebration(false)
-    const timer = setTimeout(dismiss, 7000)
+    const timer = setTimeout(dismiss, 10000)
     document.addEventListener("click", dismiss)
     return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -303,7 +344,7 @@ export default function CommonDashboard() {
       setShowUclCelebration(true)
       localStorage.setItem(key, "1")
       const dismiss = () => setShowUclCelebration(false)
-      const timer = setTimeout(dismiss, 7000)
+      const timer = setTimeout(dismiss, 10000)
       document.addEventListener("click", dismiss)
       return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     }
@@ -323,13 +364,22 @@ export default function CommonDashboard() {
     : null
 
   // TEST-ONLY: ?testBallonDor=1 previews this instantly, skipping the
-  // UCL-first sequencing, for quick testing.
+  // UCL-first sequencing, for quick testing. ?testBallonDor=SomePlayerName
+  // previews with that specific player instead of the real current leader —
+  // useful for checking a player's avatar/background who isn't actually #1.
   const testBallonDorActive = urlParams.has("testBallonDor")
+  const testBallonDorParam  = urlParams.get("testBallonDor")
+  const testBallonDorMatchedPlayer = testBallonDorParam && !["1", "true"].includes(testBallonDorParam)
+    ? players.find(p => p.name.toLowerCase() === testBallonDorParam.toLowerCase())
+    : null
+  const displayBallonDorWinner = testBallonDorActive
+    ? (testBallonDorMatchedPlayer || ballonDorWinner)
+    : ballonDorWinner
   useEffect(() => {
     if (!testBallonDorActive) return
     setShowBallonDorCelebration(true)
     const dismiss = () => setShowBallonDorCelebration(false)
-    const timer = setTimeout(dismiss, 7000)
+    const timer = setTimeout(dismiss, 10000)
     document.addEventListener("click", dismiss)
     return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -358,7 +408,7 @@ export default function CommonDashboard() {
     if (testBallonDorActive) return
     if (!showBallonDorCelebration) return
     const dismiss = () => setShowBallonDorCelebration(false)
-    const timer = setTimeout(dismiss, 7000)
+    const timer = setTimeout(dismiss, 10000)
     document.addEventListener("click", dismiss)
     return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
   }, [showBallonDorCelebration, testBallonDorActive])
@@ -450,6 +500,8 @@ export default function CommonDashboard() {
           eyebrow="Weekly Tournament"
           title={displayWeeklyChampion}
           subtitle="is the Weekly Champion! 🎉"
+          badgeImage={displayWeeklyChampionAvatar.thumb}
+          bgImage={displayWeeklyChampionAvatar.bg}
         >
           {weeklyGoldenBoot && <GoldenBootBadge scorer={weeklyGoldenBoot} />}
         </ChampionCelebration>
@@ -472,14 +524,18 @@ export default function CommonDashboard() {
           eyebrow="UCL"
           title={displayUclChampion}
           subtitle="is the UCL Champion! 🏆"
+          badgeImage={displayUclChampionAvatar.thumb}
+          bgImage={displayUclChampionAvatar.bg}
         >
           {uclGoldenBoot && <GoldenBootBadge scorer={uclGoldenBoot} />}
         </ChampionCelebration>
-      ) : showBallonDorCelebration && ballonDorWinner ? (
+      ) : showBallonDorCelebration && displayBallonDorWinner ? (
         <BallonDorCelebration
           trophyImage={ballonDorTrophy}
-          winnerName={ballonDorWinner.name}
-          bdrPoints={ballonDorWinner.bdrPoints}
+          winnerName={displayBallonDorWinner.name}
+          bdrPoints={displayBallonDorWinner.bdrPoints}
+          avatarImage={resolveAvatar(displayBallonDorWinner).thumb}
+          bgImage={resolveAvatar(displayBallonDorWinner).bg}
         />
       ) : null}
       {/* Live auction banner — only shows when an auction is actually active */}
