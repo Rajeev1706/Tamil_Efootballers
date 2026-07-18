@@ -64,7 +64,8 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
 
   return (
     <div className={cn("border-b border-surface-border/50", justSaved && "animate-result-flash")}>
-      <div className="flex items-center justify-between px-5 py-3.5">
+      <div className="flex items-center px-5 py-3.5">
+        <span className="text-xs text-slate-600 font-mono w-9 flex-shrink-0">#{match.match_number}</span>
         <div className="flex-1 min-w-0 text-left flex items-center gap-2">
           {match.player1_id && (
             <PlayerAvatarIcon player={{ avatarId: match.player1AvatarId, avatarUrl: match.player1AvatarUrl, name: match.player1Name }} />

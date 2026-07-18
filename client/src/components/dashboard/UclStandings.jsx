@@ -249,25 +249,32 @@ export default function UclStandings({ onPlayerClick }) {
                   const p1IsWinner = isCompleted && m.winnerId === m.player1Id
                   const p2IsWinner = isCompleted && m.winnerId === m.player2Id
                   return (
-                    <div key={`${m.round}-${m.matchNumber}`} className="flex items-center justify-between px-5 py-3.5 border-b border-surface-border/50">
+                    <div key={`${m.round}-${m.matchNumber}`} className="flex items-center px-5 py-3.5 border-b border-surface-border/50">
+                      <span className="text-xs text-slate-600 font-mono w-9 flex-shrink-0">#{m.matchNumber}</span>
                       <span
                         onClick={() => m.player1Id && onPlayerClick?.({ id: m.player1Id, name: m.player1Name })}
-                        className={cn("flex-1 min-w-0 truncate font-medium",
+                        className={cn("flex-1 min-w-0 flex items-center gap-2 font-medium",
                           m.player1Id ? "cursor-pointer hover:text-accent" : "",
                           !m.player1Id ? "text-slate-600 italic" : p1IsWinner ? "text-emerald-400" : "text-white"
                         )}>
-                        {m.player1Name ?? "TBD"}
+                        {m.player1Id && (
+                          <PlayerAvatarIcon player={{ avatarId: m.player1AvatarId, avatarUrl: m.player1AvatarUrl, name: m.player1Name }} />
+                        )}
+                        <span className="truncate">{m.player1Name ?? "TBD"}</span>
                       </span>
                       <div className="px-4 flex-shrink-0">
                         <span className="text-xs text-slate-600">vs</span>
                       </div>
                       <span
                         onClick={() => m.player2Id && onPlayerClick?.({ id: m.player2Id, name: m.player2Name })}
-                        className={cn("flex-1 min-w-0 truncate font-medium text-right",
+                        className={cn("flex-1 min-w-0 flex items-center justify-end gap-2 font-medium text-right",
                           m.player2Id ? "cursor-pointer hover:text-accent" : "",
                           !m.player2Id ? "text-slate-600 italic" : p2IsWinner ? "text-emerald-400" : "text-white"
                         )}>
-                        {m.player2Name ?? "TBD"}
+                        <span className="truncate">{m.player2Name ?? "TBD"}</span>
+                        {m.player2Id && (
+                          <PlayerAvatarIcon player={{ avatarId: m.player2AvatarId, avatarUrl: m.player2AvatarUrl, name: m.player2Name }} />
+                        )}
                       </span>
                     </div>
                   )

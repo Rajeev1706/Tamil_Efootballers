@@ -66,7 +66,8 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
 
   return (
     <div className={cn("border-b border-surface-border/50", justSaved && "animate-result-flash")}>
-      <div className="flex items-center justify-between px-5 py-3.5">
+      <div className="flex items-center px-5 py-3.5">
+        <span className="text-xs text-slate-600 font-mono w-9 flex-shrink-0">#{match.match_number}</span>
         <span className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
           !match.player1_id ? "text-slate-600 italic" :
           isCompleted && p1IsWinner ? "text-emerald-400" : "text-white"

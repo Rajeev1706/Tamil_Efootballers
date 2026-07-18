@@ -113,7 +113,8 @@ export default function WeeklyDashboard({ onPlayerClick }) {
               const isBye = m.status === "bye"
               const isCompleted = m.status === "completed"
               return (
-                <div key={i} className="flex items-center justify-between px-5 py-3.5">
+                <div key={i} className="flex items-center px-5 py-3.5">
+                  <span className="text-xs text-slate-600 font-mono w-9 flex-shrink-0">#{m.matchNumber ?? i + 1}</span>
                   <button
                     onClick={() => m.player1Id && onPlayerClick?.({ id: m.player1Id, name: m.player1Name })}
                     className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
