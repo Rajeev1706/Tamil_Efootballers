@@ -3,6 +3,7 @@ import { Target, Trophy } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
+import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import teamLeagueTrophy from "../../../images/Team League.png"
 import goldenBoot from "../../../images/Golden Boot.png"
 
@@ -324,7 +325,8 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                         }
                       </td>
                       <td className="py-3 px-4">
-                        <span className={cn("font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                        <span className={cn("inline-flex items-center gap-2 font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                          <PlayerAvatarIcon player={scorer} />
                           {scorer.name}
                         </span>
                       </td>

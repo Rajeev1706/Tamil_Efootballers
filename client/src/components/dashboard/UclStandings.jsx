@@ -3,6 +3,7 @@ import { Trophy, Target, Swords } from "lucide-react"
 import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent, useUclFixturesPublic } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { TeamLogoIcon } from "../common/TeamLogo"
+import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import uclTrophy from "../../../images/ucl.png"
 import goldenBootGB from "../../../images/ucl_gb.png"
 
@@ -187,13 +188,18 @@ export default function UclStandings({ onPlayerClick }) {
                     <span className={cn("text-sm font-medium", i < 4 ? "text-emerald-400" : "text-slate-500")}>{i + 1}</span>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={cn("font-medium", i === 0 ? "text-gold" : "text-slate-300")}>{p.name}</span>
-                    {p.team && (
-                      <span className="inline-flex items-center gap-1 text-xs text-slate-600 ml-2">
-                        <TeamLogoIcon logoUrl={p.teamLogo} name={p.team} size="w-4 h-4" />
-                        {p.team}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <PlayerAvatarIcon player={p} />
+                      <div>
+                        <span className={cn("font-medium", i === 0 ? "text-gold" : "text-slate-300")}>{p.name}</span>
+                        {p.team && (
+                          <div className="flex items-center gap-1 text-xs text-slate-600 mt-0.5">
+                            <TeamLogoIcon logoUrl={p.teamLogo} name={p.team} size="w-4 h-4" />
+                            {p.team}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3 px-2 text-center text-slate-400">{p.played}</td>
                   <td className="py-3 px-2 text-center text-emerald-400 font-semibold">{p.won}</td>
@@ -310,7 +316,8 @@ export default function UclStandings({ onPlayerClick }) {
                         }
                       </td>
                       <td className="py-3 px-4">
-                        <span className={cn("font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                        <span className={cn("inline-flex items-center gap-2 font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                          <PlayerAvatarIcon player={scorer} />
                           {scorer.name}
                         </span>
                       </td>

@@ -4,6 +4,7 @@ import { Trophy } from "lucide-react"
 import { useUclAdminGroups } from "../lib/queries"
 import { uclApi } from "../lib/api"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
+import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
 
 export default function UclDraw() {
   const navigate = useNavigate()
@@ -125,6 +126,7 @@ export default function UclDraw() {
                   <div className="w-6 h-6 rounded-full bg-accent/15 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {i + 1}
                   </div>
+                  <PlayerAvatarIcon player={p} />
                   <span className="text-base font-semibold text-white">{p.name}</span>
                   {p.team && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
@@ -174,7 +176,10 @@ export default function UclDraw() {
                 <p className="text-xs font-bold text-accent mb-2">{g.name}</p>
                 <div className="space-y-1">
                   {g.players.map(p => (
-                    <p key={p.id} className="text-xs text-slate-300 truncate">{p.name}</p>
+                    <p key={p.id} className="text-xs text-slate-300 flex items-center gap-1.5 min-w-0">
+                      <PlayerAvatarIcon player={p} />
+                      <span className="truncate">{p.name}</span>
+                    </p>
                   ))}
                 </div>
               </div>

@@ -5,6 +5,7 @@ import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament, use
 import { cn } from "../lib/utils"
 import Confetti from "../components/common/Confetti"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
+import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
 
 function getRoundLabel(round, totalRounds) {
   const fromEnd = totalRounds - round
@@ -66,11 +67,14 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   return (
     <div className={cn("border-b border-surface-border/50", justSaved && "animate-result-flash")}>
       <div className="flex items-center justify-between px-5 py-3.5">
-        <span className={cn("font-medium text-left flex-1 truncate",
+        <span className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
           !match.player1_id ? "text-slate-600 italic" :
           isCompleted && p1IsWinner ? "text-emerald-400" : "text-white"
         )}>
-          {isBye && !match.player1_id ? "BYE" : (match.player1Name ?? "TBD")}
+          {!isBye && match.player1_id && (
+            <PlayerAvatarIcon player={{ avatarId: match.player1AvatarId, avatarUrl: match.player1AvatarUrl, name: match.player1Name }} />
+          )}
+          <span className="truncate">{isBye && !match.player1_id ? "BYE" : (match.player1Name ?? "TBD")}</span>
         </span>
 
         <div className="px-4 flex-shrink-0">
@@ -85,11 +89,14 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
           )}
         </div>
 
-        <span className={cn("font-medium text-right flex-1 truncate",
+        <span className={cn("font-medium text-right flex-1 min-w-0 flex items-center justify-end gap-2",
           !match.player2_id ? "text-slate-600 italic" :
           isCompleted && p2IsWinner ? "text-emerald-400" : "text-white"
         )}>
-          {match.player2Name ?? "TBD"}
+          <span className="truncate">{match.player2Name ?? "TBD"}</span>
+          {match.player2_id && (
+            <PlayerAvatarIcon player={{ avatarId: match.player2AvatarId, avatarUrl: match.player2AvatarUrl, name: match.player2Name }} />
+          )}
         </span>
       </div>
 
@@ -328,6 +335,7 @@ export default function WeeklyBracket() {
         <div className="flex flex-wrap gap-2">
           {tournament.players?.map(p => (
             <span key={p.player_id} className="px-2.5 py-1 bg-pitch-800 border border-surface-border rounded-lg text-xs text-slate-300 inline-flex items-center gap-1.5">
+              <PlayerAvatarIcon player={p} />
               <TeamLogoIcon logoUrl={p.teamLogo} name={p.team} size="w-4 h-4" />
               {p.name}{p.team && <span className="text-slate-600 ml-1">({p.team})</span>}
             </span>

@@ -87,7 +87,9 @@ router.get("/public/current", async (req, res, next) => {
         wtm.round, wtm.match_number AS "matchNumber", wtm.status,
         wtm.player1_score AS "player1Score", wtm.player2_score AS "player2Score",
         p1.id AS "player1Id", p1.name AS "player1Name",
+        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl",
         p2.id AS "player2Id", p2.name AS "player2Name",
+        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl",
         w.id  AS "winnerId"
       FROM weekly_tournament_matches wtm
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
@@ -113,6 +115,7 @@ router.get("/public/top-scorers", async (req, res, next) => {
     const result = await query(`
       SELECT
         p.id, p.name, t.name AS team, t.logo_url AS "teamLogo",
+        p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
         COALESCE(SUM(
           CASE
             WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
@@ -133,7 +136,7 @@ router.get("/public/top-scorers", async (req, res, next) => {
       JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
       LEFT JOIN teams t ON p.team_id = t.id
       WHERE wtm.tournament_id = $1
-      GROUP BY p.id, p.name, t.name, t.logo_url
+      GROUP BY p.id, p.name, t.name, t.logo_url, p.avatar_id, p.avatar_url
       ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
     `, [t.rows[0].id])
@@ -156,7 +159,7 @@ router.get("/:id", async (req, res, next) => {
     if (!t.rows[0]) return res.status(404).json({ error: "Tournament not found" })
 
     const players = await query(`
-      SELECT wtp.seed, p.id, p.name, t.name AS team, t.logo_url AS "teamLogo"
+      SELECT wtp.seed, p.id, p.name, t.name AS team, t.logo_url AS "teamLogo", p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl"
       FROM weekly_tournament_players wtp
       JOIN players p ON p.id = wtp.player_id
       LEFT JOIN teams t ON p.team_id = t.id
@@ -168,7 +171,9 @@ router.get("/:id", async (req, res, next) => {
       SELECT
         wtm.*,
         p1.name AS "player1Name",
+        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl",
         p2.name AS "player2Name",
+        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl",
         w.name  AS "winnerName"
       FROM weekly_tournament_matches wtm
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
@@ -336,7 +341,9 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
     }
 
     const fresh = await query(`
-      SELECT wtm.*, p1.name AS "player1Name", p2.name AS "player2Name"
+      SELECT wtm.*, p1.name AS "player1Name", p2.name AS "player2Name",
+        p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl",
+        p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl"
       FROM weekly_tournament_matches wtm
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
       LEFT JOIN players p2 ON wtm.player2_id = p2.id

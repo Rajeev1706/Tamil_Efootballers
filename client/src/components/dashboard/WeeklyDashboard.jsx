@@ -3,6 +3,7 @@ import { Trophy, Target, Calendar } from "lucide-react"
 import { useWeeklyCurrent, useWeeklyTopScorers } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { TeamLogoIcon } from "../common/TeamLogo"
+import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import weeklyLogo from "../../../images/Weekly.png"
 import goldenBootLogo from "../../../images/Golden Boot.png"
 
@@ -115,12 +116,15 @@ export default function WeeklyDashboard({ onPlayerClick }) {
                 <div key={i} className="flex items-center justify-between px-5 py-3.5">
                   <button
                     onClick={() => m.player1Id && onPlayerClick?.({ id: m.player1Id, name: m.player1Name })}
-                    className={cn("font-medium text-left flex-1 truncate",
+                    className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
                       m.winnerId === m.player1Id ? "text-white" : "text-slate-400",
                       !m.player1Id && "text-slate-600 italic"
                     )}
                   >
-                    {m.player1Name ?? "TBD"}
+                    {m.player1Id && (
+                      <PlayerAvatarIcon player={{ avatarId: m.player1AvatarId, avatarUrl: m.player1AvatarUrl, name: m.player1Name }} />
+                    )}
+                    <span className="truncate">{m.player1Name ?? "TBD"}</span>
                   </button>
 
                   <div className="px-4 flex-shrink-0">
@@ -137,12 +141,15 @@ export default function WeeklyDashboard({ onPlayerClick }) {
 
                   <button
                     onClick={() => m.player2Id && onPlayerClick?.({ id: m.player2Id, name: m.player2Name })}
-                    className={cn("font-medium text-right flex-1 truncate",
+                    className={cn("font-medium text-right flex-1 min-w-0 flex items-center justify-end gap-2",
                       m.winnerId === m.player2Id ? "text-white" : "text-slate-400",
                       !m.player2Id && "text-slate-600 italic"
                     )}
                   >
-                    {m.player2Name ?? "TBD"}
+                    <span className="truncate">{m.player2Name ?? "TBD"}</span>
+                    {m.player2Id && (
+                      <PlayerAvatarIcon player={{ avatarId: m.player2AvatarId, avatarUrl: m.player2AvatarUrl, name: m.player2Name }} />
+                    )}
                   </button>
                 </div>
               )
@@ -189,7 +196,8 @@ export default function WeeklyDashboard({ onPlayerClick }) {
                         }
                       </td>
                       <td className="py-3 px-4">
-                        <span className={cn("font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                        <span className={cn("inline-flex items-center gap-2 font-medium", isFirst ? "text-white" : "text-slate-300")}>
+                          <PlayerAvatarIcon player={scorer} />
                           {scorer.name}
                         </span>
                       </td>
