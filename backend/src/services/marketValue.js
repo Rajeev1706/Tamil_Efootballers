@@ -12,13 +12,13 @@
  * Formula:
  *   1. Sum weighted "effective wins" (ewRaw) from the player's own match_records
  *      (as player_id), based on result + opponent grade.
- *   2. Cap ewRaw at 14 to get ew.
- *   3. pp = ew * 3, winPct = ew / 14
+ *   2. No ceiling — ew scales directly with ewRaw, uncapped, so continuing to
+ *      win keeps growing market value indefinitely instead of plateauing.
+ *   3. pp = ew * 3, winPct = ew / 14 (scaling reference only, not a cap)
  *   4. matchValue = pp * 5 + winPct * 85
- *   5. BDR swing — up to 36 extra points, scaled by the player's current
- *      bdr_points (capped at 120) — only applies once the player has a
- *      positive effective-win score (ewRaw > 0), i.e. they've actually won or
- *      drawn at least something.
+ *   5. BDR swing — scaled by the player's current bdr_points, also uncapped —
+ *      only applies once the player has a positive effective-win score
+ *      (ewRaw > 0), i.e. they've actually won or drawn at least something.
  *   6. mvRaw = matchValue + bdrSwing
  *   7. Final value = max(50, round to nearest 5) — but ONLY if the player has
  *      ANY match involvement at all (as player_id or opponent_id). A player
@@ -31,8 +31,7 @@ const WIN_WEIGHT  = { S: 1.5,  "A+": 1.2,  A: 0.9,  B: 0.7,  C: 0.6  }
 const DRAW_WEIGHT = { S: 0.75, "A+": 0.60, A: 0.45, B: 0.35, C: 0.30 }
 const LOSS_WEIGHT = { S: -0.5, "A+": -0.6, A: -0.7, B: -0.8, C: -1.0 }
 
-const BDR_CAP   = 120
-const BDR_SWING = 36
+const BDR_SWING_RATE = 36 / 120 // same per-point rate as the old 120-point-cap/36-point-swing, just uncapped now
 
 function resultWeight(result, grade) {
   if (result === "win")  return WIN_WEIGHT[grade]  ?? 0
@@ -71,13 +70,13 @@ export async function calculateMarketValue(playerId) {
     ewRaw += resultWeight(m.result, m.grade)
   }
 
-  const ew     = Math.min(ewRaw, 14)
+  const ew     = Math.max(ewRaw, 0) // no upper cap — keeps growing with more wins
   const pp     = ew * 3
-  const winPct = Math.max(ew / 14, 0)
+  const winPct = Math.max(ew / 14, 0) // scaling reference, not a cap — can exceed 1
   const matchValue = pp * 5 + winPct * 85
 
   const bdrPoints = playerRes.rows[0]?.bdr ?? 0
-  const bdrSwing  = ewRaw > 0 ? (Math.min(bdrPoints, BDR_CAP) / BDR_CAP) * BDR_SWING : 0
+  const bdrSwing  = ewRaw > 0 ? bdrPoints * BDR_SWING_RATE : 0 // no cap here either
 
   const mvRaw = matchValue + bdrSwing
   return Math.max(50, Math.round(mvRaw / 5) * 5)

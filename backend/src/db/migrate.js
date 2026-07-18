@@ -167,7 +167,7 @@ BEGIN
   FROM match_records mr
   WHERE mr.player_id = p_player_id;
 
-  ew       := LEAST(ew_raw, 14);
+  ew       := GREATEST(ew_raw, 0);
   pp       := ew * 3;
   win_pct  := GREATEST(ew / 14.0, 0);
   mv_raw   := pp * 5 + win_pct * 85;
