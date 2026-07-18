@@ -1,4 +1,5 @@
 import LetterReveal from "./LetterReveal"
+import FireworkBurst from "./FireworkBurst"
 
 // Rough-edged diagonal gold streaks in the corners, approximating a
 // brush-painted texture across the black card — built from angled,
@@ -16,39 +17,6 @@ function BrushStrokes() {
       <div className="absolute bottom-6 -right-16 w-52 h-10 opacity-40 pointer-events-none"
         style={{ background: stroke, transform: "rotate(-18deg)", clipPath: "polygon(0% 20%, 100% 0%, 100% 80%, 0% 100%)" }} />
     </>
-  )
-}
-
-// A real two-stage firework: a small bright spark climbs from the bottom
-// (the "trail"), then right as it arrives, 8 rays burst outward from that
-// point and fade — not a static burst that just appears in place. Loops
-// continuously; --rise controls how high it climbs before bursting.
-function FireworkBurst({ bottom, left, delay = "0s", rise = "-500px", color = "#F2C766" }) {
-  const rays = [0, 45, 90, 135, 180, 225, 270, 315]
-  return (
-    <div className="absolute pointer-events-none" style={{ bottom, left }}>
-      <span
-        className="absolute bottom-0 left-0 w-[3px] rounded-full origin-bottom animate-firework-streak"
-        style={{ background: `linear-gradient(to top, transparent, ${color})`, "--rise": rise, animationDelay: delay }}
-      />
-      <span
-        className="absolute bottom-0 left-0 w-[4px] h-[4px] rounded-full animate-firework-trail"
-        style={{ background: color, "--rise": rise, animationDelay: delay, boxShadow: `0 0 6px 2px ${color}` }}
-      />
-      <div className="absolute bottom-0 left-0" style={{ transform: `translateY(${rise})` }}>
-        {rays.map((angle) => (
-          <span key={angle}
-            className="absolute top-0 left-0 w-[5px] h-[5px] rounded-full animate-firework-burst-ray"
-            style={{
-              background: color,
-              "--angle": `${angle}deg`,
-              animationDelay: delay,
-              boxShadow: `0 0 6px 1px ${color}`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -77,27 +45,23 @@ export default function BallonDorCelebration({ trophyImage, winnerName, bdrPoint
         <BrushStrokes />
 
         <div className="relative z-10">
-          {avatarImage ? (
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-5 animate-trophy-float">
-              <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
-              <img
-                src={avatarImage}
-                alt=""
-                className="relative w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-full border-2"
-                style={{ borderColor: "#D9A441" }}
-              />
-              <img src={trophyImage} alt="Ballon d'Or" className="absolute -bottom-2 -right-2 w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-lg" />
-            </div>
-          ) : (
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-5 animate-trophy-float">
-              <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
-              <img src={trophyImage} alt="Ballon d'Or" className="relative w-24 h-24 sm:w-28 sm:h-28 object-contain animate-trophy-reveal" />
-            </div>
-          )}
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-5 animate-trophy-float">
+            <div className="absolute inset-0 rounded-full bg-gold/25 blur-xl animate-glow-pulse" />
+            <img src={trophyImage} alt="Ballon d'Or" className="relative w-24 h-24 sm:w-28 sm:h-28 object-contain animate-trophy-reveal" />
+          </div>
 
           <p className="text-sm sm:text-base font-bold uppercase tracking-[0.15em] mb-3" style={{ color: "#F2C766" }}>
             Ballon d'Or
           </p>
+
+          {avatarImage && (
+            <img
+              src={avatarImage}
+              alt=""
+              className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-full border-2 mx-auto mb-3"
+              style={{ borderColor: "#D9A441" }}
+            />
+          )}
 
           <LetterReveal
             text={winnerName}
@@ -119,10 +83,12 @@ export default function BallonDorCelebration({ trophyImage, winnerName, bdrPoint
           </div>
 
           {bdrPoints != null && (
-            <p className="mt-4 text-sm" style={{ color: "#C9A24B" }}>
-              <span className="text-xl font-bold" style={{ color: "#F2C766" }}>{bdrPoints}</span>{" "}
-              <span className="text-slate-400">Total BDR</span>
-            </p>
+            <div className="mt-4 flex items-center justify-center">
+              <p className="text-sm bg-black/60 rounded-full px-4 py-1.5" style={{ color: "#C9A24B" }}>
+                <span className="text-xl font-bold" style={{ color: "#F2C766" }}>{bdrPoints}</span>{" "}
+                <span className="text-slate-400">Total BDR</span>
+              </p>
+            </div>
           )}
         </div>
       </div>

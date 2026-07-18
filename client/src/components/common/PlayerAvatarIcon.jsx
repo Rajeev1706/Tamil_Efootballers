@@ -6,7 +6,7 @@ import { cn } from "../../lib/utils"
 // admin-set real photo (that's PlayerAvatar.jsx, used elsewhere and left
 // untouched). Renders nothing if the player hasn't set one — the name
 // stays exactly as plain text like it does now.
-export default function PlayerAvatarIcon({ player, size = "w-10 h-10", className }) {
+export default function PlayerAvatarIcon({ player, size = "w-[43px] h-[43px]", className }) {
   if (!player) return null
   const preset = getAvatarById(player.avatarId)
   const src = player.avatarUrl || preset?.thumb

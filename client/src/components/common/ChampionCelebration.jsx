@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import LetterReveal from "./LetterReveal"
 import TrophySparkles from "./TrophySparkles"
+import FireworkBurst from "./FireworkBurst"
 
 // Full-screen "champion decided" takeover — dimmed vignette backdrop, a
 // trophy with a 3D landing animation + idle float + twinkling sparkles,
@@ -20,6 +21,11 @@ export default function ChampionCelebration({ trophyImage, eyebrow, title, subti
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center celebration-vignette backdrop-blur-sm animate-celebration-backdrop overflow-hidden">
       <audio ref={audioRef} src="/sounds/crowd-cheer.mp3" preload="auto" />
+      <FireworkBurst bottom="0" left="15%" delay="0s" rise="-620px" />
+      <FireworkBurst bottom="0" left="82%" delay="0.6s" rise="-680px" color="#fff" />
+      <FireworkBurst bottom="0" left="8%" delay="1.2s" rise="-540px" />
+      <FireworkBurst bottom="0" left="90%" delay="1.8s" rise="-600px" color="#fff" />
+      <FireworkBurst bottom="0" left="50%" delay="0.9s" rise="-720px" />
       <div className="relative animate-champion-pop animate-shine-sweep
                        bg-gradient-to-b from-pitch-800 to-pitch-900 border-2 border-gold/50
                        shadow-[0_0_80px_rgba(245,158,11,0.3)] rounded-2xl

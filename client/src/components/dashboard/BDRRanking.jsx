@@ -55,13 +55,13 @@ export default function BDRRanking({ players, onPlayerClick }) {
                     <img
                       src={avatarSrc}
                       alt={player.name}
-                      className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                      className="w-[43px] h-[43px] rounded-lg object-cover flex-shrink-0"
                     />
                   )
                 }
                 return (
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
+                    "w-[43px] h-[43px] rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
                     isFirst ? "bg-gold/20 text-gold" : "bg-surface-border text-slate-400"
                   )}>
                     {player.name.split(" ").map(n => n[0]).join("")}
