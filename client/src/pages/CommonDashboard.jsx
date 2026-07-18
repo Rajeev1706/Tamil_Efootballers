@@ -59,12 +59,14 @@ const GoldenBootBadge = ({ scorer }) => {
   }, [scorer.goals])
 
   return (
-    <div className="mt-4 pt-4 border-t border-surface-border/50 flex items-center justify-center gap-2.5">
-      <img src={goldenBootLogo} alt="Golden Boot" className="w-6 h-6 object-contain flex-shrink-0" />
-      <p className="text-sm text-slate-300">
-        Golden Boot: <span className="font-semibold text-white">{scorer.name}</span>
-        <span className="text-slate-500"> (<CountUp value={animatedGoals} duration={5500} /> goals)</span>
-      </p>
+    <div className="relative mt-4 pt-4 border-t border-surface-border/50 flex items-center justify-center">
+      <div className="flex items-center gap-2.5 bg-pitch-900/80 rounded-full px-3.5 py-1.5">
+        <img src={goldenBootLogo} alt="Golden Boot" className="w-6 h-6 object-contain flex-shrink-0" />
+        <p className="text-sm text-slate-300 whitespace-nowrap">
+          Golden Boot: <span className="font-semibold text-white">{scorer.name}</span>
+          <span className="text-slate-400"> (<CountUp value={animatedGoals} duration={5500} /> goals)</span>
+        </p>
+      </div>
     </div>
   )
 }
