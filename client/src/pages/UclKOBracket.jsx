@@ -4,6 +4,7 @@ import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2 } from "lucide-react"
 import { useUclKnockout, useSaveUclKnockoutResult, useResetUclKnockout, useUpdateUclKnockoutMatchPlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
 import Confetti from "../components/common/Confetti"
+import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
 
 const TOTAL_ROUNDS = 5 // fixed: R32 → R16 → QF → SF → Final, always
 
@@ -64,14 +65,19 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   return (
     <div className={cn("border-b border-surface-border/50", justSaved && "animate-result-flash")}>
       <div className="flex items-center justify-between px-5 py-3.5">
-        <div className="flex-1 min-w-0 text-left">
-          <span className={cn("font-medium truncate block",
-            !match.player1_id ? "text-slate-600 italic" :
-            isCompleted && p1IsWinner ? "text-emerald-400" : "text-white"
-          )}>
-            {match.player1Name ?? "TBD"}
-          </span>
-          {match.player1Group && <span className="text-xs text-slate-600">{match.player1Group}</span>}
+        <div className="flex-1 min-w-0 text-left flex items-center gap-2">
+          {match.player1_id && (
+            <PlayerAvatarIcon player={{ avatarId: match.player1AvatarId, avatarUrl: match.player1AvatarUrl, name: match.player1Name }} />
+          )}
+          <div className="min-w-0">
+            <span className={cn("font-medium truncate block",
+              !match.player1_id ? "text-slate-600 italic" :
+              isCompleted && p1IsWinner ? "text-emerald-400" : "text-white"
+            )}>
+              {match.player1Name ?? "TBD"}
+            </span>
+            {match.player1Group && <span className="text-xs text-slate-600">{match.player1Group}</span>}
+          </div>
         </div>
 
         <div className="px-4 flex-shrink-0">
@@ -84,14 +90,19 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
           )}
         </div>
 
-        <div className="flex-1 min-w-0 text-right">
-          <span className={cn("font-medium truncate block",
-            !match.player2_id ? "text-slate-600 italic" :
-            isCompleted && p2IsWinner ? "text-emerald-400" : "text-white"
-          )}>
-            {match.player2Name ?? "TBD"}
-          </span>
-          {match.player2Group && <span className="text-xs text-slate-600">{match.player2Group}</span>}
+        <div className="flex-1 min-w-0 text-right flex items-center justify-end gap-2">
+          <div className="min-w-0">
+            <span className={cn("font-medium truncate block",
+              !match.player2_id ? "text-slate-600 italic" :
+              isCompleted && p2IsWinner ? "text-emerald-400" : "text-white"
+            )}>
+              {match.player2Name ?? "TBD"}
+            </span>
+            {match.player2Group && <span className="text-xs text-slate-600">{match.player2Group}</span>}
+          </div>
+          {match.player2_id && (
+            <PlayerAvatarIcon player={{ avatarId: match.player2AvatarId, avatarUrl: match.player2AvatarUrl, name: match.player2Name }} />
+          )}
         </div>
       </div>
 

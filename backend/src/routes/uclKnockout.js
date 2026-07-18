@@ -87,52 +87,60 @@ function hasNoSameGroupPairs(players) {
 }
 
 // Helper: random draw — guaranteed no same-group R32 matchup
-function generateRandomMatches(allPlayers) {
-  let shuffled = shuffle(allPlayers)
+// Seeded Round of 32 pairing: within the qualifiers, group-1st-place
+// finishers face group-4th-place finishers, and 2nd-place finishers face
+// 3rd-place finishers — but always against a player from a DIFFERENT
+// group, never their own group's 4th (or 3rd) place finisher.
+// `groups` is an array of groups, each already ranked [1st, 2nd, 3rd, 4th]
+// by getGroupStandings().
+function generateSeededMatches(groups) {
+  // Only groups with a full 4 qualifiers participate in seeded pairing —
+  // a group short on registered players can't cleanly fill all four pots.
+  const fullGroups = groups.filter(g => g.length === 4)
 
-  // Fix any same-group pairs by swapping with a safe player
-  const MAX_PASSES = 100
-  for (let pass = 0; pass < MAX_PASSES; pass++) {
-    let fixed = true
-    for (let i = 0; i < shuffled.length - 1; i += 2) {
-      if (shuffled[i].groupId === shuffled[i + 1].groupId) {
-        fixed = false
-        // Find a player from a different group to swap with shuffled[i+1]
-        let swapped = false
-        for (let j = i + 2; j < shuffled.length; j++) {
-          const jPartner = j % 2 === 0 ? j + 1 : j - 1
-          const jPartnerPlayer = shuffled[jPartner]
-          // Swap if it doesn't create a new conflict
-          if (
-            shuffled[j].groupId !== shuffled[i].groupId &&
-            (!jPartnerPlayer || jPartnerPlayer.groupId !== shuffled[i + 1].groupId)
-          ) {
-            ;[shuffled[i + 1], shuffled[j]] = [shuffled[j], shuffled[i + 1]]
-            swapped = true
-            break
+  const pot1 = fullGroups.map(g => g[0]) // every group's 1st place
+  const pot2 = fullGroups.map(g => g[1]) // every group's 2nd place
+  const pot3 = fullGroups.map(g => g[2]) // every group's 3rd place
+  const pot4 = fullGroups.map(g => g[3]) // every group's 4th place
+
+  // Randomly pairs potA[i] with a shuffled potB, fixing any pairing where
+  // both players share a group by swapping within potB — same technique
+  // as the existing same-group-avoidance logic, just applied per-pot.
+  function pairPots(potA, potB) {
+    let shuffledB = shuffle(potB)
+    const MAX_PASSES = 100
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+      let hasConflict = false
+      for (let i = 0; i < potA.length; i++) {
+        if (potA[i].groupId === shuffledB[i].groupId) {
+          hasConflict = true
+          for (let j = 0; j < shuffledB.length; j++) {
+            if (j === i) continue
+            const swapSafe =
+              shuffledB[j].groupId !== potA[i].groupId &&
+              potA[j].groupId !== shuffledB[i].groupId
+            if (swapSafe) {
+              ;[shuffledB[i], shuffledB[j]] = [shuffledB[j], shuffledB[i]]
+              break
+            }
           }
         }
-        // If no direct swap found, do a full reshuffle of remaining players
-        if (!swapped) {
-          const remaining = shuffled.slice(i + 1)
-          shuffled = [...shuffled.slice(0, i + 1), ...shuffle(remaining)]
-        }
-        break
       }
+      if (!hasConflict) break
     }
-    if (fixed) break
+    return potA.map((p, i) => ({ p1Id: p.id, p2Id: shuffledB[i].id }))
   }
 
-  const matches = []
-  for (let i = 0; i < shuffled.length - 1; i += 2) {
-    matches.push({
-      matchNumber: Math.floor(i / 2) + 1,
-      p1Id: shuffled[i].id,
-      p2Id: shuffled[i + 1].id,
-    })
-  }
-  return matches
+  const pairs1v4 = pairPots(pot1, pot4)
+  const pairs2v3 = pairPots(pot2, pot3)
+
+  // Randomize which bracket slot each pairing lands in, so 1-vs-4 and
+  // 2-vs-3 matches are mixed throughout the draw rather than grouped.
+  const allPairs = shuffle([...pairs1v4, ...pairs2v3])
+
+  return allPairs.map((pair, i) => ({ matchNumber: i + 1, p1Id: pair.p1Id, p2Id: pair.p2Id }))
 }
+
 
 // GET /api/ucl-knockout — list all tournaments
 router.get("/", authenticate, adminOnly, async (req, res, next) => {
@@ -212,7 +220,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     }
 
     // Generate random R32 matches (no same-group pairs)
-    const r32Matches = generateRandomMatches(allPlayers)
+    const r32Matches = generateSeededMatches(groups)
 
     // Insert R32 matches
     for (const m of r32Matches) {
