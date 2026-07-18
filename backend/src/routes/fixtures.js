@@ -190,7 +190,7 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
       const roundNumber = i + 1
       for (const [homeId, awayId] of rounds[i]) {
         await query(
-          "INSERT INTO fixtures (home_team_id, away_team_id, round) VALUES ($1, $2, $3)",
+          "INSERT INTO fixtures (home_team_id, away_team_id, round, scheduled_date) VALUES ($1, $2, $3, CURRENT_DATE)",
           [homeId, awayId, roundNumber]
         )
         fixturesCreated++
