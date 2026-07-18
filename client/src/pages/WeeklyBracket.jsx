@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2 } from "lucide-react"
-import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament, useUpdateMatchPlayers } from "../lib/queries"
+import { useWeeklyTournament, useSaveWeeklyResult, useResetWeeklyTournament, useUpdateMatchPlayers, usePlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
 import Confetti from "../components/common/Confetti"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
@@ -232,6 +232,8 @@ export default function WeeklyBracket() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: tournament, refetch } = useWeeklyTournament(id)
+  const { data: rosterPlayersRaw = [] } = usePlayers()
+  const rosterPlayers = [...rosterPlayersRaw].sort((a, b) => a.name.localeCompare(b.name))
   const resetTournament = useResetWeeklyTournament()
   const [confirmReset, setConfirmReset] = useState(false)
   const [activeRound, setActiveRound] = useState(1)
@@ -322,7 +324,7 @@ export default function WeeklyBracket() {
                 match={match}
                 totalRounds={totalRounds}
                 tournamentId={parseInt(id)}
-                allPlayers={tournament.players || []}
+                allPlayers={rosterPlayers}
                 onSaved={refetch}
               />
             ))}
