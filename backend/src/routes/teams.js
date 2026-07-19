@@ -5,6 +5,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
+import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 
 const router = Router()
 
@@ -625,6 +626,36 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
           for (const p of playersRes.rows) await addBdr(p.id, bdr)
         }
       }
+
+      // Trophy awards — re-checked EVERY time the Final's result is saved
+      // (not gated by claimAward above), so correcting a wrong Final result
+      // later automatically reverts the wrong team's roster and reassigns
+      // the trophy to the actual correct champion's current roster.
+      const rosterRes = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
+      await reconcileTrophyRoster({
+        sourceKey: `team_league_champion_season_${match.season_number}`,
+        trophyColumn: "trophy2_count",
+        playerIds: rosterRes.rows.map(r => r.id),
+        seasonNumber: match.season_number,
+      })
+
+      const topScorerRes = await query(`
+        SELECT p.id,
+          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
+          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
+        FROM players p
+        LEFT JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='league'
+        GROUP BY p.id
+        ORDER BY goals DESC, conceded ASC
+        LIMIT 1
+      `)
+      const topScorer = topScorerRes.rows[0]
+      await awardOrReassignTrophy({
+        sourceKey: `team_league_golden_boot_season_${match.season_number}`,
+        trophyColumn: "trophy6_count",
+        playerId: topScorer?.goals > 0 ? topScorer.id : null,
+        seasonNumber: match.season_number,
+      })
     }
 
     const fresh = await query(PLAYOFF_SELECT + " WHERE p.id = $1", [match.id])

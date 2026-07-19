@@ -21,7 +21,7 @@ import teamLeagueTrophyLogo from "../../images/Team League.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
-import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useAuctionCurrent } from "../lib/queries"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 
 // Resolves a player's chosen avatar — custom upload takes priority,
@@ -232,13 +232,16 @@ export default function CommonDashboard() {
   }, [weeklyChampion, weeklyTournament?.id])
 
   // ── Team League champion celebration ────────────────────────────────────
-  // Fires once the last league fixture is completed. `teams` is already
-  // sorted by the league_standings view (points, then GD, then GF), so
-  // teams[0] is the table topper the moment the season is fully played out.
+  // Fires once the PLAYOFF FINAL is completed — NOT when regular-season
+  // fixtures finish (that moment only generates the playoff bracket; the
+  // actual champion isn't decided until the Final itself is played).
   const [showTeamCelebration, setShowTeamCelebration] = useState(false)
   const teamCelebrationSeason = settings.current_season
-  const leagueComplete = fixtures.length > 0 && fixtures.every(f => f.status === "completed")
-  const teamChampion    = leagueComplete ? teams[0] : null
+  const { data: playoffsData } = useTeamLeaguePlayoffs()
+  const playoffFinal = playoffsData?.matches?.find(m => m.matchType === "final")
+  const playoffComplete = playoffFinal?.status === "completed"
+  const championTeamId  = playoffComplete ? playoffFinal.winnerTeamId : null
+  const teamChampion    = championTeamId ? teams.find(t => t.id === championTeamId) : null
 
   // Captain always shown first in the roster list, wherever it's used.
   const sortCaptainFirst = (list) =>

@@ -5,6 +5,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 
 const router = Router()
 const TOTAL_ROUNDS = 5   // R32 → R16 → QF → SF → Final
@@ -371,6 +372,45 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         `, [match.tournament_id])
         if (goldenBootRes.rows[0]?.goals > 0) await addBdr(goldenBootRes.rows[0].id, 6)
       }
+
+      // Trophy awards — runs EVERY time completion is detected (unlike the
+      // BDR block above), so correcting an earlier result later on will
+      // automatically revert the wrong holder and reassign to whoever is
+      // now actually correct. Champion trophy always looks at the Final
+      // (round 5) specifically, not whichever match was just saved.
+      const finalRes = await query(
+        "SELECT winner_id FROM ucl_knockout_matches WHERE tournament_id = $1 AND round = 5 AND status = 'completed'",
+        [match.tournament_id]
+      )
+      await awardOrReassignTrophy({
+        sourceKey: `ucl_champion_tournament_${match.tournament_id}`,
+        trophyColumn: "trophy4_count",
+        playerId: finalRes.rows[0]?.winner_id ?? null,
+        seasonNumber: season,
+      })
+
+      // UCL Golden Boot trophy uses the SAME combined group-stage +
+      // knockout goal total that the public dashboard actually displays and
+      // celebrates as "UCL Golden Boot" — not the knockout-only figure used
+      // for the internal BDR bonus above, which is a narrower, separate thing.
+      const combinedGoldenBootRes = await query(`
+        SELECT p.id,
+          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
+          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
+        FROM players p
+        JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='ucl'
+        WHERE p.ucl_group_id IS NOT NULL
+        GROUP BY p.id
+        ORDER BY goals DESC, conceded ASC
+        LIMIT 1
+      `)
+      const topScorer = combinedGoldenBootRes.rows[0]
+      await awardOrReassignTrophy({
+        sourceKey: `ucl_golden_boot_tournament_${match.tournament_id}`,
+        trophyColumn: "trophy7_count",
+        playerId: topScorer?.goals > 0 ? topScorer.id : null,
+        seasonNumber: season,
+      })
     }
 
     res.json({ updated: true, winnerId })

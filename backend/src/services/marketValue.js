@@ -8,31 +8,35 @@
  * answer — this file's calculateMarketValue() is. This means changing the
  * formula only ever requires editing this file — never a DB migration or
  * manual SQL. (NOTE: as of this version, the SQL trigger's own formula was
- * NOT updated to match this file's draw/loss matrix or trophy bonuses — it's
- * still on the older simple table. Since its output is always overwritten
- * before it's ever read, this has no user-visible effect, but flagging it in
- * case it ever needs to be brought back in sync.)
+ * NOT updated to match this file's draw/loss matrix, season-scoping, or
+ * trophy bonuses — it's still on the older simple table. Since its output is
+ * always overwritten before it's ever read, this has no user-visible effect,
+ * but flagging it in case it ever needs to be brought back in sync.)
  *
- * Formula:
+ * Formula — EVERYTHING here is scoped to the CURRENT season only (matches,
+ * BDR points, and trophies alike), so "Start New Season" genuinely gives
+ * every player a clean slate across the whole formula, not just part of it:
  *   1. WIN value depends only on the opponent's grade (unchanged — beating a
  *      tougher opponent is worth more, regardless of your own grade).
  *   2. DRAW and LOSS values depend on BOTH the player's own grade AND the
  *      opponent's grade (a full grade x grade matrix, see below).
- *   3. ew scales directly with the summed weighted total (ewRaw), uncapped.
- *   4. pp = ew * 3, winPct = ew / 14 (scaling reference only)
- *   5. matchValue = min(pp * 5 + winPct * 85, MATCH_VALUE_CEILING) — the
+ *   3. Only match_records from the CURRENT season_number count at all.
+ *   4. ew scales directly with the summed weighted total (ewRaw), uncapped.
+ *   5. pp = ew * 3, winPct = ew / 14 (scaling reference only)
+ *   6. matchValue = min(pp * 5 + winPct * 85, MATCH_VALUE_CEILING) — the
  *      match-performance component alone is capped at 450.
- *   6. BDR swing — scaled by the player's current bdr_points, uncapped, only
- *      applies once the player has a positive effective-win score (ewRaw > 0).
- *   7. mvRaw = matchValue + bdrSwing
- *   8. Base value = max(50, round to nearest 5) — but ONLY if the player has
- *      ANY match involvement at all. A player with zero involvement stays at 0.
- *   9. Trophy bonus — added ON TOP of the base value (after the floor/ceiling
- *      above), so a trophy always adds exactly its stated amount regardless
- *      of where the player's base value landed. One-time-per-trophy-count
- *      bonus, stacks additively across every trophy type and every trophy a
- *      player has won. See TROPHY_BONUS below for values per trophy type.
- *  10. Final value = base value + trophy bonus.
+ *   7. BDR swing — scaled by the player's current bdr_points (itself already
+ *      reset to 0 on a season reset), uncapped, only applies once the player
+ *      has a positive effective-win score this season (ewRaw > 0).
+ *   8. mvRaw = matchValue + bdrSwing
+ *   9. Base value = max(50, round to nearest 5) — but ONLY if the player has
+ *      played at least one match THIS season. Zero matches this season ->
+ *      market value is 0, a genuine fresh start, regardless of past seasons.
+ *  10. Trophy bonus — added ON TOP of the base value, from trophies won
+ *      THIS season only (player_trophies, season-scoped) — the lifetime
+ *      trophy1Count..trophy7Count columns never affect this, they're purely
+ *      the career Trophy Case display.
+ *  11. Final value = base value + trophy bonus.
  */
 import { query } from "../db/pool.js"
 
@@ -59,12 +63,15 @@ const LOSS_MATRIX = {
 const BDR_SWING_RATE      = 18 / 120 // halved from the previous 36/120 rate, still uncapped
 const MATCH_VALUE_CEILING = 450      // ceiling on match-performance only, not the final total
 
-// One-time bonus per trophy a player has won, added after everything else.
-// Column names match the players table's trophy1Count..trophy7Count fields
-// (trophy1Count/Ballon d'Or intentionally excluded — already reflected via BDR).
+// One-time bonus per trophy a player has won IN THE CURRENT SEASON ONLY,
+// added after everything else. Reads from player_trophies (season-scoped),
+// NOT the lifetime trophy1Count..trophy7Count columns on players — those
+// stay purely a career/Trophy-Case display and never affect market value
+// directly. (trophy1Count/Ballon d'Or intentionally excluded from bonuses —
+// already reflected via BDR.)
 const TROPHY_BONUS = {
-  trophy2_count: 35, // Team League
-  trophy4_count: 25, // UCL
+  trophy2_count: 25, // Team League
+  trophy4_count: 20, // UCL
   trophy3_count: 15, // Weekly
   trophy6_count: 15, // Team League Golden Boot
   trophy7_count: 10, // UCL Golden Boot
@@ -78,12 +85,20 @@ function resultWeight(result, ownGrade, opponentGrade) {
   return 0
 }
 
-// Computes the market value a player SHOULD have right now, based on their
-// own match_records (as player_id), their current bdr_points, and their
-// trophy counts. Does not check whether the player has any match involvement
-// at all — call recalcMarketValue() below for that, which handles the
-// zero-involvement case.
+async function getCurrentSeason() {
+  const r = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+  return parseInt(r.rows[0]?.value || "6")
+}
+
+// Computes the market value a player SHOULD have right now, based ENTIRELY
+// on the CURRENT season — their match_records from this season only, their
+// current bdr_points (already season-scoped since it's reset on season
+// start), and trophies won this season only. Does not check whether the
+// player has played at all this season — call recalcMarketValue() below for
+// that, which handles the zero-involvement-this-season case.
 export async function calculateMarketValue(playerId) {
+  const currentSeason = await getCurrentSeason()
+
   const [matchesRes, playerRes] = await Promise.all([
     query(
       `SELECT
@@ -98,16 +113,10 @@ export async function calculateMarketValue(playerId) {
            ELSE (SELECT grade FROM players WHERE id = player_id)
          END AS opponent_grade
        FROM match_records
-       WHERE player_id = $1 OR opponent_id = $1`,
-      [playerId]
+       WHERE (player_id = $1 OR opponent_id = $1) AND season_number = $2`,
+      [playerId, currentSeason]
     ),
-    query(
-      `SELECT bdr_points AS bdr, grade,
-              trophy2_count, trophy3_count, trophy4_count,
-              trophy5_count, trophy6_count, trophy7_count
-       FROM players WHERE id = $1`,
-      [playerId]
-    ),
+    query("SELECT bdr_points AS bdr, grade FROM players WHERE id = $1", [playerId]),
   ])
 
   const player = playerRes.rows[0] ?? {}
@@ -130,23 +139,33 @@ export async function calculateMarketValue(playerId) {
   const mvRaw = matchValue + bdrSwing
   const baseValue = Math.max(50, Math.round(mvRaw / 5) * 5)
 
+  const seasonTrophiesRes = await query(
+    `SELECT trophy_column, COUNT(*)::int AS count
+     FROM player_trophies
+     WHERE player_id = $1 AND season_number = $2
+     GROUP BY trophy_column`,
+    [playerId, currentSeason]
+  )
+
   let trophyBonus = 0
-  for (const [column, bonus] of Object.entries(TROPHY_BONUS)) {
-    trophyBonus += (player[column] ?? 0) * bonus
+  for (const row of seasonTrophiesRes.rows) {
+    const bonus = TROPHY_BONUS[row.trophy_column]
+    if (bonus) trophyBonus += row.count * bonus
   }
 
   return baseValue + trophyBonus
 }
 
 // Recalculates and persists a player's market_value. If the player has zero
-// match involvement at all (neither as player_id nor opponent_id), resets to
-// 0 — their fresh/never-played state. Otherwise computes via
-// calculateMarketValue() (which includes BDR swing and trophy bonuses) and
-// saves it.
+// match involvement in the CURRENT SEASON (regardless of past seasons),
+// resets to 0 — a genuine fresh-season baseline. Otherwise computes via
+// calculateMarketValue() (which itself is fully season-scoped) and saves it.
 export async function recalcMarketValue(playerId) {
+  const currentSeason = await getCurrentSeason()
+
   const countRes = await query(
-    "SELECT COUNT(*)::int AS count FROM match_records WHERE player_id = $1 OR opponent_id = $1",
-    [playerId]
+    "SELECT COUNT(*)::int AS count FROM match_records WHERE (player_id = $1 OR opponent_id = $1) AND season_number = $2",
+    [playerId, currentSeason]
   )
 
   if (countRes.rows[0].count === 0) {

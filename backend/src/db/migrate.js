@@ -74,6 +74,32 @@ CREATE TABLE IF NOT EXISTS players (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- PLAYER TROPHIES — season-scoped award log
+-- ─────────────────────────────────────────────────────────────────────────────
+-- One row per real-world trophy-worthy event (e.g. "UCL Knockout Tournament
+-- #5's Final"), NOT per trophy count increment. source_key uniquely
+-- identifies that event regardless of who wins it, which is what makes
+-- corrections possible: if an admin fixes a wrong result later, the same
+-- source_key gets looked up again, the previous (wrong) holder's trophy
+-- count + market value get reverted, and the correct winner gets awarded
+-- instead. The lifetime trophy1Count..trophy7Count columns on players stay
+-- untouched by this table's existence — they're still the source of truth
+-- for the Trophy Case / career display. This table exists purely so market
+-- value can filter trophies down to "won in the CURRENT season only".
+CREATE TABLE IF NOT EXISTS player_trophies (
+  id            SERIAL PRIMARY KEY,
+  player_id     INT  NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  trophy_column VARCHAR(20) NOT NULL,
+  season_number INT  NOT NULL,
+  source_key    TEXT NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(source_key, player_id)
+);
+CREATE INDEX IF NOT EXISTS idx_player_trophies_player ON player_trophies(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_trophies_season ON player_trophies(season_number);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- MATCH RECORDS
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS match_records (
