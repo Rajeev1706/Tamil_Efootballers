@@ -263,7 +263,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     }).parse(req.body)
 
     const matchRes = await query(
-      "SELECT km.*, kt.total_rounds FROM ucl_knockout_matches km JOIN ucl_knockout_tournaments kt ON kt.id = km.tournament_id WHERE km.id = $1",
+      "SELECT * FROM ucl_knockout_matches WHERE id = $1",
       [req.params.matchId]
     )
     const match = matchRes.rows[0]
