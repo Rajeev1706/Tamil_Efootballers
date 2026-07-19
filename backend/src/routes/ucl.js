@@ -531,6 +531,7 @@ router.get("/standings", async (req, res, next) => {
       LEFT JOIN teams t ON p.team_id = t.id
       LEFT JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.match_type = 'ucl'
+        AND NOT EXISTS (SELECT 1 FROM ucl_knockout_matches km WHERE km.match_record_id = mr.id)
       WHERE p.ucl_group_id IS NOT NULL
       GROUP BY p.id, p.name, p.ucl_group_id, t.name, t.logo_url, p.avatar_id, p.avatar_url
     `)

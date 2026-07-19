@@ -53,6 +53,7 @@ async function getGroupStandings() {
     JOIN ucl_groups g ON p.ucl_group_id = g.id AND g.status = 'active'
     LEFT JOIN match_records mr
       ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.match_type = 'ucl'
+      AND NOT EXISTS (SELECT 1 FROM ucl_knockout_matches km WHERE km.match_record_id = mr.id)
     GROUP BY p.id, p.name, p.ucl_group_id, g.name
     ORDER BY g.name ASC, points DESC, gd DESC, gf DESC
   `)
