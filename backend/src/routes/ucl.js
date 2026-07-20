@@ -566,6 +566,8 @@ router.get("/standings", async (req, res, next) => {
 // GET /api/ucl/top-scorers — top 10 players by goals in UCL group stage (public)
 router.get("/top-scorers", async (req, res, next) => {
   try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "6")
     const result = await query(`
       SELECT
         p.id,
@@ -593,13 +595,14 @@ router.get("/top-scorers", async (req, res, next) => {
       LEFT JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.match_type = 'ucl'
+        AND mr.season_number = $1
       LEFT JOIN teams t      ON p.team_id      = t.id
       LEFT JOIN ucl_groups g ON p.ucl_group_id = g.id
       WHERE p.ucl_group_id IS NOT NULL AND g.status = 'active'
       GROUP BY p.id, p.name, t.name, t.logo_url, p.avatar_id, p.avatar_url, g.name
       ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
-    `)
+    `, [season])
     res.json(result.rows)
   } catch (err) { next(err) }
 })

@@ -196,6 +196,7 @@ router.get("/hall-of-fame", async (req, res, next) => {
 // GET /api/teams/top-scorers — top 10 players by goals in team league
 router.get("/top-scorers", async (req, res, next) => {
   try {
+    const season = await getCurrentSeason()
     const result = await query(`
       SELECT
         p.id,
@@ -222,11 +223,12 @@ router.get("/top-scorers", async (req, res, next) => {
       LEFT JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.match_type = 'league'
+        AND mr.season_number = $1
       LEFT JOIN teams t ON p.team_id = t.id
       GROUP BY p.id, p.name, t.name, t.logo_url, p.avatar_id, p.avatar_url
       ORDER BY goals DESC, conceded ASC, p.name ASC
       LIMIT 10
-    `)
+    `, [season])
     res.json(result.rows)
   } catch (err) { next(err) }
 })

@@ -178,15 +178,13 @@ router.post("/team", authenticate, async (req, res, next) => {
       req.user.id, seasonNumber, fixtureId,
     ])
 
-    await recalcMarketValue(playerId)
-    await recalcMarketValue(opponentId)
-    await recalcForm(playerId)
-    await recalcForm(opponentId)
-
     // Live team points/goals — added immediately as each player result comes
     // in, not waiting for the fixture to be closed. Player's own team gets
     // 3/1/0 based on their result; the opponent's team gets the mirrored
-    // 3/1/0. Goals for/against accumulate the same way.
+    // 3/1/0. Goals for/against accumulate the same way. This runs BEFORE
+    // the market-value/form recalc below deliberately — those are
+    // supplementary and shouldn't be able to block the team stats update
+    // (a league-table-facing change) if something's wrong with them.
     const playerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
     const oppPts    = result === "win" ? 0 : result === "draw" ? 1 : 3
     const pScore = playerScore ?? 0
@@ -195,6 +193,17 @@ router.post("/team", authenticate, async (req, res, next) => {
       [playerPts, pScore, oScore, playerCheck.rows[0].team_id])
     await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
       [oppPts, oScore, pScore, oppTeamId])
+
+    try {
+      await recalcMarketValue(playerId)
+      await recalcMarketValue(opponentId)
+      await recalcForm(playerId)
+      await recalcForm(opponentId)
+    } catch (recalcErr) {
+      // Match record + team stats already saved above — don't fail the
+      // whole request over a market-value/form recalculation problem.
+      console.error("Post-result recalc failed (match + team stats still saved):", recalcErr)
+    }
 
     const fresh = await query(
       `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
@@ -343,8 +352,12 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
     await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
 
-    await recalcMarketValue(playerId)
-    await recalcMarketValue(opponentId)
+    try {
+      await recalcMarketValue(playerId)
+      await recalcMarketValue(opponentId)
+    } catch (recalcErr) {
+      console.error("Post-result market value recalc failed (match record still saved):", recalcErr)
+    }
 
     const fresh = await query(
       `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
@@ -386,10 +399,14 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
     const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
     await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [letter, playerId])
     await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
-    await recalcMarketValue(playerId)
-    await recalcMarketValue(opponentId)
-    await recalcForm(playerId)
-    await recalcForm(opponentId)
+    try {
+      await recalcMarketValue(playerId)
+      await recalcMarketValue(opponentId)
+      await recalcForm(playerId)
+      await recalcForm(opponentId)
+    } catch (recalcErr) {
+      console.error("Post-edit recalc failed (result edit still saved):", recalcErr)
+    }
 
     const fresh = await query(
       `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
