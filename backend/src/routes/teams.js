@@ -322,11 +322,11 @@ router.get("/", async (req, res, next) => {
         FROM fixture_scores
       ),
       per_team AS (
-        SELECT home_team_id AS team_id, home_goals AS gf, away_goals AS ga, outcome,
+        SELECT home_team_id AS team_id, home_goals AS gf, away_goals AS ga, home_pts AS pts, outcome,
           (outcome = 'home') AS won, (outcome = 'draw') AS drawn, (outcome = 'away') AS lost
         FROM fixture_outcomes WHERE outcome IS NOT NULL
         UNION ALL
-        SELECT away_team_id AS team_id, away_goals AS gf, home_goals AS ga, outcome,
+        SELECT away_team_id AS team_id, away_goals AS gf, home_goals AS ga, away_pts AS pts, outcome,
           (outcome = 'away') AS won, (outcome = 'draw') AS drawn, (outcome = 'home') AS lost
         FROM fixture_outcomes WHERE outcome IS NOT NULL
       ),
@@ -336,8 +336,9 @@ router.get("/", async (req, res, next) => {
           COUNT(*) FILTER (WHERE won)   AS won,
           COUNT(*) FILTER (WHERE drawn) AS drawn,
           COUNT(*) FILTER (WHERE lost)  AS lost,
-          COALESCE(SUM(gf), 0) AS gf,
-          COALESCE(SUM(ga), 0) AS ga
+          COALESCE(SUM(gf), 0)  AS gf,
+          COALESCE(SUM(ga), 0)  AS ga,
+          COALESCE(SUM(pts), 0) AS points
         FROM per_team
         GROUP BY team_id
       )
@@ -350,9 +351,9 @@ router.get("/", async (req, res, next) => {
         COALESCE(ts.gf, 0)     AS gf,
         COALESCE(ts.ga, 0)     AS ga,
         COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0) AS gd,
-        COALESCE(ts.won, 0) * 3 + COALESCE(ts.drawn, 0) AS points,
+        COALESCE(ts.points, 0) AS points,
         ROW_NUMBER() OVER (
-          ORDER BY COALESCE(ts.won, 0) * 3 + COALESCE(ts.drawn, 0) DESC,
+          ORDER BY COALESCE(ts.points, 0) DESC,
                    COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0) DESC,
                    COALESCE(ts.gf, 0) DESC
         ) AS position
