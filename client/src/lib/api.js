@@ -53,13 +53,15 @@ export const teamsApi = {
 }
 
 export const playersApi = {
-  list:      (params) => api.get("/players", { params }).then(r => r.data),
-  get:       (id)     => api.get(`/players/${id}`).then(r => r.data),
-  create:    (body)   => api.post("/players", body).then(r => r.data),
-  update:    (id, b)  => api.patch(`/players/${id}`, b).then(r => r.data),
-  delete:    (id)     => api.delete(`/players/${id}`).then(r => r.data),
-  unassign:  (id)     => api.patch(`/players/${id}`, { teamId: null, teamIdProvided: true }).then(r => r.data),
-  setAvatar: (id, body) => api.patch(`/players/${id}/avatar`, body).then(r => r.data),
+  list:            (params) => api.get("/players", { params }).then(r => r.data),
+  get:             (id)     => api.get(`/players/${id}`).then(r => r.data),
+  create:          (body)   => api.post("/players", body).then(r => r.data),
+  update:          (id, b)  => api.patch(`/players/${id}`, b).then(r => r.data),
+  delete:          (id)     => api.delete(`/players/${id}`).then(r => r.data),
+  unassign:        (id)     => api.patch(`/players/${id}`, { teamId: null, teamIdProvided: true }).then(r => r.data),
+  setAvatar:       (id, body) => api.patch(`/players/${id}/avatar`, body).then(r => r.data),
+  compareStats:    (id)          => api.get(`/players/${id}/compare-stats`).then(r => r.data),
+  performanceZones:(id, season)  => api.get(`/players/${id}/performance-zones`, { params: { season } }).then(r => r.data),
 }
 
 export const leagueInfoApi = {

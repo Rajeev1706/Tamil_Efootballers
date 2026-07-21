@@ -64,3 +64,19 @@ export async function uploadTeamLogo(teamId, file) {
 
   return data.publicUrl
 }
+export async function uploadTeamAnthem(teamId, file) {
+  const ext  = file.name.split(".").pop().toLowerCase()
+  const path = `anthem-${teamId}-${Date.now()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from("player-images")
+    .upload(path, file, { upsert: true, contentType: file.type })
+
+  if (error) throw new Error(error.message)
+
+  const { data } = supabase.storage
+    .from("player-images")
+    .getPublicUrl(path)
+
+  return data.publicUrl
+}

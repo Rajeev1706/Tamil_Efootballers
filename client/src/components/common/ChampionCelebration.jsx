@@ -7,7 +7,7 @@ import FireworkBurst from "./FireworkBurst"
 // trophy with a 3D landing animation + idle float + twinkling sparkles,
 // and the champion's name revealed letter by letter. `children` renders
 // extra content below the subtitle (e.g. a team's player roster).
-export default function ChampionCelebration({ trophyImage, eyebrow, title, subtitle, badgeImage, bgImage, children }) {
+export default function ChampionCelebration({ trophyImage, eyebrow, title, subtitle, badgeImage, bgImage, anthemUrl, children }) {
   const audioRef = useRef(null)
 
   useEffect(() => {
@@ -20,7 +20,8 @@ export default function ChampionCelebration({ trophyImage, eyebrow, title, subti
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center celebration-vignette backdrop-blur-sm animate-celebration-backdrop overflow-hidden">
-      <audio ref={audioRef} src="/sounds/crowd-cheer.mp3" preload="auto" />
+      {/* Anthem plays if set, otherwise falls back to generic crowd cheer */}
+      <audio ref={audioRef} src={anthemUrl || "/sounds/crowd-cheer.mp3"} preload="auto" />
       <FireworkBurst bottom="0" left="15%" delay="0s" rise="-620px" />
       <FireworkBurst bottom="0" left="82%" delay="0.6s" rise="-680px" color="#fff" />
       <FireworkBurst bottom="0" left="8%" delay="1.2s" rise="-540px" />

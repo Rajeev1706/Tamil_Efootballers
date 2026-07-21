@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
-import { Settings, Camera, Loader2, CheckCircle, KeyRound, Eye, EyeOff, Check, X } from "lucide-react"
-import { uploadTeamLogo } from "../../lib/supabase"
+import { Settings, Camera, Loader2, CheckCircle, KeyRound, Eye, EyeOff, Check, X, Music } from "lucide-react"
+import { uploadTeamLogo, uploadTeamAnthem } from "../../lib/supabase"
 import { useUpdateTeamSettings } from "../../lib/queries"
 import { authApi } from "../../lib/api"
 import { cn } from "../../lib/utils"
@@ -9,8 +9,12 @@ export default function TeamSettings({ team }) {
   const [name, setName]               = useState(team?.name || "")
   const [logoPreview, setLogoPreview] = useState(team?.logoUrl || null)
   const [logoLoading, setLogoLoading] = useState(false)
+  const [anthemUrl, setAnthemUrl]     = useState(team?.anthemUrl || null)
+  const [anthemLoading, setAnthemLoading] = useState(false)
+  const [anthemName, setAnthemName]   = useState(null)
   const [savedName, setSavedName]     = useState(false)
   const inputRef                      = useRef(null)
+  const anthemRef                     = useRef(null)
   const updateSettings                = useUpdateTeamSettings()
 
   // Password change state
@@ -44,6 +48,25 @@ export default function TeamSettings({ team }) {
       setLogoPreview(team?.logoUrl || null)
     } finally {
       setLogoLoading(false)
+    }
+  }
+
+  const handleAnthemUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 1024 * 1024) return alert("Anthem must be under 1 MB (around 10 seconds of audio)")
+    setAnthemLoading(true)
+    try {
+      const publicUrl = await uploadTeamAnthem(team.id, file)
+      setAnthemUrl(publicUrl)
+      setAnthemName(file.name)
+      updateSettings.mutate({ id: team.id, anthemUrl: publicUrl }, {
+        onError: (err) => alert(err.response?.data?.error || "Failed to save anthem"),
+      })
+    } catch (err) {
+      alert(err.message || "Upload failed")
+    } finally {
+      setAnthemLoading(false)
     }
   }
 
@@ -128,6 +151,31 @@ export default function TeamSettings({ team }) {
               </div>
               <input id="team-logo-input" ref={inputRef} type="file" accept="image/*" onChange={handleLogoFile} className="hidden" />
             </div>
+          </div>
+
+          {/* Club anthem */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-2 block">Club anthem <span className="text-slate-600">(max 1 MB · ~10 sec)</span></label>
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-pitch-800">
+              <div className="w-10 h-10 rounded-lg bg-pitch-700 flex items-center justify-center flex-shrink-0">
+                <Music className="w-5 h-5 text-slate-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                {anthemUrl ? (
+                  <>
+                    <p className="text-xs text-white truncate">{anthemName || "Anthem uploaded"}</p>
+                    <audio controls src={anthemUrl} className="mt-1 h-6 w-full" style={{ filter: "invert(1) hue-rotate(180deg)", maxWidth: "200px" }} />
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">No anthem yet — plays when your team wins a title</p>
+                )}
+              </div>
+              <label htmlFor="team-anthem-input"
+                className="flex-shrink-0 text-xs font-semibold text-accent border border-accent/30 px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors cursor-pointer">
+                {anthemLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : anthemUrl ? "Change" : "Upload"}
+              </label>
+            </div>
+            <input id="team-anthem-input" ref={anthemRef} type="file" accept="audio/*" onChange={handleAnthemUpload} className="hidden" />
           </div>
 
           {/* Team name */}

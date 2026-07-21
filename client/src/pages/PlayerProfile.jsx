@@ -4,7 +4,7 @@ import { ArrowLeft, Trophy, ImageIcon, Crown, UserRound, Pencil } from "lucide-r
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import AvatarPicker from "../components/player/AvatarPicker"
-import { usePlayer } from "../lib/queries"
+import { usePlayer, usePlayerPerformanceZones } from "../lib/queries"
 import { useTeamColor, readableTeamColor } from "../lib/teamColor"
 import { getAvatarById } from "../lib/avatars"
 import { cn } from "../lib/utils"
@@ -73,6 +73,7 @@ function PlayerSquadCard({ player }) {
 
 import HeadToHead from "../components/player/HeadToHead"
 import SeasonSummary from "../components/player/SeasonSummary"
+import PerformanceZones from "../components/dashboard/PerformanceZones"
 
 function TrophyCase({ player }) {
   const trophies = [
@@ -332,6 +333,11 @@ export default function PlayerProfile() {
           <SeasonSummary player={player} />
 
         </div>
+      </div>
+
+      {/* ── Season Performance graph ── */}
+      <div className="mt-6">
+        <PerformanceZones playerId={player.id} />
       </div>
 
       {/* ── Trophies (full width row) ── */}

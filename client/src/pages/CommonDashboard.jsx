@@ -12,6 +12,7 @@ import UclStandings from "../components/dashboard/UclStandings"
 import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
+import PlayerComparison from "../components/dashboard/PlayerComparison"
 import Loading from "../components/common/Loading"
 import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
@@ -144,13 +145,14 @@ function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
 }
 
 const PANEL_OPTIONS = [
-  { value: "players",   label: "Total players" },
-  { value: "standings", label: "League table"  },
-  { value: "ucl",       label: "UCL"           },
-  { value: "weekly",    label: "Weekly"        },
-  { value: "bdr",       label: "BDR ranking"   },
-  { value: "market",    label: "Market values" },
-  { value: "trophies",  label: "Trophies"      },
+  { value: "players",    label: "Total players"   },
+  { value: "compare",    label: "Compare players" },
+  { value: "standings",  label: "League table"    },
+  { value: "ucl",        label: "UCL"             },
+  { value: "weekly",     label: "Weekly"          },
+  { value: "bdr",        label: "BDR ranking"     },
+  { value: "market",     label: "Market values"   },
+  { value: "trophies",   label: "Trophies"        },
 ]
 
 export default function CommonDashboard() {
@@ -268,7 +270,8 @@ export default function CommonDashboard() {
   const displayTeamPlayers = testTeamMatch
     ? sortCaptainFirst(players.filter(p => p.teamId === testTeamMatch.id))
     : (testTeamName ? [] : teamChampionPlayers)
-  const displayTeamLogo = testTeamMatch?.logoUrl || teamChampion?.logoUrl || null
+  const displayTeamLogo   = testTeamMatch?.logoUrl || teamChampion?.logoUrl || null
+  const displayTeamAnthem = testTeamMatch?.anthemUrl || teamChampion?.anthemUrl || null
   const bestPerformerTeamId = testTeamMatch?.id || teamChampion?.id || null
   const { data: displayBestPerformer } = useBestLeaguePerformer(bestPerformerTeamId)
 
@@ -517,6 +520,7 @@ export default function CommonDashboard() {
           title={displayTeamChampion}
           subtitle="are the Team League Champions! 🏆"
           badgeImage={displayTeamLogo}
+          anthemUrl={displayTeamAnthem}
         >
           {displayTeamPlayers.length > 0 && (
             <TeamRosterChips players={displayTeamPlayers} bestPerformerId={displayBestPerformer?.id} />
@@ -688,6 +692,7 @@ export default function CommonDashboard() {
                 {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
+                {activePanel === "compare"   && <PlayerComparison onPlayerClick={handlePlayer} />}
               </div>
             </>
           )}

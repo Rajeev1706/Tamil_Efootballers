@@ -300,4 +300,183 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /api/players/:id/compare-stats — rich stats for player comparison tool
+// Market Value, BDR Points, Auction Price = current DB values (current season)
+// All match stats (W/D/L, goals, wins per competition) = ALL-TIME combined
+router.get("/:id/compare-stats", async (req, res, next) => {
+  try {
+    const [playerRes, matchRes, trophyRes] = await Promise.all([
+      query(`
+        SELECT p.id, p.name, p.alias, p.grade, p.auction_price AS "auctionPrice",
+               p.market_value AS "marketValue", p.bdr_points AS "bdrPoints",
+               p.is_captain AS "isCaptain",
+               p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+               p.avatar_bg_url AS "avatarBgUrl",
+               t.name AS team
+        FROM players p LEFT JOIN teams t ON p.team_id = t.id WHERE p.id = $1
+      `, [req.params.id]),
+      // ALL-TIME match history — no season filter
+      query(`
+        SELECT
+          CASE
+            WHEN player_id = $1 THEN result
+            WHEN result = 'win'  THEN 'loss'
+            WHEN result = 'loss' THEN 'win'
+            ELSE 'draw'
+          END AS result,
+          match_type::text AS match_type,
+          CASE WHEN player_id = $1 THEN player_score ELSE opponent_score END AS goals_scored,
+          CASE WHEN player_id = $1 THEN opponent_score ELSE player_score END AS goals_conceded
+        FROM match_records
+        WHERE player_id = $1 OR opponent_id = $1
+      `, [req.params.id]),
+      query(`
+        SELECT trophy1_count, trophy2_count, trophy3_count, trophy4_count,
+               trophy5_count, trophy6_count, trophy7_count
+        FROM players WHERE id = $1
+      `, [req.params.id]),
+    ])
+
+    if (!playerRes.rows[0]) return res.status(404).json({ error: "Player not found" })
+
+    const matches = matchRes.rows
+    const total   = matches.length
+    const wins    = matches.filter(m => m.result === "win").length
+    const draws   = matches.filter(m => m.result === "draw").length
+    const losses  = matches.filter(m => m.result === "loss").length
+    const goals   = matches.reduce((s, m) => s + (m.goals_scored  ?? 0), 0)
+    const conceded= matches.reduce((s, m) => s + (m.goals_conceded ?? 0), 0)
+    const leagueMatches = matches.filter(m => m.match_type === "league")
+    const uclMatches    = matches.filter(m => m.match_type === "ucl")
+    const weeklyMatches = matches.filter(m => m.match_type === "weekly")
+
+    const trophyRow = trophyRes.rows[0] ?? {}
+    const trophies = {
+      trophy1_count: trophyRow.trophy1_count ?? 0,
+      trophy2_count: trophyRow.trophy2_count ?? 0,
+      trophy3_count: trophyRow.trophy3_count ?? 0,
+      trophy4_count: trophyRow.trophy4_count ?? 0,
+      trophy5_count: trophyRow.trophy5_count ?? 0,
+      trophy6_count: trophyRow.trophy6_count ?? 0,
+      trophy7_count: trophyRow.trophy7_count ?? 0,
+    }
+
+    res.json({
+      player: playerRes.rows[0],
+      stats: {
+        total, wins, draws, losses,
+        goals, conceded,
+        winRate:   total > 0 ? Math.round((wins / total) * 100) : 0,
+        avgGoals:  total > 0 ? (goals / total).toFixed(1) : "0.0",
+        leagueMatches: leagueMatches.length,
+        leagueWins:    leagueMatches.filter(m => m.result === "win").length,
+        leagueDraws:   leagueMatches.filter(m => m.result === "draw").length,
+        leagueLosses:  leagueMatches.filter(m => m.result === "loss").length,
+        leagueGoals:   leagueMatches.reduce((s, m) => s + (m.goals_scored ?? 0), 0),
+        uclMatches:    uclMatches.length,
+        uclWins:       uclMatches.filter(m => m.result === "win").length,
+        uclDraws:      uclMatches.filter(m => m.result === "draw").length,
+        uclLosses:     uclMatches.filter(m => m.result === "loss").length,
+        uclGoals:      uclMatches.reduce((s, m) => s + (m.goals_scored ?? 0), 0),
+        weeklyMatches: weeklyMatches.length,
+        weeklyWins:    weeklyMatches.filter(m => m.result === "win").length,
+        weeklyDraws:   weeklyMatches.filter(m => m.result === "draw").length,
+        weeklyLosses:  weeklyMatches.filter(m => m.result === "loss").length,
+        weeklyGoals:   weeklyMatches.reduce((s, m) => s + (m.goals_scored ?? 0), 0),
+        trophies,
+      },
+    })
+  } catch (err) { next(err) }
+})
+// GET /api/players/:id/performance-zones
+// ?season=current (default), ?season=all, or ?season=N
+router.get("/:id/performance-zones", async (req, res, next) => {
+  try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const currentSeason = parseInt(seasonRes.rows[0]?.value || "6")
+    const seasonParam   = req.query.season ?? "current"
+
+    // All seasons this player has ever played in — for the dropdown
+    const seasonsRes = await query(`
+      SELECT DISTINCT season_number
+      FROM match_records
+      WHERE player_id=$1 OR opponent_id=$1
+      ORDER BY season_number DESC
+    `, [req.params.id])
+    const availableSeasons = seasonsRes.rows.map(r => r.season_number)
+
+    // Helper: fetch all matches for a given season_number and build cumulative sequence
+    async function fetchSeasonMatches(seasonNum) {
+      const r = await query(`
+        SELECT
+          CASE
+            WHEN mr.player_id = $1 THEN mr.result
+            WHEN mr.result = 'win'  THEN 'loss'
+            WHEN mr.result = 'loss' THEN 'win'
+            ELSE 'draw'
+          END AS result,
+          mr.match_type::text AS competition,
+          CASE WHEN mr.player_id=$1 THEN mr.player_score  ELSE mr.opponent_score END AS goals_scored,
+          CASE WHEN mr.player_id=$1 THEN mr.opponent_score ELSE mr.player_score  END AS goals_conceded,
+          mr.recorded_at,
+          CASE mr.match_type::text
+            WHEN 'league' THEN CONCAT('TL R', COALESCE(f.round::text, '?'))
+            WHEN 'ucl'    THEN 'UCL'
+            WHEN 'weekly' THEN COALESCE(wt.name, 'Weekly')
+            ELSE mr.match_type::text
+          END AS label
+        FROM match_records mr
+        LEFT JOIN fixtures f ON f.id = mr.fixture_id AND mr.match_type::text = 'league'
+        LEFT JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
+        LEFT JOIN weekly_tournaments wt ON wt.id = wtm.tournament_id
+        WHERE (mr.player_id=$1 OR mr.opponent_id=$1) AND mr.season_number=$2
+        ORDER BY mr.recorded_at ASC
+      `, [req.params.id, seasonNum])
+
+      let cumulative = 0
+      return r.rows.map((m, i) => {
+        const delta = m.result === "win" ? 3 : m.result === "draw" ? 1 : -2
+        cumulative += delta
+        return {
+          index: i + 1, result: m.result, competition: m.competition,
+          label: m.label, delta, cumulative,
+          goalsScored: m.goals_scored ?? 0, goalsConceded: m.goals_conceded ?? 0,
+          date: m.recorded_at, season: seasonNum, isCurrent: seasonNum === currentSeason,
+        }
+      })
+    }
+
+    if (seasonParam === "all") {
+      // Build the current season line (fresh from M1)
+      const currentMatches = await fetchSeasonMatches(currentSeason)
+
+      // Build per-previous-season sequences, then average across positions
+      const prevSeasons = availableSeasons.filter(s => s !== currentSeason)
+      const prevSequences = await Promise.all(prevSeasons.map(s => fetchSeasonMatches(s)))
+
+      // For each match position (1, 2, 3...), average the cumulative across all
+      // previous seasons that had at least that many matches
+      const maxLen = prevSequences.reduce((m, s) => Math.max(m, s.length), 0)
+      const prevAvg = []
+      for (let i = 0; i < maxLen; i++) {
+        const values = prevSequences.filter(s => s[i] != null).map(s => s[i].cumulative)
+        if (values.length > 0) {
+          prevAvg.push({
+            index: i + 1,
+            cumulative: Math.round(values.reduce((a, b) => a + b, 0) / values.length * 10) / 10,
+          })
+        }
+      }
+
+      return res.json({ mode: "all", currentMatches, prevAvg, currentSeason, availableSeasons })
+    }
+
+    // Single season mode (current or specific past season)
+    let seasonNum = seasonParam === "current" ? currentSeason : parseInt(seasonParam)
+    const matches = await fetchSeasonMatches(seasonNum)
+    res.json({ mode: "single", matches, currentSeason, availableSeasons })
+
+  } catch (err) { next(err) }
+})
+
 export default router

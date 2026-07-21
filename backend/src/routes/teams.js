@@ -504,12 +504,13 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /api/teams/:id/settings — team owner (own team only) or admin updates name/logo
+// PATCH /api/teams/:id/settings — team owner (own team only) or admin updates name/logo/anthem
 const settingsSchema = z.object({
-  name:    z.string().min(1).optional(),
-  logoUrl: z.string().url().optional().nullable(),
-}).refine(d => d.name !== undefined || d.logoUrl !== undefined, {
-  message: "Provide at least name or logoUrl",
+  name:      z.string().min(1).optional(),
+  logoUrl:   z.string().url().optional().nullable(),
+  anthemUrl: z.string().url().optional().nullable(),
+}).refine(d => d.name !== undefined || d.logoUrl !== undefined || d.anthemUrl !== undefined, {
+  message: "Provide at least name, logoUrl, or anthemUrl",
 })
 
 router.patch("/:id/settings", authenticate, async (req, res, next) => {
@@ -521,14 +522,15 @@ router.patch("/:id/settings", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "Not authorized to edit this team" })
     }
 
-    const { name, logoUrl } = settingsSchema.parse(req.body)
+    const { name, logoUrl, anthemUrl } = settingsSchema.parse(req.body)
     const result = await query(`
       UPDATE teams SET
-        name     = COALESCE($1, name),
-        logo_url = COALESCE($2, logo_url)
-      WHERE id = $3
-      RETURNING id, name, logo_url AS "logoUrl"
-    `, [name ?? null, logoUrl ?? null, targetId])
+        name       = COALESCE($1, name),
+        logo_url   = COALESCE($2, logo_url),
+        anthem_url = COALESCE($3, anthem_url)
+      WHERE id = $4
+      RETURNING id, name, logo_url AS "logoUrl", anthem_url AS "anthemUrl"
+    `, [name ?? null, logoUrl ?? null, anthemUrl ?? null, targetId])
 
     if (!result.rows[0]) return res.status(404).json({ error: "Team not found" })
     res.json(result.rows[0])

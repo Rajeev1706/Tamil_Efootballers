@@ -743,3 +743,9 @@ export const useUndoLastSale = () => useAuctionMutation((sessionId) => auctionAp
 export const useDeleteAuctionSession = () => useAuctionMutation((sessionId) => auctionApi.deleteSession(sessionId))
 export const useEnterAuction = () => useAuctionMutation((sessionId) => auctionApi.enter(sessionId))
 export const useLeaveAuction = () => useAuctionMutation((sessionId) => auctionApi.leave(sessionId))
+// ── Player comparison & performance zones ────────────────────────────────
+export const usePlayerCompareStats    = (id) =>
+  useQuery({ queryKey: ["player-compare-stats", String(id)], queryFn: () => playersApi.compareStats(id), enabled: !!id })
+
+export const usePlayerPerformanceZones = (id, season = "current") =>
+  useQuery({ queryKey: ["player-performance-zones", String(id), season], queryFn: () => playersApi.performanceZones(id, season), enabled: !!id })

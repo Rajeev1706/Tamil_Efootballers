@@ -38,8 +38,9 @@ CREATE TABLE IF NOT EXISTS teams (
 );
 
 ALTER TABLE teams
-  ADD COLUMN IF NOT EXISTS gd      INT GENERATED ALWAYS AS (gf - ga) STORED,
-  ADD COLUMN IF NOT EXISTS points  INT GENERATED ALWAYS AS (won * 3 + drawn) STORED;
+  ADD COLUMN IF NOT EXISTS gd         INT GENERATED ALWAYS AS (gf - ga) STORED,
+  ADD COLUMN IF NOT EXISTS points     INT GENERATED ALWAYS AS (won * 3 + drawn) STORED,
+  ADD COLUMN IF NOT EXISTS anthem_url TEXT;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- USERS
