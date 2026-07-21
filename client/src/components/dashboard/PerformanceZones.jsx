@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { usePlayerPerformanceZones } from "../../lib/queries"
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
-         ReferenceLine, CartesianGrid } from "recharts"
+         ResponsiveContainer, ReferenceLine, CartesianGrid } from "recharts"
 import { ChevronDown } from "lucide-react"
 import { cn } from "../../lib/utils"
 
@@ -46,32 +46,34 @@ const TotalTooltip = ({ active, payload, label }) => {
 }
 
 function SingleChart({ matches }) {
-  const chartWidth = Math.max(600, matches.length * 28)
+  const minWidth = Math.max(600, matches.length * 28)
   return (
-    <div style={{ width: chartWidth, height: 200 }}>
-      <AreaChart width={chartWidth} height={200} data={matches} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-        <defs>
-          <linearGradient id="perfGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#10b981" stopOpacity={0.25} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
-        <XAxis dataKey="index" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `M${v}`} />
-        <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
-        <ReferenceLine y={0} stroke="#334155" strokeDasharray="3 3" />
-        <Tooltip content={<SingleTooltip />} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }} />
-        <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2}
-          fill="url(#perfGrad)" dot={<CustomDot />}
-          activeDot={{ r: 6, fill: "#10b981", stroke: "#0f172a", strokeWidth: 2 }} />
-      </AreaChart>
+    <div style={{ width: "100%", minWidth, height: 200 }}>
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={matches} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+          <defs>
+            <linearGradient id="perfGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#10b981" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="index" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `M${v}`} />
+          <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <ReferenceLine y={0} stroke="#334155" strokeDasharray="3 3" />
+          <Tooltip content={<SingleTooltip />} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }} />
+          <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2}
+            fill="url(#perfGrad)" dot={<CustomDot />}
+            activeDot={{ r: 6, fill: "#10b981", stroke: "#0f172a", strokeWidth: 2 }} />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   )
 }
 
 function TotalChart({ currentMatches, prevAvg, currentSeason }) {
   const maxLen = Math.max(currentMatches.length, prevAvg.length)
-  const chartWidth = Math.max(600, maxLen * 28)
+  const minWidth = Math.max(600, maxLen * 28)
   const data = Array.from({ length: maxLen }, (_, i) => ({
     index:   i + 1,
     current: currentMatches[i]?.cumulative ?? null,
@@ -82,20 +84,22 @@ function TotalChart({ currentMatches, prevAvg, currentSeason }) {
   }))
 
   return (
-    <div style={{ width: chartWidth, height: 200 }}>
-      <LineChart width={chartWidth} height={200} data={data} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
-        <XAxis dataKey="index" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `M${v}`} />
-        <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
-        <ReferenceLine y={0} stroke="#334155" strokeDasharray="3 3" />
-        <Tooltip content={<TotalTooltip />} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }} />
-        <Line type="monotone" dataKey="prevAvg" stroke="#64748b" strokeWidth={1.5}
-          strokeDasharray="5 3" dot={false} connectNulls name="Prev seasons avg" />
-        <Line type="monotone" dataKey="current" stroke="#10b981" strokeWidth={2.5}
-          dot={<CustomDot />}
-          activeDot={{ r: 6, fill: "#10b981", stroke: "#0f172a", strokeWidth: 2 }}
-          connectNulls name={`Season ${currentSeason}`} />
-      </LineChart>
+    <div style={{ width: "100%", minWidth, height: 200 }}>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={data} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="index" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `M${v}`} />
+          <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <ReferenceLine y={0} stroke="#334155" strokeDasharray="3 3" />
+          <Tooltip content={<TotalTooltip />} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }} />
+          <Line type="monotone" dataKey="prevAvg" stroke="#64748b" strokeWidth={1.5}
+            strokeDasharray="5 3" dot={false} connectNulls name="Prev seasons avg" />
+          <Line type="monotone" dataKey="current" stroke="#10b981" strokeWidth={2.5}
+            dot={<CustomDot />}
+            activeDot={{ r: 6, fill: "#10b981", stroke: "#0f172a", strokeWidth: 2 }}
+            connectNulls name={`Season ${currentSeason}`} />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   )
 }
