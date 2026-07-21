@@ -368,12 +368,91 @@ router.get("/", async (req, res, next) => {
 // GET /api/teams/:id — single team with roster
 router.get("/:id", authenticate, async (req, res, next) => {
   try {
+    const season = await getCurrentSeason()
+    // Same live-computed standings logic as GET / (the dashboard list),
+    // just filtered down to this one team, so this page can never again
+    // drift out of sync with what the dashboard shows for the same team.
     const teamRes = await query(`
-      SELECT t.*, t.logo_url AS "logoUrl", ls.points, ls.position
+      WITH fixture_scores AS (
+        SELECT
+          f.id,
+          f.home_team_id,
+          f.away_team_id,
+          SUM(CASE
+            WHEN p.team_id = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN p.team_id = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            ELSE 0
+          END) AS home_pts,
+          SUM(CASE
+            WHEN p.team_id = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN p.team_id = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            ELSE 0
+          END) AS away_pts,
+          COALESCE(SUM(CASE WHEN p.team_id = f.home_team_id THEN mr.player_score WHEN p.team_id = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0) AS home_goals,
+          COALESCE(SUM(CASE WHEN p.team_id = f.away_team_id THEN mr.player_score WHEN p.team_id = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0) AS away_goals,
+          COUNT(mr.id) AS results_logged
+        FROM fixtures f
+        LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type = 'league' AND mr.season_number = $1
+        LEFT JOIN players p ON p.id = mr.player_id
+        GROUP BY f.id, f.home_team_id, f.away_team_id
+      ),
+      fixture_outcomes AS (
+        SELECT *,
+          CASE
+            WHEN results_logged = 0 THEN NULL
+            WHEN home_pts > away_pts THEN 'home'
+            WHEN away_pts > home_pts THEN 'away'
+            ELSE 'draw'
+          END AS outcome
+        FROM fixture_scores
+      ),
+      per_team AS (
+        SELECT home_team_id AS team_id, home_goals AS gf, away_goals AS ga, home_pts AS pts, outcome,
+          (outcome = 'home') AS won, (outcome = 'draw') AS drawn, (outcome = 'away') AS lost
+        FROM fixture_outcomes WHERE outcome IS NOT NULL
+        UNION ALL
+        SELECT away_team_id AS team_id, away_goals AS gf, home_goals AS ga, away_pts AS pts, outcome,
+          (outcome = 'away') AS won, (outcome = 'draw') AS drawn, (outcome = 'home') AS lost
+        FROM fixture_outcomes WHERE outcome IS NOT NULL
+      ),
+      team_stats AS (
+        SELECT team_id,
+          COUNT(*) AS played,
+          COUNT(*) FILTER (WHERE won)   AS won,
+          COUNT(*) FILTER (WHERE drawn) AS drawn,
+          COUNT(*) FILTER (WHERE lost)  AS lost,
+          COALESCE(SUM(gf), 0)  AS gf,
+          COALESCE(SUM(ga), 0)  AS ga,
+          COALESCE(SUM(pts), 0) AS points
+        FROM per_team
+        GROUP BY team_id
+      ),
+      all_positions AS (
+        SELECT t.id,
+          ROW_NUMBER() OVER (
+            ORDER BY COALESCE(ts.points, 0) DESC,
+                     COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0) DESC,
+                     COALESCE(ts.gf, 0) DESC
+          ) AS position
+        FROM teams t
+        LEFT JOIN team_stats ts ON ts.team_id = t.id
+      )
+      SELECT
+        t.id, t.name, t.logo_url AS "logoUrl", t.score_points, t.created_at,
+        COALESCE(ts.played, 0) AS played,
+        COALESCE(ts.won, 0)    AS won,
+        COALESCE(ts.drawn, 0)  AS drawn,
+        COALESCE(ts.lost, 0)   AS lost,
+        COALESCE(ts.gf, 0)     AS gf,
+        COALESCE(ts.ga, 0)     AS ga,
+        COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0) AS gd,
+        COALESCE(ts.points, 0) AS points,
+        ap.position
       FROM teams t
-      LEFT JOIN league_standings ls ON ls.id = t.id
-      WHERE t.id = $1
-    `, [req.params.id])
+      LEFT JOIN team_stats ts ON ts.team_id = t.id
+      LEFT JOIN all_positions ap ON ap.id = t.id
+      WHERE t.id = $2
+    `, [season, req.params.id])
     if (!teamRes.rows[0]) return res.status(404).json({ error: "Team not found" })
     const playersRes = await query(
       `SELECT * FROM players_full WHERE "teamId" = $1 ORDER BY "bdrPoints" DESC`,
