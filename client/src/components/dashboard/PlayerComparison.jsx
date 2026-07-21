@@ -111,14 +111,11 @@ function PlayerCard({ data, side, onPlayerClick }) {
 
         {/* Trophy Case — icons + counts, only for trophies the player has */}
         {trophyTotal > 0 && (
-          <div className="mt-3 pt-3 border-t border-surface-border/50 grid grid-cols-2 gap-1.5">
+          <div className="mt-3 pt-3 border-t border-surface-border/50 flex flex-wrap gap-1.5">
             {TROPHY_DEFS.filter(t => (s?.trophies?.[t.key] ?? 0) > 0).map(t => (
-              <div key={t.key} className="flex items-center gap-1.5 bg-pitch-900/60 rounded-lg px-2 py-1.5">
-                <img src={t.image} alt={t.label} className="w-6 h-6 object-contain flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white leading-none">{s.trophies[t.key]}</p>
-                  <p className="text-[10px] text-slate-500 leading-tight truncate">{t.label}</p>
-                </div>
+              <div key={t.key} className="flex items-center gap-1 bg-pitch-900/60 rounded-lg px-1.5 py-1">
+                <img src={t.image} alt={t.label} className="w-5 h-5 object-contain flex-shrink-0" />
+                <span className="text-xs font-bold text-white">{s.trophies[t.key]}</span>
               </div>
             ))}
           </div>
@@ -202,9 +199,11 @@ export default function PlayerComparison({ onPlayerClick }) {
 
       {bothReady && (
         <>
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div style={{ overflowX: "scroll", WebkitOverflowScrolling: "touch" }} className="-mx-5 sm:mx-0 px-5 sm:px-0 mb-6">
+            <div className="grid gap-3 min-w-[480px]" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <PlayerCard data={dataA} side="a" onPlayerClick={onPlayerClick} />
             <PlayerCard data={dataB} side="b" onPlayerClick={onPlayerClick} />
+          </div>
           </div>
 
           <div className="card p-4">
