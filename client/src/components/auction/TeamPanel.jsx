@@ -1,20 +1,51 @@
+import { Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 
-// A side-panel column of team cards — logo, name, a budget progress bar,
-// and the roster they've bought so far this auction, each chip showing
-// what that player actually cost. Ported layout concept from the
-// original app's left/right team panels (teams are split across both
-// sides, flanking the central auction area). Shared identically by the
-// admin screen, the team captain page, and the public live view.
-export default function TeamPanel({ title, teamList, sales, budgetPerTeam }) {
+// Chip for a regular auction purchase
+function PurchaseChip({ player }) {
+  return (
+    <span className="team-player-tag">
+      <span className="team-player-tag-name">{player.playerName}</span>
+      {player.rtmUsed && <span className="team-player-tag-rtm" title="Right to Match">RTM</span>}
+    </span>
+  )
+}
+
+// Chip for a retained player — blue tint, "RET" label
+function RetentionChip({ name, price }) {
+  return (
+    <span className="team-player-tag"
+      style={{ background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.35)" }}>
+      <span className="team-player-tag-name" style={{ color: "#93c5fd" }}>{name}</span>
+      <span style={{ fontSize: "9px", color: "#60a5fa", fontWeight: 700, marginLeft: 3 }}>RET</span>
+    </span>
+  )
+}
+
+// Chip for the team captain — gold tint, crown icon
+function CaptainChip({ name }) {
+  return (
+    <span className="team-player-tag"
+      style={{ background: "rgba(217,164,65,0.15)", border: "1px solid rgba(217,164,65,0.40)" }}>
+      <Crown size={9} style={{ color: "#D9A441", flexShrink: 0, marginRight: 2 }} />
+      <span className="team-player-tag-name" style={{ color: "#F2C766" }}>{name}</span>
+    </span>
+  )
+}
+
+export default function TeamPanel({ title, teamList, sales, retentions = [], budgetPerTeam }) {
   return (
     <div className="side-panel">
       <h2>{title}</h2>
       {teamList.map(t => {
-        const roster = sales.filter(s => s.teamId === t.id)
-        const isLowBudget = t.budget <= 100
-        const total = budgetPerTeam || t.budget
-        const spentPct = total > 0 ? Math.min(100, Math.round(((total - t.budget) / total) * 100)) : 0
+        const roster       = sales.filter(s => s.teamId === t.id)
+        const teamRetained = retentions.filter(r => r.teamId === t.id)
+        const captains     = t.captains || []
+        const isLowBudget  = t.budget <= 100
+        const total        = budgetPerTeam || t.budget
+        const spentPct     = total > 0 ? Math.min(100, Math.round(((total - t.budget) / total) * 100)) : 0
+
+        const hasAnyPlayers = captains.length > 0 || teamRetained.length > 0 || roster.length > 0
 
         return (
           <div key={t.id} className={cn("team-leader", isLowBudget && "low-budget")}>
@@ -36,14 +67,16 @@ export default function TeamPanel({ title, teamList, sales, budgetPerTeam }) {
               />
             </div>
 
-            {roster.length > 0 && (
+            {hasAnyPlayers && (
               <div className="team-players">
-                {roster.map(p => (
-                  <span key={p.id} className="team-player-tag">
-                    <span className="team-player-tag-name">{p.playerName}</span>
-                    {p.rtmUsed && <span className="team-player-tag-rtm" title="Right to Match">RTM</span>}
-                  </span>
-                ))}
+                {/* Captain chips — always first, gold */}
+                {captains.map(c => <CaptainChip key={`cap-${c.id}`} name={c.name} />)}
+
+                {/* Retention chips — blue */}
+                {teamRetained.map(r => <RetentionChip key={`ret-${r.playerId}`} name={r.playerName} price={r.price} />)}
+
+                {/* Regular auction purchases */}
+                {roster.map(p => <PurchaseChip key={p.id} player={p} />)}
               </div>
             )}
           </div>

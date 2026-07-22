@@ -50,7 +50,7 @@ export default function TeamAuctionLive() {
     )
   }
 
-  const { session, pool = [], sales = [], teams = [] } = data
+  const { session, pool = [], sales = [], teams = [], retentions = [] } = data
   const teamNameById = Object.fromEntries(teams.map(t => [t.id, t.name]))
 
   if (session.status === "retention") {
@@ -95,7 +95,7 @@ export default function TeamAuctionLive() {
       </div>
 
       <div className="auction-layout max-w-[100rem] mx-auto">
-        <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} budgetPerTeam={session.budgetPerTeam} />
+        <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
 
         <div className="space-y-4">
           {/* Current player */}
@@ -183,7 +183,7 @@ export default function TeamAuctionLive() {
           <PoolPanel pool={pool} clickable />
         </div>
 
-        <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} budgetPerTeam={session.budgetPerTeam} />
+        <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
       </div>
     </div>
   )

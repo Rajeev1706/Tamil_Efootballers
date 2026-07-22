@@ -103,7 +103,7 @@ export default function AuctionLive() {
       </div>
 
       <div className="auction-layout max-w-[100rem] mx-auto">
-        <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} budgetPerTeam={session.budgetPerTeam} />
+        <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
 
         <div className="space-y-4">
           {narratives.map((n, i) => (
@@ -157,7 +157,7 @@ export default function AuctionLive() {
           <PoolPanel pool={pool} />
         </div>
 
-        <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} budgetPerTeam={session.budgetPerTeam} />
+        <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
       </div>
     </div>
   )

@@ -297,7 +297,7 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
 
   return (
     <div className="auction-layout max-w-[100rem] mx-auto">
-      <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} budgetPerTeam={session.budgetPerTeam} />
+      <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
 
       <div className={cn("space-y-4", shake && "auction-shake")}>
       <div className="flex items-center justify-between">
@@ -469,7 +469,7 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
       <PoolPanel pool={pool} clickable />
       </div>
 
-      <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} budgetPerTeam={session.budgetPerTeam} />
+      <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
     </div>
   )
 }

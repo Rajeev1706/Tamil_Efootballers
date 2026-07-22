@@ -61,7 +61,18 @@ async function getFullAuctionState() {
     ORDER BY s.sold_at DESC
   `, [session.id])
 
-  const teamsRes = await query(`SELECT id, name, budget, logo_url AS "logoUrl" FROM teams ORDER BY name`)
+  const teamsRes = await query(`
+    SELECT t.id, t.name, t.budget, t.logo_url AS "logoUrl",
+      COALESCE(
+        json_agg(json_build_object('id', p.id, 'name', p.name) ORDER BY p.name)
+        FILTER (WHERE p.id IS NOT NULL),
+        '[]'
+      ) AS captains
+    FROM teams t
+    LEFT JOIN players p ON p.team_id = t.id AND p.is_captain = true
+    GROUP BY t.id, t.name, t.budget, t.logo_url
+    ORDER BY t.name
+  `)
 
   const retentionsRes = await query(`
     SELECT r.id, r.team_id AS "teamId", r.player_id AS "playerId", p.name AS "playerName", r.price
@@ -234,6 +245,20 @@ router.post("/build-pool", authenticate, adminOnly, async (req, res, next) => {
        WHERE id IN (SELECT player_id FROM auction_pool WHERE session_id = $1)`,
       [sessionId]
     )
+
+    // Set every team's budget to the session's budget_per_team, then deduct
+    // whatever they already spent on retained players. This is the authoritative
+    // moment where the admin-set budget actually takes effect — it was stored
+    // in auction_sessions but never applied to teams.budget until now.
+    const session = sessionRes.rows[0]
+    await query("UPDATE teams SET budget = $1", [session.budget_per_team])
+    await query(`
+      UPDATE teams t SET budget = budget - COALESCE((
+        SELECT SUM(r.price) FROM auction_retentions r
+        WHERE r.session_id = $1 AND r.team_id = t.id
+      ), 0)
+    `, [sessionId])
+
     await query("UPDATE auction_sessions SET status = 'active', version = version + 1 WHERE id = $1", [sessionId])
 
     res.json({ success: true, poolCount: parseInt(poolCountRes.rows[0].count) })
