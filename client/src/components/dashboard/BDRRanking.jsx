@@ -45,7 +45,7 @@ export default function BDRRanking({ players, onPlayerClick }) {
               <div className="w-6 flex-shrink-0 text-center">
                 {isFirst
                   ? <Crown className="w-4 h-4 text-gold mx-auto" />
-                  : <span className="flex items-center gap-0.5"><span className="text-sm font-medium text-slate-500">#{idx + 1}</span><RankBadge change={rankChanges[p.id]} /></span>
+                  : <span className="flex items-center gap-0.5"><span className="text-sm font-medium text-slate-500">#{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></span>
                 }
               </div>
 
