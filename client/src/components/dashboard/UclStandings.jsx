@@ -4,6 +4,8 @@ import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent, useUclFixture
 import { cn } from "../../lib/utils"
 import { TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
+import RankBadge from "../common/RankBadge"
+import { useRankChanges } from "../../hooks/useRankChanges"
 import uclTrophy from "../../../images/ucl.png"
 import goldenBootGB from "../../../images/ucl_gb.png"
 
@@ -20,6 +22,11 @@ function getRoundLabel(round, totalRounds) {
 export default function UclStandings({ onPlayerClick }) {
   const { data: groups = [], isLoading } = useUclStandings()
   const { data: scorers = [] } = useUclTopScorers()
+  const uclScorerRankChanges = useRankChanges("ucl-golden-boot", scorers.map(s => s.id))
+  const uclGroupRankChanges  = useRankChanges(
+    `ucl-group-${group?.name ?? "none"}`,
+    (group?.players ?? []).map(p => p.id)
+  )
   const { data: knockout } = useUclKnockoutCurrent()
   const [activeGroup, setActiveGroup] = useState(0)
   const group = groups[activeGroup] || groups[0]
@@ -175,7 +182,8 @@ export default function UclStandings({ onPlayerClick }) {
             <tbody>
               {group?.players.length === 0 ? (
                 <tr><td colSpan={10} className="text-center py-8 text-slate-500 text-sm">No players in this group</td></tr>
-              ) : group?.players.map((p, i) => (
+              ) : group?.players.map((p, i) => {
+                return (
                 <tr
                   key={p.id}
                   onClick={() => onPlayerClick?.(p)}
@@ -185,7 +193,10 @@ export default function UclStandings({ onPlayerClick }) {
                   )}
                 >
                   <td className="py-3 px-2 text-center">
-                    <span className={cn("text-sm font-medium", i < 4 ? "text-emerald-400" : "text-slate-500")}>{i + 1}</span>
+                    <div className="flex items-center justify-center gap-0.5">
+                      <span className={cn("text-sm font-medium", i < 4 ? "text-emerald-400" : "text-slate-500")}>{i + 1}</span>
+                      <RankBadge change={uclGroupRankChanges[p.id]} />
+                    </div>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
@@ -208,17 +219,18 @@ export default function UclStandings({ onPlayerClick }) {
                   <td className="py-3 px-2 text-center text-slate-400">{p.gf}</td>
                   <td className="py-3 px-2 text-center text-slate-400">{p.ga}</td>
                   <td className={cn("py-3 px-2 text-center font-medium", p.gd > 0 ? "text-emerald-400" : p.gd < 0 ? "text-rose-400" : "text-slate-400")}>
-                    {p.gd > 0 ? `+${p.gd}` : p.gd}
+                    {p.gd > 0 ? "+" + p.gd : p.gd}
                   </td>
                   <td className="py-3 px-2 text-center font-bold text-white">{p.points}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Knockout Stage — read-only round-tabs bracket view */}
+      {/* Knockout Stage - read-only round-tabs bracket view */}
       {view === "knockout" && (
         !knockout || (knockout.matches || []).length === 0 ? (
           <div className="px-5 py-10 text-center">
@@ -319,7 +331,7 @@ export default function UclStandings({ onPlayerClick }) {
                       <td className="py-3 px-3 text-center">
                         {isFirst
                           ? <span className="rank-gold text-sm">1</span>
-                          : <span className="text-slate-500 text-sm">{idx + 1}</span>
+                          : <span className="flex items-center justify-center gap-0.5"><span className="text-slate-500 text-sm">{idx + 1}</span><RankBadge change={uclScorerRankChanges[scorer.id]} /></span>
                         }
                       </td>
                       <td className="py-3 px-4">

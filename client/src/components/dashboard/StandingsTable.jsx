@@ -5,6 +5,8 @@ import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
+import RankBadge from "../common/RankBadge"
+import { useRankChanges } from "../../hooks/useRankChanges"
 import teamLeagueTrophy from "../../../images/Team League.png"
 import goldenBoot from "../../../images/Golden Boot.png"
 
@@ -49,10 +51,12 @@ function PlayoffMatchCard({ label, match }) {
 export default function StandingsTable({ teams, players, onPlayerClick, view: controlledView, onViewChange }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const leagueRankChanges  = useRankChanges("league-table", teams.map(t => t.id))
   const [internalView, setInternalView] = useState("table")
   const view    = controlledView || internalView
   const setView = onViewChange || setInternalView
   const { data: scorers = [] } = useTopScorers()
+  const scorerRankChanges = useRankChanges("league-golden-boot", scorers.map(s => s.id))
   const { data: playoffsData } = useTeamLeaguePlayoffs()
   const { data: fixtures = [] } = useFixtures()
   const [activeFixtureRound, setActiveFixtureRound] = useState(1)
@@ -248,7 +252,10 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                     )}
                   >
                     <td className="py-3 px-3 text-center">
-                      <span className={cn("text-sm font-medium", pos <= 4 ? "text-emerald-400" : "text-slate-500")}>{pos}</span>
+                      <div className="flex items-center justify-center gap-0.5">
+                        <span className={cn("text-sm font-medium", pos <= 4 ? "text-emerald-400" : "text-slate-500")}>{pos}</span>
+                        <RankBadge change={leagueRankChanges[team.id]} />
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -322,10 +329,13 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                       )}
                     >
                       <td className="py-3 px-3 text-center">
-                        {isFirst
-                          ? <span className="rank-gold text-sm">1</span>
-                          : <span className="text-slate-500 text-sm">{idx + 1}</span>
-                        }
+                        <div className="flex items-center justify-center gap-0.5">
+                          {isFirst
+                            ? <span className="rank-gold text-sm">1</span>
+                            : <span className="text-slate-500 text-sm">{idx + 1}</span>
+                          }
+                          <RankBadge change={scorerRankChanges[scorer.id]} />
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         <span className={cn("inline-flex items-center gap-2 font-medium", isFirst ? "text-white" : "text-slate-300")}>

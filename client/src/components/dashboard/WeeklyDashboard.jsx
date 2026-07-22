@@ -4,6 +4,8 @@ import { useWeeklyCurrent, useWeeklyTopScorers } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
+import RankBadge from "../common/RankBadge"
+import { useRankChanges } from "../../hooks/useRankChanges"
 import weeklyLogo from "../../../images/Weekly.png"
 import goldenBootLogo from "../../../images/Golden Boot.png"
 
@@ -25,6 +27,7 @@ function getRoundLabel(round, totalRounds) {
 export default function WeeklyDashboard({ onPlayerClick }) {
   const { data: tournament, isLoading } = useWeeklyCurrent()
   const { data: scorers = [] } = useWeeklyTopScorers()
+  const weeklyScorerRankChanges = useRankChanges("weekly-golden-boot", scorers.map(s => s.id))
   const [view, setView] = useState("fixtures") // "fixtures" | "scorers"
   const [activeRound, setActiveRound] = useState(1)
 
@@ -193,7 +196,7 @@ export default function WeeklyDashboard({ onPlayerClick }) {
                       <td className="py-3 px-3 text-center">
                         {isFirst
                           ? <span className="rank-gold text-sm">1</span>
-                          : <span className="text-slate-500 text-sm">{idx + 1}</span>
+                          : <span className="flex items-center justify-center gap-0.5"><span className="text-slate-500 text-sm">{idx + 1}</span><RankBadge change={weeklyScorerRankChanges[scorer.id]} /></span>
                         }
                       </td>
                       <td className="py-3 px-4">

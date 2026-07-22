@@ -2,11 +2,14 @@ import { TrendingUp } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
+import RankBadge from "../common/RankBadge"
+import { useRankChanges } from "../../hooks/useRankChanges"
 
 export default function MarketValues({ players, onPlayerClick }) {
   const sorted = [...players].sort((a, b) =>
     (b.marketValue - a.marketValue) || a.name.localeCompare(b.name)
   )
+  const rankChanges = useRankChanges("market-values", sorted.map(p => p.id))
 
   return (
     <div className="card overflow-hidden">
@@ -52,7 +55,7 @@ export default function MarketValues({ players, onPlayerClick }) {
                   <td className="py-3 px-3 text-center">
                     {isFirst
                       ? <span className="rank-gold text-sm">1</span>
-                      : <span className="text-slate-500 text-sm">{idx + 1}</span>
+                      : <span className="flex items-center gap-0.5"><span className="text-slate-500 text-sm">{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></span>
                     }
                   </td>
                   <td className="py-3 px-4">

@@ -2,6 +2,8 @@ import { Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { getAvatarById } from "../../lib/avatars"
 import ballondorImg from "../../../images/ballondor.png"
+import RankBadge from "../common/RankBadge"
+import { useRankChanges } from "../../hooks/useRankChanges"
 
 const FormDot = ({ result }) => {
   const map = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
@@ -13,6 +15,7 @@ export default function BDRRanking({ players, onPlayerClick }) {
     (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
   )
   const maxPts = sorted[0]?.bdrPoints || 1
+  const rankChanges = useRankChanges("bdr-ranking", sorted.map(p => p.id))
 
   return (
     <div className="card overflow-hidden">
@@ -42,7 +45,7 @@ export default function BDRRanking({ players, onPlayerClick }) {
               <div className="w-6 flex-shrink-0 text-center">
                 {isFirst
                   ? <Crown className="w-4 h-4 text-gold mx-auto" />
-                  : <span className="text-sm font-medium text-slate-500">#{idx + 1}</span>
+                  : <span className="flex items-center gap-0.5"><span className="text-sm font-medium text-slate-500">#{idx + 1}</span><RankBadge change={rankChanges[p.id]} /></span>
                 }
               </div>
 
