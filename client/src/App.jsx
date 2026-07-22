@@ -14,6 +14,7 @@ import UclKOBracket from "./pages/UclKOBracket"
 import AuctionAdmin from "./pages/AuctionAdmin"
 import AuctionLive from "./pages/AuctionLive"
 import TeamAuctionLive from "./pages/TeamAuctionLive"
+import TeamRosterPage from "./pages/TeamRosterPage"
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/"             element={<CommonDashboard />} />
         <Route path="/login"        element={<Login />} />
         <Route path="/player/:id"   element={<PlayerProfile />} />
+        <Route path="/team-roster/:id" element={<TeamRosterPage />} />
         <Route path="/hall-of-fame"      element={<HallOfFame />} />
         <Route path="/weekly/draw/:id"    element={<WeeklyDraw />} />
         <Route path="/weekly/bracket/:id" element={<WeeklyBracket />} />

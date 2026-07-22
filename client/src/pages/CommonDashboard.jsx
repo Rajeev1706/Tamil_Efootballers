@@ -13,6 +13,7 @@ import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import PlayerComparison from "../components/dashboard/PlayerComparison"
+import TeamsDirectory from "../components/dashboard/TeamsDirectory"
 import Loading from "../components/common/Loading"
 import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
@@ -147,6 +148,7 @@ function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
 const PANEL_OPTIONS = [
   { value: "players",    label: "Total players"   },
   { value: "compare",    label: "Compare players" },
+  { value: "teams",      label: "Teams"           },
   { value: "standings",  label: "League table"    },
   { value: "ucl",        label: "UCL"             },
   { value: "weekly",     label: "Weekly"          },
@@ -693,6 +695,7 @@ export default function CommonDashboard() {
                 {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
                 {activePanel === "compare"   && <PlayerComparison onPlayerClick={handlePlayer} />}
+                {activePanel === "teams"     && <TeamsDirectory teams={teams} />}
               </div>
             </>
           )}

@@ -343,7 +343,7 @@ router.get("/", async (req, res, next) => {
         GROUP BY team_id
       )
       SELECT
-        t.id, t.name, t.logo_url AS "logoUrl", t.score_points, t.created_at,
+        t.id, t.name, t.logo_url AS "logoUrl", t.anthem_url AS "anthemUrl", t.score_points, t.created_at,
         COALESCE(ts.played, 0) AS played,
         COALESCE(ts.won, 0)    AS won,
         COALESCE(ts.drawn, 0)  AS drawn,
@@ -438,7 +438,7 @@ router.get("/:id", authenticate, async (req, res, next) => {
         LEFT JOIN team_stats ts ON ts.team_id = t.id
       )
       SELECT
-        t.id, t.name, t.logo_url AS "logoUrl", t.score_points, t.created_at,
+        t.id, t.name, t.logo_url AS "logoUrl", t.anthem_url AS "anthemUrl", t.score_points, t.created_at,
         COALESCE(ts.played, 0) AS played,
         COALESCE(ts.won, 0)    AS won,
         COALESCE(ts.drawn, 0)  AS drawn,
