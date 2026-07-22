@@ -129,7 +129,6 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                 return (
                   <div key={f.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-border/50">
                     <span
-                      onClick={() => f.homeTeamId && onPlayerClick?.({ id: f.homeTeamId, name: f.home, isTeam: true })}
                       className={cn("flex-1 min-w-0 flex items-center justify-end gap-1.5 truncate font-medium text-right pr-3",
                         homeWon ? "text-emerald-400" : "text-white"
                       )}>
