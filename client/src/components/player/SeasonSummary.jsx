@@ -1,10 +1,10 @@
 import { useState } from "react"
-import { Trophy } from "lucide-react"
+import { Trophy, ChevronDown } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 const MATCH_TYPE_OPTIONS = [
   { value: "all",    label: "Total matches" },
-  { value: "league", label: "Team league"   },
+  { value: "league", label: "Team League"   },
   { value: "ucl",    label: "UCL"           },
   { value: "weekly", label: "Weekly"        },
 ]
@@ -18,29 +18,51 @@ function SummaryRow({ label, value }) {
   )
 }
 
-// Overall career match record — total wins/draws/losses, games played,
-// win rate, goals, filterable by match type. This is the OVERALL summary
-// across every match, distinct from HeadToHead which is filtered to one
-// specific opponent at a time. Shared identically between the player
-// profile page and the team auction page.
+function Dropdown({ value, onChange, options }) {
+  return (
+    <div className="relative flex-1">
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full appearance-none bg-pitch-800 border border-surface-border rounded-xl pl-3 pr-7 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors cursor-pointer">
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+    </div>
+  )
+}
+
 export default function SeasonSummary({ player }) {
-  const [summaryFilter, setSummaryFilter] = useState("all")
+  const [seasonFilter, setSeasonFilter] = useState("overall")
+  const [typeFilter, setTypeFilter] = useState("all")
+
   const allHistory = player?.matchHistory || []
 
-  const filteredHistory = summaryFilter === "all"
+  // Build available seasons from match history
+  const seasons = [...new Set(allHistory.map(m => m.seasonNumber).filter(Boolean))].sort((a, b) => b - a)
+  const currentSeason = seasons[0] ?? null
+
+  const seasonOptions = [
+    { value: "overall", label: "Overall (All-time)" },
+    { value: "current", label: "Current Season" },
+    ...seasons.slice(1).map(s => ({ value: String(s), label: `Season ${s}` })),
+  ]
+
+  // First filter by season
+  const seasonFiltered = seasonFilter === "overall"
     ? allHistory
-    : allHistory.filter(m => m.matchType === summaryFilter)
+    : seasonFilter === "current"
+      ? allHistory.filter(m => m.seasonNumber === currentSeason)
+      : allHistory.filter(m => m.seasonNumber === parseInt(seasonFilter))
 
-  const filteredWins   = filteredHistory.filter(m => m.result === "win").length
-  const filteredDraws  = filteredHistory.filter(m => m.result === "draw").length
-  const filteredLosses = filteredHistory.filter(m => m.result === "loss").length
-  const filteredTotal  = filteredWins + filteredDraws + filteredLosses
+  // Then filter by match type
+  const filtered = typeFilter === "all"
+    ? seasonFiltered
+    : seasonFiltered.filter(m => m.matchType === typeFilter)
 
-  const filteredGoals  = filteredHistory.reduce((sum, m) =>
-    sum + (m.playerScore != null ? m.playerScore : 0), 0)
-  const goalsPerMatch  = filteredTotal > 0
-    ? (filteredGoals / filteredTotal).toFixed(1)
-    : "—"
+  const wins   = filtered.filter(m => m.result === "win").length
+  const draws  = filtered.filter(m => m.result === "draw").length
+  const losses = filtered.filter(m => m.result === "loss").length
+  const total  = wins + draws + losses
+  const goals  = filtered.reduce((s, m) => s + (m.playerScore ?? 0), 0)
 
   return (
     <div className="card overflow-hidden">
@@ -49,23 +71,17 @@ export default function SeasonSummary({ player }) {
         <h2 className="text-base font-semibold text-white">Season summary</h2>
       </div>
 
-      <div className="px-5 pt-4">
-        <select
-          value={summaryFilter}
-          onChange={e => setSummaryFilter(e.target.value)}
-          className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
-        >
-          {MATCH_TYPE_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+      {/* Two dropdowns side by side */}
+      <div className="px-5 pt-4 flex gap-2">
+        <Dropdown value={seasonFilter} onChange={setSeasonFilter} options={seasonOptions} />
+        <Dropdown value={typeFilter}   onChange={setTypeFilter}   options={MATCH_TYPE_OPTIONS} />
       </div>
 
       <div className="p-5 grid grid-cols-3 gap-3">
         {[
-          { label: "Wins",   value: filteredWins,   color: "text-emerald-400" },
-          { label: "Draws",  value: filteredDraws,  color: "text-amber-400"  },
-          { label: "Losses", value: filteredLosses, color: "text-rose-400"   },
+          { label: "Wins",   value: wins,   color: "text-emerald-400" },
+          { label: "Draws",  value: draws,  color: "text-amber-400"  },
+          { label: "Losses", value: losses, color: "text-rose-400"   },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-pitch-800 rounded-xl p-3 text-center border border-surface-border">
             <p className={cn("text-2xl font-extrabold font-mono", color)}>{value}</p>
@@ -75,14 +91,11 @@ export default function SeasonSummary({ player }) {
       </div>
 
       <div className="px-5 pb-5 space-y-2.5">
-        <SummaryRow label="Games played" value={filteredTotal} />
-        <SummaryRow
-          label="Win rate"
-          value={filteredTotal ? `${Math.round((filteredWins / filteredTotal) * 100)}%` : "—"}
-        />
-        <SummaryRow label="Goals scored" value={filteredGoals} />
-        <SummaryRow label="Goals per match" value={goalsPerMatch} />
-        <SummaryRow label="BDR points" value={player?.bdrPoints?.toLocaleString() ?? "—"} />
+        <SummaryRow label="Games played"   value={total} />
+        <SummaryRow label="Win rate"       value={total ? `${Math.round((wins / total) * 100)}%` : "—"} />
+        <SummaryRow label="Goals scored"   value={goals} />
+        <SummaryRow label="Goals per match" value={total ? (goals / total).toFixed(1) : "—"} />
+        <SummaryRow label="BDR points"     value={player?.bdrPoints?.toLocaleString() ?? "—"} />
       </div>
     </div>
   )

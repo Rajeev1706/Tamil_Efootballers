@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Target, Trophy } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures } from "../../lib/queries"
@@ -46,6 +47,8 @@ function PlayoffMatchCard({ label, match }) {
 }
 
 export default function StandingsTable({ teams, players, onPlayerClick, view: controlledView, onViewChange }) {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [internalView, setInternalView] = useState("table")
   const view    = controlledView || internalView
   const setView = onViewChange || setInternalView
@@ -238,8 +241,9 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                 return (
                   <tr
                     key={team.id}
+                    onClick={() => navigate(`/team-roster/${team.id}?${searchParams.toString()}`)}
                     className={cn(
-                      "border-b border-surface-border/50 transition-colors",
+                      "border-b border-surface-border/50 transition-colors cursor-pointer",
                       "table-row-hover",
                       isFirst && "bg-gold/5 border-l-2 border-l-gold/60"
                     )}

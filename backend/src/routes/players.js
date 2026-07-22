@@ -59,6 +59,7 @@ router.get("/:id", async (req, res, next) => {
         CASE WHEN mr.player_id = $1 THEN mr.player_score   ELSE mr.opponent_score END AS "playerScore",
         CASE WHEN mr.player_id = $1 THEN mr.opponent_score ELSE mr.player_score   END AS "opponentScore",
         mr.recorded_at AS date,
+        mr.season_number AS "seasonNumber",
         CASE WHEN mr.player_id = $1 THEN opp.id   ELSE p2.id   END AS "opponentId",
         CASE WHEN mr.player_id = $1 THEN opp.name ELSE p2.name END AS "opponentName",
         CASE WHEN mr.player_id = $1 THEN ot.name  ELSE pt.name END AS "opponentTeam"
