@@ -168,14 +168,15 @@ router.post("/team", authenticate, async (req, res, next) => {
     const seasonNumber = await getCurrentSeason()
     const ins = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number, fixture_id)
-      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9,$10)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number, fixture_id, team_id)
+      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9,$10,$11)
       RETURNING *
     `, [
       playerId, opponentId, result, oppCheck.rows[0].grade,
       playerScore ?? null, opponentScore ?? null,
       new Date().toISOString().slice(0, 10),
       req.user.id, seasonNumber, fixtureId,
+      playerCheck.rows[0].team_id ?? null,
     ])
 
     // Live team points/goals — added immediately as each player result comes
@@ -194,6 +195,7 @@ router.post("/team", authenticate, async (req, res, next) => {
     await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
       [oppPts, oScore, pScore, oppTeamId])
 
+    let recalcError = null
     try {
       await recalcMarketValue(playerId)
       await recalcMarketValue(opponentId)
@@ -203,13 +205,14 @@ router.post("/team", authenticate, async (req, res, next) => {
       // Match record + team stats already saved above — don't fail the
       // whole request over a market-value/form recalculation problem.
       console.error("Post-result recalc failed (match + team stats still saved):", recalcErr)
+      recalcError = recalcErr.message
     }
 
     const fresh = await query(
       `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
       [playerId]
     )
-    res.status(201).json({ record: ins.rows[0], player: fresh.rows[0] })
+    res.status(201).json({ record: ins.rows[0], player: fresh.rows[0], recalcError })
   } catch (err) { next(err) }
 })
 
@@ -352,11 +355,13 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
     await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
 
+    let recalcError = null
     try {
       await recalcMarketValue(playerId)
       await recalcMarketValue(opponentId)
     } catch (recalcErr) {
       console.error("Post-result market value recalc failed (match record still saved):", recalcErr)
+      recalcError = recalcErr.message
     }
 
     const fresh = await query(
@@ -365,6 +370,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     )
 
     res.status(201).json({
+      recalcError,
       record: { ...ins.rows[0], matchType, playerScore: playerScore ?? null, opponentScore: opponentScore ?? null },
       player: fresh.rows[0],
     })
@@ -399,6 +405,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
     const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
     await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [letter, playerId])
     await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
+    let recalcError = null
     try {
       await recalcMarketValue(playerId)
       await recalcMarketValue(opponentId)
@@ -406,13 +413,14 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       await recalcForm(opponentId)
     } catch (recalcErr) {
       console.error("Post-edit recalc failed (result edit still saved):", recalcErr)
+      recalcError = recalcErr.message
     }
 
     const fresh = await query(
       `SELECT id, name, grade, market_value AS "marketValue", bdr_points AS "bdrPoints", form FROM players WHERE id = $1`,
       [playerId]
     )
-    res.json({ updated: true, player: fresh.rows[0] })
+    res.json({ updated: true, player: fresh.rows[0], recalcError })
   } catch (err) { next(err) }
 })
 
