@@ -294,20 +294,21 @@ router.get("/", async (req, res, next) => {
           f.home_team_id,
           f.away_team_id,
           SUM(CASE
-            WHEN mr.team_id = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-            WHEN mr.team_id = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
             ELSE 0
           END) AS home_pts,
           SUM(CASE
-            WHEN mr.team_id = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-            WHEN mr.team_id = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
             ELSE 0
           END) AS away_pts,
-          COALESCE(SUM(CASE WHEN mr.team_id = f.home_team_id THEN mr.player_score WHEN mr.team_id = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0) AS home_goals,
-          COALESCE(SUM(CASE WHEN mr.team_id = f.away_team_id THEN mr.player_score WHEN mr.team_id = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0) AS away_goals,
+          COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0) AS home_goals,
+          COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0) AS away_goals,
           COUNT(mr.id) AS results_logged
         FROM fixtures f
         LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type = 'league' AND mr.season_number = $1
+        LEFT JOIN players p ON p.id = mr.player_id
         GROUP BY f.id, f.home_team_id, f.away_team_id
       ),
       fixture_outcomes AS (
@@ -378,20 +379,21 @@ router.get("/:id", authenticate, async (req, res, next) => {
           f.home_team_id,
           f.away_team_id,
           SUM(CASE
-            WHEN mr.team_id = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-            WHEN mr.team_id = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
             ELSE 0
           END) AS home_pts,
           SUM(CASE
-            WHEN mr.team_id = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-            WHEN mr.team_id = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+            WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
             ELSE 0
           END) AS away_pts,
-          COALESCE(SUM(CASE WHEN mr.team_id = f.home_team_id THEN mr.player_score WHEN mr.team_id = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0) AS home_goals,
-          COALESCE(SUM(CASE WHEN mr.team_id = f.away_team_id THEN mr.player_score WHEN mr.team_id = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0) AS away_goals,
+          COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0) AS home_goals,
+          COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0) AS away_goals,
           COUNT(mr.id) AS results_logged
         FROM fixtures f
         LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type = 'league' AND mr.season_number = $1
+        LEFT JOIN players p ON p.id = mr.player_id
         GROUP BY f.id, f.home_team_id, f.away_team_id
       ),
       fixture_outcomes AS (
