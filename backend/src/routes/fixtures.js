@@ -3,6 +3,7 @@ import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { generatePlayoffs } from "../services/playoffs.js"
+import { addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 
@@ -168,9 +169,8 @@ const createSchema = z.object({
 })
 
 // POST /api/fixtures/generate — auto-creates the full double round-robin
-// season schedule from every current team. Refuses to run if any fixtures
-// already exist, to avoid mixing with manually-created ones — reset first
-// if a fresh regeneration is actually wanted.
+// season schedule from every current team. Accepts { format: 'league' | 'league_knockout' }
+// which controls whether a playoff bracket generates after the group stage.
 router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
     const existingRes = await query("SELECT COUNT(*) FROM fixtures")
@@ -183,6 +183,13 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
     if (teamIds.length < 2) {
       return res.status(400).json({ error: "Need at least 2 teams to generate a schedule." })
     }
+
+    // Save the chosen format so close-fixture knows what to do at season end
+    const format = req.body.format === "league" ? "league" : "league_knockout"
+    await query(`
+      INSERT INTO app_settings (key, value) VALUES ('team_league_format', $1)
+      ON CONFLICT (key) DO UPDATE SET value = $1
+    `, [format])
 
     const rounds = generateDoubleRoundRobin(teamIds)
     let fixturesCreated = 0
@@ -197,7 +204,7 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
       }
     }
 
-    res.json({ success: true, roundsGenerated: rounds.length, fixturesGenerated: fixturesCreated })
+    res.json({ success: true, format, roundsGenerated: rounds.length, fixturesGenerated: fixturesCreated })
   } catch (err) { next(err) }
 })
 
@@ -375,19 +382,176 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       }
     })
 
-    // Auto-generate the playoff bracket the instant the group stage
-    // finishes — replaces the old BDR-on-completion trigger. Season BDR
-    // now fires later, off the Playoff Final specifically (see
-    // routes/teams.js playoffs section).
+    // When all fixtures are complete, check the format and act accordingly
     const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
     if (parseInt(remainingRes.rows[0].count) === 0) {
-      const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
-      const season = parseInt(seasonRes.rows[0]?.value || "1")
-      await generatePlayoffs(season)
+      const seasonRes  = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+      const formatRes  = await query("SELECT value FROM app_settings WHERE key = 'team_league_format'")
+      const season     = parseInt(seasonRes.rows[0]?.value || "1")
+      const format     = formatRes.rows[0]?.value || "league_knockout"
+
+      if (format === "league") {
+        // League-only: top of the table wins immediately — award trophies now
+        // Import the trophy service inline to avoid circular deps
+        const { reconcileTrophyRoster } = await import("../services/trophyAwards.js")
+
+        // Find the team with the most points from the live standings
+        const champRes = await query(`
+          WITH fixture_scores AS (
+            SELECT
+              f.home_team_id, f.away_team_id,
+              SUM(CASE WHEN p.team_id = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+                       WHEN p.team_id = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END ELSE 0 END) AS home_pts,
+              SUM(CASE WHEN p.team_id = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+                       WHEN p.team_id = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END ELSE 0 END) AS away_pts,
+              SUM(CASE WHEN p.team_id = f.home_team_id THEN mr.player_score WHEN p.team_id = f.away_team_id THEN mr.opponent_score ELSE 0 END) AS home_gf,
+              SUM(CASE WHEN p.team_id = f.away_team_id THEN mr.player_score WHEN p.team_id = f.home_team_id THEN mr.opponent_score ELSE 0 END) AS away_gf
+            FROM fixtures f
+            LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type::text = 'league' AND mr.season_number = $1
+            LEFT JOIN players p ON p.id = mr.player_id
+            GROUP BY f.home_team_id, f.away_team_id
+          ),
+          team_pts AS (
+            SELECT home_team_id AS team_id,
+              SUM(CASE WHEN home_pts > away_pts THEN home_pts ELSE home_pts END) AS pts,
+              SUM(home_gf) AS gf
+            FROM fixture_scores GROUP BY home_team_id
+            UNION ALL
+            SELECT away_team_id,
+              SUM(away_pts), SUM(away_gf)
+            FROM fixture_scores GROUP BY away_team_id
+          ),
+          totals AS (
+            SELECT team_id, SUM(pts) AS total_pts, SUM(gf) AS total_gf
+            FROM team_pts GROUP BY team_id
+          )
+          SELECT t.id, t.name FROM totals tot
+          JOIN teams t ON t.id = tot.team_id
+          ORDER BY tot.total_pts DESC, tot.total_gf DESC LIMIT 1
+        `, [season])
+
+        if (champRes.rows[0]) {
+          const champTeam = champRes.rows[0]
+          const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [champTeam.id])
+
+          // Award Team League trophy to every player on the champion team
+          for (const player of playersRes.rows) {
+            await reconcileTrophyRoster({
+              playerId: player.id,
+              trophyColumn: "trophy2_count",
+              season,
+              sourceKey: `tl-champion-league-only-s${season}`,
+              teamId: champTeam.id,
+            })
+          }
+
+          // Allocate BDR points based on final league standings
+          // (same scale as League+Knockout but without the playoff positions)
+          const standingsRes = await query(`
+            WITH totals AS (
+              SELECT team_id,
+                SUM(CASE WHEN home_team_id = team_id THEN home_pts ELSE away_pts END) AS pts,
+                SUM(CASE WHEN home_team_id = team_id THEN home_gf ELSE away_gf END) AS gf
+              FROM (
+                SELECT f.home_team_id, f.away_team_id,
+                  SUM(CASE WHEN p.team_id = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END ELSE CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END END) AS home_pts,
+                  SUM(CASE WHEN p.team_id = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END ELSE CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END END) AS away_pts,
+                  SUM(CASE WHEN p.team_id = f.home_team_id THEN mr.player_score ELSE mr.opponent_score END) AS home_gf,
+                  SUM(CASE WHEN p.team_id = f.away_team_id THEN mr.player_score ELSE mr.opponent_score END) AS away_gf
+                FROM fixtures f
+                LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type::text = 'league' AND mr.season_number = $1
+                LEFT JOIN players p ON p.id = mr.player_id
+                GROUP BY f.home_team_id, f.away_team_id
+              ) s CROSS JOIN LATERAL (VALUES (s.home_team_id), (s.away_team_id)) t(team_id)
+              GROUP BY team_id
+            )
+            SELECT team_id, ROW_NUMBER() OVER (ORDER BY pts DESC, gf DESC) AS pos
+            FROM totals
+            LIMIT 8
+          `, [season])
+
+          const bdrByPos = { 1: 12, 2: 9, 3: 7, 4: 5, 5: 3, 6: 2, 7: 1, 8: 1 }
+          for (const row of standingsRes.rows) {
+            const bdr = bdrByPos[row.pos] || 0
+            if (bdr > 0) {
+              const teamPlayers = await query("SELECT id FROM players WHERE team_id = $1", [row.team_id])
+              for (const p of teamPlayers.rows) await addBdr(p.id, bdr)
+            }
+          }
+
+          // Store champion team ID so the frontend celebration can detect it
+          // (without a playoff Final to watch, the frontend needs another signal)
+          await query(`
+            INSERT INTO app_settings (key, value) VALUES ('league_only_champion_team_id', $1)
+            ON CONFLICT (key) DO UPDATE SET value = $1
+          `, [String(champTeam.id)])
+        }
+      } else {
+        // League + Knockout: generate the playoff bracket as before
+        await generatePlayoffs(season)
+      }
     }
 
     const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [req.params.id])
     res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
+// GET /api/fixtures/format/public — public version for the common dashboard
+router.get("/format/public", async (req, res, next) => {
+  try {
+    const [formatRes, champRes] = await Promise.all([
+      query("SELECT value FROM app_settings WHERE key = 'team_league_format'"),
+      query("SELECT value FROM app_settings WHERE key = 'league_only_champion_team_id'"),
+    ])
+    res.json({
+      format: formatRes.rows[0]?.value || "league_knockout",
+      leagueOnlyChampionTeamId: champRes.rows[0]?.value ? parseInt(champRes.rows[0].value) : null,
+    })
+  } catch (err) { next(err) }
+})
+
+// GET /api/fixtures/format — admin version with pending fixture counts
+router.get("/format", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const [formatRes, pendingRes, totalRes, champRes] = await Promise.all([
+      query("SELECT value FROM app_settings WHERE key = 'team_league_format'"),
+      query("SELECT COUNT(*) FROM fixtures WHERE status != 'completed'"),
+      query("SELECT COUNT(*) FROM fixtures"),
+      query("SELECT value FROM app_settings WHERE key = 'league_only_champion_team_id'"),
+    ])
+    res.json({
+      format: formatRes.rows[0]?.value || "league_knockout",
+      pendingFixtures: parseInt(pendingRes.rows[0].count),
+      totalFixtures: parseInt(totalRes.rows[0].count),
+      leagueOnlyChampionTeamId: champRes.rows[0]?.value ? parseInt(champRes.rows[0].value) : null,
+    })
+  } catch (err) { next(err) }
+})
+
+// PATCH /api/fixtures/format — change the team league format mid-season.
+// Allowed any time while at least one fixture is still not completed.
+// Locked once the last fixture is closed (that's when the format triggers).
+router.patch("/format", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { format } = req.body
+    if (!["league", "league_knockout"].includes(format)) {
+      return res.status(400).json({ error: "Format must be 'league' or 'league_knockout'" })
+    }
+
+    // Check if any fixtures still pending — if all done, it's too late to change
+    const pendingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
+    const pending = parseInt(pendingRes.rows[0].count)
+    if (pending === 0) {
+      return res.status(400).json({ error: "Cannot change format — all fixtures are already completed." })
+    }
+
+    await query(`
+      INSERT INTO app_settings (key, value) VALUES ('team_league_format', $1)
+      ON CONFLICT (key) DO UPDATE SET value = $1
+    `, [format])
+
+    res.json({ success: true, format, pendingFixtures: pending })
   } catch (err) { next(err) }
 })
 

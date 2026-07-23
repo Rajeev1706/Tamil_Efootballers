@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Target, Trophy } from "lucide-react"
+import { Target, Trophy, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useTopScorers, useTeamLeaguePlayoffs, useFixtures } from "../../lib/queries"
+import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormat } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
@@ -56,6 +56,9 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
   const view    = controlledView || internalView
   const setView = onViewChange || setInternalView
   const { data: scorers = [] } = useTopScorers()
+  const { data: formatData }  = useLeagueFormat()
+  const leagueFormat = formatData?.format || "league_knockout"
+  const isLeagueOnly = leagueFormat === "league"
   const scorerRankChanges = useRankChanges("league-golden-boot", scorers.map(s => s.id))
   const { data: playoffsData } = useTeamLeaguePlayoffs()
   const { data: fixtures = [] } = useFixtures()
@@ -167,7 +170,13 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
           Qualifier 2, which feeds into the Final alongside Qualifier 1's
           winner. */}
       {view === "playoffs" && (
-        !playoffsData?.matches || playoffsData.matches.length === 0 ? (
+        isLeagueOnly ? (
+          <div className="px-5 py-10 text-center">
+            <Crown className="w-6 h-6 text-gold mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No playoffs this season</p>
+            <p className="text-xs text-slate-600 mt-1">This season is League Only — the table topper wins the championship directly</p>
+          </div>
+        ) : !playoffsData?.matches || playoffsData.matches.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <Trophy className="w-6 h-6 text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-500">Playoffs haven't started yet</p>
@@ -253,7 +262,13 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                   >
                     <td className="py-3 px-3 text-center">
                       <div className="flex items-center justify-center gap-0.5">
-                        <span className={cn("text-sm font-medium", pos <= 4 ? "text-emerald-400" : "text-slate-500")}>{pos}</span>
+                        {isLeagueOnly && pos === 1
+                          ? <Crown className="w-4 h-4 text-gold" />
+                          : <span className={cn("text-sm font-medium",
+                              isLeagueOnly ? (pos === 1 ? "text-gold" : "text-slate-500")
+                                           : (pos <= 4 ? "text-emerald-400" : "text-slate-500")
+                            )}>{pos}</span>
+                        }
                         <RankBadge change={leagueRankChanges[team.id]} />
                       </div>
                     </td>
@@ -292,7 +307,10 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
       )}
       {view === "table" && teams.length >= 4 && (
         <div className="px-5 py-3 border-t border-surface-border/60 flex items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 4 qualify for Playoffs</span>
+          {isLeagueOnly
+            ? <span className="flex items-center gap-1.5"><Crown className="w-3 h-3 text-gold" /> Table topper wins the Team League</span>
+            : <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 4 qualify for Playoffs</span>
+          }
         </div>
       )}
 

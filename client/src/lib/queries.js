@@ -400,6 +400,20 @@ export const useGenerateSeasonFixtures = () => {
   })
 }
 
+export const useChangeLeagueFormat = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fixturesApi.changeFormat,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["league-format"] }),
+  })
+}
+
+export const useLeagueFormat = () =>
+  useQuery({ queryKey: ["league-format"], queryFn: () => fixturesApi.getFormat() })
+
+export const useLeagueFormatPublic = () =>
+  useQuery({ queryKey: ["league-format-public"], queryFn: () => fixturesApi.getFormatPublic() })
+
 export const useUpdateFixture = () => {
   const qc = useQueryClient()
   return useMutation({

@@ -1,8 +1,9 @@
 import { useState, useRef } from "react"
-import { Check, CheckCircle, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download } from "lucide-react"
+import { Check, CheckCircle, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download, RefreshCw } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
-  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture, useGenerateSeasonFixtures
+  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture,
+  useGenerateSeasonFixtures, useChangeLeagueFormat, useLeagueFormat
 } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { toPng } from "html-to-image"
@@ -10,25 +11,70 @@ import logoUrl from "../../../images/logo.png"
 
 // ── Generate Full Season ───────────────────────────────────────────────────
 function GenerateSeasonCard({ hasExistingFixtures }) {
-  const [confirming, setConfirming] = useState(false)
-  const [result, setResult]         = useState(null)
+  const [step, setStep]     = useState("idle")
+  const [format, setFormat] = useState(null)
+  const [result, setResult] = useState(null)
   const generate = useGenerateSeasonFixtures()
 
   const handleGenerate = () => {
-    generate.mutate(undefined, {
-      onSuccess: (data) => {
-        setResult(data)
-        setConfirming(false)
-      },
+    generate.mutate({ format }, {
+      onSuccess: (data) => { setResult(data); setStep("idle") },
       onError: (err) => alert(err.response?.data?.error || "Failed to generate fixtures"),
     })
   }
+
+  const reset = () => { setStep("idle"); setFormat(null) }
 
   if (hasExistingFixtures) {
     return (
       <div className="card px-4 py-3 flex items-center gap-2 text-xs text-slate-500">
         <Lock className="w-3.5 h-3.5 flex-shrink-0" />
         Fixtures already exist for this season — delete them all first if you want to auto-generate a fresh double round-robin schedule instead.
+      </div>
+    )
+  }
+
+  if (step === "pick-format") {
+    return (
+      <div className="card px-5 py-4">
+        <p className="text-sm font-semibold text-white mb-1">Choose competition format</p>
+        <p className="text-xs text-slate-500 mb-4">This decides how the Team League champion is determined at the end of the season.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <button onClick={() => setFormat("league")}
+            className={`rounded-xl border p-4 text-left transition-colors ${format === "league" ? "border-accent bg-accent/10" : "border-surface-border hover:border-accent/40"}`}>
+            <p className="font-semibold text-white text-sm mb-1">League Only</p>
+            <p className="text-xs text-slate-400">Top of the table at the end of the regular season wins. No playoff bracket.</p>
+          </button>
+          <button onClick={() => setFormat("league_knockout")}
+            className={`rounded-xl border p-4 text-left transition-colors ${format === "league_knockout" ? "border-accent bg-accent/10" : "border-surface-border hover:border-accent/40"}`}>
+            <p className="font-semibold text-white text-sm mb-1">League + Knockout</p>
+            <p className="text-xs text-slate-400">Top 4 qualify for an IPL-style playoff (Q1, Eliminator, Q2, Final). Champion decided in the Final.</p>
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={reset} className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
+          <button onClick={() => format && setStep("confirm")} disabled={!format}
+            className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-40">
+            Next
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === "confirm") {
+    return (
+      <div className="card px-5 py-4">
+        <p className="text-sm font-semibold text-white mb-1">Confirm generation</p>
+        <p className="text-xs text-slate-400 mb-1">Format: <span className="text-white font-semibold">{format === "league" ? "League Only" : "League + Knockout"}</span></p>
+        <p className="text-xs text-slate-500 mb-4">Every team plays every other team twice. Cannot be undone without deleting all fixtures.</p>
+        <div className="flex gap-2">
+          <button onClick={() => setStep("pick-format")} className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Back</button>
+          <button onClick={handleGenerate} disabled={generate.isPending}
+            className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50">
+            {generate.isPending ? "Generating..." : "Generate Fixtures"}
+          </button>
+        </div>
       </div>
     )
   }
@@ -42,31 +88,86 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
         </p>
         {result && (
           <p className="text-xs text-emerald-400 mt-1">
-            ✓ Generated {result.roundsGenerated} rounds, {result.fixturesGenerated} fixtures
+            Generated {result.roundsGenerated} rounds ({result.format === "league" ? "League Only" : "League + Knockout"})
           </p>
         )}
       </div>
-      {confirming ? (
-        <div className="flex items-center gap-2">
-          <button onClick={() => setConfirming(false)}
-            className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
-          <button onClick={handleGenerate} disabled={generate.isPending}
-            className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50">
-            {generate.isPending ? "Generating…" : "Yes, Generate"}
-          </button>
+      <button onClick={() => setStep("pick-format")} className="btn-primary text-sm px-4 py-2">
+        + Auto-generate schedule
+      </button>
+    </div>
+  )
+}
+
+// ── Format Switcher ────────────────────────────────────────────────────────
+function FormatSwitcherCard() {
+  const { data, isLoading } = useLeagueFormat()
+  const changeFormat = useChangeLeagueFormat()
+  const [confirming, setConfirming] = useState(null)
+
+  if (isLoading || !data || data.totalFixtures === 0) return null
+  if (data.pendingFixtures === 0) return null
+
+  const current = data.format || "league_knockout"
+  const currentLabel = current === "league" ? "League Only" : "League + Knockout"
+
+  const handleChange = (format) => {
+    changeFormat.mutate(format, {
+      onSuccess: () => setConfirming(null),
+      onError: (err) => { alert(err.response?.data?.error || "Failed to change format"); setConfirming(null) },
+    })
+  }
+
+  return (
+    <div className="card px-4 py-3.5">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold text-white flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+            Competition format
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Currently: <span className="text-white font-semibold">{currentLabel}</span>
+            {" · "}{data.pendingFixtures} fixture{data.pendingFixtures !== 1 ? "s" : ""} remaining
+          </p>
+          <p className="text-xs text-slate-600 mt-0.5">Can be changed until the last fixture is closed.</p>
         </div>
-      ) : (
-        <button onClick={() => setConfirming(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 text-xs font-semibold transition-colors">
-          <Plus className="w-3.5 h-3.5" /> Generate Season
-        </button>
-      )}
+        {confirming ? (
+          <div className="flex flex-col gap-2 items-end">
+            <p className="text-xs text-slate-400">
+              Switch to <span className="text-white font-semibold">{confirming === "league" ? "League Only" : "League + Knockout"}</span>?
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirming(null)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
+              <button onClick={() => handleChange(confirming)} disabled={changeFormat.isPending}
+                className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50">
+                {changeFormat.isPending ? "Saving..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            {current !== "league" && (
+              <button onClick={() => setConfirming("league")}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-300 hover:border-accent/40 transition-colors">
+                Switch to League Only
+              </button>
+            )}
+            {current !== "league_knockout" && (
+              <button onClick={() => setConfirming("league_knockout")}
+                className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-300 hover:border-accent/40 transition-colors">
+                Switch to League + Knockout
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 
-// ── Create Fixture Form ───────────────────────────────────────────────────────
 function CreateFixtureForm({ teams }) {
   const [homeTeamId, setHomeTeamId] = useState("")
   const [awayTeamId, setAwayTeamId] = useState("")
@@ -685,6 +786,7 @@ export default function FixtureResults({ fixtures }) {
 
       {/* Auto-generate full season */}
       <GenerateSeasonCard hasExistingFixtures={fixtures.length > 0} />
+      <FormatSwitcherCard />
 
       {/* Create fixture form */}
       <CreateFixtureForm teams={teams} />
