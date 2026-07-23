@@ -22,16 +22,16 @@ function getRoundLabel(round, totalRounds) {
 export default function UclStandings({ onPlayerClick }) {
   const { data: groups = [], isLoading } = useUclStandings()
   const { data: scorers = [] } = useUclTopScorers()
-  const uclScorerRankChanges = useRankChanges("ucl-golden-boot", scorers.map(s => s.id))
-  const uclGroupRankChanges  = useRankChanges(
-    `ucl-group-${group?.name ?? "none"}`,
-    (group?.players ?? []).map(p => p.id)
-  )
   const { data: knockout } = useUclKnockoutCurrent()
   const [activeGroup, setActiveGroup] = useState(0)
   const group = groups[activeGroup] || groups[0]
   const { data: fixtures = [] } = useUclFixturesPublic(group?.id)
   const [activeFixtureRound, setActiveFixtureRound] = useState(1)
+  const uclScorerRankChanges = useRankChanges("ucl-golden-boot", scorers.map(s => s.id))
+  const uclGroupRankChanges  = useRankChanges(
+    `ucl-group-${group?.name ?? "none"}`,
+    (group?.players ?? []).map(p => p.id)
+  )
 
   // A round only "unlocks" once every fixture in every round before it is
   // completed — so admins logging results progressively reveals rounds
