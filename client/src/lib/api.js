@@ -15,8 +15,12 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
+      const hadToken = !!localStorage.getItem("token")
       localStorage.removeItem("token")
-      window.location.href = "/login"
+      // Only redirect to login if the user was actually logged in before —
+      // public visitors hitting a protected endpoint should NOT be kicked
+      // to login, they just shouldn't see that data.
+      if (hadToken) window.location.href = "/login"
     }
     return Promise.reject(err)
   }

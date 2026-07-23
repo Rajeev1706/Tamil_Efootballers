@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Target, Trophy, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormat } from "../../lib/queries"
+import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
@@ -56,7 +56,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
   const view    = controlledView || internalView
   const setView = onViewChange || setInternalView
   const { data: scorers = [] } = useTopScorers()
-  const { data: formatData }  = useLeagueFormat()
+  const { data: formatData }  = useLeagueFormatPublic()
   const leagueFormat = formatData?.format || "league_knockout"
   const isLeagueOnly = leagueFormat === "league"
   const scorerRankChanges = useRankChanges("league-golden-boot", scorers.map(s => s.id))
