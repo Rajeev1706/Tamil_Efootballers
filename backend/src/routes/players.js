@@ -431,7 +431,7 @@ router.get("/:id/performance-zones", async (req, res, next) => {
         LEFT JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
         LEFT JOIN weekly_tournaments wt ON wt.id = wtm.tournament_id
         WHERE (mr.player_id=$1 OR mr.opponent_id=$1) AND mr.season_number=$2
-        ORDER BY mr.recorded_at ASC
+        ORDER BY mr.recorded_at ASC, mr.id ASC
       `, [req.params.id, seasonNum])
 
       let cumulative = 0
