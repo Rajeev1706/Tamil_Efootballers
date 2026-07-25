@@ -345,6 +345,7 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
       SELECT wtm.*, p1.name AS "player1Name", p2.name AS "player2Name",
         p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
         p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl"
+      FROM weekly_tournament_matches wtm
       LEFT JOIN players p1 ON wtm.player1_id = p1.id
       LEFT JOIN players p2 ON wtm.player2_id = p2.id
       WHERE wtm.id = $1
