@@ -60,7 +60,7 @@ function PercentileBar({ stat, percentile, rawValue, delay = 0 }) {
             "text-xs font-bold px-1.5 py-0.5 rounded border",
             tier.bg, tier.color, tier.border,
           )}>
-            {isNull ? "N/A" : `Top ${100 - percentile}%`}
+            {isNull ? "N/A" : `Top ${Math.max(100 - percentile, 1)}%`}
           </span>
         </div>
       </div>
