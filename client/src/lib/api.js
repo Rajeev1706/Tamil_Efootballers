@@ -66,6 +66,7 @@ export const playersApi = {
   setAvatar:       (id, body) => api.patch(`/players/${id}/avatar`, body).then(r => r.data),
   compareStats:    (id)          => api.get(`/players/${id}/compare-stats`).then(r => r.data),
   performanceZones:(id, season)  => api.get(`/players/${id}/performance-zones`, { params: { season } }).then(r => r.data),
+  percentiles:     (id)          => api.get(`/players/${id}/percentiles`).then(r => r.data),
 }
 
 export const leagueInfoApi = {

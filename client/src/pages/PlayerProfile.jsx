@@ -74,6 +74,7 @@ function PlayerSquadCard({ player }) {
 import HeadToHead from "../components/player/HeadToHead"
 import SeasonSummary from "../components/player/SeasonSummary"
 import PerformanceZones from "../components/dashboard/PerformanceZones"
+import PercentileDashboard from "../components/player/PercentileDashboard"
 
 function TrophyCase({ player }) {
   const trophies = [
@@ -333,6 +334,11 @@ export default function PlayerProfile() {
           <SeasonSummary player={player} />
 
         </div>
+      </div>
+
+      {/* ── Percentile Rankings ── */}
+      <div className="mt-6">
+        <PercentileDashboard playerId={player.id} />
       </div>
 
       {/* ── Season Performance graph ── */}

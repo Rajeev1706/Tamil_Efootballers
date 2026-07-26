@@ -146,15 +146,9 @@ function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
 }
 
 const PANEL_OPTIONS = [
-  { value: "players",    label: "Total players"   },
-  { value: "compare",    label: "Compare players" },
-  { value: "teams",      label: "Teams"           },
   { value: "standings",  label: "League table"    },
   { value: "ucl",        label: "UCL"             },
   { value: "weekly",     label: "Weekly"          },
-  { value: "bdr",        label: "BDR ranking"     },
-  { value: "market",     label: "Market values"   },
-  { value: "trophies",   label: "Trophies"        },
 ]
 
 export default function CommonDashboard() {
@@ -433,7 +427,7 @@ export default function CommonDashboard() {
   }, [showBallonDorCelebration, testBallonDorActive])
 
   const [searchParams, setSearchParams] = useSearchParams()
-  const activePanel    = searchParams.get("view") || "players"
+  const activePanel    = searchParams.get("view") || "standings"
   const trophyKey      = searchParams.get("trophy") || undefined
   const standingsView  = searchParams.get("standingsView") || undefined
   const urlYear        = searchParams.get("year")
@@ -682,18 +676,30 @@ export default function CommonDashboard() {
               </div>
 
               {/* Panel */}
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Dashboard view</p>
-                <select
-                  value={activePanel}
-                  onChange={e => setActivePanel(e.target.value)}
-                  className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
-                >
-                  {PANEL_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
+              {(() => {
+                const isSidebarView = ["players","compare","teams","bdr","market","trophies"].includes(activePanel)
+                const sidebarLabels = { players: "Total Players", compare: "Compare Players", teams: "Teams", bdr: "BDR Rankings", market: "Market Values", trophies: "Trophies" }
+                return (
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Dashboard view</p>
+                    {isSidebarView ? (
+                      <span className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-1.5 text-sm text-white">
+                        {sidebarLabels[activePanel]}
+                      </span>
+                    ) : (
+                      <select
+                        value={activePanel}
+                        onChange={e => setActivePanel(e.target.value)}
+                        className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                      >
+                        {PANEL_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })()}
 
               <div key={activePanel} className="animate-panel-in">
                 {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
