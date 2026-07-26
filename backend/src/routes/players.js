@@ -480,4 +480,188 @@ router.get("/:id/performance-zones", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /api/players/:id/percentiles — calculates where this player ranks
+// across 8 stat dimensions compared to every other player in the league.
+router.get("/:id/percentiles", async (req, res, next) => {
+  try {
+    const targetId = parseInt(req.params.id)
+
+    // Pull every player's match data in one query — both sides of match_records
+    const allMatchesRes = await query(`
+      SELECT
+        sub.pid,
+        sub.result,
+        sub.opponent_grade,
+        sub.match_type,
+        sub.recorded_at
+      FROM (
+        SELECT mr.player_id AS pid,
+               mr.result::text AS result,
+               mr.opponent_grade::text AS opponent_grade,
+               mr.match_type::text AS match_type,
+               mr.recorded_at
+        FROM match_records mr
+        UNION ALL
+        SELECT mr.opponent_id AS pid,
+               CASE mr.result::text
+                 WHEN 'win' THEN 'loss'
+                 WHEN 'loss' THEN 'win'
+                 ELSE 'draw'
+               END AS result,
+               p.grade::text AS opponent_grade,
+               mr.match_type::text AS match_type,
+               mr.recorded_at
+        FROM match_records mr
+        JOIN players p ON p.id = mr.player_id
+      ) sub
+      ORDER BY sub.pid, sub.recorded_at DESC
+    `)
+
+    // Pull player metadata (grade, MV, auction price, trophies, BDR)
+    const playersRes = await query(`
+      SELECT id, grade::text AS grade, market_value, auction_price, bdr_points, is_captain,
+             COALESCE(trophy1_count,0)+COALESCE(trophy2_count,0)+COALESCE(trophy3_count,0)+
+             COALESCE(trophy4_count,0)+COALESCE(trophy5_count,0)+COALESCE(trophy6_count,0)+
+             COALESCE(trophy7_count,0) AS total_trophies
+      FROM players
+    `)
+
+    // Group matches by player
+    const matchesByPlayer = {}
+    for (const m of allMatchesRes.rows) {
+      if (!matchesByPlayer[m.pid]) matchesByPlayer[m.pid] = []
+      matchesByPlayer[m.pid].push(m)
+    }
+
+    const GRADE_RANK = { S: 5, "A+": 4, A: 3, B: 2, C: 1 }
+
+    // Calculate stats for each player
+    const playerStats = playersRes.rows
+      .filter(p => (matchesByPlayer[p.id]?.length || 0) >= 3) // minimum 3 matches
+      .map(p => {
+        const matches = matchesByPlayer[p.id] || []
+        const total = matches.length
+        const wins = matches.filter(m => m.result === "win").length
+        const draws = matches.filter(m => m.result === "draw").length
+        const losses = matches.filter(m => m.result === "loss").length
+
+        // 1. Win Rate
+        const winRate = total > 0 ? wins / total : 0
+
+        // 2. Consistency (inverse of std deviation of results)
+        const resultValues = matches.map(m =>
+          m.result === "win" ? 1 : m.result === "draw" ? 0.5 : 0
+        )
+        const mean = resultValues.reduce((a, b) => a + b, 0) / (resultValues.length || 1)
+        const variance = resultValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (resultValues.length || 1)
+        const stdDev = Math.sqrt(variance)
+        const consistency = 1 - stdDev // higher = more consistent
+
+        // 3. Clutch — win rate in UCL knockout + weekly (tournament matches)
+        const tourneyMatches = matches.filter(m => m.match_type === "ucl" || m.match_type === "weekly")
+        const clutch = tourneyMatches.length >= 2
+          ? tourneyMatches.filter(m => m.result === "win").length / tourneyMatches.length
+          : null
+
+        // 4. Giant Killing — win rate vs higher-graded opponents
+        //    S-grade: vs S and A+ opponents (toughest tier)
+        //    A+: vs S opponents
+        //    Others: vs anyone graded higher
+        const myGradeRank = GRADE_RANK[p.grade] || 0
+        const vsTough = myGradeRank >= 5
+          ? matches.filter(m => (GRADE_RANK[m.opponent_grade] || 0) >= 4)  // S-grade: vs S & A+
+          : matches.filter(m => (GRADE_RANK[m.opponent_grade] || 0) > myGradeRank)
+        const giantKillingMin = myGradeRank >= 5 ? 1 : 2
+        const giantKilling = vsTough.length >= giantKillingMin
+          ? vsTough.filter(m => m.result === "win").length / vsTough.length
+          : null
+
+        // 5. Form Score — weighted last 5 matches (most recent = 5x)
+        const last5 = matches.slice(0, 5)
+        let formScore = 0
+        let formMax = 0
+        last5.forEach((m, i) => {
+          const weight = 5 - i
+          formMax += weight
+          formScore += (m.result === "win" ? 1 : m.result === "draw" ? 0.5 : 0) * weight
+        })
+        const form = formMax > 0 ? formScore / formMax : 0
+
+        // 6. Loss Avoidance — (wins + draws) / total
+        const lossAvoidance = total > 0 ? (wins + draws) / total : 0
+
+        // 7. Trophies
+        const trophies = p.total_trophies || 0
+
+        // 8. Value Growth (ROI)
+        const auctionPrice = p.is_captain ? null : (p.auction_price || 0)
+        const valueGrowth = auctionPrice && auctionPrice > 0
+          ? (p.market_value - auctionPrice) / auctionPrice
+          : null
+
+        return {
+          id: p.id, winRate, consistency, clutch, giantKilling,
+          form, lossAvoidance, trophies, valueGrowth,
+        }
+      })
+
+    // Calculate percentile for a given stat
+    function percentile(statKey, playerId) {
+      const validPlayers = playerStats.filter(p => p[statKey] !== null && p[statKey] !== undefined)
+      const target = validPlayers.find(p => p.id === playerId)
+      if (!target || validPlayers.length < 2) return null
+
+      const below = validPlayers.filter(p => p[statKey] < target[statKey]).length
+      return Math.round((below / (validPlayers.length - 1)) * 100)
+    }
+
+    // Find target player
+    const targetPlayer = playerStats.find(p => p.id === targetId)
+    if (!targetPlayer) {
+      return res.json({
+        percentiles: null,
+        message: "Not enough match data to calculate percentiles",
+      })
+    }
+
+    // Check if target player is a captain
+    const targetMeta = playersRes.rows.find(p => p.id === targetId)
+    const isCaptain = targetMeta?.is_captain || false
+
+    const stats = [
+      "winRate", "consistency", "clutch", "giantKilling",
+      "form", "lossAvoidance", "trophies", "valueGrowth",
+    ]
+
+    const percentiles = {}
+    const rawValues = {}
+    for (const stat of stats) {
+      const pct = percentile(stat, targetId)
+      // Captains have no auction price — Value Growth is not applicable
+      if (stat === "valueGrowth" && isCaptain) {
+        percentiles[stat] = null
+      } else {
+        percentiles[stat] = pct !== null ? pct : 0
+      }
+      rawValues[stat] = targetPlayer[stat]
+    }
+
+    // Find best and worst stat for headline
+    const validPercentiles = Object.entries(percentiles).filter(([, v]) => v !== null)
+    const best = validPercentiles.sort((a, b) => b[1] - a[1])[0]
+    const worst = validPercentiles.sort((a, b) => a[1] - b[1])[0]
+
+    res.json({
+      percentiles,
+      rawValues,
+      totalPlayers: playerStats.length,
+      best: best ? { stat: best[0], percentile: best[1] } : null,
+      worst: worst ? { stat: worst[0], percentile: worst[1] } : null,
+    })
+  } catch (err) {
+    console.error("[percentiles] Error:", err.message)
+    next(err)
+  }
+})
+
 export default router

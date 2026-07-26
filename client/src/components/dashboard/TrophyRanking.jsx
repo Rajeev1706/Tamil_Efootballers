@@ -96,11 +96,13 @@ export default function TrophyRanking({ players, onPlayerClick, trophyKey: contr
                       isFirst && "bg-gold/5"
                     )}
                   >
-                    <td className="py-3 px-3 text-center">
-                      {isFirst
-                        ? <span className="rank-gold text-sm">1</span>
-                        : <span className="text-slate-500 text-sm">{idx + 1}</span>
-                      }
+                    <td className="py-3 px-3 w-16">
+                      <div className="flex items-center justify-center">
+                        {isFirst
+                          ? <span className="rank-gold text-sm">1</span>
+                          : <span className="text-slate-500 text-sm">{idx + 1}</span>
+                        }
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <span className={cn("inline-flex items-center gap-2 font-medium", isFirst ? "text-white" : "text-slate-300")}>

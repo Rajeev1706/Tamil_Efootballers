@@ -470,7 +470,7 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
             LIMIT 8
           `, [season])
 
-          const bdrByPos = { 1: 12, 2: 9, 3: 7, 4: 5, 5: 3, 6: 2, 7: 1, 8: 1 }
+          const bdrByPos = { 1: 12, 2: 9, 3: 7, 4: 5 }
           for (const row of standingsRes.rows) {
             const bdr = bdrByPos[row.pos] || 0
             if (bdr > 0) {

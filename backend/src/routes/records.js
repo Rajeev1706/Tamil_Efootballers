@@ -386,13 +386,32 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       opponentScore: z.number().int().min(0).optional(),
     }).parse(req.body)
 
-    // Fetch existing record to get player/opponent IDs
-    const existing = await query(
-      "SELECT player_id, opponent_id FROM match_records WHERE id = $1",
-      [req.params.id]
-    )
+    // Fetch existing record — include old scores, result, teams, and match_type
+    const existing = await query(`
+      SELECT mr.player_id, mr.opponent_id, mr.result, mr.match_type::text AS match_type,
+             mr.player_score, mr.opponent_score,
+             p.team_id AS player_team_id, opp.team_id AS opponent_team_id
+      FROM match_records mr
+      JOIN players p   ON mr.player_id   = p.id
+      JOIN players opp ON mr.opponent_id = opp.id
+      WHERE mr.id = $1
+    `, [req.params.id])
     if (!existing.rows[0]) return res.status(404).json({ error: "Record not found" })
-    const { player_id: playerId, opponent_id: opponentId } = existing.rows[0]
+    const record = existing.rows[0]
+    const { player_id: playerId, opponent_id: opponentId } = record
+
+    // For league matches: reverse old team scores, then apply new ones
+    if (record.match_type === "league" && record.player_team_id && record.opponent_team_id) {
+      // Reverse OLD contribution
+      const oldPlayerPts = record.result === "win" ? 3 : record.result === "draw" ? 1 : 0
+      const oldOppPts    = record.result === "win" ? 0 : record.result === "loss" ? 3 : 1
+      const oldPScore = record.player_score ?? 0
+      const oldOScore = record.opponent_score ?? 0
+      await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
+        [oldPlayerPts, oldPScore, oldOScore, record.player_team_id])
+      await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
+        [oldOppPts, oldOScore, oldPScore, record.opponent_team_id])
+    }
 
     await query(`
       UPDATE match_records
@@ -400,11 +419,19 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       WHERE id = $4
     `, [result, playerScore ?? null, opponentScore ?? null, req.params.id])
 
+    // Apply NEW contribution for league matches
+    if (record.match_type === "league" && record.player_team_id && record.opponent_team_id) {
+      const newPlayerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
+      const newOppPts    = result === "win" ? 0 : result === "loss" ? 3 : 1
+      const newPScore = playerScore ?? 0
+      const newOScore = opponentScore ?? 0
+      await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
+        [newPlayerPts, newPScore, newOScore, record.player_team_id])
+      await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
+        [newOppPts, newOScore, newPScore, record.opponent_team_id])
+    }
+
     // Rebuild form and MV for both players since result may have changed
-    const letter    = result === "win" ? "W" : result === "draw" ? "D" : "L"
-    const oppLetter = result === "win" ? "L" : result === "loss" ? "W" : "D"
-    await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [letter, playerId])
-    await query(`UPDATE players SET form = (SELECT ARRAY(SELECT unnest(ARRAY[$1::char(1)] || form) LIMIT 5)) WHERE id = $2`, [oppLetter, opponentId])
     let recalcError = null
     try {
       await recalcMarketValue(playerId)

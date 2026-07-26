@@ -763,3 +763,6 @@ export const usePlayerCompareStats    = (id) =>
 
 export const usePlayerPerformanceZones = (id, season = "current") =>
   useQuery({ queryKey: ["player-performance-zones", String(id), season], queryFn: () => playersApi.performanceZones(id, season), enabled: !!id })
+
+export const usePlayerPercentiles = (id) =>
+  useQuery({ queryKey: ["player-percentiles", String(id)], queryFn: () => playersApi.percentiles(id), enabled: !!id })

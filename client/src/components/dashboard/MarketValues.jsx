@@ -52,11 +52,13 @@ export default function MarketValues({ players, onPlayerClick }) {
                     isFirst && "bg-gold/5"
                   )}
                 >
-                  <td className="py-3 px-3 text-center">
-                    {isFirst
-                      ? <span className="rank-gold text-sm">1</span>
-                      : <span className="flex items-center gap-0.5"><span className="text-slate-500 text-sm">{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></span>
-                    }
+                  <td className="py-3 px-3 w-16">
+                    <div className="flex items-center justify-center gap-1">
+                      {isFirst
+                        ? <span className="rank-gold text-sm">1</span>
+                        : <><span className="text-slate-500 text-sm">{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></>
+                      }
+                    </div>
                   </td>
                   <td className="py-3 px-4">
                     <span className={cn("inline-flex items-center gap-2 font-medium", isFirst ? "text-white" : "text-slate-300")}>

@@ -309,8 +309,49 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       await query("DELETE FROM match_records WHERE id = $1", [oldMatchRecordId])
     }
 
-    // Recalc market value for both players — the DB trigger alone only
-    // handles the player_id side and skips the BDR swing (see marketValue.js).
+    // ── LIVE BDR — "reaching" based, diff-only, edit-safe ──────────────────
+    // UCL Knockout: R32=1, R16=2, QF=3, SF=4, Final=5
+    // BDR is awarded for REACHING a round. When advancing further, only the
+    // DIFFERENCE is added (never cumulative).
+    //
+    // UCL BDR totals:  QF=4, SF=8, Final(runner-up)=12, Champion=15
+    // So diffs:        reach QF=+4, reach SF=+4, reach Final=+4, win Final=+3
+
+    // Total BDR a player should have for reaching a given round
+    function bdrForReaching(round) {
+      if (round >= 5) return 12  // reached Final = runner-up level
+      if (round >= 4) return 8   // reached SF
+      if (round >= 3) return 4   // reached QF
+      return 0
+    }
+
+    // The diff to award when a player advances FROM currentRound TO the next
+    function advancementDiff(currentRound) {
+      if (currentRound >= TOTAL_ROUNDS) return 0
+      const oldBdr = bdrForReaching(currentRound)
+      const newBdr = bdrForReaching(currentRound + 1)
+      return newBdr - oldBdr
+    }
+
+    // Champion bonus: awarded on top of runner-up when winning the final
+    const championBonus = match.round === 5 ? (15 - 12) : 0
+
+    // The diff this match's winner earns
+    const winnerDiff = match.round === 5
+      ? championBonus
+      : advancementDiff(match.round)
+
+    // If this is an edit, reverse the old winner's diff
+    if (oldMatchRecordId && match.winner_id && winnerDiff > 0) {
+      await addBdr(match.winner_id, -winnerDiff)
+    }
+
+    // Award new winner's diff
+    if (winnerId && winnerDiff > 0) {
+      await addBdr(winnerId, winnerDiff)
+    }
+
+    // Recalc MV for both (BDR affects MV)
     await recalcMarketValue(match.player1_id)
     await recalcMarketValue(match.player2_id)
     await recalcForm(match.player1_id)
@@ -335,29 +376,9 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE ucl_knockout_tournaments SET status='completed' WHERE id=$1", [match.tournament_id])
 
-      // BDR awards — winner/runner-up/semi-finalist/quarter-finalist, plus
-      // this specific knockout run's golden boot. Fixed round structure
-      // (R32→R16→QF→SF→Final = rounds 1-5), so QF=3, SF=4, Final=5 always.
-      // Only ever fires once per tournament (claimAward guards it).
-      if (await claimAward("ucl_knockout", match.tournament_id)) {
-        const allMatches = await query(`
-          SELECT round, player1_id, player2_id, winner_id
-          FROM ucl_knockout_matches
-          WHERE tournament_id = $1 AND status = 'completed'
-        `, [match.tournament_id])
-
-        for (const m of allMatches.rows) {
-          const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
-          if (m.round === 5) {
-            if (m.winner_id) await addBdr(m.winner_id, 15)
-            if (loserId)      await addBdr(loserId, 12)
-          } else if (m.round === 4 && loserId) {
-            await addBdr(loserId, 8)
-          } else if (m.round === 3 && loserId) {
-            await addBdr(loserId, 4)
-          }
-        }
-
+      // Golden Boot BDR — awarded at tournament end since top scorer can
+      // change until the last match. Uses claimAward to fire only once.
+      if (await claimAward("ucl_knockout_gb", match.tournament_id)) {
         const goldenBootRes = await query(`
           SELECT p.id,
             COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,

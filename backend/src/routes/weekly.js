@@ -416,15 +416,60 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       await query("DELETE FROM match_records WHERE id = $1", [oldMatchRecordId])
     }
 
-    // Recalc market value for both players — the DB trigger alone only
-    // handles the player_id side and skips the BDR swing (see marketValue.js).
+    // ── LIVE BDR — "reaching" based, diff-only, edit-safe ──────────────────
+    // BDR is awarded for REACHING a round, not losing in it.
+    // When advancing further, only the DIFFERENCE is added (never cumulative).
+    //
+    // Weekly BDR totals:  QF=3, SF=5, Final(runner-up)=8, Champion=10
+    // So diffs:           reach QF=+3, reach SF=+2, reach Final=+3, win Final=+2
+    //
+    // On edit: reverse the diff that was awarded to the old winner, give it
+    // to the new winner instead.
+
+    const totalRounds = match.total_rounds
+    const finalRound  = totalRounds
+    const sfRound     = totalRounds - 1
+    const qfRound     = totalRounds - 2
+
+    // Total BDR a player should have for reaching a given round
+    function bdrForReaching(round) {
+      if (round >= finalRound) return 8   // reached Final = runner-up level
+      if (round >= sfRound)    return 5   // reached SF
+      if (round >= qfRound)    return 3   // reached QF
+      return 0
+    }
+
+    // The diff to award when a player advances FROM currentRound TO the next
+    function advancementDiff(currentRound) {
+      if (currentRound >= totalRounds) return 0  // can't advance past final
+      const oldBdr = bdrForReaching(currentRound)
+      const newBdr = bdrForReaching(currentRound + 1)
+      return newBdr - oldBdr
+    }
+
+    // Champion bonus: awarded on top of runner-up when winning the final
+    const championBonus = match.round === finalRound ? (10 - 8) : 0
+
+    // The diff this match's winner earns (either advancing or winning final)
+    const winnerDiff = match.round === finalRound
+      ? championBonus
+      : advancementDiff(match.round)
+
+    // If this is an edit, reverse the old winner's diff
+    if (oldMatchRecordId && match.winner_id && winnerDiff > 0) {
+      await addBdr(match.winner_id, -winnerDiff)
+    }
+
+    // Award new winner's diff
+    if (winnerId && winnerDiff > 0) {
+      await addBdr(winnerId, winnerDiff)
+    }
+
+    // Recalc MV for both (BDR affects MV)
     await recalcMarketValue(match.player1_id)
     await recalcMarketValue(match.player2_id)
-    await recalcForm(match.player1_id)
-    await recalcForm(match.player2_id)
 
     // Advance winner to next round
-    const totalRounds = match.total_rounds
     if (winnerId && totalRounds && match.round < totalRounds) {
       const nextRound    = match.round + 1
       const nextMatchNum = Math.ceil(match.match_number / 2)
@@ -446,33 +491,9 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE weekly_tournaments SET status = 'completed' WHERE id = $1", [match.tournament_id])
 
-      // BDR awards — winner/runner-up/semi-finalist/quarter-finalist,
-      // based on furthest round each player actually reached, plus this
-      // specific tournament's golden boot. Only ever fires once per
-      // tournament (claimAward guards it).
-      if (await claimAward("weekly_tournament", match.tournament_id)) {
-        const allMatches = await query(`
-          SELECT round, player1_id, player2_id, winner_id
-          FROM weekly_tournament_matches
-          WHERE tournament_id = $1 AND status = 'completed'
-        `, [match.tournament_id])
-
-        const finalRound = totalRounds
-        const sfRound     = totalRounds - 1
-        const qfRound     = totalRounds - 2
-
-        for (const m of allMatches.rows) {
-          const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
-          if (m.round === finalRound) {
-            if (m.winner_id) await addBdr(m.winner_id, 10)
-            if (loserId)      await addBdr(loserId, 8)
-          } else if (m.round === sfRound && loserId) {
-            await addBdr(loserId, 5)
-          } else if (m.round === qfRound && loserId) {
-            await addBdr(loserId, 3)
-          }
-        }
-
+      // Golden Boot BDR — awarded at tournament end since top scorer can
+      // change until the last match. Uses claimAward to fire only once.
+      if (await claimAward("weekly_tournament_gb", match.tournament_id)) {
         const goldenBootRes = await query(`
           SELECT p.id,
             COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
