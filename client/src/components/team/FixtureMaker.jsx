@@ -492,6 +492,7 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
             oppTeamName={opponent}
             onClose={() => setShowScout(false)}
             onApplyRecommendations={handleApplyRecommendations}
+            savedLineup={savedLineup}
           />
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Target, Trophy, Crown } from "lucide-react"
+import TitleRaceTracker from "./TitleRaceTracker"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
@@ -224,6 +225,11 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
             </div>
           )
         })()
+      )}
+
+      {/* Title Race Tracker — shown above table when season is live */}
+      {view === "table" && teams.length >= 2 && (
+        <TitleRaceTracker teams={teams} fixtures={fixtures} />
       )}
 
       {/* League Table View */}

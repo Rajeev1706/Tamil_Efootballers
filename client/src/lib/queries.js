@@ -345,6 +345,9 @@ export const useMyPlayers = (teamId) =>
 export const usePlayer = (id) =>
   useQuery({ queryKey: QK.player(id), queryFn: () => playersApi.get(id), enabled: !!id })
 
+export const usePlayerSeasonSummary = (id) =>
+  useQuery({ queryKey: ["player-season-summary", id], queryFn: () => playersApi.seasonSummary(id), enabled: !!id })
+
 export const useUpdatePlayer = () => {
   const qc = useQueryClient()
   return useMutation({
