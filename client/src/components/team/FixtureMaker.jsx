@@ -1,9 +1,10 @@
 import { useState } from "react"
-import { ClipboardList, ChevronRight, X, Save, Trash2, History, Check, ChevronDown, Download } from "lucide-react"
+import { ClipboardList, ChevronRight, X, Save, Trash2, History, Check, ChevronDown, Download, ImageIcon, Search } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import { useLineup, useSaveLineup, useClearLineup, useH2H } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import tecLogo from "../../../images/logo.png"
+import ScoutingReport from "./ScoutingReport"
 
 // ── H2H Popup ────────────────────────────────────────────────────────────────
 function H2HPopup({ p1, p2, onClose }) {
@@ -105,60 +106,113 @@ function H2HPopup({ p1, p2, onClose }) {
   )
 }
 
-// ── Matchup Row ───────────────────────────────────────────────────────────────
-function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H }) {
-  const myP  = myPlayers.find(p => p.id === matchup?.myPlayerId)  || null
-  const oppP = oppPlayers.find(p => p.id === matchup?.oppPlayerId) || null
+// ── Matchup Row with squad pics ───────────────────────────────────────────────
+function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H, isActive, onActivate, allMyPlayers, allOppPlayers }) {
+  const myP  = allMyPlayers.find(p => p.id === matchup?.myPlayerId)  || null
+  const oppP = allOppPlayers.find(p => p.id === matchup?.oppPlayerId) || null
+  const bothSelected = myP && oppP
 
   return (
-    <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_32px_1fr_80px] sm:gap-3 sm:items-center px-5 py-3 border-b border-surface-border/50 last:border-b-0">
-      {/* My player select */}
-      <select
-        value={matchup?.myPlayerId || ""}
-        onChange={e => onChange(slot, "myPlayerId", e.target.value ? parseInt(e.target.value) : null)}
-        className="bg-pitch-900 border border-surface-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors w-full"
-      >
-        <option value="">— Pick player —</option>
-        {myPlayers.map(p => (
-          <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
-        ))}
-      </select>
+    <div>
+      {/* Row with dropdowns */}
+      <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_32px_1fr_auto] sm:gap-3 sm:items-center px-5 py-3 border-b border-surface-border/50 last:border-b-0">
+        {/* My player select */}
+        <select
+          value={matchup?.myPlayerId || ""}
+          onChange={e => onChange(slot, "myPlayerId", e.target.value ? parseInt(e.target.value) : null)}
+          className="bg-pitch-900 border border-surface-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors w-full"
+        >
+          <option value="">— Pick player —</option>
+          {myPlayers.map(p => (
+            <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
+          ))}
+        </select>
 
-      {/* VS */}
-      <span className="text-xs font-bold text-slate-600 text-center">VS</span>
+        <span className="text-xs font-bold text-slate-600 text-center">VS</span>
 
-      {/* Opp player select */}
-      <select
-        value={matchup?.oppPlayerId || ""}
-        onChange={e => onChange(slot, "oppPlayerId", e.target.value ? parseInt(e.target.value) : null)}
-        className="bg-pitch-900 border border-surface-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors w-full"
-      >
-        <option value="">— Pick player —</option>
-        {oppPlayers.map(p => (
-          <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
-        ))}
-      </select>
+        {/* Opp player select */}
+        <select
+          value={matchup?.oppPlayerId || ""}
+          onChange={e => onChange(slot, "oppPlayerId", e.target.value ? parseInt(e.target.value) : null)}
+          className="bg-pitch-900 border border-surface-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors w-full"
+        >
+          <option value="">— Pick player —</option>
+          {oppPlayers.map(p => (
+            <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
+          ))}
+        </select>
 
-      {/* H2H button */}
-      <button
-        onClick={() => myP && oppP && onViewH2H(myP, oppP)}
-        disabled={!myP || !oppP}
-        className={cn(
-          "flex items-center justify-center gap-1 text-xs font-semibold px-3 py-2 rounded-xl border transition-all w-full sm:w-auto",
-          myP && oppP
-            ? "text-violet-400 bg-violet-400/10 border-violet-400/25 hover:bg-violet-400/20"
-            : "text-slate-600 bg-surface-border border-surface-border cursor-not-allowed"
-        )}
-        title="View head-to-head history"
-      >
-        <History className="w-3 h-3" /> H2H
-      </button>
+        {/* Buttons */}
+        <div className="flex items-center gap-1.5">
+          {/* Squad button */}
+          <button
+            onClick={() => bothSelected && onActivate()}
+            disabled={!bothSelected}
+            className={cn(
+              "flex items-center justify-center gap-1 text-xs font-semibold px-2.5 py-2 rounded-xl border transition-all",
+              bothSelected
+                ? isActive
+                  ? "text-amber-400 bg-amber-400/20 border-amber-400/40"
+                  : "text-amber-400 bg-amber-400/10 border-amber-400/25 hover:bg-amber-400/20"
+                : "text-slate-600 bg-surface-border border-surface-border cursor-not-allowed"
+            )}
+            title="View squad pics"
+          >
+            <ImageIcon className="w-3 h-3" />
+          </button>
+
+          {/* H2H button */}
+          <button
+            onClick={() => myP && oppP && onViewH2H(myP, oppP)}
+            disabled={!myP || !oppP}
+            className={cn(
+              "flex items-center justify-center gap-1 text-xs font-semibold px-2.5 py-2 rounded-xl border transition-all",
+              myP && oppP
+                ? "text-violet-400 bg-violet-400/10 border-violet-400/25 hover:bg-violet-400/20"
+                : "text-slate-600 bg-surface-border border-surface-border cursor-not-allowed"
+            )}
+            title="View head-to-head history"
+          >
+            <History className="w-3 h-3" /> H2H
+          </button>
+        </div>
+      </div>
+
+      {/* Squad pics — shown when active */}
+      {isActive && bothSelected && (
+        <div className="bg-pitch-900/60 border-b border-surface-border/50 px-5 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-accent mb-2">{myP.name}'s Squad</p>
+              {myP.imageUrl ? (
+                <img src={myP.imageUrl} alt={`${myP.name} squad`}
+                  className="w-full aspect-[20/9] object-cover rounded-xl border border-surface-border" />
+              ) : (
+                <div className="w-full aspect-[20/9] rounded-xl border-2 border-dashed border-surface-border flex items-center justify-center bg-pitch-800">
+                  <p className="text-xs text-slate-600">No squad image</p>
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-rose-400 mb-2">{oppP.name}'s Squad</p>
+              {oppP.imageUrl ? (
+                <img src={oppP.imageUrl} alt={`${oppP.name} squad`}
+                  className="w-full aspect-[20/9] object-cover rounded-xl border border-surface-border" />
+              ) : (
+                <div className="w-full aspect-[20/9] rounded-xl border-2 border-dashed border-surface-border flex items-center justify-center bg-pitch-800">
+                  <p className="text-xs text-slate-600">No squad image</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Fixture Card ──────────────────────────────────────────────────────────────
-function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, onExpand, isExpanded }) {
+function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, teamLogoUrl, onExpand, isExpanded }) {
   const isHome    = fixture.home === myTeamName
   const opponent  = isHome ? fixture.away : fixture.home
   const oppTeamId = isHome ? fixture.awayTeamId : fixture.homeTeamId
@@ -168,14 +222,15 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
   const saveLineup  = useSaveLineup()
   const clearLineup = useClearLineup()
 
-  // Local matchup state: array of { slot, myPlayerId, oppPlayerId }
   const [matchups, setMatchups] = useState(() => {
     const base = myPlayers.map((_, i) => ({ slot: i + 1, myPlayerId: null, oppPlayerId: null }))
     return base
   })
   const [initialized, setInitialized] = useState(false)
-  const [h2hTarget, setH2hTarget]     = useState(null) // { p1, p2 }
+  const [h2hTarget, setH2hTarget]     = useState(null)
   const [saved, setSaved]             = useState(false)
+  const [activeSlot, setActiveSlot]   = useState(null)
+  const [showScout, setShowScout]     = useState(false) // which matchup slot is expanded
 
   // Load saved lineup into local state when expanded
   const handleExpand = () => {
@@ -390,8 +445,33 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
           </div>
           <p className="text-xs text-slate-500">Round {fixture.round} · {formattedDate}</p>
         </div>
-        <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform flex-shrink-0", isExpanded && "rotate-180")} />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={e => { e.stopPropagation(); setShowScout(s => !s) }}
+            className={cn(
+              "flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all",
+              showScout
+                ? "text-amber-400 bg-amber-400/20 border-amber-400/40"
+                : "text-amber-400 bg-amber-400/10 border-amber-400/25 hover:bg-amber-400/20"
+            )}
+          >
+            <Search className="w-3 h-3" /> Scout
+          </button>
+          <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform", isExpanded && "rotate-180")} />
+        </div>
       </button>
+
+      {/* Scouting Report panel */}
+      {showScout && (
+        <div className="border-t border-surface-border p-5 bg-pitch-900/30">
+          <ScoutingReport
+            myTeamId={myTeamId}
+            oppTeamId={oppTeamId}
+            oppTeamName={opponent}
+            onClose={() => setShowScout(false)}
+          />
+        </div>
+      )}
 
       {/* Expanded lineup builder */}
       {isExpanded && (
@@ -408,7 +488,6 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
 
           {/* Matchup rows */}
           {matchups.map((m, idx) => {
-            // Exclude players already selected in OTHER rows from each dropdown
             const usedMyIds  = matchups.filter((x, i) => i !== idx && x.myPlayerId).map(x => x.myPlayerId)
             const usedOppIds = matchups.filter((x, i) => i !== idx && x.oppPlayerId).map(x => x.oppPlayerId)
             const availableMyPlayers  = myPlayers.filter(p => !usedMyIds.includes(p.id))
@@ -419,14 +498,18 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
                 slot={m.slot}
                 myPlayers={availableMyPlayers}
                 oppPlayers={availableOppPlayers}
+                allMyPlayers={myPlayers}
+                allOppPlayers={oppPlayers}
                 matchup={m}
                 onChange={handleChange}
                 onViewH2H={(p1, p2) => setH2hTarget({ p1, p2 })}
+                isActive={activeSlot === m.slot}
+                onActivate={() => setActiveSlot(s => s === m.slot ? null : m.slot)}
               />
               {matchups.length > 1 && (
                 <button
                   onClick={() => removeSlot(m.slot)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
+                  className="absolute right-1 top-3 w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -490,7 +573,7 @@ function FixtureCard({ fixture, myTeamName, myPlayers, allPlayers, teamLogoUrl, 
 }
 
 // ── Main FixtureMaker ─────────────────────────────────────────────────────────
-export default function FixtureMaker({ fixtures, myTeamName, myPlayers, allPlayers, teamLogoUrl }) {
+export default function FixtureMaker({ fixtures, myTeamName, myTeamId, myPlayers, allPlayers, teamLogoUrl }) {
   const upcoming = fixtures.filter(
     f => f.status === "upcoming" && f.home === myTeamName
   )
@@ -519,6 +602,7 @@ export default function FixtureMaker({ fixtures, myTeamName, myPlayers, allPlaye
           key={fixture.id}
           fixture={fixture}
           myTeamName={myTeamName}
+          myTeamId={myTeamId}
           myPlayers={myPlayers}
           allPlayers={allPlayers}
           teamLogoUrl={teamLogoUrl}

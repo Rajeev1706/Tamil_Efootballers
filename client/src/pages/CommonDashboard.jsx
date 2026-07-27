@@ -10,6 +10,7 @@ import MarketValues from "../components/dashboard/MarketValues"
 import TrophyRanking from "../components/dashboard/TrophyRanking"
 import UclStandings from "../components/dashboard/UclStandings"
 import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
+import RevolutionDashboard from "../components/dashboard/RevolutionDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import PlayerComparison from "../components/dashboard/PlayerComparison"
@@ -146,9 +147,10 @@ function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
 }
 
 const PANEL_OPTIONS = [
-  { value: "standings",  label: "League table"    },
-  { value: "ucl",        label: "UCL"             },
-  { value: "weekly",     label: "Weekly"          },
+  { value: "standings",   label: "League table"       },
+  { value: "ucl",         label: "UCL"                },
+  { value: "weekly",      label: "Weekly"             },
+  { value: "revolution",  label: "Revolution Trophy"  },
 ]
 
 export default function CommonDashboard() {
@@ -706,6 +708,7 @@ export default function CommonDashboard() {
                 {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} view={standingsView} onViewChange={setStandingsView} />}
                 {activePanel === "ucl"       && <UclStandings onPlayerClick={handlePlayer} />}
                 {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
+                {activePanel === "revolution" && <RevolutionDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}

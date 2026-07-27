@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -111,6 +111,74 @@ export const useUclKnockoutCurrent = () =>
 
 export const useWeeklyTopScorers = () =>
   useQuery({ queryKey: ["weekly-top-scorers"], queryFn: weeklyApi.topScorers })
+
+export const useRevolutionCurrent = () =>
+  useQuery({ queryKey: ["revolution-current"], queryFn: revolutionApi.current })
+
+export const useRevolutionTopScorers = () =>
+  useQuery({ queryKey: ["revolution-top-scorers"], queryFn: revolutionApi.topScorers })
+
+export const useRevolutionTournaments = () =>
+  useQuery({ queryKey: ["revolution-tournaments"], queryFn: revolutionApi.list })
+
+export const useRevolutionTournament = (id) =>
+  useQuery({ queryKey: ["revolution-tournament", id], queryFn: () => revolutionApi.get(id), enabled: !!id })
+
+export const useCreateRevolutionTournament = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name) => revolutionApi.create(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["revolution-tournaments"] }),
+  })
+}
+
+export const useSetRevolutionPlayers = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, playerIds }) => revolutionApi.setPlayers(id, playerIds),
+    onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: ["revolution-tournament", id] }),
+  })
+}
+
+export const useSaveRevolutionResult = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId }) =>
+      revolutionApi.saveResult(matchId, player1Score, player2Score, tieWinnerId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["revolution-tournament"] })
+      qc.invalidateQueries({ queryKey: ["revolution-current"] })
+      qc.invalidateQueries({ queryKey: ["revolution-top-scorers"] })
+    },
+  })
+}
+
+export const useDeleteRevolutionTournament = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => revolutionApi.deleteTournament(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["revolution-tournaments"] }),
+  })
+}
+
+export const useResetRevolutionTournament = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => revolutionApi.reset(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["revolution-tournaments"] })
+      qc.invalidateQueries({ queryKey: ["revolution-tournament"] })
+    },
+  })
+}
+
+export const useUpdateRevolutionMatchPlayers = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, ...body }) => revolutionApi.updateMatchPlayers(matchId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["revolution-tournament"] }),
+  })
+}
 
 export const useCreateUclGroup = () => {
   const qc = useQueryClient()
@@ -766,3 +834,9 @@ export const usePlayerPerformanceZones = (id, season = "current") =>
 
 export const usePlayerPercentiles = (id) =>
   useQuery({ queryKey: ["player-percentiles", String(id)], queryFn: () => playersApi.percentiles(id), enabled: !!id })
+export const useScoutingReport = (myTeamId, oppTeamId) =>
+  useQuery({
+    queryKey: ["scouting-report", myTeamId, oppTeamId],
+    queryFn: () => scoutingApi.getReport(myTeamId, oppTeamId),
+    enabled: !!myTeamId && !!oppTeamId,
+  })
