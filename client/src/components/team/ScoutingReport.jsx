@@ -294,8 +294,8 @@ function SmartLineupModal({ myPlayers, oppPlayers, h2hLookup, oppTeamName, onApp
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-pitch-800 border border-surface-border rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-pitch-800 border border-surface-border rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[92vh]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border flex-shrink-0">
@@ -316,7 +316,7 @@ function SmartLineupModal({ myPlayers, oppPlayers, h2hLookup, oppTeamName, onApp
           {/* Strategy selector */}
           <div className="p-4 border-b border-surface-border">
             <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-3">Choose strategy</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               {STRATEGIES.map(s => {
                 const Icon = s.icon
                 const isActive = strategy === s.id
@@ -329,9 +329,9 @@ function SmartLineupModal({ myPlayers, oppPlayers, h2hLookup, oppTeamName, onApp
                       isActive ? s.color + " " + s.activeColor : "border-surface-border text-slate-400 hover:border-slate-600 hover:text-slate-300"
                     )}
                   >
-                    <Icon className={cn("w-4 h-4", isActive ? "" : "text-slate-500")} />
-                    <span className="text-xs font-bold leading-tight">{s.label}</span>
-                    <span className="text-[10px] text-slate-500 leading-tight">{s.sub}</span>
+                    <Icon className={cn("w-3.5 h-3.5", isActive ? "" : "text-slate-500")} />
+                    <span className="text-[10px] font-bold leading-tight">{s.label}</span>
+                    <span className="text-[9px] text-slate-500 leading-tight hidden sm:block">{s.sub}</span>
                   </button>
                 )
               })}
@@ -387,9 +387,10 @@ function SmartLineupModal({ myPlayers, oppPlayers, h2hLookup, oppTeamName, onApp
 
           {/* Lineup preview */}
           <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Lineup preview</p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className={cn(
                   "text-[9px] font-bold px-2 py-0.5 rounded-full border",
                   effectiveTarget >= Math.ceil(total / 2)
@@ -398,72 +399,68 @@ function SmartLineupModal({ myPlayers, oppPlayers, h2hLookup, oppTeamName, onApp
                 )}>
                   {effectiveTarget >= Math.ceil(total / 2) ? "⚡ Grade Cascade" : "🎯 Greedy Pick"}
                 </span>
-                <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Win target</span>
+                <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Win</span>
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Sacrifice</span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            {/* Matchup cards — stacked layout works on all screen sizes */}
+            <div className="space-y-2">
               {preview.map((pair, i) => {
-                const pred  = scoreToPrediction(pair.score)
-                const isWin = pair.intent === "win"
+                const pred   = scoreToPrediction(pair.score)
+                const isWin  = pair.intent === "win"
+                const badge  = isWin ? pred : sacrificePrediction(pair.score)
                 const hasH2H = pair.h2h.wins + pair.h2h.draws + pair.h2h.losses > 0
                 return (
                   <div
                     key={i}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl border-l-2 bg-pitch-900/60",
+                      "rounded-xl border-l-2 bg-pitch-900/60 px-3 py-2.5 space-y-1.5",
                       isWin ? "border-l-emerald-400/60" : "border-l-rose-400/40"
                     )}
                   >
-                    {/* Slot number */}
-                    <span className="text-xs text-slate-600 font-mono w-5 flex-shrink-0">#{i + 1}</span>
-
-                    {/* Intent badge */}
-                    <span className={cn(
-                      "text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 w-16 text-center",
-                      isWin
-                        ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/25"
-                        : "text-rose-400 bg-rose-400/10 border-rose-400/20"
-                    )}>
-                      {isWin ? "🎯 WIN" : "⚡ SACRIFICE"}
-                    </span>
-
-                    {/* My player */}
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span className="text-sm text-white font-medium truncate">{pair.myPlayer.name}</span>
-                      <GradeBadge grade={pair.myPlayer.grade} size="sm" />
-                    </div>
-
-                    <span className="text-xs text-slate-600 flex-shrink-0">vs</span>
-
-                    {/* Opp player */}
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                      <GradeBadge grade={pair.oppPlayer.grade} size="sm" />
-                      <span className="text-sm text-white font-medium truncate">{pair.oppPlayer.name}</span>
-                    </div>
-
-                    {/* H2H summary */}
-                    {hasH2H && (
-                      <span className="text-[10px] text-slate-500 flex-shrink-0 w-14 text-right font-mono">
-                        {pair.h2h.wins}W {pair.h2h.draws}D {pair.h2h.losses}L
-                      </span>
-                    )}
-
-                    {/* Prediction badge */}
-                    {(() => {
-                      const badge = isWin ? pred : sacrificePrediction(pair.score)
-                      return (
+                    {/* Top row: slot + intent + prediction */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-600 font-mono">#{i + 1}</span>
                         <span className={cn(
-                          "text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 w-20 text-center",
+                          "text-[9px] font-bold px-2 py-0.5 rounded border",
+                          isWin
+                            ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/25"
+                            : "text-rose-400 bg-rose-400/10 border-rose-400/20"
+                        )}>
+                          {isWin ? "🎯 WIN" : "⚡ SACRIFICE"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hasH2H && (
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            {pair.h2h.wins}W {pair.h2h.draws}D {pair.h2h.losses}L
+                          </span>
+                        )}
+                        <span className={cn(
+                          "text-[9px] font-bold px-2 py-0.5 rounded border",
                           badge.cls
                         )}>
                           {badge.label}
                         </span>
-                      )
-                    })()}
+                      </div>
+                    </div>
+
+                    {/* Bottom row: my player vs opp player */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="text-sm font-semibold text-white truncate">{pair.myPlayer.name}</span>
+                        <GradeBadge grade={pair.myPlayer.grade} size="sm" />
+                      </div>
+                      <span className="text-[10px] text-slate-500 flex-shrink-0 font-medium">vs</span>
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                        <GradeBadge grade={pair.oppPlayer.grade} size="sm" />
+                        <span className="text-sm font-semibold text-white truncate">{pair.oppPlayer.name}</span>
+                      </div>
+                    </div>
                   </div>
                 )
               })}
@@ -683,23 +680,27 @@ export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClo
               <div key={p.id}>
                 <button
                   onClick={() => setExpandedPlayer(isExpanded ? null : p.id)}
-                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-surface-hover transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-4 py-3 hover:bg-surface-hover transition-colors text-left"
                 >
                   <PlayerAvatarIcon player={p} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{p.name}</span>
+                    {/* Row 1: name + grade + threat */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-semibold text-white truncate max-w-[120px]">{p.name}</span>
                       <GradeBadge grade={p.grade} size="sm" />
                       <ThreatBadge level={p.threatLevel} />
                     </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-slate-500">MV: <span className="text-slate-300">{p.market_value}</span></span>
-                      <span className="text-xs text-slate-500">Win: <span className="text-slate-300">{p.winRate}%</span></span>
-                      <span className="text-xs text-slate-500">GPM: <span className="text-slate-300">{p.goalsPerMatch}</span></span>
+                    {/* Row 2: stats + form */}
+                    <div className="flex items-center justify-between mt-1.5 gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-slate-500">MV: <span className="text-slate-300">{p.market_value}</span></span>
+                        <span className="text-[10px] text-slate-500">Win: <span className="text-slate-300">{p.winRate}%</span></span>
+                        <span className="text-[10px] text-slate-500">GPM: <span className="text-slate-300">{p.goalsPerMatch}</span></span>
+                      </div>
+                      <FormDisplay form={p.form} />
                     </div>
                   </div>
-                  <FormDisplay form={p.form} />
-                  <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform", isExpanded && "rotate-180")} />
+                  <ChevronDown className={cn("w-4 h-4 text-slate-500 flex-shrink-0 transition-transform", isExpanded && "rotate-180")} />
                 </button>
 
                 {isExpanded && (
@@ -764,40 +765,57 @@ export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClo
       {/* ── Recommended Matchups + Smart Lineup CTA ───────────────────────── */}
       {recommendations.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-surface-border">
-            <Swords className="w-4 h-4 text-accent" />
-            <h3 className="text-sm font-semibold text-white">Recommended Matchups</h3>
-            <span className="text-xs text-slate-500 ml-1 flex-1">— based on H2H records & grade advantage</span>
-            {onApplyRecommendations && (
-              <button
-                onClick={() => setShowSmartModal(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent-dim px-3 py-1.5 rounded-lg transition-all flex-shrink-0"
-              >
-                <Zap className="w-3 h-3" /> Smart Lineup
-              </button>
-            )}
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-surface-border space-y-2">
+            {/* Row 1: icon + title */}
+            <div className="flex items-center gap-2">
+              <Swords className="w-4 h-4 text-accent flex-shrink-0" />
+              <h3 className="text-sm font-semibold text-white">Recommended Matchups</h3>
+            </div>
+            {/* Row 2: subtitle + button side by side */}
+            <div className="flex items-center justify-between gap-2 ml-6">
+              <p className="text-[10px] text-slate-500 leading-tight">Based on H2H records &amp; grade advantage</p>
+              {onApplyRecommendations && (
+                <button
+                  onClick={() => setShowSmartModal(true)}
+                  className="flex items-center gap-1 text-[10px] font-semibold text-white bg-accent hover:bg-accent-dim px-2 py-1 rounded-md transition-all flex-shrink-0"
+                >
+                  <Zap className="w-2.5 h-2.5" /> Smart Lineup
+                </button>
+              )}
+            </div>
           </div>
+
           <div className="divide-y divide-surface-border/50">
             {recommendations.map((rec, i) => {
-              const h2h = rec.h2h
+              const h2h    = rec.h2h
               const hasH2H = h2h.wins + h2h.losses + h2h.draws > 0
               return (
-                <div key={i} className="flex items-center gap-3 px-5 py-3">
-                  <span className="text-xs text-slate-600 font-mono w-6">#{i + 1}</span>
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <span className="text-sm font-medium text-white truncate">{rec.myPlayer.name}</span>
-                    <GradeBadge grade={rec.myPlayer.grade} size="sm" />
-                  </div>
-                  <div className="flex flex-col items-center px-3">
-                    <span className="text-xs text-slate-600">vs</span>
+                <div key={i} className="px-4 py-2.5 space-y-1.5">
+
+                  {/* Line 1: slot · reason · threat · H2H */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[10px] text-slate-600 font-mono flex-shrink-0">#{i + 1}</span>
+                      <span className="text-[10px] text-slate-400 truncate">{rec.reason}</span>
+                      <ThreatBadge level={rec.oppPlayer.threatLevel} />
+                    </div>
                     {hasH2H && <H2HCell h2h={h2h} />}
                   </div>
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                    <span className="text-sm font-medium text-white truncate">{rec.oppPlayer.name}</span>
-                    <GradeBadge grade={rec.oppPlayer.grade} size="sm" />
-                    <ThreatBadge level={rec.oppPlayer.threatLevel} />
+
+                  {/* Line 2: MyPlayer [Grade]  vs  [Grade] OppPlayer — names get full space */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className="text-sm font-semibold text-white truncate">{rec.myPlayer.name}</span>
+                      <GradeBadge grade={rec.myPlayer.grade} size="sm" />
+                    </div>
+                    <span className="text-[10px] text-slate-500 flex-shrink-0 px-1">vs</span>
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                      <GradeBadge grade={rec.oppPlayer.grade} size="sm" />
+                      <span className="text-sm font-semibold text-white truncate">{rec.oppPlayer.name}</span>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-500 w-28 text-right flex-shrink-0">{rec.reason}</span>
+
                 </div>
               )
             })}
