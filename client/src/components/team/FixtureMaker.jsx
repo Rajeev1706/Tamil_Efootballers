@@ -229,6 +229,7 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
   const [initialized, setInitialized] = useState(false)
   const [h2hTarget, setH2hTarget]     = useState(null)
   const [saved, setSaved]             = useState(false)
+  const [applied, setApplied]         = useState(false)
   const [activeSlot, setActiveSlot]   = useState(null)
   const [showScout, setShowScout]     = useState(false) // which matchup slot is expanded
 
@@ -248,6 +249,24 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
       }
     }
     onExpand()
+  }
+
+  // Called by ScoutingReport's "Apply to Lineup" button.
+  // Maps the recommended pairings into the lineup builder, collapses the
+  // scout panel, expands the lineup editor, and shows a brief badge so the
+  // user sees the change landed.
+  const handleApplyRecommendations = (recs) => {
+    const newMatchups = recs.map((r, i) => ({
+      slot:        i + 1,
+      myPlayerId:  r.myPlayerId,
+      oppPlayerId: r.oppPlayerId,
+    }))
+    setMatchups(newMatchups)
+    setInitialized(true)  // prevent handleExpand from overwriting with the old saved lineup
+    setShowScout(false)   // collapse scout panel
+    setApplied(true)
+    setTimeout(() => setApplied(false), 2500)
+    if (!isExpanded) onExpand() // expand lineup builder if it wasn't already open
   }
 
   const handleChange = (slot, field, value) => {
@@ -437,7 +456,12 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
               {isHome ? "H" : "A"}
             </span>
             <span className="text-sm font-bold text-white">vs {opponent}</span>
-            {savedLineup.length > 0 && (
+            {applied && (
+              <span className="text-xs font-semibold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-full animate-pulse">
+                ✓ Recommendation applied
+              </span>
+            )}
+            {!applied && savedLineup.length > 0 && (
               <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
                 ✓ Lineup saved
               </span>
@@ -469,6 +493,7 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
             oppTeamId={oppTeamId}
             oppTeamName={opponent}
             onClose={() => setShowScout(false)}
+            onApplyRecommendations={handleApplyRecommendations}
           />
         </div>
       )}
