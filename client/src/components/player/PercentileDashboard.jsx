@@ -73,8 +73,8 @@ function PercentileBar({ stat, percentile, rawValue, delay = 0 }) {
         />
       </div>
 
-      {/* Tooltip on hover */}
-      <p className="text-xs text-slate-600 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Always visible on mobile, hover-reveal on desktop */}
+      <p className="text-[10px] text-slate-500 mt-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
         {config?.description}
       </p>
     </div>

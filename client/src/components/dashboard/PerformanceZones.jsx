@@ -186,18 +186,18 @@ export default function PerformanceZones({ playerId }) {
         <div className="text-center py-10 text-slate-600 text-sm">No matches found for this period</div>
       ) : (
         <>
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1 rounded-lg bg-emerald-400/10 border border-emerald-400/20 px-3 py-2 text-center">
-              <p className="text-xs text-slate-500">High</p>
-              <p className="text-lg font-bold text-emerald-400">+{peak}</p>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="rounded-lg bg-emerald-400/10 border border-emerald-400/20 px-2 py-2 text-center">
+              <p className="text-[10px] text-slate-500">High</p>
+              <p className="text-base font-bold text-emerald-400">+{peak}</p>
             </div>
-            <div className="flex-1 rounded-lg bg-pitch-800 border border-surface-border px-3 py-2 text-center">
-              <p className="text-xs text-slate-500">{mode === "all" ? "This season" : "Current"}</p>
-              <p className="text-lg font-bold text-white">{current}</p>
+            <div className="rounded-lg bg-pitch-800 border border-surface-border px-2 py-2 text-center">
+              <p className="text-[10px] text-slate-500 truncate">{mode === "all" ? "This season" : "Current"}</p>
+              <p className="text-base font-bold text-white">{current}</p>
             </div>
-            <div className="flex-1 rounded-lg bg-red-400/10 border border-red-400/20 px-3 py-2 text-center">
-              <p className="text-xs text-slate-500">Low</p>
-              <p className="text-lg font-bold text-red-400">{trough}</p>
+            <div className="rounded-lg bg-red-400/10 border border-red-400/20 px-2 py-2 text-center">
+              <p className="text-[10px] text-slate-500">Low</p>
+              <p className="text-base font-bold text-red-400">{trough}</p>
             </div>
           </div>
 
