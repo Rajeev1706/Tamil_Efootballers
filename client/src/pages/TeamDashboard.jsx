@@ -170,6 +170,7 @@ export default function TeamDashboard() {
             <FixtureMaker
               fixtures={fixtures}
               myTeamName={myTeamName}
+              myTeamId={teamData?.id}
               myPlayers={myPlayers}
               allPlayers={allPlayers}
               teamLogoUrl={teamData?.logoUrl}

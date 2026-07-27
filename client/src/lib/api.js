@@ -92,6 +92,26 @@ export const weeklyApi = {
   deleteTournament: (id)      => api.delete(`/weekly/${id}`).then(r => r.data),
 }
 
+export const revolutionApi = {
+  list:         ()            => api.get("/revolution").then(r => r.data),
+  get:          (id)          => api.get(`/revolution/${id}`).then(r => r.data),
+  current:      ()            => api.get("/revolution/public/current").then(r => r.data),
+  topScorers:   ()            => api.get("/revolution/public/top-scorers").then(r => r.data),
+  create:       (name)        => api.post("/revolution", { name }).then(r => r.data),
+  setPlayers:   (id, playerIds) => api.post(`/revolution/${id}/players`, { playerIds }).then(r => r.data),
+  start:        (id)          => api.post(`/revolution/${id}/start`).then(r => r.data),
+  saveResult:    (matchId, player1Score, player2Score, tieWinnerId) =>
+    api.patch(`/revolution/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId }).then(r => r.data),
+  updateMatchPlayers: (matchId, body) =>
+    api.patch(`/revolution/matches/${matchId}/players`, body).then(r => r.data),
+  reset:        (id)          => api.post(`/revolution/${id}/reset`).then(r => r.data),
+  deleteTournament: (id)      => api.delete(`/revolution/${id}`).then(r => r.data),
+}
+
+export const scoutingApi = {
+  getReport: (myTeamId, oppTeamId) => api.get(`/scouting/${myTeamId}/${oppTeamId}`).then(r => r.data),
+}
+
 export const uclApi = {
   groups:            ()              => api.get("/ucl/groups").then(r => r.data),
   adminGroups:       ()              => api.get("/ucl/admin-groups").then(r => r.data),

@@ -15,6 +15,8 @@ import lineupRoutes   from "./routes/lineup.js"
 import favoriteRoutes from "./routes/favorites.js"
 import uclRoutes      from "./routes/ucl.js"
 import weeklyRoutes      from "./routes/weekly.js"
+import revolutionRoutes  from "./routes/revolution.js"
+import scoutingRoutes    from "./routes/scouting.js"
 import uclKnockoutRoutes from "./routes/uclKnockout.js"
 import auctionRoutes     from "./routes/auction.js"
 import { setSocketServer } from "./services/socket.js"
@@ -49,6 +51,8 @@ app.use("/api/lineups",  lineupRoutes)
 app.use("/api/favorites", favoriteRoutes)
 app.use("/api/ucl",    uclRoutes)
 app.use("/api/weekly",       weeklyRoutes)
+app.use("/api/revolution",   revolutionRoutes)
+app.use("/api/scouting",     scoutingRoutes)
 app.use("/api/ucl-knockout", uclKnockoutRoutes)
 app.use("/api/auction",      auctionRoutes)
 
