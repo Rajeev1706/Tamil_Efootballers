@@ -70,7 +70,7 @@ function WarningCard({ warning }) {
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
-export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClose }) {
+export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClose, onApplyRecommendations }) {
   const { data: report, isLoading, isError } = useScoutingReport(myTeamId, oppTeamId)
   const [expandedPlayer, setExpandedPlayer] = useState(null)
 
@@ -240,7 +240,22 @@ export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClo
           <div className="flex items-center gap-2 px-5 py-3 border-b border-surface-border">
             <Swords className="w-4 h-4 text-accent" />
             <h3 className="text-sm font-semibold text-white">Recommended Matchups</h3>
-            <span className="text-xs text-slate-500 ml-1">— based on H2H records & grade advantage</span>
+            <span className="text-xs text-slate-500 ml-1 flex-1">— based on H2H records & grade advantage</span>
+            {onApplyRecommendations && (
+              <button
+                onClick={() =>
+                  onApplyRecommendations(
+                    recommendations.map(r => ({
+                      myPlayerId:  r.myPlayer.id,
+                      oppPlayerId: r.oppPlayer.id,
+                    }))
+                  )
+                }
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent-dim px-3 py-1.5 rounded-lg transition-all flex-shrink-0"
+              >
+                <Swords className="w-3 h-3" /> Apply to Lineup
+              </button>
+            )}
           </div>
           <div className="divide-y divide-surface-border/50">
             {recommendations.map((rec, i) => {
