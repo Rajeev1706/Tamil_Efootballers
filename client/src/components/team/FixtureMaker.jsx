@@ -443,9 +443,9 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
   return (
     <div className="card overflow-hidden">
       {/* Fixture header — click to expand */}
-      <button
+      <div
         onClick={handleExpand}
-        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-surface-hover transition-colors text-left"
+        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-surface-hover transition-colors text-left cursor-pointer"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
@@ -483,7 +483,7 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
           </button>
           <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform", isExpanded && "rotate-180")} />
         </div>
-      </button>
+      </div>
 
       {/* Scouting Report panel */}
       {showScout && (
