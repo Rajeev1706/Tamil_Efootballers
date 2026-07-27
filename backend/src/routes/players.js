@@ -389,6 +389,63 @@ router.get("/:id/compare-stats", async (req, res, next) => {
     })
   } catch (err) { next(err) }
 })
+// GET /api/players/:id/season-summary
+// Returns per-season win rates for breakout detection on the player profile.
+router.get("/:id/season-summary", async (req, res, next) => {
+  try {
+    const playerId = parseInt(req.params.id)
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const currentSeason = parseInt(seasonRes.rows[0]?.value || "1")
+
+    const r = await query(`
+      SELECT
+        season_number,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE
+          (player_id = $1 AND result = 'win') OR
+          (opponent_id = $1 AND result = 'loss')
+        )::int AS wins,
+        COUNT(*) FILTER (WHERE result = 'draw')::int AS draws
+      FROM match_records
+      WHERE player_id = $1 OR opponent_id = $1
+      GROUP BY season_number
+      ORDER BY season_number ASC
+    `, [playerId])
+
+    const seasons = r.rows.map(s => ({
+      season:    s.season_number,
+      total:     s.total,
+      wins:      s.wins,
+      draws:     s.draws,
+      losses:    s.total - s.wins - s.draws,
+      winRate:   s.total > 0 ? Math.round((s.wins / s.total) * 100) : 0,
+      isCurrent: s.season_number === currentSeason,
+    }))
+
+    // Detect breakout: current season win rate jumped 20%+ vs previous season
+    let breakout = null
+    const currIdx = seasons.findIndex(s => s.isCurrent)
+    if (currIdx > 0) {
+      const prev = seasons[currIdx - 1]
+      const curr = seasons[currIdx]
+      if (prev.total >= 3 && curr.total >= 3) {
+        const jump = curr.winRate - prev.winRate
+        if (jump >= 20) {
+          breakout = {
+            jump,
+            currentWinRate: curr.winRate,
+            prevWinRate:    prev.winRate,
+            prevSeason:     prev.season,
+            currentSeason:  curr.season,
+          }
+        }
+      }
+    }
+
+    res.json({ seasons, currentSeason, breakout })
+  } catch (err) { next(err) }
+})
+
 // GET /api/players/:id/performance-zones
 // ?season=current (default), ?season=all, or ?season=N
 router.get("/:id/performance-zones", async (req, res, next) => {

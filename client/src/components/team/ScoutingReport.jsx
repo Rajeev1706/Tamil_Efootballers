@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { Shield, AlertTriangle, CheckCircle, Swords, TrendingUp, Target, ChevronDown, X, Search, Trophy, Zap, Brain, Check, Info } from "lucide-react"
+import { Shield, AlertTriangle, CheckCircle, Swords, TrendingUp, Target, ChevronDown, X, Search, Trophy, Zap, Brain, Check, Info, TrendingDown, BarChart2, RefreshCw, Star, ArrowRightLeft } from "lucide-react"
 import { useScoutingReport } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
@@ -35,13 +35,83 @@ function pairScore(myPlayer, oppPlayer, h2hLookup) {
 
 // Build a score matrix and greedily assign best unmatched pairs.
 // Best for LOW target wins — isolates the N easiest wins.
+// ─────────────────────────────────────────────────────────────────────────────
+// Assignment Algorithms
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+function _winRate(p) {
+  const t = (p.wins || 0) + (p.draws || 0) + (p.losses || 0)
+  return t > 0 ? (p.wins || 0) / t : (calcFormScore(p.form) + 1) / 2
+}
+
+// Sort strongest first — used to split WIN vs SACRIFICE players
+// (top N strongest = WIN candidates, rest = SACRIFICE)
+function _strengthSort(a, b) {
+  const gd = (GRADE_NUM[b.grade] ?? 1) - (GRADE_NUM[a.grade] ?? 1)
+  if (gd !== 0) return gd
+  const wd = _winRate(b) - _winRate(a)
+  if (Math.abs(wd) > 0.05) return wd
+  return calcFormScore(b.form) - calcFormScore(a.form)
+}
+
+// Sort weakest first within tier — used for within-tier picking order
+// Weakest player picks first and gets the easiest available opponent.
+// Strongest player picks last and absorbs whatever remains.
+function _tierSort(a, b) {
+  const gd = (GRADE_NUM[b.grade] ?? 1) - (GRADE_NUM[a.grade] ?? 1)
+  if (gd !== 0) return gd
+  const wd = _winRate(a) - _winRate(b)                  // asc — weakest first
+  if (Math.abs(wd) > 0.05) return wd
+  return calcFormScore(a.form) - calcFormScore(b.form)   // asc
+}
+
+function _pickBest(mp, pool, h2hLookup) {
+  return pool.reduce((best, op) =>
+    pairScore(mp, op, h2hLookup) > pairScore(mp, best, h2hLookup) ? op : best
+  )
+}
+
+function _removeFrom(arr, item) {
+  const i = arr.indexOf(item)
+  if (i !== -1) arr.splice(i, 1)
+}
+
+// Valid opponent pool per grade — grade ceiling with one-tier fallback:
+//   S  → non-S opponents (highest available = A). Fallback: anything.
+//   C  → C first, fallback B (never A/S in WIN slots unless nothing else)
+//   B  → B/C first, fallback A only if B/C exhausted (never S)
+//   A  → A/B/C first, fallback S only if nothing else remains
+function _validPool(mp, pool) {
+  const g = mp.grade
+  if (g === "S") {
+    const nonS = pool.filter(op => op.grade !== "S")
+    return nonS.length > 0 ? nonS : pool
+  }
+  if (g === "C") {
+    const c = pool.filter(op => op.grade === "C")
+    if (c.length > 0) return c
+    const b = pool.filter(op => op.grade === "B")
+    return b.length > 0 ? b : pool
+  }
+  if (g === "B") {
+    const bc = pool.filter(op => op.grade === "B" || op.grade === "C")
+    if (bc.length > 0) return bc
+    const a = pool.filter(op => op.grade === "A")
+    return a.length > 0 ? a : pool
+  }
+  // A grade: prefer equal/lower, fallback S
+  const abc = pool.filter(op => (GRADE_NUM[op.grade] ?? 1) <= (GRADE_NUM[g] ?? 1))
+  return abc.length > 0 ? abc : pool
+}
+
+// ── Greedy assignment (used when target < half) ───────────────────────────────
+// Finds the N easiest wins for a small target. Grade ceiling enforced.
 function buildGreedyAssignment(myPlayers, oppPlayers, h2hLookup) {
-  // Grade ceiling: prefer equal/lower grade opponents; fallback to lowest available
   const allPairs = []
   for (const mp of myPlayers) {
-    const myG        = GRADE_NUM[mp.grade] ?? 1
-    const validOpps  = oppPlayers.filter(op => (GRADE_NUM[op.grade] ?? 1) <= myG)
-    const pool       = validOpps.length > 0 ? validOpps : oppPlayers // fallback
+    const pool = _validPool(mp, oppPlayers)
     for (const op of pool) {
       allPairs.push({
         myPlayer:  mp,
@@ -65,130 +135,108 @@ function buildGreedyAssignment(myPlayers, oppPlayers, h2hLookup) {
     if (result.length === Math.min(myPlayers.length, oppPlayers.length)) break
   }
 
-  return result // sorted best → worst
+  return result
 }
 
-// Grade-cascade assignment (used when target >= half).
+// ── Cascade assignment (used when target >= half) ─────────────────────────────
 //
-// TWO-PHASE assignment based on targetWins:
+// All rules in one clean pass:
 //
-// Phase 1 — WIN players (top `targetWins` strongest):
-//   • S first → strongest available opponent (A grade)
-//   • Then bottom-up: C claims C, B claims B/C, A claims A/B
-//   • Grade ceiling enforced (no player faces higher grade)
-//   → High scores → WIN slots
+// WIN phase (top `target` strongest players):
+//   1. MY S player  → opponent A grade only (never S vs S). Picks highest
+//      non-S opponent; if none, falls back to lowest available.
+//   2. MY C players → C opponents only (HARD ceiling). Fallback: B.
+//      Never A/S in WIN slots for C grade players.
+//   3. MY B players → B/C opponents (HARD ceiling). Fallback: A.
+//      Never S in WIN slots for B grade players.
+//   4. MY A players → remaining opponents. Can absorb slightly negative
+//      score matchups — they are strong enough to handle it.
+//   Bottom-up order (C runs before B, B before A) prevents A/B stealing
+//   C-grade opponents that weaker players need.
 //
-// Phase 2 — SACRIFICE players (remaining weakest):
-//   • Assigned to the STRONGEST remaining opponents (grade ceiling lifted)
-//   • Opponent's tough A/B players absorb the sacrifice matches
-//   • Opp's weak C players never get free wins from sacrifice slots
-//   → Low scores → SACRIFICE slots
+// SACRIFICE phase (weakest remaining players):
+//   • Face opponent S/A grade players ONLY — these are the toughest
+//     remaining opponents. Opponent B/C never get free wins.
+//   • Fallback to B if not enough S/A remain, then C as last resort.
+//
 function buildCascadeAssignment(myPlayers, oppPlayers, h2hLookup, targetWins) {
-
-  function myWinRate(p) {
-    const total = (p.wins || 0) + (p.draws || 0) + (p.losses || 0)
-    if (total > 0) return (p.wins || 0) / total
-    return (calcFormScore(p.form) + 1) / 2
-  }
-
-  function strengthSort(a, b) {
-    const gd = (GRADE_NUM[b.grade] ?? 1) - (GRADE_NUM[a.grade] ?? 1)
-    if (gd !== 0) return gd
-    const wd = myWinRate(b) - myWinRate(a)
-    if (Math.abs(wd) > 0.05) return wd
-    return calcFormScore(b.form) - calcFormScore(a.form)
-  }
-
-  function pickBest(mp, pool) {
-    return pool.reduce((best, op) =>
-      pairScore(mp, op, h2hLookup) > pairScore(mp, best, h2hLookup) ? op : best
-    )
-  }
-
-  function removeFrom(arr, item) {
-    const i = arr.indexOf(item); if (i !== -1) arr.splice(i, 1)
-  }
-
   const total  = Math.min(myPlayers.length, oppPlayers.length)
   const target = Math.min(targetWins ?? total, total)
 
-  // Split players: strongest `target` = WIN, weakest rest = SACRIFICE
-  const allSorted      = [...myPlayers].sort(strengthSort)
-  const winPlayers     = allSorted.slice(0, target)
+  // Split: strongest target players = WIN candidates, rest = SACRIFICE
+  const allSorted        = [...myPlayers].sort(_strengthSort)
+  const winCandidates    = allSorted.slice(0, target)
   const sacrificePlayers = allSorted.slice(target)
 
   const remainingOpp = [...oppPlayers]
   const winPairs     = []
+  const sacrificePairs = []
 
-  // ── Phase 1: WIN assignments (bottom-up tier, grade ceiling) ─────────────
-
-  function assignWinGroup(players) {
-    const sorted = [...players].sort(strengthSort)
-    for (const mp of sorted) {
-      if (remainingOpp.length === 0) break
-      const myG   = GRADE_NUM[mp.grade] ?? 1
-      const valid = remainingOpp.filter(op => (GRADE_NUM[op.grade] ?? 1) <= myG)
-      const pool  = valid.length > 0 ? valid : (() => {
-        const minG = Math.min(...remainingOpp.map(op => GRADE_NUM[op.grade] ?? 1))
-        return remainingOpp.filter(op => (GRADE_NUM[op.grade] ?? 1) === minG)
-      })()
-      const best = pickBest(mp, pool)
-      winPairs.push({
-        myPlayer:  mp,
-        oppPlayer: best,
-        score:     pairScore(mp, best, h2hLookup),
-        h2h:       h2hLookup?.[mp.id]?.[best.id] || { wins: 0, draws: 0, losses: 0 },
-      })
-      removeFrom(remainingOpp, best)
+  // Helper: assign one player from a sorted list to their best valid opponent
+  function assign(mp) {
+    if (remainingOpp.length === 0) return
+    const pool = _validPool(mp, remainingOpp)
+    if (pool.length === 0) return
+    // For S: from the valid (non-S) pool, only look at the highest grade tier
+    if (mp.grade === "S") {
+      const maxG = Math.max(...pool.map(op => GRADE_NUM[op.grade] ?? 1))
+      const top  = pool.filter(op => (GRADE_NUM[op.grade] ?? 1) === maxG)
+      const best = _pickBest(mp, top, h2hLookup)
+      winPairs.push({ myPlayer: mp, oppPlayer: best, score: pairScore(mp, best, h2hLookup), h2h: h2hLookup?.[mp.id]?.[best.id] || { wins: 0, draws: 0, losses: 0 } })
+      _removeFrom(remainingOpp, best)
+    } else {
+      const best = _pickBest(mp, pool, h2hLookup)
+      winPairs.push({ myPlayer: mp, oppPlayer: best, score: pairScore(mp, best, h2hLookup), h2h: h2hLookup?.[mp.id]?.[best.id] || { wins: 0, draws: 0, losses: 0 } })
+      _removeFrom(remainingOpp, best)
     }
   }
 
-  // S win players: strongest available opponent
-  const sWin = winPlayers.filter(p => p.grade === "S").sort(strengthSort)
-  for (const mp of sWin) {
-    if (remainingOpp.length === 0) break
-    const maxG   = Math.max(...remainingOpp.map(op => GRADE_NUM[op.grade] ?? 1))
-    const topOpp = remainingOpp.filter(op => (GRADE_NUM[op.grade] ?? 1) === maxG)
-    const best   = pickBest(mp, topOpp)
-    winPairs.push({
-      myPlayer:  mp,
-      oppPlayer: best,
-      score:     pairScore(mp, best, h2hLookup),
-      h2h:       h2hLookup?.[mp.id]?.[best.id] || { wins: 0, draws: 0, losses: 0 },
-    })
-    removeFrom(remainingOpp, best)
-  }
+  // ── WIN phase ──────────────────────────────────────────────────────────────
 
-  // C → B → A win players (bottom-up so C claims C first)
+  // 1. S players first (they skip opponent S)
+  winCandidates
+    .filter(p => p.grade === "S")
+    .sort(_tierSort)
+    .forEach(assign)
+
+  // 2. Bottom-up: C → B → A
+  //    C runs first to claim C opponents before B/A can take them.
+  //    B runs next to claim B opponents before A can take them.
+  //    A runs last and takes whatever remains (can handle tough matchups).
+  //    Within each tier: weakest picks first → gets easiest available opponent.
   for (const grade of ["C", "B", "A"]) {
-    const tier = winPlayers.filter(p => p.grade === grade)
-    if (tier.length > 0) assignWinGroup(tier)
+    winCandidates
+      .filter(p => p.grade === grade)
+      .sort(_tierSort)
+      .forEach(assign)
   }
 
-  // ── Phase 2: SACRIFICE assignments (strongest remaining opp, no grade ceiling)
-  // Opp sorted strongest first — tough A/B players absorb sacrifice matches,
-  // their weak C players don't get free wins.
-  const sacrificePairs = []
-  const sortedRemainingOpp = [...remainingOpp].sort((a, b) =>
-    (GRADE_NUM[b.grade] ?? 1) - (GRADE_NUM[a.grade] ?? 1)
-  )
-  const sacrificeSorted = [...sacrificePlayers].sort(strengthSort) // weakest last
+  // ── SACRIFICE phase ────────────────────────────────────────────────────────
+  // Opponent S/A grade players absorb sacrifice matches — their weak B/C
+  // players never get free wins.
+  // Build sacrifice opponent pool: S first, then A, then B fallback, then C last resort.
+  const saPool = [
+    ...remainingOpp.filter(op => op.grade === "S"),
+    ...remainingOpp.filter(op => op.grade === "A"),
+    ...remainingOpp.filter(op => op.grade === "B"),
+    ...remainingOpp.filter(op => op.grade === "C"),
+  ]
 
-  for (let i = 0; i < sacrificeSorted.length; i++) {
-    const mp = sacrificeSorted[i]
-    if (sortedRemainingOpp.length === 0) break
-    // Pair with next strongest remaining opponent
-    const op = sortedRemainingOpp.shift()
-    sacrificePairs.push({
-      myPlayer:  mp,
-      oppPlayer: op,
-      score:     pairScore(mp, op, h2hLookup),
-      h2h:       h2hLookup?.[mp.id]?.[op.id] || { wins: 0, draws: 0, losses: 0 },
+  sacrificePlayers
+    .sort(_strengthSort)
+    .forEach((mp, i) => {
+      const op = saPool[i]
+      if (!op) return
+      sacrificePairs.push({
+        myPlayer:  mp,
+        oppPlayer: op,
+        score:     pairScore(mp, op, h2hLookup),
+        h2h:       h2hLookup?.[mp.id]?.[op.id] || { wins: 0, draws: 0, losses: 0 },
+      })
     })
-  }
 
-  // WIN pairs first (sorted by score desc), then SACRIFICE pairs
-  // Modal reads first `target` as WIN, rest as SACRIFICE — order matters
+  // WIN pairs sorted by score (best first), then SACRIFICE pairs appended.
+  // Modal reads first `target` entries as WIN, rest as SACRIFICE.
   return [
     ...winPairs.sort((a, b) => b.score - a.score),
     ...sacrificePairs,
@@ -199,6 +247,8 @@ function buildCascadeAssignment(myPlayers, oppPlayers, h2hLookup, targetWins) {
 function buildOptimalAssignment(myPlayers, oppPlayers, h2hLookup) {
   return buildGreedyAssignment(myPlayers, oppPlayers, h2hLookup)
 }
+
+
 
 function sacrificePrediction(score) {
   if (score >  0.2) return { label: "Mostly Win", cls: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" }
@@ -214,6 +264,164 @@ function scoreToPrediction(score) {
   return               { label: "Likely Loss",  cls: "text-rose-400   bg-rose-400/10   border-rose-400/20"   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Opponent Weakness Spotter
+// ─────────────────────────────────────────────────────────────────────────────
+
+function analyseWeaknesses(oppPlayers, myPlayers, h2hLookup, oppTeamName) {
+  const insights = []
+  const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
+  const gradeGroups = { S: [], A: [], B: [], C: [] }
+  for (const p of oppPlayers) gradeGroups[p.grade]?.push(p)
+
+  // No elite players
+  const myS = myPlayers.filter(p => p.grade === "S").map(p => p.name)
+  if (gradeGroups.S.length === 0 && gradeGroups.A.length === 0) {
+    insights.push({ type: "exploit", icon: "Trophy", title: "No Elite Players",
+      detail: `${oppTeamName} has zero S or A grade players. Grade advantage across every matchup.` })
+  } else if (gradeGroups.S.length === 0 && myS.length > 0) {
+    insights.push({ type: "exploit", icon: "Star", title: "No S-Grade Threat",
+      detail: `They have no S-grade player. ${myS.join(", ")} can dominate without fear of a grade counter.` })
+  }
+
+  // Players on cold streak (3+ losses)
+  const coldPlayers = oppPlayers.filter(p => {
+    const f = p.form || []
+    return f.length >= 3 && f.slice(0, 3).every(x => x === "L")
+  })
+  if (coldPlayers.length > 0) {
+    insights.push({ type: "exploit", icon: "TrendingDown", title: "Cold Streak Targets",
+      detail: `${coldPlayers.map(p => p.name).join(", ")} ${coldPlayers.length > 1 ? "are" : "is"} on a 3+ match losing streak — assign strong players here for easy wins.` })
+  }
+
+  // Players my squad dominates (H2H ≥60% win rate, min 2 games)
+  const dominated = []
+  for (const op of oppPlayers) {
+    for (const mp of myPlayers) {
+      const h2h = h2hLookup[mp.id]?.[op.id]
+      if (!h2h) continue
+      const total = h2h.wins + h2h.draws + h2h.losses
+      if (total < 2) continue
+      const wr = h2h.wins / total
+      if (wr >= 0.6) dominated.push({ opp: op, mp, wr: Math.round(wr * 100) })
+    }
+  }
+  if (dominated.length > 0) {
+    dominated.sort((a, b) => b.wr - a.wr)
+    insights.push({ type: "exploit", icon: "Zap", title: "Historically Dominated",
+      items: dominated.slice(0, 3).map(d => `${d.mp.name} wins ${d.wr}% vs ${d.opp.name}`) })
+  }
+
+  // Low win rate players (potential easy wins)
+  const weak = oppPlayers.filter(p => parseInt(p.totalMatches) >= 3 && parseInt(p.winRate) < 30)
+  if (weak.length >= 2) {
+    insights.push({ type: "exploit", icon: "Target", title: "Low Win-Rate Players",
+      detail: `${weak.map(p => p.name).join(", ")} have under 30% win rate — safe targets for your B/C players.` })
+  }
+
+  // Grade-thin squad
+  const lowG = (gradeGroups.B?.length || 0) + (gradeGroups.C?.length || 0)
+  const highG = (gradeGroups.S?.length || 0) + (gradeGroups.A?.length || 0)
+  if (lowG > highG + 3) {
+    insights.push({ type: "exploit", icon: "BarChart2", title: "Grade-Thin Squad",
+      detail: `${oppTeamName} fields ${lowG} B/C players vs only ${highG} S/A. Your A-grade players should dominate the majority of matchups.` })
+  }
+
+  // Danger: hot streak players
+  const hot = oppPlayers.filter(p => {
+    const f = p.form || []
+    return f.length >= 3 && f.slice(0, 3).every(x => x === "W")
+  })
+  if (hot.length > 0) {
+    insights.push({ type: "danger", icon: "AlertTriangle", title: "Hot Streak Danger",
+      detail: `${hot.map(p => p.name).join(", ")} ${hot.length > 1 ? "are" : "is"} on a 3+ win streak — avoid weak matchups against ${hot.length > 1 ? "them" : "this player"}.` })
+  }
+
+  // Danger: high overall win rate
+  const elite = oppPlayers.filter(p => parseInt(p.winRate) >= 70 && parseInt(p.totalMatches) >= 3)
+  if (elite.length > 0) {
+    insights.push({ type: "danger", icon: "Shield", title: "Elite Performers",
+      detail: `${elite.map(p => `${p.name} (${p.winRate}% WR)`).join(", ")} — only deploy your best against ${elite.length > 1 ? "these players" : "this player"}.` })
+  }
+
+  return insights
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lineup Confidence Score  (0–100)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GRADE_NUM_LC = { S: 4, A: 3, B: 2, C: 1 }
+
+function calcFormScoreLC(form) {
+  if (!form || form.length === 0) return 0
+  const r = form.slice(0, 5)
+  return r.reduce((a, f) => a + (f === "W" ? 1 : f === "L" ? -1 : 0), 0) / r.length
+}
+
+function pairScoreLC(mp, op, h2hLookup) {
+  const h2h   = h2hLookup?.[mp.id]?.[op.id] || { wins: 0, draws: 0, losses: 0 }
+  const total = h2h.wins + h2h.draws + h2h.losses
+  const h2hS  = total > 0 ? ((h2h.wins - h2h.losses) / total) * 2 : 0
+  const gradeS = ((GRADE_NUM_LC[mp.grade] ?? 1) - (GRADE_NUM_LC[op.grade] ?? 1)) * 0.4
+  const formS  = calcFormScoreLC(mp.form) * 0.6
+  return h2hS + gradeS + formS
+}
+
+function computeLineupScore(savedLineup, myPlayers, oppPlayers, h2hLookup) {
+  if (!savedLineup || savedLineup.length === 0) return null
+  const myById  = Object.fromEntries(myPlayers.map(p  => [String(p.id),  p]))
+  const oppById = Object.fromEntries(oppPlayers.map(p => [String(p.id),  p]))
+
+  const slots = []
+  for (const s of savedLineup) {
+    const mp = myById[String(s.myPlayerId)]
+    const op = oppById[String(s.oppPlayerId)]
+    if (!mp || !op) continue
+    const score = pairScoreLC(mp, op, h2hLookup)
+    const norm  = Math.max(0, Math.min(10, ((score + 3.2) / 6.4) * 10))
+    slots.push({ slot: s.slot, myPlayer: mp, oppPlayer: op, score, norm,
+      h2h: h2hLookup?.[mp.id]?.[op.id] || { wins: 0, draws: 0, losses: 0 } })
+  }
+  if (slots.length === 0) return null
+
+  const confidence = Math.round((slots.reduce((a, s) => a + s.norm, 0) / slots.length) * 10)
+  return { confidence, slots }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Alternative Swap Suggester
+// ─────────────────────────────────────────────────────────────────────────────
+
+function findAlternativeSwaps(slots, h2hLookup) {
+  if (!slots || slots.length < 2) return []
+  const improvements = []
+
+  for (let i = 0; i < slots.length; i++) {
+    for (let j = i + 1; j < slots.length; j++) {
+      const a = slots[i], b = slots[j]
+      const current  = a.score + b.score
+      const newA     = pairScoreLC(a.myPlayer, b.oppPlayer, h2hLookup)
+      const newB     = pairScoreLC(b.myPlayer, a.oppPlayer, h2hLookup)
+      const gain     = newA + newB - current
+      if (gain > 0.15) {
+        improvements.push({
+          slotA: a.slot, slotB: b.slot,
+          playerA: a.myPlayer.name, playerB: b.myPlayer.name,
+          oppA: a.oppPlayer.name,   oppB: b.oppPlayer.name,
+          gain: Math.round(gain * 8),  // scaled to 0-100 pts
+          gradeA: a.myPlayer.grade,    gradeB: b.myPlayer.grade,
+        })
+      }
+    }
+  }
+
+  improvements.sort((a, b) => b.gain - a.gain)
+  return improvements.slice(0, 2)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Smart Lineup Modal
 // ─────────────────────────────────────────────────────────────────────────────
 // Smart Lineup Modal
 // ─────────────────────────────────────────────────────────────────────────────
@@ -577,10 +785,25 @@ function WarningCard({ warning }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClose, onApplyRecommendations }) {
+export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClose, onApplyRecommendations, savedLineup = [] }) {
   const { data: report, isLoading, isError } = useScoutingReport(myTeamId, oppTeamId)
   const [expandedPlayer,  setExpandedPlayer]  = useState(null)
   const [showSmartModal,  setShowSmartModal]  = useState(false)
+
+  const weaknesses = useMemo(() => {
+    if (!report) return []
+    return analyseWeaknesses(report.oppPlayers, report.myPlayers, report.h2hLookup, report.oppTeam?.name || oppTeamName)
+  }, [report, oppTeamName])
+
+  const lineupAnalysis = useMemo(() => {
+    if (!report || savedLineup.length === 0) return null
+    return computeLineupScore(savedLineup, report.myPlayers, report.oppPlayers, report.h2hLookup)
+  }, [report, savedLineup])
+
+  const swapSuggestions = useMemo(() => {
+    if (!lineupAnalysis || !report) return []
+    return findAlternativeSwaps(lineupAnalysis.slots, report.h2hLookup)
+  }, [lineupAnalysis, report])
 
   if (isLoading) {
     return (
@@ -663,6 +886,46 @@ export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClo
           </div>
           <div className="p-4 space-y-2">
             {warnings.map((w, i) => <WarningCard key={i} warning={w} />)}
+          </div>
+        </div>
+      )}
+
+      {/* ── Opponent Weakness Spotter ────────────────────────────────────────── */}
+      {weaknesses.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
+            <TrendingDown className="w-4 h-4 text-rose-400" />
+            <h3 className="text-sm font-semibold text-white">Weakness Spotter</h3>
+            <span className="text-[10px] text-slate-500 ml-1">— exploit these gaps</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {weaknesses.map((w, i) => {
+              const isExploit = w.type === "exploit"
+              return (
+                <div key={i} className={cn(
+                  "rounded-xl px-3 py-2.5 border",
+                  isExploit ? "bg-emerald-400/5 border-emerald-400/20" : "bg-rose-400/5 border-rose-400/20"
+                )}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn("text-xs font-bold", isExploit ? "text-emerald-400" : "text-rose-400")}>
+                      {isExploit ? "⚡ EXPLOIT" : "⚠ DANGER"}
+                    </span>
+                    <span className="text-xs font-semibold text-white">{w.title}</span>
+                  </div>
+                  {w.detail && <p className="text-[11px] text-slate-400 leading-relaxed">{w.detail}</p>}
+                  {w.items && (
+                    <ul className="space-y-0.5 mt-1">
+                      {w.items.map((item, ii) => (
+                        <li key={ii} className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-emerald-400 flex-shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -820,6 +1083,126 @@ export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClo
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* ── Lineup Confidence Score + Swap Suggester ──────────────────────── */}
+      {lineupAnalysis && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
+            <BarChart2 className="w-4 h-4 text-violet-400" />
+            <h3 className="text-sm font-semibold text-white">Lineup Confidence</h3>
+            <span className="text-[10px] text-slate-500 ml-1">— based on saved lineup</span>
+          </div>
+
+          {/* Score headline */}
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-end justify-between mb-2">
+              <div>
+                <span className={cn(
+                  "text-4xl font-black font-mono",
+                  lineupAnalysis.confidence >= 70 ? "text-emerald-400" :
+                  lineupAnalysis.confidence >= 50 ? "text-amber-400" : "text-rose-400"
+                )}>
+                  {lineupAnalysis.confidence}
+                </span>
+                <span className="text-lg text-slate-500 ml-1">/100</span>
+              </div>
+              <span className={cn(
+                "text-xs font-bold px-3 py-1 rounded-full border",
+                lineupAnalysis.confidence >= 70 ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/25" :
+                lineupAnalysis.confidence >= 55 ? "text-amber-400 bg-amber-400/10 border-amber-400/25" :
+                                                   "text-rose-400 bg-rose-400/10 border-rose-400/25"
+              )}>
+                {lineupAnalysis.confidence >= 70 ? "Strong" :
+                 lineupAnalysis.confidence >= 55 ? "Decent" :
+                 lineupAnalysis.confidence >= 40 ? "Risky" : "Weak"}
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full h-2 bg-pitch-700 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  lineupAnalysis.confidence >= 70 ? "bg-emerald-400" :
+                  lineupAnalysis.confidence >= 50 ? "bg-amber-400" : "bg-rose-400"
+                )}
+                style={{ width: `${lineupAnalysis.confidence}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Per-slot breakdown */}
+          <div className="px-4 pb-3 space-y-1.5">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mb-2">Matchup breakdown</p>
+            {lineupAnalysis.slots.map((s, i) => {
+              const pct = Math.round(s.norm * 10)
+              const hasH2H = s.h2h.wins + s.h2h.draws + s.h2h.losses > 0
+              return (
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[10px] text-slate-600 font-mono w-5">#{s.slot}</span>
+                      <span className="text-[11px] font-medium text-white truncate max-w-[80px]">{s.myPlayer.name}</span>
+                      <GradeBadge grade={s.myPlayer.grade} size="sm" />
+                      <span className="text-[9px] text-slate-600">vs</span>
+                      <span className="text-[11px] text-slate-300 truncate max-w-[80px]">{s.oppPlayer.name}</span>
+                      <GradeBadge grade={s.oppPlayer.grade} size="sm" />
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {hasH2H && (
+                        <span className="text-[9px] text-slate-500 font-mono">{s.h2h.wins}W{s.h2h.draws}D{s.h2h.losses}L</span>
+                      )}
+                      <span className={cn(
+                        "text-[9px] font-bold w-8 text-right",
+                        pct >= 70 ? "text-emerald-400" : pct >= 45 ? "text-amber-400" : "text-rose-400"
+                      )}>{pct}%</span>
+                    </div>
+                  </div>
+                  <div className="ml-5 h-1 bg-pitch-700 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        pct >= 70 ? "bg-emerald-400" : pct >= 45 ? "bg-amber-400" : "bg-rose-400"
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Swap suggestions */}
+          {swapSuggestions.length > 0 && (
+            <div className="border-t border-surface-border px-4 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowRightLeft className="w-3.5 h-3.5 text-sky-400" />
+                <p className="text-xs font-semibold text-white">Suggested Swaps</p>
+                <span className="text-[10px] text-slate-500">— improve your score</span>
+              </div>
+              <div className="space-y-2">
+                {swapSuggestions.map((sw, i) => (
+                  <div key={i} className="bg-sky-400/5 border border-sky-400/20 rounded-xl px-3 py-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-sky-400">SWAP #{i + 1}</span>
+                      <span className="text-[10px] font-bold text-emerald-400">+{sw.gain} pts</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-semibold text-white">{sw.playerA}</span>
+                      <GradeBadge grade={sw.gradeA} size="sm" />
+                      <ArrowRightLeft className="w-2.5 h-2.5 text-sky-400 flex-shrink-0" />
+                      <span className="text-[11px] font-semibold text-white">{sw.playerB}</span>
+                      <GradeBadge grade={sw.gradeB} size="sm" />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      {sw.playerA} → {sw.oppB} · {sw.playerB} → {sw.oppA}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
