@@ -456,18 +456,16 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
               {isHome ? "H" : "A"}
             </span>
             <span className="text-sm font-bold text-white">vs {opponent}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-slate-500">Round {fixture.round} · {formattedDate}</p>
             {applied && (
-              <span className="text-xs font-semibold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-full animate-pulse">
-                ✓ Recommendation applied
-              </span>
+              <span className="text-[9px] font-bold text-accent">✓ Applied</span>
             )}
             {!applied && savedLineup.length > 0 && (
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
-                ✓ Lineup saved
-              </span>
+              <span className="text-[9px] font-bold text-emerald-400">✓ Saved</span>
             )}
           </div>
-          <p className="text-xs text-slate-500">Round {fixture.round} · {formattedDate}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
