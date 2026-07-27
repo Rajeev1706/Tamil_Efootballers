@@ -227,11 +227,6 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
         })()
       )}
 
-      {/* Title Race Tracker — shown above table when season is live */}
-      {view === "table" && teams.length >= 2 && (
-        <TitleRaceTracker teams={teams} fixtures={fixtures} />
-      )}
-
       {/* League Table View */}
       {view === "table" && (
         <div className="overflow-x-auto">
