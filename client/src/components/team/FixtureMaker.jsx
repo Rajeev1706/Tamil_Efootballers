@@ -477,7 +477,7 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
                 : "text-amber-400 bg-amber-400/10 border-amber-400/25 hover:bg-amber-400/20"
             )}
           >
-            <Search className="w-3 h-3" /> Scout
+            <Search className="w-3 h-3" /> Report
           </button>
           <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform", isExpanded && "rotate-180")} />
         </div>
