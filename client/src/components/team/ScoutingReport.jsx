@@ -163,22 +163,46 @@ function buildCascadeAssignment(myPlayers, oppPlayers, h2hLookup, targetWins) {
   const total  = Math.min(myPlayers.length, oppPlayers.length)
   const target = Math.min(targetWins ?? total, total)
 
-  // Split: strongest target players = WIN candidates, rest = SACRIFICE
+  // ── Trigger check: Reserved Elite Method ─────────────────────────────────
+  // Activates ONLY when:
+  //   1. Opp has EXACTLY 2 elite players total (1S+1A  OR  0S+2A)
+  //   2. Cap target is 1–8 wins (target < 9)
+  //
+  // When triggered: opp S/A are RESERVED for sacrifice slots.
+  //   WIN assignments use opp B/C only.
+  //   My S player faces best available B (highest non-elite remaining).
+  //   My A/B/C players follow normal bottom-up tier against B/C pool.
+  //
+  // When NOT triggered (opp elite ≠ 2, OR target ≥ 9):
+  //   Normal cascade runs — My S → opp A, sacrifice → strongest remaining.
+  const oppElite       = oppPlayers.filter(p => p.grade === "S" || p.grade === "A")
+  const useReserved    = oppElite.length === 2 && target < 9
+
+  // Split my players: strongest → WIN candidates, weakest → SACRIFICE
   const allSorted        = [...myPlayers].sort(_strengthSort)
   const winCandidates    = allSorted.slice(0, target)
   const sacrificePlayers = allSorted.slice(target)
 
-  const remainingOpp = [...oppPlayers]
-  const winPairs     = []
+  // Build the WIN opponent pool:
+  // Reserved method → exclude elite opp players from WIN pool (lock them for sacrifice)
+  // Normal method   → all opponents available
+  const lockedForSacrifice = useReserved ? [...oppElite] : []
+  const remainingOpp = useReserved
+    ? oppPlayers.filter(op => !lockedForSacrifice.includes(op))
+    : [...oppPlayers]
+
+  const winPairs       = []
   const sacrificePairs = []
 
-  // Helper: assign one player from a sorted list to their best valid opponent
+  // Assign a WIN candidate to their best valid opponent from remainingOpp
   function assign(mp) {
     if (remainingOpp.length === 0) return
     const pool = _validPool(mp, remainingOpp)
     if (pool.length === 0) return
-    // For S: from the valid (non-S) pool, only look at the highest grade tier
     if (mp.grade === "S") {
+      // S player: pick the highest grade available in the WIN pool.
+      // Reserved method → pool has no A/S, so highest = B.
+      // Normal method   → pool has A (non-S filtered), so highest = A.
       const maxG = Math.max(...pool.map(op => GRADE_NUM[op.grade] ?? 1))
       const top  = pool.filter(op => (GRADE_NUM[op.grade] ?? 1) === maxG)
       const best = _pickBest(mp, top, h2hLookup)
@@ -191,52 +215,39 @@ function buildCascadeAssignment(myPlayers, oppPlayers, h2hLookup, targetWins) {
     }
   }
 
-  // ── WIN phase ──────────────────────────────────────────────────────────────
-
-  // 1. S players first (they skip opponent S)
-  winCandidates
-    .filter(p => p.grade === "S")
-    .sort(_tierSort)
-    .forEach(assign)
-
-  // 2. Bottom-up: C → B → A
-  //    C runs first to claim C opponents before B/A can take them.
-  //    B runs next to claim B opponents before A can take them.
-  //    A runs last and takes whatever remains (can handle tough matchups).
-  //    Within each tier: weakest picks first → gets easiest available opponent.
+  // ── WIN phase: S first, then bottom-up C → B → A ─────────────────────────
+  winCandidates.filter(p => p.grade === "S").sort(_tierSort).forEach(assign)
   for (const grade of ["C", "B", "A"]) {
-    winCandidates
-      .filter(p => p.grade === grade)
-      .sort(_tierSort)
-      .forEach(assign)
+    winCandidates.filter(p => p.grade === grade).sort(_tierSort).forEach(assign)
   }
 
-  // ── SACRIFICE phase ────────────────────────────────────────────────────────
-  // Opponent S/A grade players absorb sacrifice matches — their weak B/C
-  // players never get free wins.
-  // Build sacrifice opponent pool: S first, then A, then B fallback, then C last resort.
-  const saPool = [
-    ...remainingOpp.filter(op => op.grade === "S"),
-    ...remainingOpp.filter(op => op.grade === "A"),
-    ...remainingOpp.filter(op => op.grade === "B"),
-    ...remainingOpp.filter(op => op.grade === "C"),
-  ]
+  // ── SACRIFICE phase ───────────────────────────────────────────────────────
+  // Reserved method: locked elite (S/A) opponents go to sacrifice first,
+  //   then any remaining opp (B/C fallback) if more sacrifice slots needed.
+  // Normal method:   strongest remaining opponents absorb sacrifice slots.
+  const saPool = useReserved
+    ? [
+        ...lockedForSacrifice.sort((a, b) => (GRADE_NUM[b.grade] ?? 1) - (GRADE_NUM[a.grade] ?? 1)),
+        ...remainingOpp.sort((a, b) => (GRADE_NUM[b.grade] ?? 1) - (GRADE_NUM[a.grade] ?? 1)),
+      ]
+    : [
+        ...remainingOpp.filter(op => op.grade === "S"),
+        ...remainingOpp.filter(op => op.grade === "A"),
+        ...remainingOpp.filter(op => op.grade === "B"),
+        ...remainingOpp.filter(op => op.grade === "C"),
+      ]
 
-  sacrificePlayers
-    .sort(_strengthSort)
-    .forEach((mp, i) => {
-      const op = saPool[i]
-      if (!op) return
-      sacrificePairs.push({
-        myPlayer:  mp,
-        oppPlayer: op,
-        score:     pairScore(mp, op, h2hLookup),
-        h2h:       h2hLookup?.[mp.id]?.[op.id] || { wins: 0, draws: 0, losses: 0 },
-      })
+  sacrificePlayers.sort(_strengthSort).forEach((mp, i) => {
+    const op = saPool[i]
+    if (!op) return
+    sacrificePairs.push({
+      myPlayer:  mp,
+      oppPlayer: op,
+      score:     pairScore(mp, op, h2hLookup),
+      h2h:       h2hLookup?.[mp.id]?.[op.id] || { wins: 0, draws: 0, losses: 0 },
     })
+  })
 
-  // WIN pairs sorted by score (best first), then SACRIFICE pairs appended.
-  // Modal reads first `target` entries as WIN, rest as SACRIFICE.
   return [
     ...winPairs.sort((a, b) => b.score - a.score),
     ...sacrificePairs,
