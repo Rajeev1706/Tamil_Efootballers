@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -347,6 +347,56 @@ export const usePlayer = (id) =>
 
 export const usePlayerSeasonSummary = (id) =>
   useQuery({ queryKey: ["player-season-summary", id], queryFn: () => playersApi.seasonSummary(id), enabled: !!id })
+
+export const useAuctionTargets = (teamId) =>
+  useQuery({ queryKey: ["auction-targets", teamId], queryFn: () => auctionTargetsApi.list(teamId), enabled: !!teamId })
+
+export const useAddAuctionTarget = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => auctionTargetsApi.add(body),
+    onSuccess: (_, { teamId }) => qc.invalidateQueries({ queryKey: ["auction-targets", teamId] }),
+  })
+}
+
+export const useUpdateAuctionTarget = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => auctionTargetsApi.update(id, body),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["auction-targets", vars.teamId] }),
+  })
+}
+
+export const useRemoveAuctionTarget = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }) => auctionTargetsApi.remove(id),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["auction-targets", vars.teamId] }),
+  })
+}
+
+export const useReorderAuctionTargets = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderedIds }) => auctionTargetsApi.reorder(orderedIds),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["auction-targets", vars.teamId] }),
+  })
+}
+
+export const usePlayerGradeMatrix  = (playerId) =>
+  useQuery({ queryKey: ["grade-matrix", playerId],  queryFn: () => auctionIntelApi.gradeMatrix(playerId),  enabled: !!playerId })
+
+export const usePlayerNemesis = (playerId) =>
+  useQuery({ queryKey: ["nemesis", playerId], queryFn: () => auctionIntelApi.nemesis(playerId), enabled: !!playerId })
+
+export const useH2HVsSquad = (playerId, myTeamId) =>
+  useQuery({ queryKey: ["h2h-vs-squad", playerId, myTeamId], queryFn: () => auctionIntelApi.h2hVsSquad(playerId, myTeamId), enabled: !!playerId && !!myTeamId })
+
+export const useAuctionHistory = () =>
+  useQuery({ queryKey: ["auction-history"], queryFn: () => auctionIntelApi.auctionHistory() })
+
+export const useMVTrajectory = (playerId) =>
+  useQuery({ queryKey: ["mv-trajectory", playerId], queryFn: () => auctionIntelApi.mvTrajectory(playerId), enabled: !!playerId })
 
 export const useUpdatePlayer = () => {
   const qc = useQueryClient()
