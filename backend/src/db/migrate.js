@@ -261,6 +261,7 @@ SELECT
   p.trophy2_count AS "trophy2Count",
   p.trophy3_count AS "trophy3Count",
   p.trophy4_count AS "trophy4Count",
+  p.is_captain    AS "isCaptain",
   t.name          AS team,
   p.team_id       AS "teamId",
   t.logo_url      AS "teamLogo",

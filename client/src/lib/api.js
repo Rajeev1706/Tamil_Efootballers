@@ -201,6 +201,23 @@ export const uclKnockoutApi = {
   deleteTournament: (id)       => api.delete(`/ucl-knockout/${id}`).then(r => r.data),
 }
 
+export const auctionIntelApi = {
+  gradeMatrix:    (playerId)           => api.get(`/auction-intel/grade-matrix/${playerId}`).then(r => r.data),
+  nemesis:        (playerId)           => api.get(`/auction-intel/nemesis/${playerId}`).then(r => r.data),
+  h2hVsSquad:     (playerId, myTeamId) => api.get(`/auction-intel/h2h-vs-squad/${playerId}`, { params: { myTeamId } }).then(r => r.data),
+  auctionHistory: ()                   => api.get("/auction-intel/auction-history").then(r => r.data),
+  mvTrajectory:   (playerId)           => api.get(`/auction-intel/mv-trajectory/${playerId}`).then(r => r.data),
+  snapshotMV:     ()                   => api.post("/auction-intel/snapshot-mv").then(r => r.data),
+}
+
+export const auctionTargetsApi = {
+  list:    (teamId)       => api.get("/auction-targets", { params: { teamId } }).then(r => r.data),
+  add:     (body)         => api.post("/auction-targets", body).then(r => r.data),
+  update:  (id, body)     => api.patch(`/auction-targets/${id}`, body).then(r => r.data),
+  remove:  (id)           => api.delete(`/auction-targets/${id}`).then(r => r.data),
+  reorder: (orderedIds)   => api.patch("/auction-targets/reorder", { orderedIds }).then(r => r.data),
+}
+
 export const auctionApi = {
   current:      ()                              => api.get("/auction/current").then(r => r.data),
   start:        (budgetPerTeam)                 => api.post("/auction/start", { budgetPerTeam }).then(r => r.data),

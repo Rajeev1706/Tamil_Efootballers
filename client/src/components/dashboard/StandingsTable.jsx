@@ -1,9 +1,8 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Target, Trophy, Crown } from "lucide-react"
-import TitleRaceTracker from "./TitleRaceTracker"
+import { Target, Trophy, Crown, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic } from "../../lib/queries"
+import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic, useFixtureRecords } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
@@ -49,6 +48,93 @@ function PlayoffMatchCard({ label, match }) {
   )
 }
 
+
+// ── Fixture Detail Panel — player results for a completed fixture ─────────────
+function FixtureDetailPanel({ fixtureId, homeTeam, awayTeam }) {
+  const { data: records = [], isLoading } = useFixtureRecords(fixtureId)
+  const navigate = useNavigate()
+
+  if (isLoading) return (
+    <div className="px-5 py-4 text-center border-t border-surface-border/50 bg-pitch-900/60">
+      <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+    </div>
+  )
+
+  if (!records.length) return (
+    <div className="px-5 py-3 text-center border-t border-surface-border/50 bg-pitch-900/60">
+      <p className="text-xs text-slate-500">No player records found for this fixture</p>
+    </div>
+  )
+
+  // Deduplicate: only show each matchup once
+  const seen = new Set()
+  const matchups = records.filter(r => {
+    const key = [r.playerId, r.opponentId].sort().join("-")
+    if (seen.has(key)) return false
+    seen.add(key); return true
+  })
+  
+  return (
+    <div className="border-t border-surface-border/50 bg-pitch-900/40">
+      <div className="px-5 py-2 border-b border-surface-border/30">
+        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Player Results</p>
+      </div>
+      <div className="divide-y divide-surface-border/20">
+        {matchups.map(r => {
+          const playerWon  = r.result === "win"
+          const playerLost = r.result === "loss"
+          const isDraw     = r.result === "draw"
+
+          return (
+            <div key={r.id} className={cn(
+              "flex items-center gap-3 px-5 py-2.5",
+              playerWon  ? "bg-emerald-400/3" :
+              playerLost ? "bg-rose-400/3"    : ""
+            )}>
+              {/* Left player */}
+              <button
+                onClick={() => navigate(`/player/${r.playerId}`)}
+                className={cn(
+                  "flex-1 min-w-0 text-right transition-colors font-medium text-sm truncate",
+                  playerWon  ? "text-emerald-400 font-bold" :
+                  playerLost ? "text-slate-500"             :
+                               "text-amber-400"
+                )}
+              >
+                {r.playerName}
+              </button>
+
+              {/* Score */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="text-sm font-bold font-mono w-5 text-center text-white">
+                  {r.playerScore ?? "—"}
+                </span>
+                <span className="text-slate-600 text-xs">-</span>
+                <span className="text-sm font-bold font-mono w-5 text-center text-white">
+                  {r.opponentScore ?? "—"}
+                </span>
+              </div>
+
+              {/* Right player */}
+              <button
+                onClick={() => navigate(`/player/${r.opponentId}`)}
+                className={cn(
+                  "flex-1 min-w-0 text-left transition-colors font-medium text-sm truncate",
+                  playerLost ? "text-emerald-400 font-bold" :
+                  playerWon  ? "text-slate-500"             :
+                               "text-amber-400"
+                )}
+              >
+                {r.opponentName}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function StandingsTable({ teams, players, onPlayerClick, view: controlledView, onViewChange }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -64,6 +150,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
   const { data: playoffsData } = useTeamLeaguePlayoffs()
   const { data: fixtures = [] } = useFixtures()
   const [activeFixtureRound, setActiveFixtureRound] = useState(1)
+  const [expandedFixture,    setExpandedFixture]    = useState(null)
 
   // Same progressive-unlock rule as UCL fixtures — a round only becomes
   // browsable once every fixture in every round before it is closed.
@@ -135,30 +222,47 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                 const homeWon = isCompleted && f.homeScore > f.awayScore
                 const awayWon = isCompleted && f.awayScore > f.homeScore
                 return (
-                  <div key={f.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-border/50">
-                    <span
-                      className={cn("flex-1 min-w-0 flex items-center justify-end gap-1.5 truncate font-medium text-right pr-3",
+                  <div key={f.id} className="border-b border-surface-border/50">
+                    <div
+                      className={cn("flex items-center justify-between px-5 py-3 transition-colors",
+                        isCompleted ? "cursor-pointer hover:bg-surface-hover/30" : ""
+                      )}
+                      onClick={() => isCompleted && setExpandedFixture(expandedFixture === f.id ? null : f.id)}
+                    >
+                      <span className={cn("flex-1 min-w-0 flex items-center justify-end gap-1.5 truncate font-medium text-right pr-3",
                         homeWon ? "text-emerald-400" : "text-white"
                       )}>
-                      {f.home ?? "TBD"}
-                      <TeamLogoIcon logoUrl={f.homeLogo} name={f.home} />
-                    </span>
-                    <span className="flex-shrink-0 text-xs px-2">
-                      {isCompleted ? (
-                        <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
-                          {f.homeScore} - {f.awayScore}
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">vs</span>
-                      )}
-                    </span>
-                    <span
-                      className={cn("flex-1 min-w-0 flex items-center gap-1.5 truncate font-medium pl-3",
+                        {f.home ?? "TBD"}
+                        <TeamLogoIcon logoUrl={f.homeLogo} name={f.home} />
+                      </span>
+                      <span className="flex-shrink-0 text-xs px-2">
+                        {isCompleted ? (
+                          <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
+                            {f.homeScore} - {f.awayScore}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">vs</span>
+                        )}
+                      </span>
+                      <span className={cn("flex-1 min-w-0 flex items-center gap-1.5 truncate font-medium pl-3",
                         awayWon ? "text-emerald-400" : "text-white"
                       )}>
-                      <TeamLogoIcon logoUrl={f.awayLogo} name={f.away} />
-                      {f.away ?? "TBD"}
-                    </span>
+                        <TeamLogoIcon logoUrl={f.awayLogo} name={f.away} />
+                        {f.away ?? "TBD"}
+                      </span>
+                      {isCompleted && (
+                        expandedFixture === f.id
+                          ? <ChevronUp className="w-3.5 h-3.5 text-slate-500 ml-2 flex-shrink-0" />
+                          : <ChevronDown className="w-3.5 h-3.5 text-slate-500 ml-2 flex-shrink-0" />
+                      )}
+                    </div>
+                    {isCompleted && expandedFixture === f.id && (
+                      <FixtureDetailPanel
+                        fixtureId={f.id}
+                        homeTeam={f.home}
+                        awayTeam={f.away}
+                      />
+                    )}
                   </div>
                 )
               })}
