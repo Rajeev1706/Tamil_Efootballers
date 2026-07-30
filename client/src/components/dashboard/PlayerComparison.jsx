@@ -1,8 +1,10 @@
-import { useState } from "react"
+import { useState, useRef, useCallback } from "react"
+import { toPng } from "html-to-image"
 import { usePlayers, usePlayerCompareStats } from "../../lib/queries"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import { getAvatarById } from "../../lib/avatars"
 import { cn } from "../../lib/utils"
+import { Download } from "lucide-react"
 import ballondorTrophy    from "../../../images/ballondor.png"
 import teamLeagueTrophy   from "../../../images/Team League.png"
 import weeklyTrophy       from "../../../images/Weekly.png"
@@ -173,6 +175,8 @@ export default function PlayerComparison({ onPlayerClick }) {
   const { data: players = [] } = usePlayers()
   const [playerAId, setPlayerAId] = useState(null)
   const [playerBId, setPlayerBId] = useState(null)
+  const [downloading, setDownloading] = useState(false)
+  const compareRef = useRef(null)
 
   const { data: dataA, isLoading: loadA } = usePlayerCompareStats(playerAId)
   const { data: dataB, isLoading: loadB } = usePlayerCompareStats(playerBId)
@@ -180,6 +184,34 @@ export default function PlayerComparison({ onPlayerClick }) {
   const sA = dataA?.stats
   const sB = dataB?.stats
   const bothReady = !!sA && !!sB
+
+  const handleDownload = useCallback(async () => {
+    if (!compareRef.current) return
+    setDownloading(true)
+    try {
+      // Temporarily remove scrollable overflow so scrollbar doesn't appear in screenshot
+      const scrollDiv = compareRef.current.querySelector("[data-scroll]")
+      if (scrollDiv) { scrollDiv.style.overflow = "visible"; scrollDiv.style.height = "auto" }
+
+      const dataUrl = await toPng(compareRef.current, {
+        quality: 1,
+        pixelRatio: 2,
+        backgroundColor: "#0f172a",
+      })
+
+      // Restore scroll
+      if (scrollDiv) { scrollDiv.style.overflow = ""; scrollDiv.style.height = "" }
+
+      const link = document.createElement("a")
+      link.download = `${dataA?.player?.name ?? "Player A"} vs ${dataB?.player?.name ?? "Player B"}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error("Download failed:", err)
+    } finally {
+      setDownloading(false)
+    }
+  }, [dataA, dataB])
 
   return (
     <div className="card p-5 sm:p-6">
@@ -199,7 +231,31 @@ export default function PlayerComparison({ onPlayerClick }) {
 
       {bothReady && (
         <>
-          <div style={{ overflowX: "scroll", WebkitOverflowScrolling: "touch" }} className="-mx-5 sm:mx-0 px-5 sm:px-0 mb-6">
+          {/* Download button */}
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dim text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60"
+            >
+              <Download className="w-4 h-4" />
+              {downloading ? "Downloading…" : "Download PNG"}
+            </button>
+          </div>
+
+          {/* Comparison content — wrapped in ref for screenshot */}
+          <div ref={compareRef} className="bg-pitch-900 rounded-2xl p-4 space-y-4">
+            {/* Header with logo */}
+            <div className="flex items-center gap-3 pb-3 border-b border-surface-border/50">
+              <img src="/logo.png" alt="TEC Logo" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+              <div className="flex-1 text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Tamil Efootballers · Player Comparison</p>
+                <p className="text-white font-bold mt-0.5">{dataA.player.name} <span className="text-slate-500">vs</span> {dataB.player.name}</p>
+              </div>
+              <div className="w-10" />{/* spacer to balance logo */}
+            </div>
+
+          <div data-scroll="true" style={{ overflowX: "scroll", WebkitOverflowScrolling: "touch" }} className="-mx-5 sm:mx-0 px-5 sm:px-0">
             <div className="grid gap-3 min-w-[480px]" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <PlayerCard data={dataA} side="a" onPlayerClick={onPlayerClick} />
             <PlayerCard data={dataB} side="b" onPlayerClick={onPlayerClick} />
@@ -225,6 +281,7 @@ export default function PlayerComparison({ onPlayerClick }) {
             <StatBar label="Weekly Wins"   a={sA.weeklyWins} b={sB.weeklyWins} />
             <StatBar label="Weekly Draws"  a={sA.weeklyDraws} b={sB.weeklyDraws} />
             <StatBar label="Weekly Losses" a={sA.weeklyLosses} b={sB.weeklyLosses} higherIsBetter={false} />
+          </div>
           </div>
         </>
       )}
