@@ -462,9 +462,16 @@ export default function TargetBoard({ myTeamId, myPlayers, allPlayers, totalBudg
 
   const targetedIds = new Set(targets.map(t => t.playerId))
 
-  // Available players = not on my team + not retained + not a team captain
+  // Auction pool — players registered by admin for this auction
+  // If no active auction session, fall back to all non-team players
+  const poolPlayerIds = auctionData?.pool?.length
+    ? new Set(auctionData.pool.map(p => p.playerId))
+    : null
+
+  // Available players = registered in auction pool (or all if no session)
+  // + not retained + not a team captain
   const availablePlayers = allPlayers
-    .filter(p => p.teamId !== myTeamId)
+    .filter(p => poolPlayerIds ? poolPlayerIds.has(p.id) : p.teamId !== myTeamId)
     .filter(p => !retainedIds.has(p.id))
     .filter(p => !p.isCaptain)
     .filter(p => gradeFilter === "all" || p.grade === gradeFilter)

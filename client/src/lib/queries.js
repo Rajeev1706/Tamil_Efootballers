@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi, winrateApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -397,6 +397,12 @@ export const useAuctionHistory = () =>
 
 export const useMVTrajectory = (playerId) =>
   useQuery({ queryKey: ["mv-trajectory", playerId], queryFn: () => auctionIntelApi.mvTrajectory(playerId), enabled: !!playerId })
+
+export const useWinRateRanking = (type, season) =>
+  useQuery({ queryKey: ["winrate-ranking", type, season], queryFn: () => winrateApi.list(type, season), staleTime: 1000 * 60 * 5 })
+
+export const useWinRateSeasons = () =>
+  useQuery({ queryKey: ["winrate-seasons"], queryFn: () => winrateApi.seasons(), staleTime: 1000 * 60 * 10 })
 
 export const useUpdatePlayer = () => {
   const qc = useQueryClient()

@@ -6,6 +6,7 @@ import AdminPage        from "./pages/AdminPage"
 import Login            from "./pages/Login"
 import PlayerProfile    from "./pages/PlayerProfile"
 import HallOfFame       from "./pages/HallOfFame"
+import WinRateRanking   from "./pages/WinRateRanking"
 import WeeklyDraw       from "./pages/WeeklyDraw"
 import WeeklyBracket    from "./pages/WeeklyBracket"
 import RevolutionDraw    from "./pages/RevolutionDraw"
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/player/:id"   element={<PlayerProfile />} />
         <Route path="/team-roster/:id" element={<TeamRosterPage />} />
         <Route path="/hall-of-fame"      element={<HallOfFame />} />
+        <Route path="/win-rate-ranking"  element={<WinRateRanking />} />
         <Route path="/weekly/draw/:id"    element={<WeeklyDraw />} />
         <Route path="/weekly/bracket/:id" element={<WeeklyBracket />} />
         <Route path="/revolution/draw/:id"    element={<RevolutionDraw />} />
