@@ -106,7 +106,7 @@ export default function WinRateRanking() {
           {!isLoading && players.length === 0 && (
             <div className="py-16 text-center">
               <TrendingUp className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-              <p className="text-slate-500 text-sm">No players with 15+ matches yet</p>
+              <p className="text-slate-500 text-sm">No players with  matches yet</p>
             </div>
           )}
 
