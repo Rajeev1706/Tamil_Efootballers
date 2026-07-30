@@ -639,9 +639,98 @@ async function clearCurrentSeasonData(q) {
 // POST /api/teams/season-reset — admin only
 // Archives current season by clearing its fixtures/UCL/team-stats, then
 // ADVANCES the season number by one.
+// Also auto-updates player grades based on completed season win rates.
 router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { withTransaction: tx } = await import("../db/pool.js")
+
+    // ── Step 1: Get the season that is ending ───────────────────────────────
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const endingSeason = parseInt(seasonRes.rows[0]?.value || "1")
+
+    // ── Step 2: Auto-update player grades ───────────────────────────────────
+    // Only players with 20+ matches in the ending season are eligible.
+    // Rank by season win rate. Apply grade rules with protection.
+    const gradeUpdateLog = []
+
+    const eligibleRes = await query(`
+      SELECT
+        p.id,
+        p.name,
+        p.grade                                                      AS current_grade,
+        COUNT(*)::int                                                AS matches,
+        COUNT(*) FILTER (WHERE
+          (mr.player_id   = p.id AND mr.result = 'win') OR
+          (mr.opponent_id = p.id AND mr.result = 'loss')
+        )::int                                                       AS wins,
+        ROUND(
+          COUNT(*) FILTER (WHERE
+            (mr.player_id   = p.id AND mr.result = 'win') OR
+            (mr.opponent_id = p.id AND mr.result = 'loss')
+          )::numeric / NULLIF(COUNT(*), 0) * 100, 2
+        )                                                            AS win_rate
+      FROM players p
+      JOIN match_records mr
+        ON (mr.player_id = p.id OR mr.opponent_id = p.id)
+        AND mr.season_number = $1
+      WHERE p.is_captain IS NOT TRUE
+      GROUP BY p.id, p.name, p.grade
+      HAVING COUNT(*) >= 20
+      ORDER BY win_rate DESC, wins DESC
+    `, [endingSeason])
+
+    const eligible = eligibleRes.rows
+
+    // Assign target grade by rank position
+    const rankToGrade = (rank) => {
+      if (rank <= 10) return "S"
+      if (rank <= 25) return "A"
+      if (rank <= 50) return "B"
+      return "C"
+    }
+
+    const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
+
+    for (let i = 0; i < eligible.length; i++) {
+      const player     = eligible[i]
+      const rank       = i + 1
+      const targetGrade = rankToGrade(rank)
+      const current    = player.current_grade
+      const curNum     = GRADE_NUM[current] || 1
+      const tgtNum     = GRADE_NUM[targetGrade] || 1
+
+      let finalGrade = current // default: no change
+
+      // Protection rules:
+      // S → never moves down (stays S)
+      // A → never moves down (stays A), can be promoted to S
+      // B → can promote to S/A, can demote to C
+      // C → can promote to S/A/B, never demotes
+
+      if (current === "S") {
+        // S never moves — stays S
+        finalGrade = "S"
+      } else if (current === "A") {
+        // A can only go UP to S, never down
+        finalGrade = tgtNum > curNum ? targetGrade : "A"
+      } else if (current === "B") {
+        // B can go up (S/A) or down (C) — all movements allowed
+        finalGrade = targetGrade
+      } else if (current === "C") {
+        // C can only go UP, never down (already at bottom)
+        finalGrade = tgtNum > curNum ? targetGrade : "C"
+      }
+
+      if (finalGrade !== current) {
+        await query(
+          `UPDATE players SET grade = $1 WHERE id = $2`,
+          [finalGrade, player.id]
+        )
+        gradeUpdateLog.push(`${player.name}: ${current} → ${finalGrade} (rank #${rank}, ${player.win_rate}% WR)`)
+      }
+    }
+
+    // ── Step 3: Reset season data and advance season number ─────────────────
     await tx(async ({ query: q }) => {
       await clearCurrentSeasonData(q)
       await q(`
@@ -654,7 +743,16 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         )
       `)
     })
-    res.json({ success: true, message: "Season reset complete. Team stats, fixtures, trades, the entire UCL competition, and everyone's BDR points were cleared. Match history and trophies are preserved." })
+
+    res.json({
+      success: true,
+      message: "Season reset complete. Team stats, fixtures, trades, the entire UCL competition, and everyone's BDR points were cleared. Match history and trophies are preserved.",
+      gradeUpdates: {
+        eligible: eligible.length,
+        changed: gradeUpdateLog.length,
+        log: gradeUpdateLog,
+      }
+    })
   } catch (err) { next(err) }
 })
 

@@ -26,13 +26,25 @@ router.get("/", async (req, res, next) => {
     const type   = req.query.type   || "overall"
     const season = req.query.season || "all"
 
-    // Higher minimums only for "All Seasons" — season-specific views use lower thresholds
-    const minMatches = season !== "all"
-                     ? (type === "league" ? 4 : 1)
-                     : type === "overall" ? 20
-                     : type === "league"  ? 14
-                     : type === "ucl"     ? 8
-                     : 10  // weekly
+    // Check if UCL group stage exists for current season
+    // If yes and viewing current season OVERALL → threshold = 20
+    let minMatches
+    if (season !== "all") {
+      if (season === "current" && type === "overall") {
+        const uclRes = await query(`SELECT COUNT(*)::int AS cnt FROM ucl_groups`)
+        const uclStarted = (uclRes.rows[0]?.cnt || 0) > 0
+        minMatches = uclStarted ? 20 : 1
+      } else {
+        // League: 4, weekly/ucl: 1 regardless of UCL stage
+        minMatches = type === "league" ? 4 : 1
+      }
+    } else {
+      // All seasons — higher thresholds
+      minMatches = type === "overall" ? 20
+                 : type === "league"  ? 14
+                 : type === "ucl"     ? 8
+                 : 10  // weekly
+    }
 
     // Match type filter
     const typeFilter = type === "overall" ? "" :

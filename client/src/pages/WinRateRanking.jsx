@@ -103,6 +103,7 @@ export default function WinRateRanking() {
                 {TYPES.find(t => t.id === activeType)?.label} ·{" "}
                 {activeSeason === "all" ? "All Seasons" : activeSeason === "current" ? `Season ${currentSeason}` : `Season ${activeSeason}`}
                 {activeSeason === "all" && ` · min ${activeType === "overall" ? 20 : activeType === "league" ? 14 : activeType === "ucl" ? 8 : 10} matches`}
+                {activeSeason !== "all" && ` · min matches apply`}
               </h2>
             </div>
             {!isLoading && (
@@ -121,7 +122,7 @@ export default function WinRateRanking() {
           {!isLoading && players.length === 0 && (
             <div className="py-16 text-center">
               <TrendingUp className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-              <p className="text-slate-500 text-sm">No players with  matches yet</p>
+              <p className="text-slate-500 text-sm">No players with matches yet</p>
             </div>
           )}
 
