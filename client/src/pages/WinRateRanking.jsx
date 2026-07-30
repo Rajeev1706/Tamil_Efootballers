@@ -130,67 +130,69 @@ export default function WinRateRanking() {
                     )}
                   >
                     {/* Rank */}
-                    <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1">
+                    <div className="w-10 sm:w-14 flex-shrink-0 flex items-center justify-center gap-1">
                       {isFirst
                         ? <Crown className="w-4 h-4 text-accent" />
-                        : <><span className="text-sm font-medium text-slate-500">#{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></>
+                        : <><span className="text-xs sm:text-sm font-medium text-slate-500">#{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></>
                       }
                     </div>
 
                     {/* Avatar */}
                     {avatarSrc
-                      ? <img src={avatarSrc} alt={player.name} className="w-[43px] h-[43px] rounded-lg object-cover flex-shrink-0" />
-                      : <div className={cn("w-[43px] h-[43px] rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
+                      ? <img src={avatarSrc} alt={player.name} className="w-9 h-9 sm:w-[43px] sm:h-[43px] rounded-lg object-cover flex-shrink-0" />
+                      : <div className={cn("w-9 h-9 sm:w-[43px] sm:h-[43px] rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
                           isFirst ? "bg-accent/20 text-accent" : "bg-surface-border text-slate-400"
                         )}>
                           {player.name.split(" ").map(n => n[0]).join("")}
                         </div>
                     }
 
-                    {/* Name + team + bar */}
+                    {/* Name + bar */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className={cn("font-semibold text-sm truncate", isFirst ? "text-white" : "text-slate-300")}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className={cn("font-semibold text-xs sm:text-sm truncate", isFirst ? "text-white" : "text-slate-300")}>
                           {player.name}
                         </span>
-                        <GradeBadge grade={player.grade} size="sm" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1 bg-surface-border rounded-full overflow-hidden">
-                          <div
-                            className={cn("h-full rounded-full transition-all",
-                              wr >= 70 ? "bg-emerald-400" :
-                              wr >= 50 ? "bg-accent"      :
-                              wr >= 35 ? "bg-amber-400"   : "bg-rose-400"
-                            )}
-                            style={{ width: `${barPct}%` }}
-                          />
-                        </div>
+                      <div className="h-1 bg-surface-border rounded-full overflow-hidden mb-0.5">
+                        <div
+                          className={cn("h-full rounded-full transition-all",
+                            wr >= 70 ? "bg-emerald-400" :
+                            wr >= 50 ? "bg-accent"      :
+                            wr >= 35 ? "bg-amber-400"   : "bg-rose-400"
+                          )}
+                          style={{ width: `${barPct}%` }}
+                        />
                       </div>
-                      {player.team && (
-                        <p className="text-[10px] text-slate-600 mt-0.5 truncate">{player.team}</p>
-                      )}
+                      {/* Mobile: stats inline */}
+                      <div className="flex sm:hidden items-center gap-1.5 flex-wrap">
+                        <span className="text-[9px] text-emerald-400 font-mono">{player.wins}W</span>
+                        <span className="text-[9px] text-amber-400 font-mono">{player.draws}D</span>
+                        <span className="text-[9px] text-rose-400 font-mono">{player.losses}L</span>
+                        <span className="text-[9px] text-slate-500">· {player.total} matches</span>
+                      </div>
+                      {player.team && <p className="hidden sm:block text-[10px] text-slate-600 truncate">{player.team}</p>}
                     </div>
 
-                    {/* Form dots */}
-                    <div className="flex items-center gap-1">
+                    {/* Desktop: form dots */}
+                    <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                       {(player.form || []).slice(0,5).map((r, i) => <FormDot key={i} result={r} />)}
                     </div>
 
-                    {/* Matches column */}
-                    <div className="text-right flex-shrink-0 w-16">
+                    {/* Desktop: matches */}
+                    <div className="hidden sm:block text-right flex-shrink-0 w-16">
                       <span className="text-sm font-bold text-white font-mono">{player.total}</span>
                       <p className="text-xs text-slate-500">matches</p>
                     </div>
 
-                    {/* W/D/L */}
-                    <div className="flex items-center gap-2 text-xs flex-shrink-0">
+                    {/* Desktop: W/D/L */}
+                    <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0">
                       <span className="text-emerald-400 font-mono">{player.wins}W</span>
                       <span className="text-amber-400 font-mono">{player.draws}D</span>
                       <span className="text-rose-400 font-mono">{player.losses}L</span>
                     </div>
 
-                    {/* Win rate */}
+                    {/* Win rate — always visible */}
                     <div className="text-right flex-shrink-0">
                       <span className={cn("font-bold text-sm font-mono",
                         wr >= 70 ? "text-emerald-400" :
@@ -199,7 +201,7 @@ export default function WinRateRanking() {
                       )}>
                         {wr}%
                       </span>
-                      <p className="text-xs text-slate-600 mt-0.5">win rate</p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 mt-0.5">win rate</p>
                     </div>
                   </div>
                 )
