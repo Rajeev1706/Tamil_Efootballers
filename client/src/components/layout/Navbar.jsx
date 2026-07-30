@@ -7,6 +7,7 @@ import { cn } from "../../lib/utils"
 const MENU_ITEMS = [
   { value: "standings", label: "Home",             icon: Home },
   { value: "players",   label: "Total Players",   icon: Users },
+  { value: "winrate",   label: "Win Rate Ranking", icon: TrendingUp, link: "/win-rate-ranking" },
   { value: "compare",   label: "Compare Players", icon: GitCompare },
   { value: "teams",     label: "Teams",            icon: Shield },
   { value: "bdr",       label: "BDR Rankings",     icon: Award },
@@ -117,7 +118,25 @@ export default function Navbar() {
             <nav className="p-3 space-y-1">
               {MENU_ITEMS.map(item => {
                 const Icon = item.icon
-                const isActive = activeView === item.value
+                const isActive = item.link ? pathname === item.link : activeView === item.value
+                if (item.link) {
+                  return (
+                    <Link
+                      key={item.value}
+                      to={item.link}
+                      onClick={() => setMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all border",
+                        isActive
+                          ? "bg-accent/15 text-accent border-accent/25"
+                          : "text-slate-400 hover:text-white hover:bg-surface border-transparent"
+                      )}
+                    >
+                      <Icon className="w-4.5 h-4.5 flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  )
+                }
                 return (
                   <button
                     key={item.value}
@@ -134,6 +153,23 @@ export default function Navbar() {
                   </button>
                 )
               })}
+
+              {/* ── Standalone page links ── */}
+              <div className="border-t border-surface-border/50 pt-2 mt-2 space-y-1">
+                <Link
+                  to="/win-rate-ranking"
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all border",
+                    pathname === "/win-rate-ranking"
+                      ? "bg-accent/15 text-accent border-accent/25"
+                      : "text-slate-400 hover:text-white hover:bg-surface border-transparent"
+                  )}
+                >
+                  <TrendingUp className="w-4.5 h-4.5 flex-shrink-0" />
+                  <span>Win Rate Ranking</span>
+                </Link>
+              </div>
             </nav>
           </div>
         </div>

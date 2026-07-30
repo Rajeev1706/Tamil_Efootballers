@@ -1,0 +1,213 @@
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { TrendingUp, Crown } from "lucide-react"
+import { cn } from "../lib/utils"
+import { getAvatarById } from "../lib/avatars"
+import { useWinRateRanking, useWinRateSeasons } from "../lib/queries"
+import Layout from "../components/layout/Layout"
+import GradeBadge from "../components/common/GradeBadge"
+import RankBadge from "../components/common/RankBadge"
+import { useRankChanges } from "../hooks/useRankChanges"
+
+const TYPES = [
+  { id: "overall", label: "Overall"     },
+  { id: "league",  label: "Team League" },
+  { id: "weekly",  label: "Weekly"      },
+  { id: "ucl",     label: "UCL"         },
+]
+
+const FormDot = ({ result }) => {
+  const map = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
+  return <span className={cn("w-2 h-2 rounded-full", map[result] || "bg-slate-600")} title={result} />
+}
+
+export default function WinRateRanking() {
+  const [activeType,   setActiveType]   = useState("overall")
+  const [activeSeason, setActiveSeason] = useState("all")
+  const navigate = useNavigate()
+
+  const { data: seasonsData } = useWinRateSeasons()
+  const currentSeason = seasonsData?.currentSeason
+  const allSeasons    = seasonsData?.seasons || []
+  const pastSeasons   = allSeasons.filter(s => s !== currentSeason)
+
+  const { data: players = [], isLoading } = useWinRateRanking(activeType, activeSeason)
+  const rankChanges = useRankChanges("winrate-ranking-" + activeType, players.map(p => p.id))
+
+  const maxWR = Number(players[0]?.winRate) || 1
+
+  return (
+    <Layout>
+      <div className="space-y-4">
+
+        {/* Type tabs — matches the sub-tab style used across the app */}
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          {TYPES.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveType(t.id)}
+              className={cn(
+                "flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all border",
+                activeType === t.id
+                  ? "bg-accent text-white border-accent"
+                  : "bg-pitch-800 text-slate-400 border-surface-border hover:text-white hover:border-slate-600"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Season dropdown */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-500 flex-shrink-0">Season:</label>
+          <select
+            value={activeSeason}
+            onChange={e => setActiveSeason(e.target.value)}
+            className="bg-pitch-800 border border-surface-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent"
+          >
+            <option value="all">All Seasons</option>
+            <option value="current">Current Season {currentSeason ? `(S${currentSeason})` : ""}</option>
+            {pastSeasons.map(s => (
+              <option key={s} value={String(s)}>Season {s}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Main card — same structure as BDRRanking */}
+        <div className="card overflow-hidden">
+
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-surface-border flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <p className="section-label mb-0.5">Win Rate Ranking</p>
+              <h2 className="text-base font-semibold text-white">
+                {TYPES.find(t => t.id === activeType)?.label} ·{" "}
+                {activeSeason === "all" ? "All Seasons" : activeSeason === "current" ? `Season ${currentSeason}` : `Season ${activeSeason}`}
+                {activeSeason === "all" && ` · min ${activeType === "overall" ? 20 : activeType === "league" ? 14 : activeType === "ucl" ? 8 : 10} matches`}
+              </h2>
+            </div>
+            {!isLoading && (
+              <span className="ml-auto text-xs text-slate-500">{players.length} players</span>
+            )}
+          </div>
+
+          {/* Loading */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-7 h-7 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {/* Empty */}
+          {!isLoading && players.length === 0 && (
+            <div className="py-16 text-center">
+              <TrendingUp className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+              <p className="text-slate-500 text-sm">No players with 15+ matches yet</p>
+            </div>
+          )}
+
+          {/* Rows */}
+          {!isLoading && players.length > 0 && (
+            <div className="divide-y divide-surface-border">
+              {players.map((player, idx) => {
+                const isFirst  = idx === 0
+                const wr       = Number(player.winRate)
+                const barPct   = (wr / maxWR) * 100
+                const preset   = getAvatarById(player.avatarId)
+                const avatarSrc = player.avatarUrl || preset?.thumb
+
+                return (
+                  <div
+                    key={player.id}
+                    onClick={() => navigate(`/player/${player.id}`)}
+                    className={cn(
+                      "px-5 py-3.5 flex items-center gap-4 transition-colors cursor-pointer",
+                      isFirst ? "bg-accent/5 hover:bg-accent/8" : "hover:bg-surface-hover"
+                    )}
+                  >
+                    {/* Rank */}
+                    <div className="w-14 flex-shrink-0 flex items-center justify-center gap-1">
+                      {isFirst
+                        ? <Crown className="w-4 h-4 text-accent" />
+                        : <><span className="text-sm font-medium text-slate-500">#{idx + 1}</span><RankBadge change={rankChanges[player.id]} /></>
+                      }
+                    </div>
+
+                    {/* Avatar */}
+                    {avatarSrc
+                      ? <img src={avatarSrc} alt={player.name} className="w-[43px] h-[43px] rounded-lg object-cover flex-shrink-0" />
+                      : <div className={cn("w-[43px] h-[43px] rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
+                          isFirst ? "bg-accent/20 text-accent" : "bg-surface-border text-slate-400"
+                        )}>
+                          {player.name.split(" ").map(n => n[0]).join("")}
+                        </div>
+                    }
+
+                    {/* Name + team + bar */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className={cn("font-semibold text-sm truncate", isFirst ? "text-white" : "text-slate-300")}>
+                          {player.name}
+                        </span>
+                        <GradeBadge grade={player.grade} size="sm" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-surface-border rounded-full overflow-hidden">
+                          <div
+                            className={cn("h-full rounded-full transition-all",
+                              wr >= 70 ? "bg-emerald-400" :
+                              wr >= 50 ? "bg-accent"      :
+                              wr >= 35 ? "bg-amber-400"   : "bg-rose-400"
+                            )}
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                      </div>
+                      {player.team && (
+                        <p className="text-[10px] text-slate-600 mt-0.5 truncate">{player.team}</p>
+                      )}
+                    </div>
+
+                    {/* Form dots */}
+                    <div className="flex items-center gap-1">
+                      {(player.form || []).slice(0,5).map((r, i) => <FormDot key={i} result={r} />)}
+                    </div>
+
+                    {/* Matches column */}
+                    <div className="text-right flex-shrink-0 w-16">
+                      <span className="text-sm font-bold text-white font-mono">{player.total}</span>
+                      <p className="text-xs text-slate-500">matches</p>
+                    </div>
+
+                    {/* W/D/L */}
+                    <div className="flex items-center gap-2 text-xs flex-shrink-0">
+                      <span className="text-emerald-400 font-mono">{player.wins}W</span>
+                      <span className="text-amber-400 font-mono">{player.draws}D</span>
+                      <span className="text-rose-400 font-mono">{player.losses}L</span>
+                    </div>
+
+                    {/* Win rate */}
+                    <div className="text-right flex-shrink-0">
+                      <span className={cn("font-bold text-sm font-mono",
+                        wr >= 70 ? "text-emerald-400" :
+                        wr >= 50 ? "text-accent"      :
+                        wr >= 35 ? "text-amber-400"   : "text-rose-400"
+                      )}>
+                        {wr}%
+                      </span>
+                      <p className="text-xs text-slate-600 mt-0.5">win rate</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </Layout>
+  )
+}

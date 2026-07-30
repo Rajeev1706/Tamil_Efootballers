@@ -201,6 +201,11 @@ export const uclKnockoutApi = {
   deleteTournament: (id)       => api.delete(`/ucl-knockout/${id}`).then(r => r.data),
 }
 
+export const winrateApi = {
+  list:    (type, season) => api.get("/winrate", { params: { type, season } }).then(r => r.data),
+  seasons: ()             => api.get("/winrate/seasons").then(r => r.data),
+}
+
 export const auctionIntelApi = {
   gradeMatrix:    (playerId)           => api.get(`/auction-intel/grade-matrix/${playerId}`).then(r => r.data),
   nemesis:        (playerId)           => api.get(`/auction-intel/nemesis/${playerId}`).then(r => r.data),

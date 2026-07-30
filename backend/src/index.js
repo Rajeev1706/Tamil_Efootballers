@@ -21,6 +21,7 @@ import uclKnockoutRoutes from "./routes/uclKnockout.js"
 import auctionRoutes     from "./routes/auction.js"
 import auctionTargetRoutes from "./routes/auctionTargets.js"
 import auctionIntelRoutes  from "./routes/auctionIntel.js"
+import winrateRoutes       from "./routes/winrate.js"
 import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
@@ -59,6 +60,7 @@ app.use("/api/ucl-knockout", uclKnockoutRoutes)
 app.use("/api/auction",         auctionRoutes)
 app.use("/api/auction-targets", auctionTargetRoutes)
 app.use("/api/auction-intel",   auctionIntelRoutes)
+app.use("/api/winrate",         winrateRoutes)
 
 // GET /api/settings — public app settings (current season etc.)
 app.get("/api/settings", async (_req, res) => {
