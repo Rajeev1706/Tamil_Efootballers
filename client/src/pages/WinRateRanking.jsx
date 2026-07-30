@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { TrendingUp, Crown } from "lucide-react"
+import { TrendingUp, Crown, Search } from "lucide-react"
 import { cn } from "../lib/utils"
 import { getAvatarById } from "../lib/avatars"
 import { useWinRateRanking, useWinRateSeasons } from "../lib/queries"
@@ -23,6 +23,7 @@ const FormDot = ({ result }) => {
 
 export default function WinRateRanking() {
   const [activeType,   setActiveType]   = useState("overall")
+  const [search,       setSearch]       = useState("")
   const [activeSeason, setActiveSeason] = useState("all")
   const navigate = useNavigate()
 
@@ -34,6 +35,9 @@ export default function WinRateRanking() {
   const { data: players = [], isLoading } = useWinRateRanking(activeType, activeSeason)
   const rankChanges = useRankChanges("winrate-ranking-" + activeType, players.map(p => p.id))
 
+  const filtered = search
+    ? players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || (p.team || "").toLowerCase().includes(search.toLowerCase()))
+    : players
   const maxWR = Number(players[0]?.winRate) || 1
 
   return (
@@ -74,6 +78,17 @@ export default function WinRateRanking() {
           </select>
         </div>
 
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search player or team..."
+            className="w-full pl-10 pr-4 py-2.5 bg-pitch-800 border border-surface-border rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent"
+          />
+        </div>
+
         {/* Main card — same structure as BDRRanking */}
         <div className="card overflow-hidden">
 
@@ -91,7 +106,7 @@ export default function WinRateRanking() {
               </h2>
             </div>
             {!isLoading && (
-              <span className="ml-auto text-xs text-slate-500">{players.length} players</span>
+              <span className="ml-auto text-xs text-slate-500">{filtered.length}{filtered.length !== players.length ? ` of ${players.length}` : ""} players</span>
             )}
           </div>
 
@@ -106,14 +121,14 @@ export default function WinRateRanking() {
           {!isLoading && players.length === 0 && (
             <div className="py-16 text-center">
               <TrendingUp className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-              <p className="text-slate-500 text-sm">No players with matches yet</p>
+              <p className="text-slate-500 text-sm">No players with  matches yet</p>
             </div>
           )}
 
           {/* Rows */}
           {!isLoading && players.length > 0 && (
             <div className="divide-y divide-surface-border">
-              {players.map((player, idx) => {
+              {filtered.map((player, idx) => {
                 const isFirst  = idx === 0
                 const wr       = Number(player.winRate)
                 const barPct   = (wr / maxWR) * 100
