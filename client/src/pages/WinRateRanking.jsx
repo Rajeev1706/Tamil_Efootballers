@@ -150,7 +150,7 @@ export default function WinRateRanking() {
                     {/* Name + bar */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={cn("font-semibold text-xs sm:text-sm truncate", isFirst ? "text-white" : "text-slate-300")}>
+                        <span className={cn("font-semibold text-xs sm:text-sm break-words leading-tight", isFirst ? "text-white" : "text-slate-300")}>
                           {player.name}
                         </span>
                       </div>
