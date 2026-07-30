@@ -7,7 +7,7 @@ import { cn } from "../../lib/utils"
 const MENU_ITEMS = [
   { value: "standings", label: "Home",             icon: Home },
   { value: "players",   label: "Total Players",   icon: Users },
-  { value: "winrate",   label: "Win Rate Ranking", icon: TrendingUp, link: "/win-rate-ranking" },
+  { value: "winrate",   label: "Win Rate", icon: TrendingUp, link: "/win-rate-ranking" },
   { value: "compare",   label: "Compare Players", icon: GitCompare },
   { value: "teams",     label: "Teams",            icon: Shield },
   { value: "bdr",       label: "BDR Rankings",     icon: Award },
@@ -154,22 +154,6 @@ export default function Navbar() {
                 )
               })}
 
-              {/* ── Standalone page links ── */}
-              <div className="border-t border-surface-border/50 pt-2 mt-2 space-y-1">
-                <Link
-                  to="/win-rate-ranking"
-                  onClick={() => setMenuOpen(false)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all border",
-                    pathname === "/win-rate-ranking"
-                      ? "bg-accent/15 text-accent border-accent/25"
-                      : "text-slate-400 hover:text-white hover:bg-surface border-transparent"
-                  )}
-                >
-                  <TrendingUp className="w-4.5 h-4.5 flex-shrink-0" />
-                  <span>Win Rate Ranking</span>
-                </Link>
-              </div>
             </nav>
           </div>
         </div>
