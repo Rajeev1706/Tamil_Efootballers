@@ -377,7 +377,7 @@ router.get("/", async (req, res, next) => {
 
 // GET /api/teams/:id — single team with roster
 // GET /api/teams/trophy-history — all-time trophy totals per player
-// Reads directly from players table — always works even if history table is empty
+// All-time = players table (current year) + SUM(player_trophy_history for past years)
 router.get("/trophy-history", async (req, res, next) => {
   try {
     const r = await query(`
@@ -390,17 +390,42 @@ router.get("/trophy-history", async (req, res, next) => {
         p.team_id        AS "teamId",
         t.name           AS team,
         t.logo_url       AS "teamLogo",
-        p.trophy1_count  AS "trophy1Count",
-        p.trophy2_count  AS "trophy2Count",
-        p.trophy3_count  AS "trophy3Count",
-        p.trophy4_count  AS "trophy4Count",
-        p.trophy5_count  AS "trophy5Count",
-        p.trophy6_count  AS "trophy6Count",
-        p.trophy7_count  AS "trophy7Count"
+        (p.trophy1_count + COALESCE(h.trophy1_total, 0)) AS "trophy1Count",
+        (p.trophy2_count + COALESCE(h.trophy2_total, 0)) AS "trophy2Count",
+        (p.trophy3_count + COALESCE(h.trophy3_total, 0)) AS "trophy3Count",
+        (p.trophy4_count + COALESCE(h.trophy4_total, 0)) AS "trophy4Count",
+        (p.trophy5_count + COALESCE(h.trophy5_total, 0)) AS "trophy5Count",
+        (p.trophy6_count + COALESCE(h.trophy6_total, 0)) AS "trophy6Count",
+        (p.trophy7_count + COALESCE(h.trophy7_total, 0)) AS "trophy7Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
+      LEFT JOIN (
+        SELECT
+          player_id,
+          SUM(trophy1_count) AS trophy1_total,
+          SUM(trophy2_count) AS trophy2_total,
+          SUM(trophy3_count) AS trophy3_total,
+          SUM(trophy4_count) AS trophy4_total,
+          SUM(trophy5_count) AS trophy5_total,
+          SUM(trophy6_count) AS trophy6_total,
+          SUM(trophy7_count) AS trophy7_total
+        FROM player_trophy_history
+        GROUP BY player_id
+      ) h ON h.player_id = p.id
       ORDER BY p.name
-    `)
+    `).catch(async () => {
+      // History table doesn't exist — fall back to players table only
+      return await query(`
+        SELECT p.id, p.name, p.grade,
+          p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+          p.team_id AS "teamId", t.name AS team, t.logo_url AS "teamLogo",
+          p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
+          p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
+          p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
+          p.trophy7_count AS "trophy7Count"
+        FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
+      `)
+    })
     res.json(r.rows)
   } catch (err) { next(err) }
 })
@@ -456,6 +481,8 @@ router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, nex
     const currentYear = parseInt(settingsRes.rows[0]?.value || new Date().getFullYear())
 
     if (parseInt(year) === currentYear) {
+      // Update players table with current year values directly
+      // Overall = players (current) + history (past years) — computed in trophy-history endpoint
       await query(`
         UPDATE players SET
           trophy1_count = $1, trophy2_count = $2, trophy3_count = $3,
@@ -519,6 +546,48 @@ router.get("/trophy-history/:year", async (req, res, next) => {
       // History table doesn't exist yet — return empty
       return res.json([])
     }
+  } catch (err) { next(err) }
+})
+
+
+// GET /api/teams/trophy-current — current year trophies only
+// = players table directly (players now stores current year counts)
+router.get("/trophy-current", async (req, res, next) => {
+  try {
+    const r = await query(`
+      SELECT
+        p.id,
+        p.name,
+        p.grade,
+        p.avatar_id  AS "avatarId",
+        p.avatar_url AS "avatarUrl",
+        p.team_id    AS "teamId",
+        t.name       AS team,
+        t.logo_url   AS "teamLogo",
+        p.trophy1_count AS "trophy1Count",
+        p.trophy2_count AS "trophy2Count",
+        p.trophy3_count AS "trophy3Count",
+        p.trophy4_count AS "trophy4Count",
+        p.trophy5_count AS "trophy5Count",
+        p.trophy6_count AS "trophy6Count",
+        p.trophy7_count AS "trophy7Count"
+      FROM players p
+      LEFT JOIN teams t ON t.id = p.team_id
+      ORDER BY p.name
+    `).catch(async () => {
+      // History table doesn't exist yet — return players counts as-is
+      return await query(`
+        SELECT p.id, p.name, p.grade,
+          p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+          p.team_id AS "teamId", t.name AS team, t.logo_url AS "teamLogo",
+          p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
+          p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
+          p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
+          p.trophy7_count AS "trophy7Count"
+        FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
+      `)
+    })
+    res.json(r.rows)
   } catch (err) { next(err) }
 })
 

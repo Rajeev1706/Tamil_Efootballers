@@ -52,6 +52,7 @@ export const teamsApi = {
   incrementYear:   ()        => api.post("/teams/increment-year").then(r => r.data),
   trophyHistory:    ()       => api.get("/teams/trophy-history").then(r => r.data),
   trophyHistoryYear: (year)  => api.get(`/teams/trophy-history/${year}`).then(r => r.data),
+  trophyCurrent:    ()       => api.get("/teams/trophy-current").then(r => r.data),
   updateTrophyYear:  (data)  => api.post("/teams/update-trophy-year", data).then(r => r.data),
   seasonDelete:    ()        => api.post("/teams/season-delete").then(r => r.data),
   seasonRecords:   ()        => api.get("/teams/season-records").then(r => r.data),

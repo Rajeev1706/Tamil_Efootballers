@@ -240,8 +240,8 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       UPDATE players SET
         name          = COALESCE($1, name),
         alias         = COALESCE($2, alias),
-        grade         = COALESCE($3, grade),
-        grade_floor   = CASE WHEN $3 IS NOT NULL THEN $3 ELSE grade_floor END,
+        grade         = COALESCE($3::player_grade, grade),
+        grade_floor   = CASE WHEN $3 IS NOT NULL THEN $3::varchar ELSE grade_floor END,
         bdr_points    = GREATEST(0, bdr_points + COALESCE($4, 0)),
         is_captain    = COALESCE($5, is_captain),
         auction_price = COALESCE($6, auction_price),

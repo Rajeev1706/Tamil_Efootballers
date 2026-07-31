@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Pencil, Check, X, Trash2, Camera, Trophy, Search, Crown } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
 import { useUpdatePlayer, useDeletePlayer, useTeams } from "../../lib/queries"
+import { teamsApi } from "../../lib/api"
 import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["S","A","B","C"]
@@ -20,6 +21,47 @@ function EditableRow({ player, onPlayerClick }) {
   const [trophy1, setTrophy1] = useState(player.trophy1Count ?? 0)
   const [trophyYear, setTrophyYear] = useState(new Date().getFullYear())
   const [trophy2, setTrophy2] = useState(player.trophy2Count ?? 0)
+
+  // When year changes, load that year's trophy counts for this player
+  const currentYear = new Date().getFullYear()
+  useEffect(() => {
+    if (trophyYear === currentYear) {
+      // Load current year = all-time minus past years
+      teamsApi.trophyCurrent().then(data => {
+        const p = data.find(d => d.id === player.id)
+        if (p) {
+          setTrophy1(p.trophy1Count ?? 0)
+          setTrophy2(p.trophy2Count ?? 0)
+          setTrophy3(p.trophy3Count ?? 0)
+          setTrophy4(p.trophy4Count ?? 0)
+          setTrophy5(p.trophy5Count ?? 0)
+          setTrophy6(p.trophy6Count ?? 0)
+          setTrophy7(p.trophy7Count ?? 0)
+        }
+      }).catch(() => {
+        // fallback to player's raw counts
+        setTrophy1(player.trophy1Count ?? 0)
+        setTrophy2(player.trophy2Count ?? 0)
+        setTrophy3(player.trophy3Count ?? 0)
+        setTrophy4(player.trophy4Count ?? 0)
+        setTrophy5(player.trophy5Count ?? 0)
+        setTrophy6(player.trophy6Count ?? 0)
+        setTrophy7(player.trophy7Count ?? 0)
+      })
+    } else {
+      // Fetch past year data
+      teamsApi.trophyHistoryYear(trophyYear).then(data => {
+        const p = data.find(d => d.id === player.id)
+        setTrophy1(p?.trophy1Count ?? 0)
+        setTrophy2(p?.trophy2Count ?? 0)
+        setTrophy3(p?.trophy3Count ?? 0)
+        setTrophy4(p?.trophy4Count ?? 0)
+        setTrophy5(p?.trophy5Count ?? 0)
+        setTrophy6(p?.trophy6Count ?? 0)
+        setTrophy7(p?.trophy7Count ?? 0)
+      }).catch(() => {})
+    }
+  }, [trophyYear])
   const [trophy3, setTrophy3] = useState(player.trophy3Count ?? 0)
   const [trophy4, setTrophy4] = useState(player.trophy4Count ?? 0)
   const [trophy5, setTrophy5] = useState(player.trophy5Count ?? 0)
