@@ -390,13 +390,13 @@ router.get("/trophy-history", async (req, res, next) => {
         p.team_id        AS "teamId",
         t.name           AS team,
         t.logo_url       AS "teamLogo",
-        (p.trophy1_count + COALESCE(h.trophy1_total, 0)) AS "trophy1Count",
-        (p.trophy2_count + COALESCE(h.trophy2_total, 0)) AS "trophy2Count",
-        (p.trophy3_count + COALESCE(h.trophy3_total, 0)) AS "trophy3Count",
-        (p.trophy4_count + COALESCE(h.trophy4_total, 0)) AS "trophy4Count",
-        (p.trophy5_count + COALESCE(h.trophy5_total, 0)) AS "trophy5Count",
-        (p.trophy6_count + COALESCE(h.trophy6_total, 0)) AS "trophy6Count",
-        (p.trophy7_count + COALESCE(h.trophy7_total, 0)) AS "trophy7Count"
+        (p.trophy1_count + COALESCE(h.trophy1_total, 0))::int AS "trophy1Count",
+        (p.trophy2_count + COALESCE(h.trophy2_total, 0))::int AS "trophy2Count",
+        (p.trophy3_count + COALESCE(h.trophy3_total, 0))::int AS "trophy3Count",
+        (p.trophy4_count + COALESCE(h.trophy4_total, 0))::int AS "trophy4Count",
+        (p.trophy5_count + COALESCE(h.trophy5_total, 0))::int AS "trophy5Count",
+        (p.trophy6_count + COALESCE(h.trophy6_total, 0))::int AS "trophy6Count",
+        (p.trophy7_count + COALESCE(h.trophy7_total, 0))::int AS "trophy7Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
       LEFT JOIN (
