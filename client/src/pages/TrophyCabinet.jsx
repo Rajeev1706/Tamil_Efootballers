@@ -46,7 +46,7 @@ export default function TrophyCabinet() {
   const allFiltered = allPlayers
     .map(p => ({
       ...p,
-      total: TROPHIES.reduce((a, t) => a + (p[t.key] || 0), 0),
+      total: TROPHIES.reduce((a, t) => a + (Number(p[t.key]) || 0), 0),
     }))
     .filter(p => p.total > 0)
     .sort((a, b) => b.total - a.total)
