@@ -187,9 +187,9 @@ function SeasonCard({ record, onEdit, onDelete }) {
 
   return (
     <div className="card overflow-hidden">
-      <button
+      <div
         onClick={() => setExpanded(v => !v)}
-        className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+        className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gold/15 text-gold flex items-center justify-center font-bold text-sm flex-shrink-0">
@@ -213,7 +213,7 @@ function SeasonCard({ record, onEdit, onDelete }) {
           </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
         </div>
-      </button>
+      </div>
 
       {confirmDel && (
         <div className="px-5 py-3 border-t border-surface-border bg-rose-500/5 flex items-center gap-3">
