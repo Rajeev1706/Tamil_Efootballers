@@ -18,6 +18,7 @@ function EditableRow({ player, onPlayerClick }) {
   const [isCaptain, setIsCaptain]     = useState(player.isCaptain ?? false)
   const [auctionPrice, setAuctionPrice] = useState(player.auctionPrice ?? "")
   const [trophy1, setTrophy1] = useState(player.trophy1Count ?? 0)
+  const [trophyYear, setTrophyYear] = useState(new Date().getFullYear())
   const [trophy2, setTrophy2] = useState(player.trophy2Count ?? 0)
   const [trophy3, setTrophy3] = useState(player.trophy3Count ?? 0)
   const [trophy4, setTrophy4] = useState(player.trophy4Count ?? 0)
@@ -31,7 +32,7 @@ function EditableRow({ player, onPlayerClick }) {
   const tier                          = getMVTier(player.marketValue)
   const deltaNum                      = parseInt(bdrDelta) || 0
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const body = {}
     if (name.trim() && name.trim() !== player.name) body.name = name.trim()
     if (alias.trim() !== (player.alias ?? "")) body.alias = alias.trim()
@@ -44,6 +45,27 @@ function EditableRow({ player, onPlayerClick }) {
     if (!isCaptain && parseInt(auctionPrice) !== player.auctionPrice) {
       body.auctionPrice = parseInt(auctionPrice) || 0
     }
+    const trophyChanged = [
+      trophy1 !== (player.trophy1Count ?? 0),
+      trophy2 !== (player.trophy2Count ?? 0),
+      trophy3 !== (player.trophy3Count ?? 0),
+      trophy4 !== (player.trophy4Count ?? 0),
+      trophy5 !== (player.trophy5Count ?? 0),
+      trophy6 !== (player.trophy6Count ?? 0),
+      trophy7 !== (player.trophy7Count ?? 0),
+    ].some(Boolean)
+
+    if (trophyChanged) {
+      // Save to year-specific trophy history
+      await teamsApi.updateTrophyYear({
+        playerId: player.id,
+        year: trophyYear,
+        trophy1Count: trophy1, trophy2Count: trophy2, trophy3Count: trophy3,
+        trophy4Count: trophy4, trophy5Count: trophy5, trophy6Count: trophy6,
+        trophy7Count: trophy7,
+      })
+    }
+
     if (trophy1 !== (player.trophy1Count ?? 0)) body.trophy1Count = trophy1
     if (trophy2 !== (player.trophy2Count ?? 0)) body.trophy2Count = trophy2
     if (trophy3 !== (player.trophy3Count ?? 0)) body.trophy3Count = trophy3
@@ -172,7 +194,20 @@ function EditableRow({ player, onPlayerClick }) {
               className="bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
               {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
-          ) : <GradeBadge grade={player.grade} />}
+          ) : (
+            <div className="flex flex-col gap-1">
+              <GradeBadge grade={player.grade} />
+              {player.gradeFloor ? (
+                <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded w-fit">
+                  🔒 Floor: {player.gradeFloor}
+                </span>
+              ) : (
+                <span className="text-[9px] font-bold text-sky-400 bg-sky-400/10 border border-sky-400/25 px-1.5 py-0.5 rounded w-fit">
+                  ⚡ Auto
+                </span>
+              )}
+            </div>
+          )}
         </td>
 
         {/* Auction */}
@@ -286,6 +321,17 @@ function EditableRow({ player, onPlayerClick }) {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Trophy className="w-4 h-4 text-gold" />
                 <span className="text-xs text-slate-400">Trophies</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs text-slate-500">Year:</span>
+                <select
+                  value={trophyYear}
+                  onChange={e => setTrophyYear(parseInt(e.target.value))}
+                  className="bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/40"
+                >
+                  <option value={new Date().getFullYear()}>Current ({new Date().getFullYear()})</option>
+                  <option value={new Date().getFullYear() - 1}>{new Date().getFullYear() - 1}</option>
+                </select>
               </div>
               {[
                 { label: "Ballon d'Or",             value: trophy1, onChange: setTrophy1 },

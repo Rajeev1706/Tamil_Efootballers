@@ -309,4 +309,18 @@
     48%       { transform: rotate(var(--angle)) translateX(0) scale(1); opacity: 1; }
     100%      { transform: rotate(var(--angle)) translateX(var(--dist, 46px)) scale(1); opacity: 0; }
   }
+
+  /* ── Rank Change Animations ─────────────────────────────────────────────── */
+  @keyframes rank-up {
+    0%   { transform: translateY(8px); background-color: rgba(52, 211, 153, 0.08); }
+    60%  { background-color: rgba(52, 211, 153, 0.04); }
+    100% { transform: translateY(0); background-color: transparent; }
+  }
+  @keyframes rank-down {
+    0%   { transform: translateY(-8px); background-color: rgba(248, 113, 113, 0.08); }
+    60%  { background-color: rgba(248, 113, 113, 0.04); }
+    100% { transform: translateY(0); background-color: transparent; }
+  }
+  .animate-rank-up   { animation: rank-up   1.5s ease-out forwards; }
+  .animate-rank-down { animation: rank-down 1.5s ease-out forwards; }
 }

@@ -7,7 +7,8 @@ import { cn } from "../../lib/utils"
 const MENU_ITEMS = [
   { value: "standings", label: "Home",             icon: Home },
   { value: "players",   label: "Total Players",   icon: Users },
-  { value: "winrate",   label: "Win Rate", icon: TrendingUp, link: "/win-rate-ranking" },
+  { value: "winrate",   label: "Win Rate",        icon: TrendingUp, link: "/win-rate-ranking"  },
+  { value: "trophycab", label: "Trophy Cabinet",  icon: Trophy,     link: "/trophy-cabinet"     },
   { value: "compare",   label: "Compare Players", icon: GitCompare },
   { value: "teams",     label: "Teams",            icon: Shield },
   { value: "bdr",       label: "BDR Rankings",     icon: Award },

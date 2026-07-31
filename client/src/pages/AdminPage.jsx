@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -94,6 +94,81 @@ function ResetMVCard() {
       <button onClick={() => setConfirm(true)}
         className="flex-shrink-0 px-4 py-2 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-sm font-semibold transition-colors">
         Reset MV
+      </button>
+    </div>
+  )
+}
+
+function IncrementYearCard() {
+  const [confirm, setConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(false)
+  const [result, setResult]   = useState(null)
+  const [error, setError]     = useState(null)
+
+  async function handleIncrement() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await teamsApi.incrementYear()
+      setResult(res)
+      setDone(true)
+      setConfirm(false)
+    } catch (err) {
+      setError(err?.response?.data?.error || "Year increment failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (done) return (
+    <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+      <p className="text-emerald-400 font-semibold text-lg mb-1">✅ Year incremented to {result?.newYear}!</p>
+      <p className="text-sm text-slate-400">Trophy counts (except Ballon d'Or) reset. Team standings and fixtures cleared. Player records intact.</p>
+      <button onClick={() => setDone(false)} className="mt-3 text-xs text-slate-500 hover:text-white transition-colors">Dismiss</button>
+    </div>
+  )
+
+  if (confirm) return (
+    <div className="card p-6 border-amber-500/30 bg-amber-500/5 space-y-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-amber-400 font-semibold mb-1">Increment Year?</p>
+          <p className="text-sm text-slate-400">
+            This will advance the year by 1, <strong>reset all trophy counts except Ballon d'Or</strong>,
+            and clear team standings and fixtures. Player records, grades, BDR points, and the player list remain unchanged.
+          </p>
+        </div>
+      </div>
+      {error && <p className="text-sm text-rose-400">{error}</p>}
+      <div className="flex gap-3">
+        <button onClick={() => setConfirm(false)}
+          className="flex-1 py-2 rounded-lg border border-surface-border text-slate-400 hover:text-white text-sm transition-colors">
+          Cancel
+        </button>
+        <button onClick={handleIncrement} disabled={loading}
+          className="flex-1 py-2 rounded-lg bg-amber-500 text-white font-semibold text-sm disabled:opacity-40 hover:bg-amber-600 transition-colors">
+          {loading ? "Incrementing…" : "Yes, Increment Year"}
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <CalendarDays className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Increment Year</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Advance year by 1 · Reset trophy counts (except Ballon d'Or) · Clear team standings & fixtures · Player records unchanged.
+          </p>
+        </div>
+      </div>
+      <button onClick={() => setConfirm(true)}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 text-sm font-semibold transition-colors">
+        Increment Year
       </button>
     </div>
   )
@@ -385,6 +460,7 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Season</p>
       <div className="space-y-3">
+        <IncrementYearCard />
         <SeasonResetCard />
         <DeleteSeasonCard />
       </div>

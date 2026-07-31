@@ -1,11 +1,10 @@
 import { useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
-import { ArrowLeft, Trophy, ImageIcon, Crown, UserRound, Pencil, TrendingUp } from "lucide-react"
+import { ArrowLeft, Trophy, ImageIcon, Crown, UserRound, Pencil } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import AvatarPicker from "../components/player/AvatarPicker"
-import { usePlayer, usePlayerPerformanceZones, usePlayerSeasonSummary } from "../lib/queries"
-import { getBreakoutPhrase } from "../lib/breakoutPhrases"
+import { usePlayer, usePlayerPerformanceZones } from "../lib/queries"
 import { useTeamColor, readableTeamColor } from "../lib/teamColor"
 import { getAvatarById } from "../lib/avatars"
 import { cn } from "../lib/utils"
@@ -84,22 +83,25 @@ function TrophyCase({ player }) {
     { image: uclTrophy,          label: "UCL",                     count: player.trophy4Count ?? 0 },
     { image: weeklyTrophy,       label: "Weekly",                  count: player.trophy3Count ?? 0 },
     { image: goldenBootTrophy,   label: "Weekly Golden Boot",      count: player.trophy5Count ?? 0 },
-    { image: teamLeagueGBTrophy, label: "Team League Golden Boot", count: player.trophy6Count ?? 0 },
+    { image: teamLeagueGBTrophy, label: "League Golden Boot",      count: player.trophy6Count ?? 0 },
     { image: uclGBTrophy,        label: "UCL Golden Boot",         count: player.trophy7Count ?? 0 },
   ]
-
+  const total = trophies.reduce((a, t) => a + t.count, 0)
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
-        <Trophy className="w-4 h-4 text-gold" />
-        <h2 className="text-base font-semibold text-white">Trophies</h2>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-gold" />
+          <h2 className="text-base font-semibold text-white">Trophies</h2>
+        </div>
+        {total > 0 && <span className="text-xs font-bold text-gold bg-gold/10 border border-gold/25 px-2.5 py-1 rounded-full">{total} total</span>}
       </div>
       <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
         {trophies.map((t, i) => (
-          <div key={i} className="flex items-center gap-3 bg-pitch-800 rounded-xl p-4 border border-surface-border">
+          <div key={i} className={cn("flex items-center gap-3 rounded-xl p-4 border transition-all", t.count > 0 ? "bg-pitch-800 border-surface-border" : "bg-pitch-900/30 border-surface-border/30 opacity-40")}>
             <img src={t.image} alt={t.label} className="w-10 h-10 object-contain flex-shrink-0" />
             <div>
-              <p className="text-2xl font-extrabold font-mono text-white">{t.count}</p>
+              <p className={cn("text-2xl font-extrabold font-mono", t.count > 0 ? "text-white" : "text-slate-600")}>{t.count}</p>
               <p className="text-xs text-slate-500">{t.label}</p>
             </div>
           </div>
@@ -114,16 +116,12 @@ export default function PlayerProfile() {
   const [searchParams] = useSearchParams()
   const showAuctionDelta = ["team", "admin"].includes(searchParams.get("ctx"))
   const { data: player, isLoading, isError } = usePlayer(id)
-  const { data: seasonSummary } = usePlayerSeasonSummary(id)
   const teamColor = useTeamColor(player?.teamLogo)
   const teamTextColor = readableTeamColor(teamColor)
   const presetAvatar = getAvatarById(player?.avatarId)
   const avatarThumb  = player?.avatarUrl    || presetAvatar?.thumb || null
   const avatarBg     = player?.avatarBgUrl  || presetAvatar?.bg    || null
   const [pickerOpen, setPickerOpen] = useState(false)
-
-  const breakout = seasonSummary?.breakout ?? null
-  const breakoutPhrase = breakout ? getBreakoutPhrase(breakout.jump, parseInt(id)) : null
 
   if (isLoading) return <Layout><Loading /></Layout>
   if (isError || !player) return (
@@ -149,62 +147,6 @@ export default function PlayerProfile() {
       >
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
-
-      {/* ── Breakout Alert ── */}
-      {breakout && breakoutPhrase && (
-        <div className={cn(
-          "rounded-2xl border p-4 mb-5 overflow-hidden relative",
-          breakoutPhrase.tier === "explosive" ? "bg-gold/8 border-gold/30" :
-          breakoutPhrase.tier === "strong"    ? "bg-accent/8 border-accent/30" :
-                                                "bg-emerald-400/8 border-emerald-400/25"
-        )}>
-          {/* Glow blob */}
-          <div className={cn(
-            "absolute -top-6 -right-6 w-32 h-32 rounded-full opacity-20 blur-2xl",
-            breakoutPhrase.tier === "explosive" ? "bg-gold" :
-            breakoutPhrase.tier === "strong"    ? "bg-accent" : "bg-emerald-400"
-          )} />
-
-          <div className="relative flex items-start gap-3">
-            <div className={cn(
-              "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg",
-              breakoutPhrase.tier === "explosive" ? "bg-gold/20" :
-              breakoutPhrase.tier === "strong"    ? "bg-accent/20" : "bg-emerald-400/15"
-            )}>
-              📈
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className={cn(
-                  "text-xs font-black uppercase tracking-widest",
-                  breakoutPhrase.tier === "explosive" ? "text-gold" :
-                  breakoutPhrase.tier === "strong"    ? "text-accent" : "text-emerald-400"
-                )}>
-                  {breakoutPhrase.tier === "explosive" ? "🔥 Explosive Breakout" :
-                   breakoutPhrase.tier === "strong"    ? "⚡ Strong Breakout" : "📈 Breakout Season"}
-                </span>
-                <span className={cn(
-                  "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                  breakoutPhrase.tier === "explosive" ? "text-gold bg-gold/10 border-gold/25" :
-                  breakoutPhrase.tier === "strong"    ? "text-accent bg-accent/10 border-accent/25" :
-                                                        "text-emerald-400 bg-emerald-400/10 border-emerald-400/25"
-                )}>
-                  +{breakout.jump}% win rate
-                </span>
-              </div>
-              <p className={cn(
-                "text-sm font-medium leading-relaxed",
-                breakoutPhrase.tier === "explosive" ? "text-amber-100" : "text-slate-200"
-              )}>
-                "{breakoutPhrase.phrase}"
-              </p>
-              <p className="text-[10px] text-slate-500 mt-1.5">
-                S{breakout.prevSeason} win rate {breakout.prevWinRate}% → S{breakout.currentSeason} win rate {breakout.currentWinRate}%
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Hero ── */}
       <div className="relative rounded-2xl overflow-hidden border border-surface-border mb-6">

@@ -376,6 +376,152 @@ router.get("/", async (req, res, next) => {
 })
 
 // GET /api/teams/:id — single team with roster
+// GET /api/teams/trophy-history — all-time trophy totals per player
+// Reads directly from players table — always works even if history table is empty
+router.get("/trophy-history", async (req, res, next) => {
+  try {
+    const r = await query(`
+      SELECT
+        p.id,
+        p.name,
+        p.grade,
+        p.avatar_id      AS "avatarId",
+        p.avatar_url     AS "avatarUrl",
+        p.team_id        AS "teamId",
+        t.name           AS team,
+        t.logo_url       AS "teamLogo",
+        p.trophy1_count  AS "trophy1Count",
+        p.trophy2_count  AS "trophy2Count",
+        p.trophy3_count  AS "trophy3Count",
+        p.trophy4_count  AS "trophy4Count",
+        p.trophy5_count  AS "trophy5Count",
+        p.trophy6_count  AS "trophy6Count",
+        p.trophy7_count  AS "trophy7Count"
+      FROM players p
+      LEFT JOIN teams t ON t.id = p.team_id
+      ORDER BY p.name
+    `)
+    res.json(r.rows)
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/update-trophy-year — admin only
+// Updates trophy counts for a specific player for a specific year
+// If year = current year → also updates players table
+// Otherwise → only updates player_trophy_history
+router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { playerId, year, trophy1Count, trophy2Count, trophy3Count,
+            trophy4Count, trophy5Count, trophy6Count, trophy7Count } = req.body
+
+    if (!playerId || !year) return res.status(400).json({ error: "playerId and year required" })
+
+    // Ensure history table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS player_trophy_history (
+        id SERIAL PRIMARY KEY,
+        player_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        year INT NOT NULL,
+        trophy1_count INT DEFAULT 0,
+        trophy2_count INT DEFAULT 0,
+        trophy3_count INT DEFAULT 0,
+        trophy4_count INT DEFAULT 0,
+        trophy5_count INT DEFAULT 0,
+        trophy6_count INT DEFAULT 0,
+        trophy7_count INT DEFAULT 0,
+        UNIQUE(player_id, year)
+      )
+    `).catch(() => {})
+
+    // Upsert into history for the specified year
+    await query(`
+      INSERT INTO player_trophy_history
+        (player_id, year, trophy1_count, trophy2_count, trophy3_count,
+         trophy4_count, trophy5_count, trophy6_count, trophy7_count)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ON CONFLICT (player_id, year) DO UPDATE SET
+        trophy1_count = EXCLUDED.trophy1_count,
+        trophy2_count = EXCLUDED.trophy2_count,
+        trophy3_count = EXCLUDED.trophy3_count,
+        trophy4_count = EXCLUDED.trophy4_count,
+        trophy5_count = EXCLUDED.trophy5_count,
+        trophy6_count = EXCLUDED.trophy6_count,
+        trophy7_count = EXCLUDED.trophy7_count
+    `, [playerId, year,
+        trophy1Count ?? 0, trophy2Count ?? 0, trophy3Count ?? 0,
+        trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0, trophy7Count ?? 0])
+
+    // If this is the current year → also update players table directly
+    const settingsRes = await query(`SELECT value FROM app_settings WHERE key = 'current_year'`)
+    const currentYear = parseInt(settingsRes.rows[0]?.value || new Date().getFullYear())
+
+    if (parseInt(year) === currentYear) {
+      await query(`
+        UPDATE players SET
+          trophy1_count = $1, trophy2_count = $2, trophy3_count = $3,
+          trophy4_count = $4, trophy5_count = $5, trophy6_count = $6,
+          trophy7_count = $7
+        WHERE id = $8
+      `, [trophy1Count ?? 0, trophy2Count ?? 0, trophy3Count ?? 0,
+          trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0, trophy7Count ?? 0,
+          playerId])
+    }
+
+    res.json({ ok: true, year, playerId, isCurrent: parseInt(year) === currentYear })
+  } catch (err) { next(err) }
+})
+
+// GET /api/teams/trophy-history/:year — trophies for a specific year
+router.get("/trophy-history/:year", async (req, res, next) => {
+  try {
+    const year = parseInt(req.params.year)
+    const settingsRes = await query(`SELECT value FROM app_settings WHERE key = 'current_year'`)
+    const currentYear = parseInt(settingsRes.rows[0]?.value || new Date().getFullYear())
+    const isCurrent   = year === currentYear
+
+    if (isCurrent) {
+      // Current year — read from players table directly
+      const r = await query(`
+        SELECT p.id, p.name, p.grade,
+          p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+          p.team_id AS "teamId", t.name AS team, t.logo_url AS "teamLogo",
+          p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
+          p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
+          p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
+          p.trophy7_count AS "trophy7Count"
+        FROM players p
+        LEFT JOIN teams t ON t.id = p.team_id
+        ORDER BY p.name
+      `)
+      return res.json(r.rows)
+    }
+
+    // Past year — read from trophy history table (if exists)
+    try {
+      const r = await query(`
+        SELECT p.id, p.name, p.grade,
+          p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+          p.team_id AS "teamId", t.name AS team, t.logo_url AS "teamLogo",
+          COALESCE(h.trophy1_count,0) AS "trophy1Count",
+          COALESCE(h.trophy2_count,0) AS "trophy2Count",
+          COALESCE(h.trophy3_count,0) AS "trophy3Count",
+          COALESCE(h.trophy4_count,0) AS "trophy4Count",
+          COALESCE(h.trophy5_count,0) AS "trophy5Count",
+          COALESCE(h.trophy6_count,0) AS "trophy6Count",
+          COALESCE(h.trophy7_count,0) AS "trophy7Count"
+        FROM players p
+        LEFT JOIN teams t ON t.id = p.team_id
+        LEFT JOIN player_trophy_history h ON h.player_id = p.id AND h.year = $1
+        ORDER BY p.name
+      `, [year])
+      return res.json(r.rows)
+    } catch {
+      // History table doesn't exist yet — return empty
+      return res.json([])
+    }
+  } catch (err) { next(err) }
+})
+
 router.get("/:id", authenticate, async (req, res, next) => {
   try {
     const season = await getCurrentSeason()
@@ -658,6 +804,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         p.id,
         p.name,
         p.grade                                                      AS current_grade,
+        p.grade_floor,
         COUNT(*)::int                                                AS matches,
         COUNT(*) FILTER (WHERE
           (mr.player_id   = p.id AND mr.result = 'win') OR
@@ -674,7 +821,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.season_number = $1
       WHERE p.is_captain IS NOT TRUE
-      GROUP BY p.id, p.name, p.grade
+      GROUP BY p.id, p.name, p.grade, p.grade_floor
       HAVING COUNT(*) >= 20
       ORDER BY win_rate DESC, wins DESC
     `, [endingSeason])
@@ -700,33 +847,24 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       const tgtNum     = GRADE_NUM[targetGrade] || 1
 
       let finalGrade = current // default: no change
+      const floor    = player.grade_floor  // NULL = pure auto, 'S'/'A'/'B'/'C' = admin floor
 
-      // Protection rules:
-      // S → never moves down (stays S)
-      // A → never moves down (stays A), can be promoted to S
-      // B → can promote to S/A, can demote to C
-      // C → can promote to S/A/B, never demotes
-
-      if (current === "S") {
-        // S never moves — stays S
-        finalGrade = "S"
-      } else if (current === "A") {
-        // A can only go UP to S, never down
-        finalGrade = tgtNum > curNum ? targetGrade : "A"
-      } else if (current === "B") {
-        // B can go up (S/A) or down (C) — all movements allowed
+      if (floor) {
+        // Admin set a floor — player can promote freely but NEVER drop below floor
+        const floorNum = GRADE_NUM[floor] || 1
+        finalGrade = tgtNum >= floorNum ? targetGrade : floor
+      } else {
+        // Pure auto — no floor, free movement in any direction
         finalGrade = targetGrade
-      } else if (current === "C") {
-        // C can only go UP, never down (already at bottom)
-        finalGrade = tgtNum > curNum ? targetGrade : "C"
       }
 
       if (finalGrade !== current) {
         await query(
-          `UPDATE players SET grade = $1 WHERE id = $2`,
+          `UPDATE players SET grade = $1, grade_floor = CASE WHEN grade_floor IS NOT NULL THEN grade_floor ELSE NULL END WHERE id = $2`,
           [finalGrade, player.id]
         )
-        gradeUpdateLog.push(`${player.name}: ${current} → ${finalGrade} (rank #${rank}, ${player.win_rate}% WR)`)
+        const floorTag = floor ? ` [floor: ${floor}]` : ' [auto]'
+        gradeUpdateLog.push(`${player.name}: ${current} → ${finalGrade} (rank #${rank}, ${player.win_rate}% WR)${floorTag}`)
       }
     }
 
@@ -955,3 +1093,86 @@ router.post("/playoffs/reset", authenticate, adminOnly, async (req, res, next) =
 })
 
 export default router
+// POST /api/teams/increment-year — admin only
+// Increments the current year:
+//  1. Saves current trophy counts to player_trophy_history (for trophy cabinet)
+//  2. Resets trophy2–7 on players table (player profile shows current-year only)
+//     trophy1 (Ballon d'Or / BDR) is KEPT on players table
+//  3. Clears team standings + fixtures
+//  Match records and player list untouched.
+router.post("/increment-year", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { withTransaction: tx } = await import("../db/pool.js")
+
+    // Ensure history table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS player_trophy_history (
+        id            SERIAL PRIMARY KEY,
+        player_id     INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        year          INT NOT NULL,
+        trophy1_count INT DEFAULT 0,
+        trophy2_count INT DEFAULT 0,
+        trophy3_count INT DEFAULT 0,
+        trophy4_count INT DEFAULT 0,
+        trophy5_count INT DEFAULT 0,
+        trophy6_count INT DEFAULT 0,
+        trophy7_count INT DEFAULT 0,
+        UNIQUE(player_id, year)
+      )
+    `)
+
+    const yearRes = await query(`SELECT value FROM app_settings WHERE key = 'current_year'`)
+    const currentYear = parseInt(yearRes.rows[0]?.value || new Date().getFullYear())
+    const newYear = currentYear + 1
+
+    await tx(async ({ query: q }) => {
+      // 1. Save current trophy counts to history BEFORE resetting
+      //    ON CONFLICT: accumulate (add) to existing history for that year
+      await q(`
+        INSERT INTO player_trophy_history
+          (player_id, year, trophy1_count, trophy2_count, trophy3_count,
+           trophy4_count, trophy5_count, trophy6_count, trophy7_count)
+        SELECT id, $1,
+          trophy1_count, trophy2_count, trophy3_count,
+          trophy4_count, trophy5_count, trophy6_count, trophy7_count
+        FROM players
+        ON CONFLICT (player_id, year) DO UPDATE SET
+          trophy1_count = player_trophy_history.trophy1_count + EXCLUDED.trophy1_count,
+          trophy2_count = player_trophy_history.trophy2_count + EXCLUDED.trophy2_count,
+          trophy3_count = player_trophy_history.trophy3_count + EXCLUDED.trophy3_count,
+          trophy4_count = player_trophy_history.trophy4_count + EXCLUDED.trophy4_count,
+          trophy5_count = player_trophy_history.trophy5_count + EXCLUDED.trophy5_count,
+          trophy6_count = player_trophy_history.trophy6_count + EXCLUDED.trophy6_count,
+          trophy7_count = player_trophy_history.trophy7_count + EXCLUDED.trophy7_count
+      `, [currentYear])
+
+      // 2. Reset trophy2–7 on players table (current year resets)
+      //    trophy1 (Ballon d'Or) is KEPT on players table
+      await q(`
+        UPDATE players SET
+          trophy2_count = 0,
+          trophy3_count = 0,
+          trophy4_count = 0,
+          trophy5_count = 0,
+          trophy6_count = 0,
+          trophy7_count = 0
+      `)
+
+      // 3. Increment year in app_settings
+      await q(`
+        INSERT INTO app_settings (key, value) VALUES ('current_year', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [String(newYear)])
+
+      // 4. Clear team standings and fixtures
+      await clearCurrentSeasonData(q)
+    })
+
+    res.json({
+      success: true,
+      previousYear: currentYear,
+      newYear,
+      message: `Year incremented to ${newYear}. Trophy history saved. Current-year trophy counts (except Ballon d'Or) reset. Team standings and fixtures cleared.`
+    })
+  } catch (err) { next(err) }
+})
