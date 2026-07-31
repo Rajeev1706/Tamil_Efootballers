@@ -404,6 +404,12 @@ export const useWinRateRanking = (type, season) =>
 export const useWinRateSeasons = () =>
   useQuery({ queryKey: ["winrate-seasons"], queryFn: () => winrateApi.seasons(), staleTime: 1000 * 60 * 10 })
 
+export const useTrophyHistory = () =>
+  useQuery({ queryKey: ["trophy-history"], queryFn: () => teamsApi.trophyHistory(), staleTime: 1000 * 60 * 5 })
+
+export const useTrophyHistoryYear = (year) =>
+  useQuery({ queryKey: ["trophy-history", year], queryFn: () => teamsApi.trophyHistoryYear(year), enabled: !!year, staleTime: 1000 * 60 * 5 })
+
 export const useUpdatePlayer = () => {
   const qc = useQueryClient()
   return useMutation({
