@@ -18,55 +18,55 @@ function EditableRow({ player, onPlayerClick }) {
   const [bdrDelta, setBdrDelta]       = useState("")
   const [isCaptain, setIsCaptain]     = useState(player.isCaptain ?? false)
   const [auctionPrice, setAuctionPrice] = useState(player.auctionPrice ?? "")
-  const [trophy1, setTrophy1] = useState(player.trophy1Count ?? 0)
   const [trophyYear, setTrophyYear] = useState(new Date().getFullYear())
+  const [trophy1, setTrophy1] = useState(player.trophy1Count ?? 0)
   const [trophy2, setTrophy2] = useState(player.trophy2Count ?? 0)
-
-  // When year changes, load that year's trophy counts for this player
-  const currentYear = new Date().getFullYear()
-  useEffect(() => {
-    if (trophyYear === currentYear) {
-      // Load current year = all-time minus past years
-      teamsApi.trophyCurrent().then(data => {
-        const p = data.find(d => d.id === player.id)
-        if (p) {
-          setTrophy1(p.trophy1Count ?? 0)
-          setTrophy2(p.trophy2Count ?? 0)
-          setTrophy3(p.trophy3Count ?? 0)
-          setTrophy4(p.trophy4Count ?? 0)
-          setTrophy5(p.trophy5Count ?? 0)
-          setTrophy6(p.trophy6Count ?? 0)
-          setTrophy7(p.trophy7Count ?? 0)
-        }
-      }).catch(() => {
-        // fallback to player's raw counts
-        setTrophy1(player.trophy1Count ?? 0)
-        setTrophy2(player.trophy2Count ?? 0)
-        setTrophy3(player.trophy3Count ?? 0)
-        setTrophy4(player.trophy4Count ?? 0)
-        setTrophy5(player.trophy5Count ?? 0)
-        setTrophy6(player.trophy6Count ?? 0)
-        setTrophy7(player.trophy7Count ?? 0)
-      })
-    } else {
-      // Fetch past year data
-      teamsApi.trophyHistoryYear(trophyYear).then(data => {
-        const p = data.find(d => d.id === player.id)
-        setTrophy1(p?.trophy1Count ?? 0)
-        setTrophy2(p?.trophy2Count ?? 0)
-        setTrophy3(p?.trophy3Count ?? 0)
-        setTrophy4(p?.trophy4Count ?? 0)
-        setTrophy5(p?.trophy5Count ?? 0)
-        setTrophy6(p?.trophy6Count ?? 0)
-        setTrophy7(p?.trophy7Count ?? 0)
-      }).catch(() => {})
-    }
-  }, [trophyYear])
   const [trophy3, setTrophy3] = useState(player.trophy3Count ?? 0)
   const [trophy4, setTrophy4] = useState(player.trophy4Count ?? 0)
   const [trophy5, setTrophy5] = useState(player.trophy5Count ?? 0)
   const [trophy6, setTrophy6] = useState(player.trophy6Count ?? 0)
   const [trophy7, setTrophy7] = useState(player.trophy7Count ?? 0)
+  // "base" values = what was loaded from the server for the currently selected year.
+  // trophyChanged diffs against these, NOT against the stale player prop — so
+  // switching year then editing always produces the correct diff.
+  const [trophyBase, setTrophyBase] = useState({
+    t1: player.trophy1Count ?? 0, t2: player.trophy2Count ?? 0,
+    t3: player.trophy3Count ?? 0, t4: player.trophy4Count ?? 0,
+    t5: player.trophy5Count ?? 0, t6: player.trophy6Count ?? 0,
+    t7: player.trophy7Count ?? 0,
+  })
+
+  const applyTrophyData = (p) => {
+    const vals = {
+      t1: p?.trophy1Count ?? 0, t2: p?.trophy2Count ?? 0,
+      t3: p?.trophy3Count ?? 0, t4: p?.trophy4Count ?? 0,
+      t5: p?.trophy5Count ?? 0, t6: p?.trophy6Count ?? 0,
+      t7: p?.trophy7Count ?? 0,
+    }
+    setTrophy1(vals.t1); setTrophy2(vals.t2); setTrophy3(vals.t3)
+    setTrophy4(vals.t4); setTrophy5(vals.t5); setTrophy6(vals.t6)
+    setTrophy7(vals.t7)
+    setTrophyBase(vals)
+  }
+
+  // When year changes (and the row is open for editing), load that year's trophy counts.
+  // Guard with `editing` so we never call teamsApi on mount for every player row —
+  // only fetch when the admin has actually opened this specific row.
+  const currentYear = new Date().getFullYear()
+  useEffect(() => {
+    if (!editing) return
+    if (trophyYear === currentYear) {
+      teamsApi.trophyCurrent().then(data => {
+        const p = data.find(d => d.id === player.id)
+        applyTrophyData(p ?? player)
+      }).catch(() => applyTrophyData(player))
+    } else {
+      teamsApi.trophyHistoryYear(trophyYear).then(data => {
+        const p = data.find(d => d.id === player.id)
+        applyTrophyData(p ?? { trophy1Count:0, trophy2Count:0, trophy3Count:0, trophy4Count:0, trophy5Count:0, trophy6Count:0, trophy7Count:0 })
+      }).catch(() => applyTrophyData({ trophy1Count:0, trophy2Count:0, trophy3Count:0, trophy4Count:0, trophy5Count:0, trophy6Count:0, trophy7Count:0 }))
+    }
+  }, [trophyYear, editing])
   const [confirmDel, setConfirmDel]   = useState(false)
   const updatePlayer                  = useUpdatePlayer()
   const deletePlayer                  = useDeletePlayer()
@@ -87,18 +87,21 @@ function EditableRow({ player, onPlayerClick }) {
     if (!isCaptain && parseInt(auctionPrice) !== player.auctionPrice) {
       body.auctionPrice = parseInt(auctionPrice) || 0
     }
-    const trophyChanged = [
-      trophy1 !== (player.trophy1Count ?? 0),
-      trophy2 !== (player.trophy2Count ?? 0),
-      trophy3 !== (player.trophy3Count ?? 0),
-      trophy4 !== (player.trophy4Count ?? 0),
-      trophy5 !== (player.trophy5Count ?? 0),
-      trophy6 !== (player.trophy6Count ?? 0),
-      trophy7 !== (player.trophy7Count ?? 0),
-    ].some(Boolean)
+    // Diff trophy counts against the values that were loaded for this year
+    // (trophyBase), NOT the stale player prop — so switching year then saving
+    // always saves the right values for the right year.
+    const trophyChanged = (
+      trophy1 !== trophyBase.t1 || trophy2 !== trophyBase.t2 ||
+      trophy3 !== trophyBase.t3 || trophy4 !== trophyBase.t4 ||
+      trophy5 !== trophyBase.t5 || trophy6 !== trophyBase.t6 ||
+      trophy7 !== trophyBase.t7
+    )
 
     if (trophyChanged) {
-      // Save to year-specific trophy history
+      // update-trophy-year handles both current year (players table) and
+      // past years (player_trophy_history) correctly on the backend.
+      // We do NOT also push trophies through updatePlayer.mutate() — that
+      // would double-write them and override whatever update-trophy-year set.
       await teamsApi.updateTrophyYear({
         playerId: player.id,
         year: trophyYear,
@@ -106,16 +109,14 @@ function EditableRow({ player, onPlayerClick }) {
         trophy4Count: trophy4, trophy5Count: trophy5, trophy6Count: trophy6,
         trophy7Count: trophy7,
       })
+      // Update base so further edits in the same session diff correctly
+      setTrophyBase({ t1:trophy1, t2:trophy2, t3:trophy3, t4:trophy4, t5:trophy5, t6:trophy6, t7:trophy7 })
     }
 
-    if (trophy1 !== (player.trophy1Count ?? 0)) body.trophy1Count = trophy1
-    if (trophy2 !== (player.trophy2Count ?? 0)) body.trophy2Count = trophy2
-    if (trophy3 !== (player.trophy3Count ?? 0)) body.trophy3Count = trophy3
-    if (trophy4 !== (player.trophy4Count ?? 0)) body.trophy4Count = trophy4
-    if (trophy5 !== (player.trophy5Count ?? 0)) body.trophy5Count = trophy5
-    if (trophy6 !== (player.trophy6Count ?? 0)) body.trophy6Count = trophy6
-    if (trophy7 !== (player.trophy7Count ?? 0)) body.trophy7Count = trophy7
-    if (!Object.keys(body).length) return setEditing(false)
+    // Trophy counts are intentionally NOT added to body here — they're saved
+    // via updateTrophyYear above (year-scoped), never through updatePlayer.
+    if (!Object.keys(body).length && !trophyChanged) return setEditing(false)
+    if (!Object.keys(body).length) { setEditing(false); setBdrDelta(""); return }
     updatePlayer.mutate({ id: player.id, ...body }, {
       onSuccess: () => { setEditing(false); setBdrDelta("") },
       onError:   (err) => alert(err.response?.data?.error || "Update failed"),
@@ -131,13 +132,18 @@ function EditableRow({ player, onPlayerClick }) {
     setTeamId(player.teamId ?? "")
     setIsCaptain(player.isCaptain ?? false)
     setAuctionPrice(player.auctionPrice ?? "")
-    setTrophy1(player.trophy1Count ?? 0)
-    setTrophy2(player.trophy2Count ?? 0)
-    setTrophy3(player.trophy3Count ?? 0)
-    setTrophy4(player.trophy4Count ?? 0)
-    setTrophy5(player.trophy5Count ?? 0)
-    setTrophy6(player.trophy6Count ?? 0)
-    setTrophy7(player.trophy7Count ?? 0)
+    // Reset year selector back to current year and restore player's current counts
+    setTrophyYear(new Date().getFullYear())
+    const base = {
+      t1: player.trophy1Count ?? 0, t2: player.trophy2Count ?? 0,
+      t3: player.trophy3Count ?? 0, t4: player.trophy4Count ?? 0,
+      t5: player.trophy5Count ?? 0, t6: player.trophy6Count ?? 0,
+      t7: player.trophy7Count ?? 0,
+    }
+    setTrophy1(base.t1); setTrophy2(base.t2); setTrophy3(base.t3)
+    setTrophy4(base.t4); setTrophy5(base.t5); setTrophy6(base.t6)
+    setTrophy7(base.t7)
+    setTrophyBase(base)
   }
 
   const handleDelete = () => {

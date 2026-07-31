@@ -6,7 +6,6 @@ import { useTrophyHistory, useTrophyHistoryYear } from "../lib/queries"
 import { getAvatarById } from "../lib/avatars"
 import Layout from "../components/layout/Layout"
 import GradeBadge from "../components/common/GradeBadge"
-import { TeamLogoIcon } from "../components/common/TeamLogo"
 
 import ballondorTrophy    from "../../images/ballondor.png"
 import teamLeagueTrophy   from "../../images/Team League.png"
@@ -42,7 +41,6 @@ export default function TrophyCabinet() {
   const allPlayers = isOverall ? overallData : yearData
   const isLoading  = isOverall ? loadOverall : loadYear
 
-  // Filter players who have at least one trophy, sort by total desc
   const allFiltered = allPlayers
     .map(p => ({
       ...p,
@@ -70,16 +68,16 @@ export default function TrophyCabinet() {
         </div>
 
         {/* Search */}
-      <div className="relative">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search player or team..."
-          className="w-full pl-4 pr-4 py-2.5 bg-pitch-800 border border-surface-border rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent"
-        />
-      </div>
+        <div className="relative">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search player or team..."
+            className="w-full pl-4 pr-4 py-2.5 bg-pitch-800 border border-surface-border rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent"
+          />
+        </div>
 
-      {/* Player list */}
+        {/* Player list */}
         <div className="card overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
@@ -95,8 +93,6 @@ export default function TrophyCabinet() {
               {players.map((player, idx) => {
                 const preset    = getAvatarById(player.avatarId)
                 const avatarSrc = player.avatarUrl || preset?.thumb
-                const wonTrophies = TROPHIES.filter(t => (player[t.key] || 0) > 0)
-
                 return (
                   <div
                     key={player.id}
@@ -110,7 +106,7 @@ export default function TrophyCabinet() {
                       #{idx + 1}
                     </span>
 
-                    {/* Avatar */}
+                    {/* Player avatar */}
                     {avatarSrc
                       ? <img src={avatarSrc} alt={player.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                       : <div className="w-10 h-10 rounded-lg bg-surface-border flex items-center justify-center text-sm font-bold text-slate-400 flex-shrink-0">
@@ -118,7 +114,7 @@ export default function TrophyCabinet() {
                         </div>
                     }
 
-                    {/* Name + team + trophies won */}
+                    {/* Name + team */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-semibold text-white truncate">{player.name}</span>
@@ -126,8 +122,6 @@ export default function TrophyCabinet() {
                       </div>
                       <span className="text-[10px] text-slate-500 truncate">{player.team || "—"}</span>
                     </div>
-
-
 
                     {/* Total */}
                     <div className="text-right flex-shrink-0">
