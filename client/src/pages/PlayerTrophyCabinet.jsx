@@ -104,7 +104,8 @@ export default function PlayerTrophyCabinet() {
   const { id }   = useParams()
   const navigate = useNavigate()
 
-  const [yearFilter, setYearFilter] = useState("overall")
+  const [yearFilter, setYearFilter]     = useState("overall")
+  const [trophyFilter, setTrophyFilter] = useState("all")
   const currentYear = new Date().getFullYear()
   const pastYear    = currentYear - 1
 
@@ -132,10 +133,23 @@ export default function PlayerTrophyCabinet() {
     ? (allTimePlayer || player)
     : (yearPlayer || { trophy1Count: 0, trophy2Count: 0, trophy3Count: 0, trophy4Count: 0, trophy5Count: 0, trophy6Count: 0, trophy7Count: 0 })
 
+
+  // Trophy category groups
+  const TROPHY_GROUPS = {
+    all:      ["trophy1Count","trophy2Count","trophy3Count","trophy4Count","trophy5Count","trophy6Count","trophy7Count"],
+    bdr:      ["trophy1Count"],
+    league:   ["trophy2Count","trophy6Count"],  // Team League title + League Golden Boot
+    ucl:      ["trophy4Count","trophy7Count"],  // UCL title + UCL Golden Boot
+    weekly:   ["trophy3Count","trophy5Count"],  // Weekly title + Weekly Golden Boot
+  }
+
+  const activeTrophyKeys = new Set(TROPHY_GROUPS[trophyFilter] || TROPHY_GROUPS.all)
+
   // Build flat array of every individual trophy instance
   // e.g. 5 BDR = 5 entries of the BDR type
   const allTrophyInstances = []
   TROPHY_TYPES.forEach(type => {
+    if (!activeTrophyKeys.has(type.key)) return  // skip filtered out types
     const count = trophySource[type.key] || 0
     for (let i = 0; i < count; i++) {
       allTrophyInstances.push(type)
@@ -191,6 +205,30 @@ export default function PlayerTrophyCabinet() {
           <option value={String(currentYear)}>Current Year ({currentYear})</option>
           <option value={String(pastYear)}>{pastYear}</option>
         </select>
+      </div>
+
+      {/* Trophy category filter */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { id: "all",    label: "All" },
+          { id: "bdr",    label: "Ballon d'Or" },
+          { id: "league", label: "Team League" },
+          { id: "ucl",    label: "UCL" },
+          { id: "weekly", label: "Weekly" },
+        ].map(f => (
+          <button
+            key={f.id}
+            onClick={() => setTrophyFilter(f.id)}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex-shrink-0",
+              trophyFilter === f.id
+                ? "bg-accent text-white border-accent"
+                : "bg-pitch-800/80 text-slate-400 border-surface-border hover:text-white backdrop-blur-sm"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {total === 0 ? (
