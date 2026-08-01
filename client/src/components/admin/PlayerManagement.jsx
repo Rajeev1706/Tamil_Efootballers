@@ -3,13 +3,13 @@ import { Pencil, Check, X, Trash2, Camera, Trophy, Search, Crown } from "lucide-
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
-import { useUpdatePlayer, useDeletePlayer, useTeams } from "../../lib/queries"
+import { useUpdatePlayer, useDeletePlayer, useTeams, useTrophyYears } from "../../lib/queries"
 import { teamsApi } from "../../lib/api"
 import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["S","A","B","C"]
 
-function EditableRow({ player, onPlayerClick }) {
+function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
   const [editing, setEditing]         = useState(false)
   const [name, setName]               = useState(player.name)
   const [alias, setAlias]             = useState(player.alias ?? "")
@@ -52,7 +52,9 @@ function EditableRow({ player, onPlayerClick }) {
   // When year changes (and the row is open for editing), load that year's trophy counts.
   // Guard with `editing` so we never call teamsApi on mount for every player row —
   // only fetch when the admin has actually opened this specific row.
-  const currentYear = new Date().getFullYear()
+  const currentYear = trophyYearOptions.length > 0
+    ? parseInt(trophyYearOptions[0].value)
+    : new Date().getFullYear()
   useEffect(() => {
     if (!editing) return
     if (trophyYear === currentYear) {
@@ -377,8 +379,9 @@ function EditableRow({ player, onPlayerClick }) {
                   onChange={e => setTrophyYear(parseInt(e.target.value))}
                   className="bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/40"
                 >
-                  <option value={new Date().getFullYear()}>Current ({new Date().getFullYear()})</option>
-                  <option value={new Date().getFullYear() - 1}>{new Date().getFullYear() - 1}</option>
+                  {trophyYearOptions?.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
                 </select>
               </div>
               {[
@@ -412,6 +415,13 @@ export default function PlayerManagement({ players, onPlayerClick }) {
   const [gradeFilter, setGradeFilter] = useState("All")
   const [teamFilter, setTeamFilter]   = useState("All")
   const { data: teams = [] }  = useTeams()
+  const { data: trophyYearsData } = useTrophyYears()
+  const trophyCurrentYear = trophyYearsData?.currentYear || new Date().getFullYear()
+  const trophyPastYears   = trophyYearsData?.pastYears   || []
+  const trophyYearOptions = [
+    { value: String(trophyCurrentYear), label: `Current (${trophyCurrentYear})` },
+    ...trophyPastYears.map(y => ({ value: String(y), label: String(y) }))
+  ]
 
   const filtered = players.filter(p => {
     const matchName  = p.name.toLowerCase().includes(search.toLowerCase())
@@ -482,7 +492,7 @@ export default function PlayerManagement({ players, onPlayerClick }) {
                 </tr>
               ) : (
                 filtered.map(p => (
-                  <EditableRow key={p.id} player={p} onPlayerClick={onPlayerClick} />
+                  <EditableRow key={p.id} player={p} onPlayerClick={onPlayerClick} trophyYearOptions={trophyYearOptions} />
                 ))
               )}
             </tbody>

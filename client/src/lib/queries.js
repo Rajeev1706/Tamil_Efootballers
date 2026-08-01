@@ -410,6 +410,9 @@ export const useTrophyHistory = () =>
 export const useTrophyHistoryYear = (year) =>
   useQuery({ queryKey: ["trophy-history", year], queryFn: () => teamsApi.trophyHistoryYear(year), enabled: !!year, staleTime: 1000 * 60 * 5 })
 
+export const useTrophyYears = () =>
+  useQuery({ queryKey: ["trophy-years"], queryFn: () => teamsApi.trophyYears(), staleTime: 1000 * 60 * 5 })
+
 export const useUpdatePlayer = () => {
   const qc = useQueryClient()
   return useMutation({

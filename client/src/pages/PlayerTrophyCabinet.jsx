@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { Trophy, ArrowLeft } from "lucide-react"
 import { cn } from "../lib/utils"
 import { useState } from "react"
-import { usePlayer, useTrophyHistory, useTrophyHistoryYear } from "../lib/queries"
+import { usePlayer, useTrophyHistory, useTrophyHistoryYear, useTrophyYears } from "../lib/queries"
 import { getAvatarById } from "../lib/avatars"
 import Layout from "../components/layout/Layout"
 import GradeBadge from "../components/common/GradeBadge"
@@ -106,8 +106,10 @@ export default function PlayerTrophyCabinet() {
 
   const [yearFilter, setYearFilter]     = useState("overall")
   const [trophyFilter, setTrophyFilter] = useState("all")
-  const currentYear = new Date().getFullYear()
-  const pastYear    = currentYear - 1
+
+  const { data: trophyYearsData } = useTrophyYears()
+  const currentYear = trophyYearsData?.currentYear || new Date().getFullYear()
+  const pastYears   = trophyYearsData?.pastYears   || []
 
   const { data: player, isLoading }    = usePlayer(id)
   const { data: allTimeData = [] }     = useTrophyHistory()
@@ -203,7 +205,9 @@ export default function PlayerTrophyCabinet() {
         >
           <option value="overall">Overall (All Time)</option>
           <option value={String(currentYear)}>Current Year ({currentYear})</option>
-          <option value={String(pastYear)}>{pastYear}</option>
+          {pastYears.map(y => (
+            <option key={y} value={String(y)}>{y}</option>
+          ))}
         </select>
       </div>
 
