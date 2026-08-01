@@ -5,15 +5,15 @@ import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
 const MENU_ITEMS = [
-  { value: "standings", label: "Home",             icon: Home },
-  { value: "players",   label: "Total Players",   icon: Users },
-  { value: "winrate",   label: "Win Rate",        icon: TrendingUp, link: "/win-rate-ranking"  },
-  { value: "trophycab", label: "Trophy Cabinet",  icon: Trophy,     link: "/trophy-cabinet"     },
-  { value: "compare",   label: "Compare Players", icon: GitCompare },
-  { value: "teams",     label: "Teams",            icon: Shield },
-  { value: "bdr",       label: "BDR Rankings",     icon: Award },
-  { value: "market",    label: "Market Value",     icon: TrendingUp },
-  { value: "trophies",  label: "Trophies",         icon: Trophy },
+  { value: "standings", label: "Home",                  icon: Home },
+  { value: "players",   label: "Total Players",         icon: Users },
+  { value: "teams",     label: "Teams",                 icon: Shield },
+  { value: "bdr",       label: "BDR Rankings",          icon: Award },
+  { value: "winrate",   label: "Win Rate",              icon: TrendingUp, link: "/win-rate-ranking" },
+  { value: "market",    label: "Market Value",          icon: TrendingUp },
+  { value: "compare",   label: "Compare Players",       icon: GitCompare },
+  { value: "trophies",  label: "Trophy (Current Year)", icon: Trophy },
+  { value: "trophycab", label: "Trophy Cabinet",        icon: Trophy, link: "/trophy-cabinet" },
 ]
 
 export default function Navbar() {
