@@ -3,6 +3,7 @@ import { Target, AlertTriangle, CheckCircle, Zap, Wallet, TrendingUp } from "luc
 import { cn } from "../../../lib/utils"
 import TargetBoard from "./TargetBoard"
 import { useAuctionTargets, useAuctionCurrent, useTeams } from "../../../lib/queries"
+import { useAuctionSocket } from "../../../hooks/useAuctionSocket"
 
 const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
 const MV_AVG    = { S: 185, A: 110, B: 65, C: 40 }
@@ -14,6 +15,7 @@ function formWinRate(form) {
 
 // ── Smart Alerts bar — always visible at top ──────────────────────────────────
 function SmartAlerts({ targets, totalBudget, myPlayers, allPlayers, myTeamId }) {
+  useAuctionSocket()  // real-time sync with admin auction
   const { data: auctionData } = useAuctionCurrent()
   const { data: teams = [] }  = useTeams()
 

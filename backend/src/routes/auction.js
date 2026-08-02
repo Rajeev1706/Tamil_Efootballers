@@ -30,6 +30,9 @@ async function getFullAuctionState() {
            p.name AS "currentPlayerName", p.alias AS "currentPlayerAlias",
            p.grade AS "currentPlayerGrade", p.bdr_points AS "currentPlayerBdrPoints",
            p.market_value AS "currentPlayerMarketValue",
+           p.avatar_url AS "currentPlayerAvatarUrl",
+           p.avatar_bg_url AS "currentPlayerAvatarBgUrl",
+           p.avatar_id AS "currentPlayerAvatarId",
            ap.card_type AS "currentPlayerCardType", ap.prev_team_id AS "currentPlayerPrevTeamId",
            t.name AS "currentBidderTeamName"
     FROM auction_sessions s

@@ -760,8 +760,8 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
 // PATCH /api/teams/:id/settings — team owner (own team only) or admin updates name/logo/anthem
 const settingsSchema = z.object({
   name:      z.string().min(1).optional(),
-  logoUrl:   z.string().url().optional().nullable(),
-  anthemUrl: z.string().url().optional().nullable(),
+  logoUrl:   z.string().optional().nullable(),
+  anthemUrl: z.string().optional().nullable(),
 }).refine(d => d.name !== undefined || d.logoUrl !== undefined || d.anthemUrl !== undefined, {
   message: "Provide at least name, logoUrl, or anthemUrl",
 })

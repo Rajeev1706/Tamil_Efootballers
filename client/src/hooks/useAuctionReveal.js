@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { revealForAuction, showSoldFullScreen, showPreRevealBanner, tickSound, buzzerSound } from "../lib/legacyReveal"
 import { detectBidPattern, getPoolMilestone } from "../lib/auctionNarrative"
+import { getAvatarById } from "../lib/avatars"
 
 /**
  * Watches auction data for a new player coming up (triggers the cinematic
@@ -34,13 +35,20 @@ export function useAuctionReveal(data, { onRevealDone, onSoldDone, onBidPattern,
       tickSound.currentTime = 0
       tickSound.play().catch(() => {})
       const thunderCombo = session.isThunder ? { from: session.thunderFrom, to: session.thunderTo } : null
+      // Resolve avatar from session data or preset
+      const preset_r      = getAvatarById(session.currentPlayerAvatarId)
+      const resolvedAvatar = session.currentPlayerAvatarUrl   || preset_r?.thumb || null
+      const resolvedBg     = session.currentPlayerAvatarBgUrl || preset_r?.bg    || null
+      console.log("[AuctionReveal] avatarId:", session.currentPlayerAvatarId, "preset:", preset_r, "bg:", resolvedBg)
       revealForAuction(
         session.currentPlayerName,
         session.isThunder,
         thunderCombo,
         session.currentPlayerCardType,
-        session.currentPlayerPrevTeamId ? teamLogoById[session.currentPlayerPrevTeamId] : null,
-        () => onRevealDone?.()
+        session.currentPlayerPrevTeamId ? teamLogoById[String(session.currentPlayerPrevTeamId)] : null,
+        () => onRevealDone?.(),
+        resolvedAvatar,
+        resolvedBg
       )
       lastBidPatternKeyRef.current = null // fresh player, fresh bid history
     }
