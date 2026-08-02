@@ -759,13 +759,23 @@ export default function FixtureResults({ fixtures }) {
         backgroundColor: "#050810",
         width: el.scrollWidth,
         height: el.scrollHeight,
+        // If any external image (e.g. a team logo) fails to load, skip it
+        // rather than crashing the whole export. This happens when Supabase
+        // storage is temporarily unavailable — the PNG still exports cleanly,
+        // just without those images.
+        filter: (node) => {
+          if (node?.tagName === "IMG" && node?.src?.startsWith("http")) {
+            return node.complete && node.naturalWidth > 0
+          }
+          return true
+        },
       })
       const link = document.createElement("a")
       link.download = `Round-${activeRound}-Fixtures.png`
       link.href = dataUrl
       link.click()
     } catch (err) {
-      alert("Export failed: " + err.message)
+      alert("Export failed: " + (err?.message || err?.toString() || "Could not generate image"))
     } finally {
       setExporting(false)
       setShowExportCard(false)
