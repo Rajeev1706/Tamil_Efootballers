@@ -161,7 +161,7 @@ const updateSchema = z.object({
   isCaptain:     z.boolean().optional(),
   auctionPrice:  z.number().int().min(0).optional(),
   teamId:        z.number().int().positive().optional().nullable(),
-  imageUrl:      z.string().url().optional().nullable(),
+  imageUrl:      z.string().optional().nullable(),
   trophy1Count:  z.number().int().min(0).optional(),
   trophy2Count:  z.number().int().min(0).optional(),
   trophy3Count:  z.number().int().min(0).optional(),
@@ -184,8 +184,8 @@ router.patch("/:id/avatar", async (req, res, next) => {
   try {
     const schema = z.object({
       avatarId:    z.string().max(64).regex(/^[a-zA-Z0-9_-]+$/).nullable().optional(),
-      avatarUrl:   z.string().url().nullable().optional(),
-      avatarBgUrl: z.string().url().nullable().optional(),
+      avatarUrl:   z.string().nullable().optional(),
+      avatarBgUrl: z.string().nullable().optional(),
     })
     const body = schema.parse(req.body)
 

@@ -72,7 +72,7 @@ export default function TeamDashboard() {
   return (
     <Layout>
       <div style={colorStyle}>
-        {auctionData?.session?.status === "active" && auctionData?.session?.hasEntered && (
+        {auctionData?.session?.status === "active" && (
           <button
             onClick={() => navigate("/team/auction")}
             className="w-full mb-6 rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-gold/5 to-transparent px-6 py-4 flex items-center gap-3 hover:border-gold/60 transition-colors text-left animate-champion-pop"

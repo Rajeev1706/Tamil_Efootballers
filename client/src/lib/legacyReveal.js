@@ -8,10 +8,12 @@
 // objects (playerMeta/teamLogos/teamMeta), since those don't exist here.
 // ============================================================================
 
-const ASSET_BASE = new URL("../../images/", import.meta.url).href
-
-export const tickSound = new Audio(`${ASSET_BASE}tick.mp3`)
-export const buzzerSound = new Audio(`${ASSET_BASE}buzzer.mp3`)
+// FIX: use static /sounds/ paths (files must be in client/public/sounds/)
+// instead of new URL("../../images/", import.meta.url).href which resolves
+// to /images/ in production and 404s because Vite doesn't serve /images/ as
+// a static folder — only /public/ contents are served as static files.
+export const tickSound   = new Audio("/sounds/tick.mp3")
+export const buzzerSound = new Audio("/sounds/buzzer.mp3")
 tickSound.volume = 1.0
 buzzerSound.volume = 0.8
 
@@ -35,6 +37,9 @@ export function skipRevealAnimation() {
       nameEl.textContent = revealState.pendingName
       nameEl.classList.add("visible")
     }
+    // Show avatar bg at same time as name
+    const cardBg = revealState.overlay.querySelector(".reveal-card-bg")
+    if (cardBg) cardBg.classList.add("visible")
     if (revealState.isThunder && revealState.goldOverlay) {
       revealState.goldOverlay.style.transition = "none"
       revealState.goldOverlay.style.clipPath = "inset(0 0% 0 0)"
@@ -184,12 +189,24 @@ function startStarsAnimation(canvas, starsState) {
  * @param {string|null} logoUrl - previous team's logo URL, shown behind the name
  * @param {() => void} done - called once the reveal fully finishes and vanishes
  */
-export function revealForAuction(name, isThunder, thunderCombo, actualCardType, logoUrl, done) {
+export function revealForAuction(name, isThunder, thunderCombo, actualCardType, logoUrl, done, avatarUrl, avatarBgUrl, avatarId) {
   revealState.active = true
   revealState.done = done
   revealState.timeouts = []
   revealState.pendingName = name
   revealState.isThunder = isThunder
+
+  // Resolve preset avatar if URLs not directly provided
+  if ((!avatarUrl || !avatarBgUrl) && avatarId) {
+    try {
+      const { getAvatarById } = require("./avatars.js")
+      const preset = getAvatarById(avatarId)
+      if (preset) {
+        avatarUrl   = avatarUrl   || preset.thumb
+        avatarBgUrl = avatarBgUrl || preset.bg
+      }
+    } catch(e) {}
+  }
   revealState.thunderTarget = thunderCombo ? thunderCombo.to : null
   revealState.goldOverlay = null
   revealState.starsState = null
@@ -228,11 +245,28 @@ export function revealForAuction(name, isThunder, thunderCombo, actualCardType, 
   const nameEl = document.createElement("div")
   nameEl.className = "reveal-player-name"
   nameEl.textContent = ""
+  nameEl.style.whiteSpace = "normal"
+
+  // Player avatar/bg — fill inside card using CSS mask to clip to shield shape
+  const bgImageUrl = avatarBgUrl || avatarUrl
+  console.log("[legacyReveal] avatarUrl:", avatarUrl, "avatarBgUrl:", avatarBgUrl, "bgImageUrl:", bgImageUrl)
+  if (bgImageUrl) {
+    const bgEl = document.createElement("div")
+    bgEl.className = "reveal-card-bg"
+    bgEl.style.backgroundImage = `url("${bgImageUrl}")`
+    front.appendChild(bgEl)
+    console.log("[legacyReveal] bgEl created and appended")
+  } else {
+    console.log("[legacyReveal] NO bgImageUrl — card will be blank")
+  }
 
   const logoEl = document.createElement("img")
   if (logoUrl) {
     logoEl.src = logoUrl
     logoEl.className = "reveal-team-logo"
+    // preload so image is ready when reveal plays
+    const preload = new Image()
+    preload.src = logoUrl
   }
 
   front.appendChild(nameEl)
@@ -300,6 +334,14 @@ export function revealForAuction(name, isThunder, thunderCombo, actualCardType, 
         bgLogo.classList.add("visible")
       }, 400))
     }, nameStartDelay - 200))
+  }
+
+  // Avatar bg fades in when card flips
+  const bgEl = front.querySelector(".reveal-card-bg")
+  if (bgEl) {
+    registerTimeout(setTimeout(() => {
+      bgEl.classList.add("visible")
+    }, flipDelay + 200))
   }
 
   registerTimeout(setTimeout(() => {

@@ -131,31 +131,31 @@
 
 .reveal-team-logo {
   position: absolute;
-  left: 50%;
-  top: calc(40% + 48px);
-  transform: translateX(-50%) scale(0.85);
-  width: 125px;
-  height: 125px;
+  left: 16px;
+  bottom: 16px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  margin-top: 16px;
   opacity: 0;
-  transition: opacity 600ms ease, transform 600ms ease;
+  transition: opacity 600ms ease;
+  z-index: 10;
+  border: 2px solid rgba(255,215,120,0.6);
+  background: rgba(0,0,0,0.5);
 }
 .reveal-team-logo.visible {
   opacity: 1;
-  transform: translateX(-50%) scale(1);
-  box-shadow: 0 0 22px rgba(255, 215, 120, 0.9);
+  box-shadow: 0 0 12px rgba(255, 215, 120, 0.7);
 }
 
 .reveal-player-name {
   position: absolute;
-  top: 38%;
+  top: 62%;
   left: 50%;
-  transform: translate(-50%, -58%) scale(0.9);
-  font-size: 58px;
+  transform: translate(-50%, -50%) scale(0.9);
+  font-size: clamp(28px, 5vw, 52px);
   font-weight: 900;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: #ffffff;
   text-align: center;
@@ -166,9 +166,38 @@
     0 0 28px rgba(255, 180, 60, 0.6),
     0 4px 18px rgba(0, 0, 0, 0.9);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
+  width: 88%;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.1;
 }
-.reveal-player-name.visible { opacity: 1; transform: translate(-50%, -58%) scale(1); }
+.reveal-player-name.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+/* Player background image — fills card front behind outline */
+.reveal-card-bg {
+  display: none;
+}
+
+/* Player avatar image — shown in upper half of card */
+/* Player avatar/bg — clipped to shield shape via CSS mask */
+.reveal-card-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center top;
+  border-radius: 8px;
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 600ms ease;
+  -webkit-mask-image: url("../../images/outline.png");
+  mask-image: url("../../images/outline.png");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+.reveal-card-bg.visible {
+  opacity: 0.85;
+}
 
 .gold-reveal-overlay {
   position: absolute;
