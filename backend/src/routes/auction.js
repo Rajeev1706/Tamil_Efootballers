@@ -47,6 +47,7 @@ async function getFullAuctionState() {
   const poolRes = await query(`
     SELECT ap.id, ap.player_id AS "playerId", p.name, p.alias, p.grade,
            p.bdr_points AS "bdrPoints", p.market_value AS "marketValue",
+           p.form,
            ap.card_type AS "cardType",
            ap.prev_team_id AS "prevTeamId", ap.status, ap.round_seen AS "roundSeen"
     FROM auction_pool ap JOIN players p ON ap.player_id = p.id

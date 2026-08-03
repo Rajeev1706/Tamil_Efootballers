@@ -110,6 +110,20 @@ function buildAnalysis({ session, pool, sales, teams, retentions, recentBids, cu
   // Form
   const form = formSummary(currentPlayer?.form)
 
+  // Similar players in pool — used in Your Target section
+  const poolWinRate = (p) => {
+    const f = p.form || []
+    return f.length ? Math.round(f.filter(r => r === "W").length / f.length * 100) : 0
+  }
+
+  const similarInPool = pendingPool
+    .filter(p => {
+      if (p.playerId === currentId) return false
+      return p.grade === playerGrade || gradeRank(p.grade) === gradeRank(playerGrade) - 1
+    })
+    .sort((a, b) => poolWinRate(b) - poolWinRate(a))
+    .slice(0, 3)
+
   // ── Section 1: Your Target ─────────────────────────────────────────────────
   const targetItems = []
 
@@ -167,6 +181,20 @@ function buildAnalysis({ session, pool, sales, teams, retentions, recentBids, cu
       })
     }
 
+    // Similar players still available in pool
+    if (similarInPool.length > 0) {
+      const names = similarInPool
+        .map(p => {
+          const wr = poolWinRate(p)
+          return `${p.name} (${p.grade}${wr > 0 ? `, ${wr}% WR` : ""}, MV ₹${p.marketValue ?? "?"})`
+        })
+        .join(" · ")
+      targetItems.push({
+        type: "info",
+        text: `Similar Grade ${playerGrade} players still in pool: ${names}`
+      })
+    }
+
   } else {
     targetItems.push({
       type: "info",
@@ -181,6 +209,20 @@ function buildAnalysis({ session, pool, sales, teams, retentions, recentBids, cu
       targetItems.push({
         type: "warn",
         text: `Picking untargeted players at full price can hurt your budget planning — bid carefully`
+      })
+    }
+
+    // Still show similar alternatives
+    if (similarInPool.length > 0) {
+      const names = similarInPool
+        .map(p => {
+          const wr = poolWinRate(p)
+          return `${p.name} (${p.grade}${wr > 0 ? `, ${wr}% WR` : ""}, MV ₹${p.marketValue ?? "?"})`
+        })
+        .join(" · ")
+      targetItems.push({
+        type: "info",
+        text: `Other Grade ${playerGrade} players still available: ${names}`
       })
     }
   }
