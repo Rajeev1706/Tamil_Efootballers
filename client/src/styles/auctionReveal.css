@@ -77,15 +77,25 @@
 }
 
 .reveal-card-front {
-  background: url("../../images/outline.png") center/contain no-repeat;
+  background: none;
   transform: rotateY(180deg);
-  filter: brightness(1.1) saturate(1.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
+}
+
+/* Outline frame rendered ON TOP of the avatar image so the card border
+   is always visible. mix-blend-mode: screen makes the dark card interior
+   transparent (avatar shows through) while keeping the gold border bright. */
+.reveal-card-front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("../../images/outline.png") center/100% 100% no-repeat;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: brightness(1.1) saturate(1.2);
 }
 
 .reveal-card-back {
@@ -95,36 +105,28 @@
 .reveal-card.silver .reveal-card-back {
   background-image: url("../../images/card-back-silver.png");
 }
-.reveal-card.silver .reveal-card-front {
+.reveal-card.silver .reveal-card-front::after {
   background-image: url("../../images/outline-silver.png");
   filter: brightness(1.05) saturate(0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  mix-blend-mode: screen;
 }
 
 .reveal-card.purple .reveal-card-back {
   background-image: url("../../images/pbackside.png");
-  filter: none;
 }
-.reveal-card.purple .reveal-card-front {
+.reveal-card.purple .reveal-card-front::after {
   background-image: url("../../images/poutline.png");
   filter: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  mix-blend-mode: screen;
 }
 
 .reveal-card.captain .reveal-card-back {
   background-image: url("../../images/cbackside.png");
-  filter: none;
 }
-.reveal-card.captain .reveal-card-front {
+.reveal-card.captain .reveal-card-front::after {
   background-image: url("../../images/coutline.png");
   filter: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  mix-blend-mode: screen;
 }
 
 .reveal-card.flipped .reveal-card-inner { transform: rotateY(180deg); }
@@ -150,7 +152,7 @@
 
 .reveal-player-name {
   position: absolute;
-  top: 62%;
+  top: 78%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
   font-size: clamp(28px, 5vw, 52px);
@@ -174,14 +176,10 @@
 }
 .reveal-player-name.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
-/* Player background image — fills card front behind outline */
+/* Player avatar — fills card front, clipped to shield shape via CSS mask.
+   Sits at z-index:0 so the outline ::after overlay (z-index:1) shows on top. */
 .reveal-card-bg {
-  display: none;
-}
-
-/* Player avatar image — shown in upper half of card */
-/* Player avatar/bg — clipped to shield shape via CSS mask */
-.reveal-card-bg {
+  display: block;
   position: absolute;
   inset: 0;
   background-size: cover;
@@ -196,7 +194,21 @@
   mask-size: 100% 100%;
 }
 .reveal-card-bg.visible {
-  opacity: 0.85;
+  opacity: 1;
+}
+
+/* Card-type specific masks — clips avatar to correct outline shape */
+.reveal-card.silver .reveal-card-bg {
+  -webkit-mask-image: url("../../images/outline-silver.png");
+  mask-image: url("../../images/outline-silver.png");
+}
+.reveal-card.purple .reveal-card-bg {
+  -webkit-mask-image: url("../../images/poutline.png");
+  mask-image: url("../../images/poutline.png");
+}
+.reveal-card.captain .reveal-card-bg {
+  -webkit-mask-image: url("../../images/coutline.png");
+  mask-image: url("../../images/coutline.png");
 }
 
 .gold-reveal-overlay {
