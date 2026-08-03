@@ -8,6 +8,7 @@ import { usePlayer, usePlayerPerformanceZones } from "../lib/queries"
 import { useTeamColor, readableTeamColor } from "../lib/teamColor"
 import { getAvatarById } from "../lib/avatars"
 import { cn } from "../lib/utils"
+import { useCachedImage } from "../hooks/useCachedImage"
 import ballondorTrophy    from "../../images/ballondor.png"
 import teamLeagueTrophy   from "../../images/Team League.png"
 import weeklyTrophy       from "../../images/Weekly.png"
@@ -31,6 +32,8 @@ const FormDot = ({ result }) => {
 
 
 function PlayerSquadCard({ player }) {
+  const cachedImage = useCachedImage(player.imageUrl)
+
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
@@ -40,11 +43,15 @@ function PlayerSquadCard({ player }) {
 
       <div className="p-5">
         {player.imageUrl ? (
-          <img
-            src={player.imageUrl}
-            alt={player.name}
-            className="w-full aspect-[20/9] object-cover rounded-xl border border-surface-border"
-          />
+          cachedImage ? (
+            <img
+              src={cachedImage}
+              alt={player.name}
+              className="w-full aspect-[20/9] object-cover rounded-xl border border-surface-border"
+            />
+          ) : (
+            <div className="w-full aspect-[20/9] rounded-xl border border-surface-border bg-pitch-800 animate-pulse" />
+          )
         ) : (
           <div className={cn(
             "w-full aspect-[20/9] rounded-xl border-2 border-dashed border-surface-border flex flex-col items-center justify-center gap-2",
@@ -110,6 +117,7 @@ function TrophyCase({ player }) {
     </div>
   )
 }
+
 export default function PlayerProfile() {
   const { id }   = useParams()
   const navigate = useNavigate()
@@ -119,8 +127,14 @@ export default function PlayerProfile() {
   const teamColor = useTeamColor(player?.teamLogo)
   const teamTextColor = readableTeamColor(teamColor)
   const presetAvatar = getAvatarById(player?.avatarId)
-  const avatarThumb  = player?.avatarUrl    || presetAvatar?.thumb || null
-  const avatarBg     = player?.avatarBgUrl  || presetAvatar?.bg    || null
+
+  // Cache Supabase URLs locally — preset (bundled) images are non-https so
+  // useCachedImage returns them as-is immediately with no async work.
+  const rawAvatarThumb = player?.avatarUrl   || presetAvatar?.thumb || null
+  const rawAvatarBg    = player?.avatarBgUrl || presetAvatar?.bg    || null
+  const avatarThumb    = useCachedImage(rawAvatarThumb)
+  const avatarBg       = useCachedImage(rawAvatarBg)
+
   const [pickerOpen, setPickerOpen] = useState(false)
 
   if (isLoading) return <Layout><Loading /></Layout>
@@ -247,7 +261,7 @@ export default function PlayerProfile() {
             ))}
           </div>
 
-{showAuctionDelta && !player.isCaptain && (
+          {showAuctionDelta && !player.isCaptain && (
             <div className="flex items-center gap-3 mt-4">
               <span className={cn(
                 "text-sm font-semibold font-mono px-3 py-1 rounded-lg border",
