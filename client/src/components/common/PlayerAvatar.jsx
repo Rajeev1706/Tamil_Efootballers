@@ -1,4 +1,5 @@
 import { cn } from "../../lib/utils"
+import { useCachedImage } from "../../hooks/useCachedImage"
 
 const gradeColors = {
   S:   "bg-gold/20 text-gold border-gold/40",
@@ -15,13 +16,14 @@ export default function PlayerAvatar({ player, size = "md", className }) {
     xl:  "w-20 h-20 text-2xl rounded-2xl border-2",
   }
 
-  const initials = player.name?.split(" ").map(n => n[0]).join("") || "?"
-  const colorCls = gradeColors[player.grade] || gradeColors["C"]
+  const initials  = player.name?.split(" ").map(n => n[0]).join("") || "?"
+  const colorCls  = gradeColors[player.grade] || gradeColors["C"]
+  const cachedSrc = useCachedImage(player.imageUrl)
 
   if (player.imageUrl) {
-    return (
+    return cachedSrc ? (
       <img
-        src={player.imageUrl}
+        src={cachedSrc}
         alt={player.name}
         className={cn(
           "object-cover flex-shrink-0",
@@ -30,6 +32,16 @@ export default function PlayerAvatar({ player, size = "md", className }) {
           className
         )}
       />
+    ) : (
+      // Loading state: show initials placeholder while blob is resolving
+      <div className={cn(
+        "flex items-center justify-center font-extrabold flex-shrink-0 animate-pulse",
+        sizes[size],
+        colorCls,
+        className
+      )}>
+        {initials}
+      </div>
     )
   }
 
