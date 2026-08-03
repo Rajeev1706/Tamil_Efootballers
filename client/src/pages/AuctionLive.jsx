@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
-import { Gavel, Trophy, Sparkles } from "lucide-react"
+import { Gavel, Trophy, Sparkles, ArrowLeft } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 import { useAuctionCurrent } from "../lib/queries"
 import { cn } from "../lib/utils"
 import { generateSaleNarratives, findMostExpensiveSale, detectCollector, getMvpCheckpoint } from "../lib/auctionNarrative"
@@ -9,8 +10,110 @@ import PoolPanel from "../components/auction/AuctionPoolPanel"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 import { useAuctionTimer } from "../hooks/useAuctionTimer"
 import { useBumpOnChange } from "../hooks/useBumpOnChange"
+import { getAvatarById } from "../lib/avatars"
+import { useCachedImage } from "../hooks/useCachedImage"
+
+
+
+// Shows player avatar + previous team logo in the auction stage center panel
+function AuctionPlayerHero({ session, teamLogoById }) {
+  const preset      = getAvatarById(session.currentPlayerAvatarId)
+  const rawAvatar   = session.currentPlayerAvatarUrl   || preset?.thumb || null
+  const avatarSrc   = useCachedImage(rawAvatar)
+  const prevLogoSrc = useCachedImage(teamLogoById?.[session.currentPlayerPrevTeamId])
+
+  return (
+    <>
+      {/* Avatar — centered above player name */}
+      {avatarSrc && (
+        <div className="flex justify-center mb-3">
+          <img
+            src={avatarSrc}
+            alt={session.currentPlayerName}
+            className="w-20 h-20 rounded-2xl object-cover border-2 border-surface-border shadow-lg"
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+// Previous team logo shown BELOW the card type + grade badges
+function PrevTeamLogo({ session, teamLogoById, teamNameById }) {
+  const prevLogoSrc = useCachedImage(teamLogoById?.[session.currentPlayerPrevTeamId])
+  if (!session.currentPlayerPrevTeamId) return null
+
+  return (
+    <div className="flex flex-col items-center gap-1 mt-3 mb-2">
+      {prevLogoSrc ? (
+        <img
+          src={prevLogoSrc}
+          alt="Previous team"
+          className="w-16 h-16 rounded-full object-cover border-2 border-surface-border shadow-md"
+        />
+      ) : (
+        <div className="w-16 h-16 rounded-full bg-pitch-800 border-2 border-surface-border flex items-center justify-center text-sm font-bold text-slate-400">
+          {teamNameById?.[session.currentPlayerPrevTeamId]?.slice(0,2).toUpperCase()}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-500 font-medium">Previous team</p>
+    </div>
+  )
+}
+
+
+// Full auction stage panel with player bg image as hero background
+function AuctionStagePanel({ session, teamLogoById, teamNameById, bidBumping, timerActive, timeLeft }) {
+  const preset    = getAvatarById(session.currentPlayerAvatarId)
+  const rawAvatar = session.currentPlayerAvatarUrl   || preset?.thumb || null
+  const rawBg     = session.currentPlayerAvatarBgUrl || preset?.bg    || null
+  const avatarSrc = useCachedImage(rawAvatar)
+  const bgSrc     = useCachedImage(rawBg)
+
+  return (
+    <div className={cn("relative rounded-2xl overflow-hidden border border-surface-border text-center", session.currentPlayerId && "auction-stage")}>
+      {bgSrc && (
+        <>
+          <div className="absolute inset-0 bg-cover bg-center bg-top" style={{ backgroundImage: `url(${bgSrc})` }} />
+          <div className="absolute inset-0 bg-pitch-900/75" />
+        </>
+      )}
+      {!bgSrc && <div className="absolute inset-0 bg-gradient-to-br from-pitch-800 to-pitch-900" />}
+      <div className="relative z-10 p-8">
+        {session.currentPlayerId ? (
+          <>
+            {avatarSrc && (
+              <div className="flex justify-center mb-3">
+                <img src={avatarSrc} alt={session.currentPlayerName} className="w-20 h-20 rounded-2xl object-cover border-2 border-surface-border shadow-lg" />
+              </div>
+            )}
+            <h2 className="text-3xl auction-stage-name text-white mb-1">{session.currentPlayerName}</h2>
+            <PrevTeamLogo session={session} teamLogoById={teamLogoById} teamNameById={teamNameById} />
+            <p className="text-4xl font-mono font-bold text-gold mb-2">
+              <span className={cn("auction-stage-bid", bidBumping && "bump")}>₹{session.currentBid}</span>
+            </p>
+            <p className="text-sm text-slate-300 mb-2">
+              {session.currentBidderTeamName ? (
+                <>Highest bid: <span className="text-white font-semibold">{session.currentBidderTeamName}</span></>
+              ) : "Waiting for bids…"}
+            </p>
+            {timerActive && (
+              <div className={cn("auction-timer", timeLeft <= 5 && "red")}>⏱ {timeLeft}s</div>
+            )}
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-6 h-6 text-slate-600 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">Waiting for the next player…</p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function AuctionLive() {
+  const navigate = useNavigate()
   const { data } = useAuctionCurrent()
   const { timeLeft, timerActive } = useAuctionTimer(data?.session)
   const bidBumping = useBumpOnChange(data?.session?.currentBid)
@@ -33,6 +136,7 @@ export default function AuctionLive() {
     if (prevTopSaleId.current !== null && topSale.id !== prevTopSaleId.current) {
       const poolEntry = data.pool.find(p => p.playerId === topSale.playerId)
       const teamNameById = Object.fromEntries(data.teams.map(t => [t.id, t.name]))
+      const teamLogoById  = Object.fromEntries(data.teams.map(t => [t.id, t.logoUrl]))
       const stories = generateSaleNarratives({
         sale: topSale, poolEntry, teamNameById,
         mostExpensiveSoFar: findMostExpensiveSale(data.sales.slice(1)),
@@ -64,6 +168,7 @@ export default function AuctionLive() {
 
   const { session, pool = [], sales = [], teams = [], retentions = [] } = data
   const teamNameById = Object.fromEntries(teams.map(t => [t.id, t.name]))
+  const teamLogoById  = Object.fromEntries(teams.map(t => [t.id, t.logoUrl]))
 
   if (session.status === "retention") {
     return (
@@ -96,10 +201,15 @@ export default function AuctionLive() {
 
   return (
     <div className="auction-page min-h-screen bg-pitch-900 p-4 md:p-6">
-      <div className="flex items-center gap-3 mb-6 justify-center">
-        <Gavel className="w-5 h-5 text-accent" />
-        <h1 className="text-lg font-extrabold text-white">Live Player Auction</h1>
-        <span className="text-xs text-slate-500">Round {session.round}</span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-6">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm w-fit">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <div className="flex items-center gap-2 sm:mx-auto">
+          <Gavel className="w-5 h-5 text-accent" />
+          <h1 className="text-lg font-extrabold text-white">Live Player Auction</h1>
+          <span className="text-xs text-slate-500">Round {session.round}</span>
+        </div>
       </div>
 
       <div className="auction-layout max-w-[100rem] mx-auto">
@@ -111,32 +221,8 @@ export default function AuctionLive() {
           ))}
 
           {/* Current player */}
-          <div className={cn("card p-8 text-center", session.currentPlayerId && "auction-stage")}>
-            {session.currentPlayerId ? (
-              <>
-                <h2 className="text-3xl auction-stage-name text-white mb-1">{session.currentPlayerName}</h2>
-                {session.currentPlayerPrevTeamId && (
-                  <p className="text-xs text-slate-500 mb-4">Previously with {teamNameById[session.currentPlayerPrevTeamId]}</p>
-                )}
-                <p className="text-4xl font-mono font-bold text-gold mb-2">
-                  <span className={cn("auction-stage-bid", bidBumping && "bump")}>₹{session.currentBid}</span>
-                </p>
-                <p className="text-sm text-slate-400 mb-2">
-                  {session.currentBidderTeamName ? (
-                    <>Highest bid: <span className="text-white font-semibold">{session.currentBidderTeamName}</span></>
-                  ) : "Waiting for bids…"}
-                </p>
-                {timerActive && (
-                  <div className={cn("auction-timer", timeLeft <= 5 && "red")}>⏱ {timeLeft}s</div>
-                )}
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-6 h-6 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">Waiting for the next player to go under the hammer…</p>
-              </>
-            )}
-          </div>
+          {/* Resolve player bg for the hero panel */}
+          <AuctionStagePanel session={session} teamLogoById={teamLogoById} teamNameById={teamNameById} bidBumping={bidBumping} timerActive={timerActive} timeLeft={timeLeft} />
 
           {/* Recent sales */}
           <div className="card p-4">
