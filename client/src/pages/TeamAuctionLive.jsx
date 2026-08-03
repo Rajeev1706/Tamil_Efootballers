@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Gavel, Trophy, Sparkles, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 import { useAuctionCurrent, usePlayer, useAuctionTargets, usePlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
@@ -238,6 +238,16 @@ function MobileTeamsDrawer({ teams, sales, retentions, budgetPerTeam }) {
   )
 }
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024)
+  useEffect(() => {
+    const fn = () => setIsDesktop(window.innerWidth >= 1024)
+    window.addEventListener("resize", fn)
+    return () => window.removeEventListener("resize", fn)
+  }, [])
+  return isDesktop
+}
+
 // Dedicated live-auction view for team captains — same live data as the
 // public /auction/live page, but deliberately WITHOUT the narrative/war/
 // collector/MVP/milestone flair (same call as the admin screen: keep it
@@ -246,6 +256,7 @@ function MobileTeamsDrawer({ teams, sales, retentions, budgetPerTeam }) {
 // to bid, not just names and animations.
 export default function TeamAuctionLive() {
   const navigate   = useNavigate()
+  const isDesktop             = useIsDesktop()
   const myTeamId              = useAuthStore(s => s.user?.teamId)
   const { data: targets = [] }  = useAuctionTargets(myTeamId)
   const { data: allPlayers = [] } = usePlayers()
@@ -325,7 +336,7 @@ export default function TeamAuctionLive() {
       <MobileTeamsDrawer teams={teams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
 
       <div className="auction-layout max-w-[100rem] mx-auto">
-        <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
+        {isDesktop && <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />}
 
         <div className="space-y-4">
           {/* Current player */}
@@ -359,7 +370,7 @@ export default function TeamAuctionLive() {
           <PoolPanel pool={pool} clickable />
         </div>
 
-        <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
+        {isDesktop && <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />}
       </div>
     </div>
   )
