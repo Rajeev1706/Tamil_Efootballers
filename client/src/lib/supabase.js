@@ -19,47 +19,49 @@ const JPEG_QUALITY  = 0.82 // 82% quality — good visual quality, small file si
 
 function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUALITY) {
   return new Promise((resolve, reject) => {
-    const img = new Image()
-    const objectUrl = URL.createObjectURL(file)
+    // Use FileReader instead of createObjectURL for better mobile compatibility
+    // (createObjectURL can fail on Android camera photos and some mobile browsers)
+    const reader = new FileReader()
 
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl)
+    reader.onload = (e) => {
+      const img = new Image()
 
-      // Calculate new dimensions keeping aspect ratio
-      let { width, height } = img
-      if (width > maxDimension || height > maxDimension) {
-        if (width >= height) {
-          height = Math.round((height / width) * maxDimension)
-          width  = maxDimension
-        } else {
-          width  = Math.round((width / height) * maxDimension)
-          height = maxDimension
+      img.onload = () => {
+        // Calculate new dimensions keeping aspect ratio
+        let { width, height } = img
+        if (width > maxDimension || height > maxDimension) {
+          if (width >= height) {
+            height = Math.round((height / width) * maxDimension)
+            width  = maxDimension
+          } else {
+            width  = Math.round((width / height) * maxDimension)
+            height = maxDimension
+          }
         }
+
+        const canvas = document.createElement("canvas")
+        canvas.width  = width
+        canvas.height = height
+
+        const ctx = canvas.getContext("2d")
+        ctx.drawImage(img, 0, 0, width, height)
+
+        // Always encode as JPEG for consistent small size
+        // (PNG files like logos with transparency are kept as PNG)
+        const isPng = file.type === "image/png"
+        const dataUrl = isPng
+          ? canvas.toDataURL("image/png")
+          : canvas.toDataURL("image/jpeg", quality)
+
+        resolve(dataUrl)
       }
 
-      const canvas = document.createElement("canvas")
-      canvas.width  = width
-      canvas.height = height
-
-      const ctx = canvas.getContext("2d")
-      ctx.drawImage(img, 0, 0, width, height)
-
-      // Always encode as JPEG for consistent small size
-      // (PNG files like logos with transparency are kept as PNG)
-      const isPng = file.type === "image/png"
-      const dataUrl = isPng
-        ? canvas.toDataURL("image/png")
-        : canvas.toDataURL("image/jpeg", quality)
-
-      resolve(dataUrl)
+      img.onerror = () => reject(new Error("Failed to decode image — try a JPEG or PNG file"))
+      img.src = e.target.result
     }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error("Failed to load image for encoding"))
-    }
-
-    img.src = objectUrl
+    reader.onerror = () => reject(new Error("Failed to read file"))
+    reader.readAsDataURL(file)
   })
 }
 
