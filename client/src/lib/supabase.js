@@ -18,51 +18,59 @@ const MAX_DIMENSION = 400  // px — enough for logos/avatars at any UI size
 const JPEG_QUALITY  = 0.82 // 82% quality — good visual quality, small file size
 
 function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUALITY) {
-  return new Promise((resolve, reject) => {
-    // Use FileReader instead of createObjectURL for better mobile compatibility
-    // (createObjectURL can fail on Android camera photos and some mobile browsers)
-    const reader = new FileReader()
+  const isPng = file.type === "image/png"
 
-    reader.onload = (e) => {
-      const img = new Image()
-
-      img.onload = () => {
-        // Calculate new dimensions keeping aspect ratio
-        let { width, height } = img
-        if (width > maxDimension || height > maxDimension) {
-          if (width >= height) {
-            height = Math.round((height / width) * maxDimension)
-            width  = maxDimension
-          } else {
-            width  = Math.round((width / height) * maxDimension)
-            height = maxDimension
-          }
-        }
-
-        const canvas = document.createElement("canvas")
-        canvas.width  = width
-        canvas.height = height
-
-        const ctx = canvas.getContext("2d")
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // Always encode as JPEG for consistent small size
-        // (PNG files like logos with transparency are kept as PNG)
-        const isPng = file.type === "image/png"
-        const dataUrl = isPng
-          ? canvas.toDataURL("image/png")
-          : canvas.toDataURL("image/jpeg", quality)
-
-        resolve(dataUrl)
-      }
-
-      img.onerror = () => reject(new Error("Failed to decode image — try a JPEG or PNG file"))
-      img.src = e.target.result
+  // Draw img onto a canvas at given dimension and return data URL
+  // Falls back to 200px if the browser runs out of memory (common on mobile with large photos)
+  function encodeImg(img, dim, qual) {
+    let { width, height } = img
+    if (width > dim || height > dim) {
+      if (width >= height) { height = Math.round((height / width) * dim); width = dim }
+      else                 { width = Math.round((width / height) * dim); height = dim }
     }
+    const canvas = document.createElement("canvas")
+    canvas.width = width
+    canvas.height = height
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height)
+    return isPng ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", qual)
+  }
 
-    reader.onerror = () => reject(new Error("Failed to read file"))
-    reader.readAsDataURL(file)
+  // Load an image from a src string (data URL or object URL)
+  function imgFrom(src) {
+    return new Promise((res, rej) => {
+      const i = new Image()
+      i.onload  = () => res(i)
+      i.onerror = () => rej(new Error("decode"))
+      i.src = src
+    })
+  }
+
+  // Attempt 1 — FileReader → data URL → canvas (best mobile compat)
+  const attempt1 = () => new Promise((res, rej) => {
+    const r = new FileReader()
+    r.onload  = e => res(e.target.result)
+    r.onerror = () => rej(new Error("read"))
+    r.readAsDataURL(file)
+  }).then(dataUrl => imgFrom(dataUrl)).then(img => {
+    try { return encodeImg(img, maxDimension, quality) }
+    catch { return encodeImg(img, 200, 0.7) }   // memory fallback
   })
+
+  // Attempt 2 — createObjectURL → canvas (fallback for some formats)
+  const attempt2 = () => {
+    const url = URL.createObjectURL(file)
+    return imgFrom(url)
+      .then(img => { URL.revokeObjectURL(url); return img })
+      .then(img => {
+        try { return encodeImg(img, maxDimension, quality) }
+        catch { return encodeImg(img, 200, 0.7) }
+      })
+      .catch(e => { URL.revokeObjectURL(url); throw e })
+  }
+
+  return attempt1()
+    .catch(() => attempt2())
+    .catch(() => { throw new Error("Could not process this image. Please use a JPEG or PNG photo.") })
 }
 
 // ─── Player photo (admin-set real photo) ─────────────────────────────────────
