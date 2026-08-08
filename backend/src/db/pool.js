@@ -2,7 +2,12 @@ import pg from "pg"
 import dotenv from "dotenv"
 dotenv.config()
 
-const { Pool } = pg
+const { Pool, types } = pg
+
+// Return DATE columns as plain strings (YYYY-MM-DD) instead of JS Date objects.
+// Without this, pg converts DATE to a JS Date in UTC which causes timezone
+// shifts when the server/client are in different timezones (e.g. UTC vs IST).
+types.setTypeParser(1082, val => val)  // 1082 = DATE type OID
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

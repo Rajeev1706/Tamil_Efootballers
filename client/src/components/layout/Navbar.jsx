@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, TrendingUp, Award, CircleDollarSign, Home } from "lucide-react"
+import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, TrendingUp, Award, CircleDollarSign, Home, Calendar } from "lucide-react"
 import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
@@ -14,6 +14,9 @@ const MENU_ITEMS = [
   { value: "compare",   label: "Compare Players",       icon: GitCompare },
   { value: "trophies",  label: "Trophy (Current Year)", icon: Trophy },
   { value: "trophycab", label: "Trophy Cabinet",        icon: Trophy, link: "/trophy-cabinet" },
+  { value: "calendar",  label: "Season Calendar",       icon: Calendar, link: "/calendar" },
+  { value: "teamtrophies", label: "Team Trophy Cabinet",  icon: Trophy,  link: "/team-trophies" },
+  { value: "duo",  label: "Duo Tournament", icon: Users, link: "/duo-tournament" },
 ]
 
 export default function Navbar() {
@@ -66,6 +69,7 @@ export default function Navbar() {
           <nav className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
             <NavLink to="/" label="Dashboard" icon={BarChart2} active={pathname === "/"} />
             <NavLink to="/hall-of-fame" label="Hall of Fame" icon={Trophy} active={pathname === "/hall-of-fame"} />
+            <NavLink to="/calendar" label="Calendar" icon={Calendar} active={pathname === "/calendar"} />
 
             {!user && (
               <NavLink to="/login" label="Login" icon={LogIn} active={pathname === "/login"} />

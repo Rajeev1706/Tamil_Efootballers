@@ -14,6 +14,8 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
   const [name, setName]               = useState(player.name)
   const [alias, setAlias]             = useState(player.alias ?? "")
   const [grade, setGrade]             = useState(player.grade)
+  const [gradeCeiling, setGradeCeiling] = useState(player.gradeCeiling ?? "")
+  const [gradeFloor, setGradeFloor]     = useState(player.gradeFloor ?? "")
   const [teamId, setTeamId]           = useState(player.teamId ?? "")
   const [bdrDelta, setBdrDelta]       = useState("")
   const [isCaptain, setIsCaptain]     = useState(player.isCaptain ?? false)
@@ -131,6 +133,8 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
     setName(player.name)
     setAlias(player.alias ?? "")
     setGrade(player.grade)
+    setGradeCeiling(player.gradeCeiling ?? "")
+    setGradeFloor(player.gradeFloor ?? "")
     setTeamId(player.teamId ?? "")
     setIsCaptain(player.isCaptain ?? false)
     setAuctionPrice(player.auctionPrice ?? "")
@@ -240,22 +244,43 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
         {/* Grade */}
         <td className="py-3.5 px-4">
           {editing ? (
-            <select value={grade} onChange={e => setGrade(e.target.value)}
-              className="bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
-              {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <div className="flex flex-col gap-1.5">
+              <select value={grade} onChange={e => setGrade(e.target.value)}
+                className="bg-pitch-900 border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40">
+                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <select value={gradeCeiling} onChange={e => setGradeCeiling(e.target.value)}
+                title="Max grade ceiling"
+                className="bg-pitch-900 border border-violet-500/30 rounded-lg px-2 py-1 text-[10px] text-violet-300 focus:outline-none">
+                <option value="">🔺 No ceiling</option>
+                {GRADES.map(g => <option key={g} value={g}>🔺 Max: {g}</option>)}
+              </select>
+              <select value={gradeFloor} onChange={e => setGradeFloor(e.target.value)}
+                title="Min grade floor"
+                className="bg-pitch-900 border border-amber-500/30 rounded-lg px-2 py-1 text-[10px] text-amber-300 focus:outline-none">
+                <option value="">⚡ No floor</option>
+                {GRADES.map(g => <option key={g} value={g}>🔒 Min: {g}</option>)}
+              </select>
+            </div>
           ) : (
             <div className="flex flex-col gap-1">
               <GradeBadge grade={player.grade} />
-              {player.gradeFloor ? (
-                <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded w-fit">
-                  🔒 Floor: {player.gradeFloor}
-                </span>
-              ) : (
-                <span className="text-[9px] font-bold text-sky-400 bg-sky-400/10 border border-sky-400/25 px-1.5 py-0.5 rounded w-fit">
-                  ⚡ Auto
-                </span>
-              )}
+              <div className="flex flex-col gap-0.5">
+                {player.gradeCeiling && (
+                  <span className="text-[9px] font-bold text-violet-400 bg-violet-400/10 border border-violet-400/25 px-1.5 py-0.5 rounded w-fit">
+                    🔺 Max: {player.gradeCeiling}
+                  </span>
+                )}
+                {player.gradeFloor ? (
+                  <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded w-fit">
+                    🔒 Min: {player.gradeFloor}
+                  </span>
+                ) : !player.gradeCeiling ? (
+                  <span className="text-[9px] font-bold text-sky-400 bg-sky-400/10 border border-sky-400/25 px-1.5 py-0.5 rounded w-fit">
+                    ⚡ Auto
+                  </span>
+                ) : null}
+              </div>
             </div>
           )}
         </td>

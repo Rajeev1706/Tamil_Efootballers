@@ -869,6 +869,126 @@ async function clearCurrentSeasonData(q) {
   await q(`DELETE FROM ucl_groups`)
 }
 
+
+// POST /api/teams/recalc-grades — admin only
+// Runs ONLY the grade auto-update logic from season-reset, without
+// clearing any season data or advancing the season number.
+// Useful for previewing/applying grade changes mid-season or on demand.
+router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { season } = req.body
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const targetSeason = season || parseInt(seasonRes.rows[0]?.value || "1")
+
+    const gradeUpdateLog = []
+
+    // Use two separate queries (player_id side + opponent_id side) instead of OR
+    // OR conditions on large tables cause seq scans and timeouts
+    const eligibleRes = await query(`
+      WITH player_stats AS (
+        SELECT
+          player_id AS pid,
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE result = 'win')::int AS wins
+        FROM match_records
+        WHERE season_number = $1
+        GROUP BY player_id
+      ),
+      opp_stats AS (
+        SELECT
+          opponent_id AS pid,
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE result = 'loss')::int AS wins
+        FROM match_records
+        WHERE season_number = $1
+        GROUP BY opponent_id
+      ),
+      combined AS (
+        SELECT pid,
+          COALESCE(ps.total,0) + COALESCE(os.total,0) AS matches,
+          COALESCE(ps.wins,0)  + COALESCE(os.wins,0)  AS wins
+        FROM (SELECT DISTINCT pid FROM (
+          SELECT player_id AS pid FROM match_records WHERE season_number = $1
+          UNION
+          SELECT opponent_id FROM match_records WHERE season_number = $1
+        ) x) ids
+        LEFT JOIN player_stats ps USING (pid)
+        LEFT JOIN opp_stats os USING (pid)
+      )
+      SELECT
+        p.id, p.name,
+        p.grade AS current_grade, p.grade_floor,
+        c.matches, c.wins,
+        ROUND(c.wins::numeric / NULLIF(c.matches,0) * 100, 2) AS win_rate
+      FROM combined c
+      JOIN players p ON p.id = c.pid
+      WHERE p.is_captain IS NOT TRUE
+        AND c.matches >= 20
+      ORDER BY win_rate DESC, wins DESC
+    `, [targetSeason])
+
+    const eligible = eligibleRes.rows
+
+    const rankToGrade = (rank) => {
+      if (rank <= 10) return "S"
+      if (rank <= 25) return "A"
+      if (rank <= 50) return "B"
+      return "C"
+    }
+    const GRADE_NUM = { S: 4, "A+": 3.5, A: 3, B: 2, C: 1 }
+
+    for (let i = 0; i < eligible.length; i++) {
+      const player      = eligible[i]
+      const rank        = i + 1
+      const targetGrade = rankToGrade(rank)
+      const current     = player.current_grade
+      const floor       = player.grade_floor
+      const tgtNum      = GRADE_NUM[targetGrade] || 1
+
+      let finalGrade = current
+      const ceiling = player.grade_ceiling
+      if (floor && ceiling) {
+        const floorNum   = GRADE_NUM[floor]   || 1
+        const ceilingNum = GRADE_NUM[ceiling] || 4
+        finalGrade = Math.min(ceilingNum, Math.max(floorNum, tgtNum)) === tgtNum ? targetGrade : (tgtNum > ceilingNum ? ceiling : floor)
+      } else if (floor) {
+        const floorNum = GRADE_NUM[floor] || 1
+        finalGrade = tgtNum >= floorNum ? targetGrade : floor
+      } else if (ceiling) {
+        const ceilingNum = GRADE_NUM[ceiling] || 4
+        finalGrade = tgtNum <= ceilingNum ? targetGrade : ceiling
+      } else {
+        finalGrade = targetGrade
+      }
+
+      if (finalGrade !== current) {
+        await query(
+          `UPDATE players SET grade = $1 WHERE id = $2`,
+          [finalGrade, player.id]
+        )
+        const floorTag = floor ? ` [floor: ${floor}]` : " [auto]"
+        gradeUpdateLog.push({
+          name: player.name,
+          from: current,
+          to: finalGrade,
+          rank,
+          winRate: player.win_rate,
+          matches: player.matches,
+          floor: floor || null,
+        })
+      }
+    }
+
+    res.json({
+      success: true,
+      season: targetSeason,
+      eligible: eligible.length,
+      updated: gradeUpdateLog.length,
+      changes: gradeUpdateLog,
+    })
+  } catch (err) { next(err) }
+})
+
 // POST /api/teams/season-reset — admin only
 // Archives current season by clearing its fixtures/UCL/team-stats, then
 // ADVANCES the season number by one.

@@ -30,7 +30,13 @@ router.get("/", async (req, res, next) => {
     if (grade)  { conditions.push(`grade = $${params.length+1}`);    params.push(grade)  }
     const where  = conditions.length ? " WHERE " + conditions.join(" AND ") : ""
     const result = await query(
-      `SELECT * FROM players_full${where} ORDER BY "bdrPoints" DESC`, params
+      `SELECT
+        id, name, alias, grade, "auctionPrice", "marketValue", "bdrPoints",
+        form, "trophy1Count", "trophy2Count", "trophy3Count", "trophy4Count",
+        "isCaptain", "gradeFloor", "gradeCeiling",
+        team, "teamId", "teamLogo",
+        "avatarId", "avatarUrl"
+      FROM players_full${where} ORDER BY "bdrPoints" DESC`, params
     )
     res.json(result.rows)
   } catch (err) { next(err) }
@@ -162,6 +168,8 @@ const updateSchema = z.object({
   auctionPrice:  z.number().int().min(0).optional(),
   teamId:        z.number().int().positive().optional().nullable(),
   imageUrl:      z.string().optional().nullable(),
+  gradeFloor:    z.string().optional().nullable(),
+  gradeCeiling:  z.string().optional().nullable(),
   trophy1Count:  z.number().int().min(0).optional(),
   trophy2Count:  z.number().int().min(0).optional(),
   trophy3Count:  z.number().int().min(0).optional(),
@@ -224,7 +232,7 @@ router.patch("/:id/avatar", async (req, res, next) => {
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      name, alias, grade, bdrDelta, isCaptain, auctionPrice, teamId, imageUrl,
+      name, alias, grade, gradeFloor, gradeCeiling, bdrDelta, isCaptain, auctionPrice, teamId, imageUrl,
       trophy1Count, trophy2Count, trophy3Count, trophy4Count, trophy5Count, trophy6Count, trophy7Count,
     } = updateSchema.parse(req.body)
 
@@ -241,7 +249,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         name          = COALESCE($1, name),
         alias         = COALESCE($2, alias),
         grade         = COALESCE($3::player_grade, grade),
-        grade_floor   = CASE WHEN $3 IS NOT NULL THEN $3::varchar ELSE grade_floor END,
+
         bdr_points    = GREATEST(0, bdr_points + COALESCE($4, 0)),
         is_captain    = COALESCE($5, is_captain),
         auction_price = COALESCE($6, auction_price),
@@ -255,7 +263,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         trophy6_count = COALESCE($14, trophy6_count),
         trophy7_count = COALESCE($15, trophy7_count)
       WHERE id = $16
-      RETURNING id, name, alias, grade, grade_floor AS "gradeFloor",
+      RETURNING id, name, alias, grade, grade_floor AS "gradeFloor", grade_ceiling AS "gradeCeiling",
                 image_url     AS "imageUrl",
                 is_captain    AS "isCaptain",
                 bdr_points    AS "bdrPoints",
@@ -277,9 +285,26 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       trophy4Count ?? null, trophy5Count ?? null,
       trophy6Count ?? null, trophy7Count ?? null,
       req.params.id, teamIdProvided,
+
     ])
 
     if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })
+
+    // Update grade_floor and grade_ceiling separately to avoid null type issues
+    if (gradeFloor !== undefined) {
+      await query(
+        `UPDATE players SET grade_floor = $1 WHERE id = $2`,
+        [gradeFloor || null, req.params.id]
+      )
+      result.rows[0].gradeFloor = gradeFloor || null
+    }
+    if (gradeCeiling !== undefined) {
+      await query(
+        `UPDATE players SET grade_ceiling = $1 WHERE id = $2`,
+        [gradeCeiling || null, req.params.id]
+      )
+      result.rows[0].gradeCeiling = gradeCeiling || null
+    }
 
     // bdr_points just changed (or could have, via bdrDelta), and market_value
     // now factors BDR points into its calculation — recalc so the two stay
