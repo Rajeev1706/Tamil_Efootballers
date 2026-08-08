@@ -1,4 +1,5 @@
 import express from "express"
+import compression from "compression"
 import cors from "cors"
 import dotenv from "dotenv"
 import { createServer } from "http"
@@ -22,6 +23,9 @@ import auctionRoutes     from "./routes/auction.js"
 import auctionTargetRoutes from "./routes/auctionTargets.js"
 import auctionIntelRoutes  from "./routes/auctionIntel.js"
 import winrateRoutes       from "./routes/winrate.js"
+import calendarRoutes      from "./routes/calendar.js"
+import teamTrophyRoutes    from "./routes/teamTrophies.js"
+import duoRoutes            from "./routes/duo.js"
 import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
@@ -29,6 +33,7 @@ const app  = express()
 const PORT = process.env.PORT || 3001
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+app.use(compression())
 app.use(cors({
   origin:      process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,
@@ -62,8 +67,11 @@ app.use("/api/auction",         auctionRoutes)
 app.use("/api/auction-targets", auctionTargetRoutes)
 app.use("/api/auction-intel",   auctionIntelRoutes)
 app.use("/api/winrate",         winrateRoutes)
+app.use("/api/calendar",        calendarRoutes)
+app.use("/api/team-trophies",   teamTrophyRoutes)
+app.use("/api/duo",              duoRoutes)
 
-// GET /api/settings — public app settings (current season etc.)
+// GET /api/settings
 app.get("/api/settings", async (_req, res) => {
   try {
     const result = await query("SELECT key, value FROM app_settings")
@@ -74,7 +82,7 @@ app.get("/api/settings", async (_req, res) => {
   }
 })
 
-// PATCH /api/settings — admin updates settings
+// PATCH /api/settings
 app.patch("/api/settings", authenticate, adminOnly, async (req, res) => {
   try {
     const { key, value } = req.body
@@ -88,21 +96,12 @@ app.patch("/api/settings", authenticate, adminOnly, async (req, res) => {
   }
 })
 
-// One-off admin utility — recalculates market_value for ALL players using the
-// full corrected JS formula (both sides + BDR). Hit once after deploying the
-// marketValue.js fix to correct stale MVs. Admin auth required.
 import { query } from "./db/pool.js"
 import { recalcMarketValue } from "./services/marketValue.js"
 import { authenticate, adminOnly } from "./middleware/auth.js"
 
 app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
   try {
-    // Recalculate every player who has ever appeared in a match, using the
-    // single real formula in services/marketValue.js (uncapped — no ceiling,
-    // includes the BDR swing) — the exact same logic that runs after every
-    // individual match result, so a bulk recalc here can never drift out of
-    // sync with the per-match path the way a separately hand-written SQL
-    // version could.
     const idsRes = await query(`
       SELECT DISTINCT id FROM (
         SELECT player_id AS id FROM match_records
@@ -111,18 +110,14 @@ app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
       ) sub
     `)
     const ids = idsRes.rows.map(r => r.id)
-
-    for (const id of ids) {
-      await recalcMarketValue(id)
-    }
-
+    for (const id of ids) await recalcMarketValue(id)
     res.json({ success: true, updated: ids.length, message: `Recalculated MV for ${ids.length} players` })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// ── League Info board (public read, admin write) ───────────────────────────
+// ── League Info ────────────────────────────────────────────────────────────────
 app.get("/api/league-info", async (_req, res) => {
   try {
     const result = await query("SELECT * FROM league_info ORDER BY sort_order ASC, id ASC")
@@ -156,18 +151,10 @@ app.delete("/api/league-info/:id", authenticate, adminOnly, async (req, res) => 
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// 404 handler
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }))
-
-// Global error handler (must be last)
 app.use(errorHandler)
 
 const httpServer = createServer(app)
-
-// Socket.IO — used specifically for real-time auction sync (bids, sales,
-// new players coming up) so every connected screen updates the instant
-// something happens, instead of waiting on a polling interval. Same CORS
-// origin as the REST API.
 const io = new SocketIOServer(httpServer, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",

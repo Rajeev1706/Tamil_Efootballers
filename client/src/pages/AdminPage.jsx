@@ -174,6 +174,65 @@ function IncrementYearCard() {
   )
 }
 
+
+function RecalcGradesCard() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult]   = useState(null)
+  const [error, setError]     = useState(null)
+  async function handleRecalc() {
+    setLoading(true); setError(null); setResult(null)
+    try {
+      const data = await teamsApi.recalcGrades()
+      setResult(data)
+    } catch (err) {
+      setError(err?.response?.data?.error || "Recalculation failed")
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold text-white mb-1">⚡ Recalculate Grades</p>
+          <p className="text-xs text-slate-500">
+            Auto-updates player grades based on current season win rates.
+            Does NOT reset the season or clear any data.
+          </p>
+        </div>
+        <button onClick={handleRecalc} disabled={loading}
+          className="flex-shrink-0 px-4 py-2 bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-sm font-semibold hover:bg-sky-500/30 disabled:opacity-50 transition-all whitespace-nowrap">
+          {loading ? "Recalculating..." : "Run Now"}
+        </button>
+      </div>
+      {error && <p className="mt-3 text-xs text-rose-400">{error}</p>}
+      {result && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs text-emerald-400 font-semibold">
+            ✅ {result.updated} grade{result.updated !== 1 ? "s" : ""} updated
+            ({result.eligible} eligible players in Season {result.season})
+          </p>
+          {result.changes.length > 0 && (
+            <div className="bg-pitch-900 rounded-xl border border-surface-border p-3 space-y-1 max-h-48 overflow-y-auto">
+              {result.changes.map((c, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-300 font-medium w-32 truncate">{c.name}</span>
+                  <span className="text-slate-500">{c.from}</span>
+                  <span className="text-slate-600">→</span>
+                  <span className={c.to > c.from ? "text-emerald-400" : "text-rose-400"} style={{}}>{c.to}</span>
+                  <span className="text-slate-600 ml-auto">#{c.rank} · {c.winRate}% WR</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {result.changes.length === 0 && (
+            <p className="text-xs text-slate-500">No grade changes needed — all grades are current.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SeasonResetCard() {
   const [confirm, setConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -461,6 +520,7 @@ export default function AdminPage() {
       <p className="section-label mb-3">Season</p>
       <div className="space-y-3">
         <IncrementYearCard />
+        <RecalcGradesCard />
         <SeasonResetCard />
         <DeleteSeasonCard />
       </div>
