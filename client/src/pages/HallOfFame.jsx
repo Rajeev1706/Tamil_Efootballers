@@ -1,15 +1,22 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Crown, ChevronDown, Trophy } from "lucide-react"
+import { ArrowLeft, Crown, ChevronDown, Trophy, Star } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
-import { useSeasonRecords, useLeagueInfo } from "../lib/queries"
+import { useSeasonRecords, useLeagueInfo, useSpecialEditions } from "../lib/queries"
 import { cn } from "../lib/utils"
 import ballondorImg  from "../../images/ballondor.png"
 import teamLeagueImg from "../../images/Team League.png"
 import weeklyImg     from "../../images/Weekly.png"
 import uclImg        from "../../images/ucl.png"
 import goldenBootImg from "../../images/Golden Boot.png"
+import epicmatchImg  from "../../images/epicmatch.jpeg"
+
+// Maps the image_url key stored in DB → actual bundled image import.
+// Add a new entry here whenever a new image is dropped into client/images/.
+const SPECIAL_EDITION_IMAGE_MAP = {
+  epicmatch: epicmatchImg,
+}
 
 function TrophyRow({ image, label, winner, sub }) {
   if (!winner) return null
@@ -109,6 +116,7 @@ export default function HallOfFame() {
   const navigate = useNavigate()
   const { data: records = [], isLoading } = useSeasonRecords()
   const { data: infoItems = [] }          = useLeagueInfo()
+  const { data: specialEditions = [] }    = useSpecialEditions()
   const [selectedId, setSelectedId] = useState(null)
 
   const sorted = [...records].sort((a, b) => b.season_number - a.season_number)
@@ -141,48 +149,101 @@ export default function HallOfFame() {
 
         {isLoading ? (
           <Loading />
-        ) : records.length === 0 ? (
-          <div className="card px-6 py-16 text-center">
-            <Trophy className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400 font-medium">No season records yet</p>
-            <p className="text-xs text-slate-600 mt-1">Admin can add season records from the Setup tab</p>
-          </div>
         ) : (
           <>
-            {/* League Info Board — shown above season dropdown */}
-            {infoItems.length > 0 && (
-              <div className="card overflow-hidden mb-4">
-                <div className="divide-y divide-surface-border/50">
-                  {infoItems.map(item => (
-                    <div key={item.id} className="px-5 py-4">
-                      <p className="text-sm font-bold text-accent mb-1">{item.title}</p>
-                      <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+            {/* Special Editions — always shown, independent of season records */}
+            {specialEditions.length > 0 && (
+              <div className="space-y-3 mb-4">
+                {specialEditions.map(edition => {
+                  // Resolve the stored key (e.g. "epicmatch") to the actual imported image
+                  const resolvedImage = SPECIAL_EDITION_IMAGE_MAP[edition.image_url] || null
+                  return (
+                    <div
+                      key={edition.id}
+                      className="relative rounded-2xl overflow-hidden border border-gold/30 shadow-lg"
+                    >
+                      {resolvedImage ? (
+                        <>
+                          {/* Full image at natural size — no cropping */}
+                          <img
+                            src={resolvedImage}
+                            alt={edition.title}
+                            className="w-full object-contain block"
+                          />
+                          {/* Text overlay at bottom */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-pitch-900 via-pitch-900/80 to-transparent px-5 py-4">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Star className="w-3.5 h-3.5 text-gold fill-gold" />
+                              <span className="text-[10px] font-bold text-gold uppercase tracking-widest">Something To Look Out</span>
+                            </div>
+                            <h2 className="text-xl font-extrabold text-white leading-tight mb-1">{edition.title}</h2>
+                            {edition.subtitle && (
+                              <p className="text-sm text-slate-300 leading-snug">{edition.subtitle}</p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="bg-gradient-to-br from-gold/10 via-pitch-800 to-pitch-900 px-5 py-6">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Star className="w-3.5 h-3.5 text-gold fill-gold" />
+                            <span className="text-[10px] font-bold text-gold uppercase tracking-widest">Special Edition</span>
+                          </div>
+                          <h2 className="text-xl font-extrabold text-white leading-tight mb-1">{edition.title}</h2>
+                          {edition.subtitle && (
+                            <p className="text-sm text-slate-300 leading-snug">{edition.subtitle}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             )}
 
-            {/* Season selector dropdown */}
-            <div className="relative">
-              <select
-                value={selectedId ?? ""}
-                onChange={e => setSelectedId(parseInt(e.target.value))}
-                className="w-full appearance-none bg-pitch-800 border border-surface-border rounded-xl px-4 py-3 text-sm font-semibold text-white focus:outline-none focus:border-accent/40 transition-colors cursor-pointer pr-10"
-              >
-                {sorted.map(r => (
-                  <option key={r.id} value={r.id} className="bg-pitch-900 text-white">
-                    {r.season_name || `Season ${r.season_number}`}
-                    {r.year ? ` · ${r.year}` : ""}
-                    {r.champion_team ? ` — 🏆 ${r.champion_team}` : ""}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+            {records.length === 0 ? (
+              <div className="card px-6 py-16 text-center">
+                <Trophy className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 font-medium">No season records yet</p>
+                <p className="text-xs text-slate-600 mt-1">Admin can add season records from the Setup tab</p>
+              </div>
+            ) : (
+              <>
+                {/* League Info Board */}
+                {infoItems.length > 0 && (
+                  <div className="card overflow-hidden mb-4">
+                    <div className="divide-y divide-surface-border/50">
+                      {infoItems.map(item => (
+                        <div key={item.id} className="px-5 py-4">
+                          <p className="text-sm font-bold text-accent mb-1">{item.title}</p>
+                          <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Selected season detail */}
-            {selected && <SeasonDetail record={selected} />}
+                {/* Season selector dropdown */}
+                <div className="relative">
+                  <select
+                    value={selectedId ?? ""}
+                    onChange={e => setSelectedId(parseInt(e.target.value))}
+                    className="w-full appearance-none bg-pitch-800 border border-surface-border rounded-xl px-4 py-3 text-sm font-semibold text-white focus:outline-none focus:border-accent/40 transition-colors cursor-pointer pr-10"
+                  >
+                    {sorted.map(r => (
+                      <option key={r.id} value={r.id} className="bg-pitch-900 text-white">
+                        {r.season_name || `Season ${r.season_number}`}
+                        {r.year ? ` · ${r.year}` : ""}
+                        {r.champion_team ? ` — 🏆 ${r.champion_team}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Selected season detail */}
+                {selected && <SeasonDetail record={selected} />}
+              </>
+            )}
           </>
         )}
       </div>

@@ -910,3 +910,32 @@ export const useScoutingReport = (myTeamId, oppTeamId) =>
     queryFn: () => scoutingApi.getReport(myTeamId, oppTeamId),
     enabled: !!myTeamId && !!oppTeamId,
   })
+// ── Special Editions ─────────────────────────────────────────────────────────
+import { specialEditionsApi } from "./api"
+
+export const useSpecialEditions = () =>
+  useQuery({ queryKey: ["special-editions"], queryFn: specialEditionsApi.list, staleTime: 1000 * 60 * 5 })
+
+export const useCreateSpecialEdition = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => specialEditionsApi.create(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["special-editions"] }),
+  })
+}
+
+export const useUpdateSpecialEdition = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => specialEditionsApi.update(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["special-editions"] }),
+  })
+}
+
+export const useDeleteSpecialEdition = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => specialEditionsApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["special-editions"] }),
+  })
+}
