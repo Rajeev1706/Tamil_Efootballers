@@ -7,7 +7,11 @@ import { useAuthStore } from "./store/authStore"
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 1000 * 60, retry: 1 },
+    queries: {
+      staleTime:   1000 * 60,  // 1 min — don't refetch data that's still fresh
+      retry:       1,           // one retry on failure
+      retryDelay:  5000,        // wait 5s before retry — gives Render time to finish waking up
+    },
   },
 })
 

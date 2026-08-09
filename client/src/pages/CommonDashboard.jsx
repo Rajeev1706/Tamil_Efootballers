@@ -446,6 +446,16 @@ export default function CommonDashboard() {
   }, [showBallonDorCelebration, testBallonDorActive])
 
   const activePanel    = searchParams.get("view") || "standings"
+
+  // Re-declare top scorer queries here so they can use activePanel + celebration states
+  // as enabled guards — defers these requests until they're actually needed, cutting
+  // the initial parallel request burst from 11 down to 9 on a cold first load.
+  const { data: uclTopScorersDeferred = [] }    = useUclTopScorers(
+    activePanel === "ucl" || showUclCelebration || showBallonDorCelebration
+  )
+  const { data: weeklyTopScorersDeferred = [] } = useWeeklyTopScorers(
+    activePanel === "weekly" || showWeeklyCelebration
+  )
   const trophyKey      = searchParams.get("trophy") || undefined
   const standingsView  = searchParams.get("standingsView") || undefined
   const urlYear        = searchParams.get("year")
@@ -520,8 +530,8 @@ export default function CommonDashboard() {
   // someone has actually scored (goals > 0), so an empty/fresh competition
   // doesn't show a misleading "0 goals" winner.
   const teamGoldenBoot   = teamTopScorers[0]?.goals > 0   ? teamTopScorers[0]   : null
-  const uclGoldenBoot    = uclTopScorers[0]?.goals > 0    ? uclTopScorers[0]    : null
-  const weeklyGoldenBoot = weeklyTopScorers[0]?.goals > 0 ? weeklyTopScorers[0] : null
+  const uclGoldenBoot    = uclTopScorersDeferred[0]?.goals > 0    ? uclTopScorersDeferred[0]    : null
+  const weeklyGoldenBoot = weeklyTopScorersDeferred[0]?.goals > 0 ? weeklyTopScorersDeferred[0] : null
 
   return (
     <Layout>
