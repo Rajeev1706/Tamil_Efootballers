@@ -434,6 +434,14 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       })
     }
 
+    // Store UCL completion timestamp for 48-hour celebration window
+    if (match.round === 5 && winnerId) {
+      await query(
+        `INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`,
+        [`ucl_champion_completed_at_${match.tournament_id}`, new Date().toISOString()]
+      )
+    }
+
     res.json({ updated: true, winnerId })
   } catch (err) { next(err) }
 })

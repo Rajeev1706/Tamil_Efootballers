@@ -153,6 +153,15 @@ const PANEL_OPTIONS = [
   { value: "revolution",  label: "Revolution Trophy"  },
 ]
 
+
+// Check if a timestamp is within 48 hours of now
+function isWithin48Hours(isoTimestamp) {
+  if (!isoTimestamp) return false
+  const completedAt = new Date(isoTimestamp).getTime()
+  const now = Date.now()
+  return (now - completedAt) < 48 * 60 * 60 * 1000
+}
+
 export default function CommonDashboard() {
   const navigate = useNavigate()
   const { data: auctionData } = useAuctionCurrent()
@@ -219,6 +228,8 @@ export default function CommonDashboard() {
   useEffect(() => {
     if (testWeeklyActive) return
     if (!weeklyChampion || !weeklyTournament?.id) return
+    const completedAt = settings[`weekly_champion_completed_at_${weeklyTournament.id}`]
+    if (!isWithin48Hours(completedAt)) return
     const key = `weekly_champion_seen_${weeklyTournament.id}`
     if (!localStorage.getItem(key)) {
       setShowWeeklyCelebration(true)
@@ -295,8 +306,9 @@ export default function CommonDashboard() {
 
   useEffect(() => {
     if (testTeamActive) return
-    if (teamsLoading || playersLoading) return // wait for real data before showing, so player chips don't pop in late
+    if (teamsLoading || playersLoading) return
     if (!teamChampion || !teamCelebrationSeason) return
+    if (!isWithin48Hours(settings['league_champion_completed_at'])) return
     const key = `team_league_champion_seen_${teamCelebrationSeason}_${teamChampion.id}`
     if (!localStorage.getItem(key)) {
       setShowTeamCelebration(true)
@@ -354,6 +366,8 @@ export default function CommonDashboard() {
   useEffect(() => {
     if (testUclActive) return
     if (!uclChampion || !uclKnockout?.id) return
+    const uclCompletedAt = settings[`ucl_champion_completed_at_${uclKnockout.id}`]
+    if (!isWithin48Hours(uclCompletedAt)) return
     const key = `ucl_champion_seen_${uclKnockout.id}`
     if (!localStorage.getItem(key)) {
       setShowUclCelebration(true)
@@ -490,7 +504,6 @@ export default function CommonDashboard() {
   const isCurrent  = selectedSeason === null
   const pastRecord = selectedSeason ? seasonRecords.find(r => r.season_number === selectedSeason) : null
 
-  const leagueLeader = [...teams].sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || (b.wins ?? 0) - (a.wins ?? 0))[0]
   const leader = [...players].sort((a, b) =>
     (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
   )[0]
@@ -640,7 +653,7 @@ export default function CommonDashboard() {
                 <div className="mt-4 flex items-center gap-2">
                   <span className="text-xs text-slate-500">League leader</span>
                   <span className="text-xs font-semibold text-white bg-accent/15 border border-accent/25 px-2 py-0.5 rounded-full">
-                    {leagueLeader?.name} · {leagueLeader?.points} pts
+                    {teams[0].name} · {teams[0].points} pts
                   </span>
                 </div>
               )}

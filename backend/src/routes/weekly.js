@@ -526,6 +526,14 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         seasonNumber: season,
       })
 
+      // Store completion timestamp for 48-hour celebration window
+      if (finalMatchRes.rows[0]?.winner_id) {
+        await query(`
+          INSERT INTO app_settings (key, value) VALUES ($1, $2)
+          ON CONFLICT (key) DO UPDATE SET value = $2
+        `, [`weekly_champion_completed_at_${match.tournament_id}`, new Date().toISOString()])
+      }
+
       const trophyGoldenBootRes = await query(`
         SELECT p.id,
           COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
