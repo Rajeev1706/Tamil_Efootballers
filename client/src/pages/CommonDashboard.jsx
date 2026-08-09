@@ -11,7 +11,6 @@ import TrophyRanking from "../components/dashboard/TrophyRanking"
 import UclStandings from "../components/dashboard/UclStandings"
 import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
 import RevolutionDashboard from "../components/dashboard/RevolutionDashboard"
-import DuoDashboard from "../components/dashboard/DuoDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import PlayerComparison from "../components/dashboard/PlayerComparison"
@@ -152,7 +151,6 @@ const PANEL_OPTIONS = [
   { value: "ucl",         label: "UCL"                },
   { value: "weekly",      label: "Weekly"             },
   { value: "revolution",  label: "Revolution Trophy"  },
-  { value: "duo",         label: "Duo Tournament"     },
 ]
 
 export default function CommonDashboard() {
@@ -492,6 +490,7 @@ export default function CommonDashboard() {
   const isCurrent  = selectedSeason === null
   const pastRecord = selectedSeason ? seasonRecords.find(r => r.season_number === selectedSeason) : null
 
+  const leagueLeader = [...teams].sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || (b.wins ?? 0) - (a.wins ?? 0))[0]
   const leader = [...players].sort((a, b) =>
     (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
   )[0]
@@ -641,7 +640,7 @@ export default function CommonDashboard() {
                 <div className="mt-4 flex items-center gap-2">
                   <span className="text-xs text-slate-500">League leader</span>
                   <span className="text-xs font-semibold text-white bg-accent/15 border border-accent/25 px-2 py-0.5 rounded-full">
-                    {teams[0].name} · {teams[0].points} pts
+                    {leagueLeader?.name} · {leagueLeader?.points} pts
                   </span>
                 </div>
               )}
@@ -711,7 +710,6 @@ export default function CommonDashboard() {
                 {activePanel === "ucl"       && <UclStandings onPlayerClick={handlePlayer} />}
                 {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "revolution" && <RevolutionDashboard onPlayerClick={handlePlayer} />}
-                {activePanel === "duo" && <DuoDashboard />}
                 {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
