@@ -1021,11 +1021,10 @@ export default function ScoutingReport({ myTeamId, oppTeamId, oppTeamName, onClo
                       )}
                     </div>
 
-                    {p.imageUrl && (
-                      <div className="mt-4">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{p.name}'s Squad</p>
-                        <img src={p.imageUrl} alt={`${p.name} squad`}
-                          className="w-full max-w-md aspect-[20/9] object-cover rounded-xl border border-surface-border" />
+                    {(p.avatarUrl || p.avatarId) && (
+                      <div className="mt-4 flex flex-col items-center gap-2">
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{p.name}</p>
+                        <PlayerAvatarIcon player={p} size="w-16 h-16" className="rounded-xl" />
                       </div>
                     )}
                   </div>
