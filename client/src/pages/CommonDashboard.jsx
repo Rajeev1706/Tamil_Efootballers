@@ -177,7 +177,10 @@ export default function CommonDashboard() {
   const { data: uclTopScorers = [] }                      = useUclTopScorers()
   const { data: weeklyTopScorers = [] }                   = useWeeklyTopScorers()
 
-  const urlParams = new URLSearchParams(window.location.search)
+  // useSearchParams must be used for all URL reads — window.location.search bypasses
+  // React Router and can read stale values during programmatic navigation.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlParams = searchParams
 
   // ── Weekly Tournament champion celebration ──────────────────────────────
   // Site-wide, once-per-visitor — fires on whatever page/view the visitor
@@ -442,7 +445,6 @@ export default function CommonDashboard() {
     return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
   }, [showBallonDorCelebration, testBallonDorActive])
 
-  const [searchParams, setSearchParams] = useSearchParams()
   const activePanel    = searchParams.get("view") || "standings"
   const trophyKey      = searchParams.get("trophy") || undefined
   const standingsView  = searchParams.get("standingsView") || undefined

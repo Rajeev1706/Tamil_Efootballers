@@ -37,7 +37,7 @@ export default function Navbar() {
     setMenuOpen(false)
   }
 
-  const activeView = pathname === "/" ? (searchParams.get("view") || "players") : null
+  const activeView = pathname === "/" ? (searchParams.get("view") || "standings") : null
 
   return (
     <>

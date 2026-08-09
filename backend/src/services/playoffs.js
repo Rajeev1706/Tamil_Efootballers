@@ -11,7 +11,9 @@ export async function generatePlayoffs(season) {
   const existing = await query("SELECT id FROM team_league_playoffs WHERE season_number = $1 LIMIT 1", [season])
   if (existing.rows.length > 0) return false
 
-  const standings = await query("SELECT id FROM teams ORDER BY score_points DESC LIMIT 4")
+  // Use the generated `points` column (won*3+drawn) + goal difference for proper seeding.
+  // score_points is a legacy manually-maintained column that can drift from the actual standings.
+  const standings = await query("SELECT id FROM teams ORDER BY points DESC, gd DESC, gf DESC LIMIT 4")
   if (standings.rows.length < 4) return false
 
   const [first, second, third, fourth] = standings.rows.map(r => r.id)

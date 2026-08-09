@@ -6,19 +6,10 @@ import { Trophy, Target, Zap } from "lucide-react"
 export default function TitleRaceTracker({ teams, fixtures }) {
 
   const data = useMemo(() => {
-    // ── Debug logs — check browser console ───────────────────────────────
-    console.log("[TitleRaceTracker] teams count:", teams?.length)
-    console.log("[TitleRaceTracker] fixtures count:", fixtures?.length)
-    console.log("[TitleRaceTracker] sample team:", teams?.[0])
-
-    if (!teams || teams.length < 2) {
-      console.log("[TitleRaceTracker] EXIT: not enough teams")
-      return null
-    }
+    if (!teams || teams.length < 2) return null
 
     const sorted = [...teams].sort((a, b) => Number(b.points) - Number(a.points))
     const leader = sorted[0]
-    console.log("[TitleRaceTracker] leader:", leader?.name, leader?.points, "played:", leader?.played)
 
     // Count remaining fixtures — String() coercion to avoid type mismatches
     const remaining = {}
@@ -34,8 +25,6 @@ export default function TitleRaceTracker({ teams, fixtures }) {
       }
     }
 
-    console.log("[TitleRaceTracker] remaining from fixtures:", { ...remaining })
-
     // Fallback: estimate from played count if fixture matching gave all zeros
     const anyRemaining = Object.values(remaining).some(v => v > 0)
     if (!anyRemaining) {
@@ -43,16 +32,10 @@ export default function TitleRaceTracker({ teams, fixtures }) {
       for (const t of teams) {
         remaining[String(t.id)] = Math.max(0, totalGames - Number(t.played || 0))
       }
-      console.log("[TitleRaceTracker] used fallback remaining:", { ...remaining })
     }
 
     const leaderRem = remaining[String(leader.id)]
-    console.log("[TitleRaceTracker] leader remaining:", leaderRem)
-
-    if (leaderRem === 0) {
-      console.log("[TitleRaceTracker] EXIT: leader has 0 remaining — season over")
-      return null
-    }
+    if (leaderRem === 0) return null
 
     const entries = []
     for (const team of sorted.slice(0, 6)) {
@@ -74,12 +57,7 @@ export default function TitleRaceTracker({ teams, fixtures }) {
       if (entries.length >= 4) break
     }
 
-    console.log("[TitleRaceTracker] entries count:", entries.length)
-
-    if (entries.length < 2) {
-      console.log("[TitleRaceTracker] EXIT: entries < 2")
-      return null
-    }
+    if (entries.length < 2) return null
 
     return { entries, leader }
   }, [teams, fixtures])

@@ -17,7 +17,7 @@ import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import RevolutionAdmin from "../components/admin/RevolutionTournament"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
-import { teamsApi } from "../lib/api"
+import api, { teamsApi } from "../lib/api"
 import { adminActivity } from "../data/mockData"
 import { cn } from "../lib/utils"
 import ManageTeams from "../components/admin/ManageTeams"
@@ -32,13 +32,7 @@ function ResetMVCard() {
   async function handleReset() {
     setLoading(true)
     try {
-      await fetch(`${import.meta.env.VITE_API_URL || "https://tamil-efootballers.onrender.com/api"}/players/reset-mv`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      })
+      await api.post("/players/reset-mv")
       setDone(true)
       setConfirm(false)
     } catch (err) {

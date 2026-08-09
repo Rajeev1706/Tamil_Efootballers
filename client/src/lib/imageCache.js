@@ -158,7 +158,6 @@ export async function clearImageCache() {
       tx.oncomplete = resolve
       tx.onerror    = resolve
     })
-    console.log("[imageCache] Cache cleared.")
   } catch (e) {
     console.warn("[imageCache] Could not clear IndexedDB:", e)
   }

@@ -38,9 +38,12 @@ CREATE TABLE IF NOT EXISTS teams (
 );
 
 ALTER TABLE teams
-  ADD COLUMN IF NOT EXISTS gd         INT GENERATED ALWAYS AS (gf - ga) STORED,
-  ADD COLUMN IF NOT EXISTS points     INT GENERATED ALWAYS AS (won * 3 + drawn) STORED,
-  ADD COLUMN IF NOT EXISTS anthem_url TEXT;
+  ADD COLUMN IF NOT EXISTS gd          INT GENERATED ALWAYS AS (gf - ga) STORED,
+  ADD COLUMN IF NOT EXISTS points      INT GENERATED ALWAYS AS (won * 3 + drawn) STORED,
+  ADD COLUMN IF NOT EXISTS anthem_url  TEXT,
+  ADD COLUMN IF NOT EXISTS logo_url    TEXT,
+  ADD COLUMN IF NOT EXISTS budget      INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS score_points INT DEFAULT 0;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- USERS
@@ -73,6 +76,20 @@ CREATE TABLE IF NOT EXISTS players (
   avatar_bg_url TEXT,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- These columns are added post-initial-create so existing deployments are safe.
+-- Fresh deploys also run these (IF NOT EXISTS guards them).
+ALTER TABLE players
+  ADD COLUMN IF NOT EXISTS trophy1_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trophy2_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trophy3_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trophy4_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trophy5_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trophy6_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trophy7_count  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS grade_floor    VARCHAR(2),
+  ADD COLUMN IF NOT EXISTS grade_ceiling  VARCHAR(2),
+  ADD COLUMN IF NOT EXISTS is_captain     BOOLEAN DEFAULT FALSE;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PLAYER TROPHIES — season-scoped award log
@@ -261,14 +278,18 @@ SELECT
   p.trophy2_count AS "trophy2Count",
   p.trophy3_count AS "trophy3Count",
   p.trophy4_count AS "trophy4Count",
-  p.is_captain    AS "isCaptain",
-  p.grade_floor   AS "gradeFloor",
-  t.name          AS team,
-  p.team_id       AS "teamId",
-  t.logo_url      AS "teamLogo",
-  p.avatar_id     AS "avatarId",
-  p.avatar_url    AS "avatarUrl",
-  p.avatar_bg_url AS "avatarBgUrl"
+  p.trophy5_count AS "trophy5Count",
+  p.trophy6_count AS "trophy6Count",
+  p.trophy7_count AS "trophy7Count",
+  p.is_captain     AS "isCaptain",
+  p.grade_floor    AS "gradeFloor",
+  p.grade_ceiling  AS "gradeCeiling",
+  t.name           AS team,
+  p.team_id        AS "teamId",
+  t.logo_url       AS "teamLogo",
+  p.avatar_id      AS "avatarId",
+  p.avatar_url     AS "avatarUrl",
+  p.avatar_bg_url  AS "avatarBgUrl"
 FROM players p
 LEFT JOIN teams t ON p.team_id = t.id;
 `

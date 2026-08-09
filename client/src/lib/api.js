@@ -254,3 +254,7 @@ export const auctionApi = {
   enter:        (sessionId)                      => api.post("/auction/enter", { sessionId }).then(r => r.data),
   leave:        (sessionId)                      => api.post("/auction/leave", { sessionId }).then(r => r.data),
 }
+export const calendarApi = {
+  list:     (month) => api.get(`/calendar?month=${month}`).then(r => r.data),
+  upcoming: ()      => api.get("/calendar/upcoming").then(r => r.data),
+}
