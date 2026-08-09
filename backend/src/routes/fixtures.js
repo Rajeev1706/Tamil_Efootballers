@@ -446,29 +446,14 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
           }
 
           // Allocate BDR points based on final league standings
-          // (same scale as League+Knockout but without the playoff positions)
+          // Use teams.points directly — same source as the league table display
           const standingsRes = await query(`
-            WITH totals AS (
-              SELECT team_id,
-                SUM(CASE WHEN home_team_id = team_id THEN home_pts ELSE away_pts END) AS pts,
-                SUM(CASE WHEN home_team_id = team_id THEN home_gf ELSE away_gf END) AS gf
-              FROM (
-                SELECT f.home_team_id, f.away_team_id,
-                  SUM(CASE WHEN p.team_id = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END ELSE CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END END) AS home_pts,
-                  SUM(CASE WHEN p.team_id = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END ELSE CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END END) AS away_pts,
-                  SUM(CASE WHEN p.team_id = f.home_team_id THEN mr.player_score ELSE mr.opponent_score END) AS home_gf,
-                  SUM(CASE WHEN p.team_id = f.away_team_id THEN mr.player_score ELSE mr.opponent_score END) AS away_gf
-                FROM fixtures f
-                LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type::text = 'league' AND mr.season_number = $1
-                LEFT JOIN players p ON p.id = mr.player_id
-                GROUP BY f.home_team_id, f.away_team_id
-              ) s CROSS JOIN LATERAL (VALUES (s.home_team_id), (s.away_team_id)) t(team_id)
-              GROUP BY team_id
-            )
-            SELECT team_id, ROW_NUMBER() OVER (ORDER BY pts DESC, gf DESC) AS pos
-            FROM totals
+            SELECT id AS team_id,
+              ROW_NUMBER() OVER (ORDER BY points DESC, goals_for - goals_against DESC, goals_for DESC) AS pos
+            FROM teams
+            ORDER BY points DESC
             LIMIT 8
-          `, [season])
+          `)
 
           const bdrByPos = { 1: 12, 2: 9, 3: 7, 4: 5 }
           for (const row of standingsRes.rows) {
