@@ -2,7 +2,7 @@ import axios from "axios"
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "https://tamil-efootballers.onrender.com/api",
-  timeout: 15000, // 15s — prevents requests hanging forever on Render cold starts
+  timeout: 60000, // 60s — Render free tier cold starts take 30-90s; 15s was cutting them off
 })
 
 api.interceptors.request.use((config) => {

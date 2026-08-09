@@ -87,21 +87,21 @@ export const useUclUnassigned = () =>
   useQuery({ queryKey: ["ucl-unassigned"], queryFn: uclApi.unassigned })
 
 export const useUclStandings = () =>
-  useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings, staleTime: 0 })
+  useQuery({ queryKey: ["ucl-standings"], queryFn: uclApi.standings, staleTime: 1000 * 60 })
 
 export const useUclFixtures = () =>
-  useQuery({ queryKey: ["ucl-fixtures"], queryFn: uclApi.fixtures, refetchOnMount: "always", staleTime: 0 })
+  useQuery({ queryKey: ["ucl-fixtures"], queryFn: uclApi.fixtures, staleTime: 1000 * 60 })
 
 export const useUclFixturesPublic = (groupId) =>
   useQuery({
     queryKey: ["ucl-fixtures-public", groupId],
     queryFn: () => uclApi.fixturesPublic(groupId),
     enabled: !!groupId,
-    staleTime: 0,
+    staleTime: 1000 * 60,
   })
 
-export const useUclTopScorers = () =>
-  useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers })
+export const useUclTopScorers = (enabled = true) =>
+  useQuery({ queryKey: ["ucl-top-scorers"], queryFn: uclApi.topScorers, enabled, staleTime: 1000 * 60 * 2 })
 
 export const useWeeklyCurrent = () =>
   useQuery({ queryKey: ["weekly-current"], queryFn: weeklyApi.current })
@@ -109,8 +109,8 @@ export const useWeeklyCurrent = () =>
 export const useUclKnockoutCurrent = () =>
   useQuery({ queryKey: ["ucl-knockout-current"], queryFn: uclKnockoutApi.current })
 
-export const useWeeklyTopScorers = () =>
-  useQuery({ queryKey: ["weekly-top-scorers"], queryFn: weeklyApi.topScorers })
+export const useWeeklyTopScorers = (enabled = true) =>
+  useQuery({ queryKey: ["weekly-top-scorers"], queryFn: weeklyApi.topScorers, enabled, staleTime: 1000 * 60 * 2 })
 
 export const useRevolutionCurrent = () =>
   useQuery({ queryKey: ["revolution-current"], queryFn: revolutionApi.current })
@@ -284,13 +284,13 @@ export const useSeasonMatchRecords = (season) =>
   })
 
 export const useTeams = () =>
-  useQuery({ queryKey: QK.teams, queryFn: teamsApi.list })
+  useQuery({ queryKey: QK.teams, queryFn: teamsApi.list, staleTime: 1000 * 60 * 2 })
 
 export const useTopScorers = () =>
   useQuery({ queryKey: ["top-scorers"], queryFn: teamsApi.topScorers })
 
 export const useTeamLeaguePlayoffs = () =>
-  useQuery({ queryKey: ["team-league-playoffs"], queryFn: teamsApi.playoffsCurrent, staleTime: 0 })
+  useQuery({ queryKey: ["team-league-playoffs"], queryFn: teamsApi.playoffsCurrent, staleTime: 1000 * 60 })
 
 export const useBestLeaguePerformer = (teamId) =>
   useQuery({
@@ -333,7 +333,7 @@ export const useTeam = (id) =>
   useQuery({ queryKey: QK.team(id), queryFn: () => teamsApi.get(id), enabled: !!id })
 
 export const usePlayers = (params) =>
-  useQuery({ queryKey: QK.players(params), queryFn: () => playersApi.list(params) })
+  useQuery({ queryKey: QK.players(params), queryFn: () => playersApi.list(params), staleTime: 1000 * 60 * 2 })
 
 export const useMyPlayers = (teamId) =>
   useQuery({
@@ -515,7 +515,7 @@ export const useDeleteRecord = () => {
 }
 
 export const useFixtures = (params) =>
-  useQuery({ queryKey: QK.fixtures(params), queryFn: () => fixturesApi.list(params) })
+  useQuery({ queryKey: QK.fixtures(params), queryFn: () => fixturesApi.list(params), staleTime: 1000 * 60 * 2 })
 
 export const useRecentFixtures = () =>
   useQuery({ queryKey: QK.recent, queryFn: fixturesApi.recent })
