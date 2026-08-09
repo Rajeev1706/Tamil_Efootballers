@@ -2,7 +2,7 @@ import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight, Calendar, Trophy, Zap, Star, Gavel } from "lucide-react"
 import Layout from "../components/layout/Layout"
-import api from "../lib/api"
+import api, { calendarApi } from "../lib/api"
 import { cn } from "../lib/utils"
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -60,13 +60,6 @@ function getFirstDayOfWeek(year, month) {
 
 function toLocalDateStr(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-}
-
-// ── API ───────────────────────────────────────────────────────────────────────
-
-const calendarApi = {
-  list: (month) => api.get(`/calendar?month=${month}`).then(r => r.data),
-  upcoming: () => api.get("/calendar/upcoming").then(r => r.data),
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────

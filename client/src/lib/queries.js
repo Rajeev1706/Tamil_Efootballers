@@ -878,7 +878,9 @@ export const useQuickBid = () => {
       }
       return { previous }
     },
-    onError: () => {},
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(["auction-current"], context.previous)
+    },
   })
 }
 

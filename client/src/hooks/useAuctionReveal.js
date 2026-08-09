@@ -39,7 +39,6 @@ export function useAuctionReveal(data, { onRevealDone, onSoldDone, onBidPattern,
       const preset_r      = getAvatarById(session.currentPlayerAvatarId)
       const resolvedAvatar = session.currentPlayerAvatarUrl   || preset_r?.thumb || null
       const resolvedBg     = session.currentPlayerAvatarBgUrl || preset_r?.bg    || null
-      console.log("[AuctionReveal] avatarId:", session.currentPlayerAvatarId, "preset:", preset_r, "bg:", resolvedBg)
       revealForAuction(
         session.currentPlayerName,
         session.isThunder,
