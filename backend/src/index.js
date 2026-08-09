@@ -26,6 +26,7 @@ import winrateRoutes       from "./routes/winrate.js"
 import calendarRoutes      from "./routes/calendar.js"
 import teamTrophyRoutes    from "./routes/teamTrophies.js"
 import duoRoutes            from "./routes/duo.js"
+import specialEditionRoutes from "./routes/specialEditions.js"
 import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
@@ -70,6 +71,7 @@ app.use("/api/winrate",         winrateRoutes)
 app.use("/api/calendar",        calendarRoutes)
 app.use("/api/team-trophies",   teamTrophyRoutes)
 app.use("/api/duo",              duoRoutes)
+app.use("/api/special-editions", specialEditionRoutes)
 
 // GET /api/settings
 app.get("/api/settings", async (_req, res) => {

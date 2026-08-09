@@ -258,3 +258,10 @@ export const calendarApi = {
   list:     (month) => api.get(`/calendar?month=${month}`).then(r => r.data),
   upcoming: ()      => api.get("/calendar/upcoming").then(r => r.data),
 }
+
+export const specialEditionsApi = {
+  list:   ()           => api.get("/special-editions").then(r => r.data),
+  create: (body)       => api.post("/special-editions", body).then(r => r.data),
+  update: (id, body)   => api.patch(`/special-editions/${id}`, body).then(r => r.data),
+  delete: (id)         => api.delete(`/special-editions/${id}`).then(r => r.data),
+}

@@ -23,6 +23,7 @@ import { cn } from "../lib/utils"
 import ManageTeams from "../components/admin/ManageTeams"
 import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
 import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
+import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 
 function ResetMVCard() {
   const [confirm, setConfirm] = useState(false)
@@ -495,6 +496,12 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">League Info Board</p>
       <LeagueInfoAdmin />
+    </div>
+
+    {/* Special Editions */}
+    <div>
+      <p className="section-label mb-3">Special Editions</p>
+      <SpecialEditionAdmin />
     </div>
 
     {/* Season Records / Hall of Fame */}
