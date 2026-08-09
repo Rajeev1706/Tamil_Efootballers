@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ClipboardList, ChevronRight, X, Save, Trash2, History, Check, ChevronDown, Download, ImageIcon, Search } from "lucide-react"
 import GradeBadge from "../common/GradeBadge"
+import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import { useLineup, useSaveLineup, useClearLineup, useH2H } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import tecLogo from "../../../images/logo.png"
@@ -178,31 +179,19 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H,
         </div>
       </div>
 
-      {/* Squad pics — shown when active */}
+      {/* Player avatars — shown when active. Squad photo (imageUrl) is not
+          included in the player list payload to keep it lightweight; avatar
+          is already there and serves the same visual purpose here. */}
       {isActive && bothSelected && (
         <div className="bg-pitch-900/60 border-b border-surface-border/50 px-5 py-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs font-semibold text-accent mb-2">{myP.name}'s Squad</p>
-              {myP.imageUrl ? (
-                <img src={myP.imageUrl} alt={`${myP.name} squad`}
-                  className="w-full aspect-[20/9] object-cover rounded-xl border border-surface-border" />
-              ) : (
-                <div className="w-full aspect-[20/9] rounded-xl border-2 border-dashed border-surface-border flex items-center justify-center bg-pitch-800">
-                  <p className="text-xs text-slate-600">No squad image</p>
-                </div>
-              )}
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs font-semibold text-accent">{myP.name}</p>
+              <PlayerAvatarIcon player={myP} size="w-16 h-16" className="rounded-xl" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-rose-400 mb-2">{oppP.name}'s Squad</p>
-              {oppP.imageUrl ? (
-                <img src={oppP.imageUrl} alt={`${oppP.name} squad`}
-                  className="w-full aspect-[20/9] object-cover rounded-xl border border-surface-border" />
-              ) : (
-                <div className="w-full aspect-[20/9] rounded-xl border-2 border-dashed border-surface-border flex items-center justify-center bg-pitch-800">
-                  <p className="text-xs text-slate-600">No squad image</p>
-                </div>
-              )}
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs font-semibold text-rose-400">{oppP.name}</p>
+              <PlayerAvatarIcon player={oppP} size="w-16 h-16" className="rounded-xl" />
             </div>
           </div>
         </div>

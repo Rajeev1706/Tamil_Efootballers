@@ -1,5 +1,6 @@
 import { cn } from "../../lib/utils"
 import { useCachedImage } from "../../hooks/useCachedImage"
+import { getAvatarById } from "../../lib/avatars"
 
 const gradeColors = {
   S:   "bg-gold/20 text-gold border-gold/40",
@@ -8,6 +9,11 @@ const gradeColors = {
   C:   "bg-slate-500/20 text-slate-400 border-slate-500/40",
 }
 
+// Priority order:
+//   1. imageUrl  — admin-uploaded squad photo (only on single-player endpoint)
+//   2. avatarUrl — player's custom uploaded character avatar
+//   3. avatarId  — player's chosen preset character avatar
+//   4. initials  — fallback when none of the above are set
 export default function PlayerAvatar({ player, size = "md", className }) {
   const sizes = {
     sm:  "w-8 h-8 text-xs rounded-lg border",
@@ -18,9 +24,14 @@ export default function PlayerAvatar({ player, size = "md", className }) {
 
   const initials  = player.name?.split(" ").map(n => n[0]).join("") || "?"
   const colorCls  = gradeColors[player.grade] || gradeColors["C"]
-  const cachedSrc = useCachedImage(player.imageUrl)
 
-  if (player.imageUrl) {
+  // Resolve the best available image source
+  const preset    = getAvatarById(player.avatarId)
+  const rawSrc    = player.imageUrl || player.avatarUrl || preset?.thumb || null
+
+  const cachedSrc = useCachedImage(rawSrc)
+
+  if (rawSrc) {
     return cachedSrc ? (
       <img
         src={cachedSrc}
@@ -33,7 +44,7 @@ export default function PlayerAvatar({ player, size = "md", className }) {
         )}
       />
     ) : (
-      // Loading state: show initials placeholder while blob is resolving
+      // Loading state — show initials while image resolves
       <div className={cn(
         "flex items-center justify-center font-extrabold flex-shrink-0 animate-pulse",
         sizes[size],
