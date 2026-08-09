@@ -470,6 +470,11 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
             INSERT INTO app_settings (key, value) VALUES ('league_only_champion_team_id', $1)
             ON CONFLICT (key) DO UPDATE SET value = $1
           `, [String(champTeam.id)])
+          // Store completion timestamp for 48-hour celebration window
+          await query(`
+            INSERT INTO app_settings (key, value) VALUES ('league_champion_completed_at', $1)
+            ON CONFLICT (key) DO UPDATE SET value = $1
+          `, [new Date().toISOString()])
         }
       } else {
         // League + Knockout: generate the playoff bracket as before
