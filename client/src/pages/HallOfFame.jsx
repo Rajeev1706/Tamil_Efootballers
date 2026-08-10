@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Crown, ChevronDown, Trophy, Star } from "lucide-react"
+import { ArrowLeft, Crown, ChevronDown, Trophy } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import { useSeasonRecords, useLeagueInfo, useSpecialEditions } from "../lib/queries"
@@ -155,27 +155,30 @@ export default function HallOfFame() {
             {specialEditions.length > 0 && (
               <div className="space-y-3 mb-4">
                 {specialEditions.map(edition => {
-                  // Resolve the stored key (e.g. "epicmatch") to the actual imported image
-                  const resolvedImage = SPECIAL_EDITION_IMAGE_MAP[edition.image_url] || null
+                  // Resolve image — Cloudinary URL takes priority over preset key
+                  const resolvedImage = edition.image_url?.startsWith("http")
+                    ? edition.image_url
+                    : SPECIAL_EDITION_IMAGE_MAP[edition.image_url] || null
                   return (
                     <div
                       key={edition.id}
-                      className="relative rounded-2xl overflow-hidden border border-gold/30 shadow-lg"
+                      className="relative rounded-2xl overflow-hidden shadow-lg"
+                      style={{ border: "1px solid rgba(245,158,11,0.5)", boxShadow: "0 0 20px rgba(245,158,11,0.15)" }}
                     >
+                      {/* Gold shimmer accent bar at top */}
+                      <div className="absolute top-0 left-0 right-0 h-1 z-20"
+                        style={{ background: "linear-gradient(90deg, transparent, #f59e0b, #fcd34d, #f59e0b, transparent)" }}
+                      />
+
                       {resolvedImage ? (
                         <>
-                          {/* Full image at natural size — no cropping */}
                           <img
                             src={resolvedImage}
                             alt={edition.title}
-                            className="w-full object-contain block"
+                            className="w-full object-cover block"
+                            style={{ maxHeight: "220px" }}
                           />
-                          {/* Text overlay at bottom */}
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-pitch-900 via-pitch-900/80 to-transparent px-5 py-4">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <Star className="w-3.5 h-3.5 text-gold fill-gold" />
-                              <span className="text-[10px] font-bold text-gold uppercase tracking-widest">Something To Look Out</span>
-                            </div>
                             <h2 className="text-xl font-extrabold text-white leading-tight mb-1">{edition.title}</h2>
                             {edition.subtitle && (
                               <p className="text-sm text-slate-300 leading-snug">{edition.subtitle}</p>
@@ -184,10 +187,6 @@ export default function HallOfFame() {
                         </>
                       ) : (
                         <div className="bg-gradient-to-br from-gold/10 via-pitch-800 to-pitch-900 px-5 py-6">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <Star className="w-3.5 h-3.5 text-gold fill-gold" />
-                            <span className="text-[10px] font-bold text-gold uppercase tracking-widest">Special Edition</span>
-                          </div>
                           <h2 className="text-xl font-extrabold text-white leading-tight mb-1">{edition.title}</h2>
                           {edition.subtitle && (
                             <p className="text-sm text-slate-300 leading-snug">{edition.subtitle}</p>
