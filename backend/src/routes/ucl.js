@@ -466,7 +466,43 @@ router.post("/groups/:id/players", authenticate, adminOnly, async (req, res, nex
   } catch (err) { next(err) }
 })
 
-// DELETE /api/ucl/players/:playerId/group — unassign player from any group
+// POST /api/ucl/players/:playerId/replace
+// Replaces a player in their UCL group with a new player.
+// Updates all fixtures in the group to use the new player.
+// Existing completed match records are kept as-is (historical results stay).
+router.post("/players/:playerId/replace", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const playerId      = parseInt(req.params.playerId)
+    const { replacementId } = req.body
+    if (!replacementId) return res.status(400).json({ error: "replacementId is required" })
+
+    // Get old player's current group
+    const playerRes = await query("SELECT ucl_group_id FROM players WHERE id = $1", [playerId])
+    const groupId   = playerRes.rows[0]?.ucl_group_id
+    if (!groupId) return res.status(400).json({ error: "Player is not in any UCL group" })
+
+    // Verify replacement is not already in a group
+    const replRes = await query("SELECT ucl_group_id, name FROM players WHERE id = $1", [replacementId])
+    if (!replRes.rows[0]) return res.status(404).json({ error: "Replacement player not found" })
+    if (replRes.rows[0].ucl_group_id) return res.status(400).json({ error: `${replRes.rows[0].name} is already in a UCL group` })
+
+    // Swap player references in all fixtures of this group
+    await query(
+      "UPDATE ucl_fixtures SET player1_id = $1 WHERE group_id = $2 AND player1_id = $3",
+      [replacementId, groupId, playerId]
+    )
+    await query(
+      "UPDATE ucl_fixtures SET player2_id = $1 WHERE group_id = $2 AND player2_id = $3",
+      [replacementId, groupId, playerId]
+    )
+
+    // Move group assignment — replacement joins, old player leaves
+    await query("UPDATE players SET ucl_group_id = $1 WHERE id = $2", [groupId, replacementId])
+    await query("UPDATE players SET ucl_group_id = NULL WHERE id = $1", [playerId])
+
+    res.json({ replaced: true, groupId, replacementId })
+  } catch (err) { next(err) }
+})
 // Also cleans up any fixtures (and their match records) this player already
 // had within that group — otherwise their old fixtures kept showing up in
 // UCL Results with their name, even though the group correctly showed them
