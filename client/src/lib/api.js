@@ -138,7 +138,8 @@ export const uclApi = {
   renameGroup:       (id, name)      => api.patch(`/ucl/groups/${id}`, { name }).then(r => r.data),
   deleteGroup:       (id)            => api.delete(`/ucl/groups/${id}`).then(r => r.data),
   assignPlayer:      (groupId, playerId) => api.post(`/ucl/groups/${groupId}/players`, { playerId }).then(r => r.data),
-  unassignPlayer:    (playerId)      => api.delete(`/ucl/players/${playerId}/group`).then(r => r.data),
+  unassignPlayer:    (playerId)                    => api.delete(`/ucl/players/${playerId}/group`).then(r => r.data),
+  replacePlayer:     (playerId, replacementId)      => api.post(`/ucl/players/${playerId}/replace`, { replacementId }).then(r => r.data),
 }
 
 export const settingsApi = {

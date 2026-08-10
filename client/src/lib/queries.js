@@ -251,6 +251,20 @@ export const useUnassignUclPlayer = () => {
   })
 }
 
+export const useReplaceUclPlayer = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ playerId, replacementId }) =>
+      uclApi.replacePlayer(playerId, replacementId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ucl-groups"] })
+      qc.invalidateQueries({ queryKey: ["ucl-unassigned"] })
+      qc.invalidateQueries({ queryKey: ["ucl-standings"] })
+      qc.invalidateQueries({ queryKey: ["ucl-fixtures"] })
+    },
+  })
+}
+
 export const useLeagueInfo = () =>
   useQuery({ queryKey: ["league-info"], queryFn: leagueInfoApi.list })
 

@@ -6,7 +6,7 @@ import {
   useUclAdminGroups, useUclUnassigned,
   useCreateUclGroup, useGenerateUclGroups,
   useRenameUclGroup, useDeleteUclGroup,
-  useAssignUclPlayer, useUnassignUclPlayer,
+  useAssignUclPlayer, useUnassignUclPlayer, useReplaceUclPlayer,
 } from "../../lib/queries"
 import { usePlayers } from "../../lib/queries"
 import { uclApi } from "../../lib/api"
@@ -106,13 +106,16 @@ function GroupCard({ group, unassigned }) {
   const [name, setName]               = useState(group.name)
   const [confirmDel, setConfirmDel]   = useState(false)
   const [confirmRegen, setConfirmRegen] = useState(false)
-  const [addPlayerId, setAddPlayerId] = useState("")
-  const [regenerating, setRegenerating] = useState(false)
+  const [addPlayerId, setAddPlayerId]         = useState("")
+  const [replacingId, setReplacingId]         = useState(null)  // player being replaced
+  const [replacementId, setReplacementId]     = useState("")    // chosen replacement
+  const [regenerating, setRegenerating]       = useState(false)
 
   const renameGroup    = useRenameUclGroup()
   const deleteGroup    = useDeleteUclGroup()
   const assignPlayer   = useAssignUclPlayer()
   const unassignPlayer = useUnassignUclPlayer()
+  const replacePlayer  = useReplaceUclPlayer()
   const qc = useQueryClient()
 
   const handleRename = () => {
@@ -125,6 +128,17 @@ function GroupCard({ group, unassigned }) {
     assignPlayer.mutate({ groupId: group.id, playerId: Number(addPlayerId) }, {
       onSuccess: () => setAddPlayerId(""),
     })
+  }
+
+  const handleReplace = () => {
+    if (!replacingId || !replacementId) return
+    replacePlayer.mutate(
+      { playerId: replacingId, replacementId: Number(replacementId) },
+      {
+        onSuccess: () => { setReplacingId(null); setReplacementId("") },
+        onError: err => alert(err?.response?.data?.error || "Replace failed"),
+      }
+    )
   }
 
   async function handleRegenerate() {
@@ -187,13 +201,50 @@ function GroupCard({ group, unassigned }) {
           ) : (
             <div className="space-y-1.5">
               {group.players.map(p => (
-                <div key={p.id} className="flex items-center justify-between bg-pitch-800 rounded-lg px-3 py-2">
-                  <div>
-                    <span className="text-sm text-white font-medium">{p.name}</span>
-                    <span className="text-xs text-slate-500 ml-2">{p.team ?? "Unassigned"}</span>
+                <div key={p.id}>
+                  <div className="flex items-center justify-between bg-pitch-800 rounded-lg px-3 py-2">
+                    <div>
+                      <span className="text-sm text-white font-medium">{p.name}</span>
+                      <span className="text-xs text-slate-500 ml-2">{p.team ?? "Unassigned"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setReplacingId(p.id === replacingId ? null : p.id); setReplacementId("") }}
+                        className="text-xs text-slate-500 hover:text-amber-400 transition-colors"
+                      >
+                        {replacingId === p.id ? "Cancel" : "Replace"}
+                      </button>
+                      <button
+                        onClick={() => unassignPlayer.mutate(p.id)}
+                        className="text-xs text-slate-500 hover:text-rose-400 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => unassignPlayer.mutate(p.id)}
-                    className="text-xs text-slate-500 hover:text-rose-400 transition-colors">Remove</button>
+
+                  {/* Inline replacement picker — shows only for the player being replaced */}
+                  {replacingId === p.id && (
+                    <div className="flex items-center gap-2 mt-1 ml-2 pl-2 border-l-2 border-amber-400/40">
+                      <select
+                        value={replacementId}
+                        onChange={e => setReplacementId(e.target.value)}
+                        className="flex-1 bg-pitch-900 border border-amber-400/30 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400/60"
+                      >
+                        <option value="">Select replacement for {p.name}…</option>
+                        {unassigned.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}{u.team ? ` (${u.team})` : ""}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleReplace}
+                        disabled={!replacementId || replacePlayer.isPending}
+                        className="px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-400 border border-amber-400/30 text-sm font-semibold disabled:opacity-40 hover:bg-amber-400/25 transition-colors"
+                      >
+                        {replacePlayer.isPending ? "…" : "Confirm"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
