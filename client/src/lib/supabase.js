@@ -1,27 +1,20 @@
 import { createClient } from "@supabase/supabase-js"
+import api from "./api"
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-// ─── Base64 image converter ───────────────────────────────────────────────────
-// Instead of uploading to Supabase Storage (which hits bandwidth limits),
-// images are converted to Base64 data URLs and stored directly in the
-// PostgreSQL database. No external storage needed — images load instantly
-// from the DB response with zero egress cost.
-//
-// Images are resized + compressed before encoding so they stay small enough
-// to store in a TEXT column without bloating the DB or slowing API responses.
+// ─── Image resize helper ──────────────────────────────────────────────────────
+// Resizes image to a max dimension before uploading — reduces upload time
+// and Cloudinary storage. Returns a base64 data URL for uploading.
 
-const MAX_DIMENSION = 400  // px — enough for logos/avatars at any UI size
-const JPEG_QUALITY  = 0.82 // 82% quality — good visual quality, small file size
+const JPEG_QUALITY = 0.85
 
-function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUALITY) {
+function resizeAndEncode(file, maxDimension, quality = JPEG_QUALITY) {
   const isPng = file.type === "image/png"
 
-  // Draw img onto a canvas at given dimension and return data URL
-  // Falls back to 200px if the browser runs out of memory (common on mobile with large photos)
   function encodeImg(img, dim, qual) {
     let { width, height } = img
     if (width > dim || height > dim) {
@@ -35,7 +28,6 @@ function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUAL
     return isPng ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", qual)
   }
 
-  // Load an image from a src string (data URL or object URL)
   function imgFrom(src) {
     return new Promise((res, rej) => {
       const i = new Image()
@@ -45,7 +37,6 @@ function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUAL
     })
   }
 
-  // Attempt 1 — FileReader → data URL → canvas (best mobile compat)
   const attempt1 = () => new Promise((res, rej) => {
     const r = new FileReader()
     r.onload  = e => res(e.target.result)
@@ -53,10 +44,9 @@ function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUAL
     r.readAsDataURL(file)
   }).then(dataUrl => imgFrom(dataUrl)).then(img => {
     try { return encodeImg(img, maxDimension, quality) }
-    catch { return encodeImg(img, 200, 0.7) }   // memory fallback
+    catch { return encodeImg(img, 200, 0.7) }
   })
 
-  // Attempt 2 — createObjectURL → canvas (fallback for some formats)
   const attempt2 = () => {
     const url = URL.createObjectURL(file)
     return imgFrom(url)
@@ -73,26 +63,34 @@ function resizeAndEncode(file, maxDimension = MAX_DIMENSION, quality = JPEG_QUAL
     .catch(() => { throw new Error("Could not process this image. Please use a JPEG or PNG photo.") })
 }
 
-// ─── Player photo (admin-set real photo) ─────────────────────────────────────
+// ─── Upload to Cloudinary via backend ────────────────────────────────────────
+// Resizes image, encodes to base64, sends to our backend /api/upload which
+// forwards to Cloudinary. Returns the Cloudinary CDN URL.
+// Images are then served from Cloudinary directly — zero Render/DB bandwidth.
+
+async function uploadToCloudinary(file, folder, maxDimension) {
+  const base64 = await resizeAndEncode(file, maxDimension)
+  const res    = await api.post("/upload", { data: base64, folder })
+  return res.data.url  // https://res.cloudinary.com/wencvhgh/...
+}
+
+// ─── Player squad photo (admin-set real match photo) ─────────────────────────
 export async function uploadPlayerImage(playerId, file) {
-  return resizeAndEncode(file, MAX_DIMENSION, JPEG_QUALITY)
+  return uploadToCloudinary(file, "squads", 1200)
 }
 
 // ─── Player avatar images (custom upload via AvatarPicker) ───────────────────
 export async function uploadPlayerAvatarImage(playerId, file, kind) {
-  // Avatar thumbnails shown inline in lists — smaller max size
-  // Background images shown full-card — slightly larger
-  const maxDim = kind === "bg" ? 600 : 300
-  return resizeAndEncode(file, maxDim, JPEG_QUALITY)
+  const maxDim = kind === "bg" ? 800 : 400
+  return uploadToCloudinary(file, kind === "bg" ? "avatar-bg" : "avatars", maxDim)
 }
 
 // ─── Team logo ────────────────────────────────────────────────────────────────
 export async function uploadTeamLogo(teamId, file) {
-  // Logos are usually square — 300px is plenty for any UI usage
-  return resizeAndEncode(file, 300, JPEG_QUALITY)
+  return uploadToCloudinary(file, "logos", 400)
 }
 
-// ─── Team anthem (audio — can't Base64 encode large audio in DB, keep Supabase) ─
+// ─── Team anthem (audio — stays on Supabase Storage) ─────────────────────────
 export async function uploadTeamAnthem(teamId, file) {
   const ext  = file.name.split(".").pop().toLowerCase()
   const path = `anthem-${teamId}-${Date.now()}.${ext}`

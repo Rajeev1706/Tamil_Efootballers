@@ -1,19 +1,88 @@
-import { useState } from "react"
-import { Star, Plus, Pencil, Trash2, Save, X } from "lucide-react"
+import { useState, useRef } from "react"
+import { Star, Plus, Pencil, Trash2, Save, X, ImageIcon, Upload } from "lucide-react"
 import {
   useSpecialEditions,
   useCreateSpecialEdition,
   useUpdateSpecialEdition,
   useDeleteSpecialEdition,
 } from "../../lib/queries"
+import { uploadImage } from "../../lib/api"
 
-// ── Available images from the images/ folder ──────────────────────────────────
-// Add new entries here whenever a new image is dropped into client/images/
 const IMAGE_OPTIONS = [
   { key: "epicmatch", label: "Epic Match" },
 ]
 
-const EMPTY_FORM = { title: "", subtitle: "", imageKey: "epicmatch", sortOrder: 0 }
+const EMPTY_FORM = { title: "", subtitle: "", imageKey: "epicmatch", imageUrl: "", sortOrder: 0 }
+
+function ImagePicker({ imageKey, imageUrl, onKeyChange, onUrlChange }) {
+  const fileRef   = useRef()
+  const [loading, setLoading] = useState(false)
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLoading(true)
+    try {
+      const url = await uploadImage(file, "special")
+      onUrlChange(url)
+      onKeyChange("") // custom upload overrides preset
+    } catch {
+      alert("Upload failed — check your connection")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <label className="text-xs text-slate-500 font-medium block">Image</label>
+
+      {/* Option A — preset from images folder */}
+      <div>
+        <p className="text-xs text-slate-600 mb-1">Use preset image:</p>
+        <select
+          value={imageKey}
+          onChange={e => { onKeyChange(e.target.value); onUrlChange("") }}
+          className="w-full bg-pitch-900 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+        >
+          <option value="">None (upload custom below)</option>
+          {IMAGE_OPTIONS.map(opt => (
+            <option key={opt.key} value={opt.key}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Option B — upload to Cloudinary */}
+      <div>
+        <p className="text-xs text-slate-600 mb-1">Or upload a new image:</p>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+
+        {imageUrl ? (
+          <div className="relative group">
+            <img src={imageUrl} alt="preview" className="w-full h-28 object-cover rounded-xl border border-surface-border" />
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
+              <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-semibold">
+                <Upload className="w-3.5 h-3.5" /> Change
+              </button>
+              <button onClick={() => onUrlChange("")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-400 text-xs font-semibold">
+                <X className="w-3.5 h-3.5" /> Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={loading}
+            className="w-full h-20 rounded-xl border-2 border-dashed border-surface-border hover:border-accent/40 flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-accent transition-colors disabled:opacity-50"
+          >
+            <ImageIcon className="w-5 h-5" />
+            <span className="text-xs font-medium">{loading ? "Uploading to Cloudinary…" : "Click to upload"}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function EditionForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
   const [form, setForm] = useState(initial)
@@ -21,48 +90,35 @@ function EditionForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
 
   return (
     <div className="space-y-4">
+      <ImagePicker
+        imageKey={form.imageKey}
+        imageUrl={form.imageUrl}
+        onKeyChange={set("imageKey")}
+        onUrlChange={set("imageUrl")}
+      />
 
-      {/* Image selector */}
-      <div>
-        <label className="text-xs text-slate-500 font-medium block mb-1">Image</label>
-        <select
-          value={form.imageKey}
-          onChange={e => set("imageKey")(e.target.value)}
-          className="w-full bg-pitch-900 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
-        >
-          <option value="">No image</option>
-          {IMAGE_OPTIONS.map(opt => (
-            <option key={opt.key} value={opt.key}>{opt.label}</option>
-          ))}
-        </select>
-        <p className="text-xs text-slate-600 mt-1">Images are added by dropping files into the client/images/ folder</p>
-      </div>
-
-      {/* Title */}
       <div>
         <label className="text-xs text-slate-500 font-medium block mb-1">Title *</label>
         <input
           type="text"
           value={form.title}
           onChange={e => set("title")(e.target.value)}
-          placeholder="e.g. Season 7 Legend, Iron Man of TEC..."
+          placeholder="e.g. Best Match So Far, Season 7 Legend..."
           className="w-full bg-pitch-900 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
         />
       </div>
 
-      {/* Subtitle */}
       <div>
         <label className="text-xs text-slate-500 font-medium block mb-1">Subtitle</label>
         <input
           type="text"
           value={form.subtitle}
           onChange={e => set("subtitle")(e.target.value)}
-          placeholder="e.g. Most decorated player of all time"
+          placeholder="e.g. Zub VS Sms · Season 7"
           className="w-full bg-pitch-900 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
         />
       </div>
 
-      {/* Sort order */}
       <div>
         <label className="text-xs text-slate-500 font-medium block mb-1">Sort order (lower = shown first)</label>
         <input
@@ -74,10 +130,7 @@ function EditionForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
       </div>
 
       <div className="flex gap-3 pt-1">
-        <button
-          onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-surface-border text-slate-400 hover:text-white text-sm transition-colors"
-        >
+        <button onClick={onCancel} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-surface-border text-slate-400 hover:text-white text-sm transition-colors">
           <X className="w-3.5 h-3.5" /> Cancel
         </button>
         <button
@@ -102,24 +155,28 @@ export default function SpecialEditionAdmin() {
   const [editingItem, setEditingItem] = useState(null)
   const [confirmDel, setConfirmDel]   = useState(null)
 
+  // imageUrl takes priority over imageKey (preset)
+  function resolvePayload(form) {
+    return {
+      title:     form.title,
+      subtitle:  form.subtitle,
+      imageUrl:  form.imageUrl || form.imageKey, // Cloudinary URL or preset key
+      sortOrder: form.sortOrder,
+    }
+  }
+
   function handleCreate(form) {
-    createEdition.mutate(
-      { title: form.title, subtitle: form.subtitle, imageUrl: form.imageKey, sortOrder: form.sortOrder },
-      {
-        onSuccess: () => setShowForm(false),
-        onError: err => alert(err?.response?.data?.error || "Failed to save"),
-      }
-    )
+    createEdition.mutate(resolvePayload(form), {
+      onSuccess: () => setShowForm(false),
+      onError: err => alert(err?.response?.data?.error || "Failed to save"),
+    })
   }
 
   function handleUpdate(form) {
-    updateEdition.mutate(
-      { id: editingItem.id, title: form.title, subtitle: form.subtitle, imageUrl: form.imageKey, sortOrder: form.sortOrder },
-      {
-        onSuccess: () => setEditingItem(null),
-        onError: err => alert(err?.response?.data?.error || "Failed to update"),
-      }
-    )
+    updateEdition.mutate({ id: editingItem.id, ...resolvePayload(form) }, {
+      onSuccess: () => setEditingItem(null),
+      onError: err => alert(err?.response?.data?.error || "Failed to update"),
+    })
   }
 
   function handleDelete(id) {
@@ -138,10 +195,7 @@ export default function SpecialEditionAdmin() {
           <span className="text-xs text-slate-500">— featured cards on Hall of Fame</span>
         </div>
         {!showForm && !editingItem && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-gold/10 text-gold border border-gold/25 hover:bg-gold/20 transition-colors"
-          >
+          <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-gold/10 text-gold border border-gold/25 hover:bg-gold/20 transition-colors">
             <Plus className="w-3.5 h-3.5" /> Add Edition
           </button>
         )}
@@ -150,11 +204,7 @@ export default function SpecialEditionAdmin() {
       {showForm && (
         <div className="card p-5 border-gold/20">
           <p className="text-sm font-semibold text-white mb-4">New Special Edition</p>
-          <EditionForm
-            onSave={handleCreate}
-            onCancel={() => setShowForm(false)}
-            saving={createEdition.isPending}
-          />
+          <EditionForm onSave={handleCreate} onCancel={() => setShowForm(false)} saving={createEdition.isPending} />
         </div>
       )}
 
@@ -165,7 +215,8 @@ export default function SpecialEditionAdmin() {
             initial={{
               title:     editingItem.title,
               subtitle:  editingItem.subtitle || "",
-              imageKey:  editingItem.image_url || "epicmatch",
+              imageKey:  IMAGE_OPTIONS.find(o => o.key === editingItem.image_url) ? itemData.image_url : "",
+              imageUrl:  itemData?.image_url?.startsWith("http") ? itemData.image_url : "",
               sortOrder: editingItem.sort_order,
             }}
             onSave={handleUpdate}
@@ -181,7 +232,6 @@ export default function SpecialEditionAdmin() {
         <div className="card px-5 py-8 text-center">
           <Star className="w-6 h-6 text-slate-600 mx-auto mb-2" />
           <p className="text-slate-500 text-sm">No special editions yet</p>
-          <p className="text-xs text-slate-600 mt-1">Add featured cards to highlight legends on the Hall of Fame</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -195,25 +245,22 @@ export default function SpecialEditionAdmin() {
                 </div>
               ) : (
                 <div className="card px-4 py-3 flex items-center gap-3 group">
-                  <div className="w-10 h-10 rounded-lg border border-gold/30 bg-gold/10 flex items-center justify-center flex-shrink-0">
-                    <Star className="w-4 h-4 text-gold" />
-                  </div>
+                  {item.image_url?.startsWith("http") ? (
+                    <img src={item.image_url} alt={item.title} className="w-14 h-10 object-cover rounded-lg border border-surface-border flex-shrink-0" />
+                  ) : (
+                    <div className="w-14 h-10 rounded-lg border border-gold/30 bg-gold/10 flex items-center justify-center flex-shrink-0">
+                      <Star className="w-4 h-4 text-gold" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{item.title}</p>
                     {item.subtitle && <p className="text-xs text-slate-500 truncate">{item.subtitle}</p>}
-                    <p className="text-xs text-slate-600 mt-0.5">Image: {item.image_url || "none"}</p>
                   </div>
                   <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => { setEditingItem(item); setShowForm(false) }}
-                      className="w-7 h-7 rounded-lg hover:bg-gold/10 flex items-center justify-center text-slate-500 hover:text-gold transition-colors"
-                    >
+                    <button onClick={() => { setEditingItem(item); setShowForm(false) }} className="w-7 h-7 rounded-lg hover:bg-gold/10 flex items-center justify-center text-slate-500 hover:text-gold transition-colors">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => setConfirmDel(item.id)}
-                      className="w-7 h-7 rounded-lg hover:bg-rose-400/10 flex items-center justify-center text-slate-500 hover:text-rose-400 transition-colors"
-                    >
+                    <button onClick={() => setConfirmDel(item.id)} className="w-7 h-7 rounded-lg hover:bg-rose-400/10 flex items-center justify-center text-slate-500 hover:text-rose-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

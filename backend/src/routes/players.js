@@ -35,7 +35,7 @@ router.get("/", async (req, res, next) => {
         form, "trophy1Count", "trophy2Count", "trophy3Count", "trophy4Count",
         "isCaptain", "gradeFloor", "gradeCeiling",
         team, "teamId", "teamLogo",
-        "avatarId", "avatarUrl"
+        "avatarId", "avatarUrl", "imageUrl"
       FROM players_full${where} ORDER BY "bdrPoints" DESC`, params
     )
     res.json(result.rows)

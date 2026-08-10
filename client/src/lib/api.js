@@ -265,3 +265,26 @@ export const specialEditionsApi = {
   update: (id, body)   => api.patch(`/special-editions/${id}`, body).then(r => r.data),
   delete: (id)         => api.delete(`/special-editions/${id}`).then(r => r.data),
 }
+
+// ── Cloudinary image upload ───────────────────────────────────────────────────
+// Converts a File object to base64 then sends to our backend which uploads to
+// Cloudinary. Returns the secure CDN URL. Images are served from Cloudinary
+// directly — zero Render bandwidth cost for images.
+export async function uploadImage(file, folder = "general") {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const res = await api.post("/upload", {
+          data:   e.target.result, // base64 data URL
+          folder,
+        })
+        resolve(res.data.url)
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = () => reject(new Error("Failed to read file"))
+    reader.readAsDataURL(file)
+  })
+}
