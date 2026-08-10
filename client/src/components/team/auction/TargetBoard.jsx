@@ -331,7 +331,6 @@ function PlayerRow({ player, isTargeted, onAdd }) {
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-[10px] sm:text-sm text-slate-500">MV: <span className="text-slate-300 font-mono">{player.marketValue}</span></span>
             <span className="text-[10px] sm:text-sm text-slate-500">BDR: <span className="text-slate-300 font-mono">{player.bdrPoints}</span></span>
-            <FormDots form={player.form} />
           </div>
         </div>
         {isTargeted ? (
