@@ -8,9 +8,15 @@ import { useAuthStore } from "./store/authStore"
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime:   1000 * 60,  // 1 min — don't refetch data that's still fresh
-      retry:       1,           // one retry on failure
-      retryDelay:  5000,        // wait 5s before retry — gives Render time to finish waking up
+      staleTime:            Infinity, // data never goes stale during a session
+      gcTime:               Infinity, // cache never cleared while app is open
+      refetchOnWindowFocus: false,    // switching tabs won't refetch
+      refetchOnMount:       false,    // navigating back won't refetch if data exists
+      refetchOnReconnect:   false,    // reconnecting won't refetch
+      retry:                1,
+      retryDelay:           5000,
+      // Data is only fetched fresh when the user does a hard refresh (F5)
+      // because that restarts the JS runtime and wipes the in-memory cache.
     },
   },
 })
