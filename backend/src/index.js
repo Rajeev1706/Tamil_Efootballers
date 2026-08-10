@@ -34,13 +34,16 @@ const app  = express()
 const PORT = process.env.PORT || 3001
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(compression())
+app.use(compression({
+  level: 9,        // maximum gzip compression (default is 6)
+  threshold: 512,  // compress responses > 512 bytes (default is 1kb)
+}))
 app.use(cors({
   origin:      process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,
 }))
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ limit: "10mb", extended: true }))
+app.use(express.json({ limit: "1mb" }))
+app.use(express.urlencoded({ limit: "1mb", extended: true }))
 
 // Request logger (dev only)
 if (process.env.NODE_ENV === "development") {
