@@ -6,7 +6,7 @@ import { cn } from "../lib/utils"
 import Confetti from "../components/common/Confetti"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
 import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
-import revolutionLogo from "../images/revolution.png"
+import revolutionLogo from "../../images/revolution.png"
 
 function getRoundLabel(round, totalRounds) {
   const fromEnd = totalRounds - round

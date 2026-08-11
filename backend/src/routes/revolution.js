@@ -71,7 +71,7 @@ router.get("/public/current", async (req, res, next) => {
 
     const matches = await query(`
       SELECT
-        rm.round, rm.match_number AS "matchNumber", rm.status,
+        rm.round, rm.match_order AS "matchNumber", rm.status,
         rm.player1_score AS "player1Score", rm.player2_score AS "player2Score",
         p1.id AS "player1Id", p1.name AS "player1Name",
         p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
@@ -83,7 +83,7 @@ router.get("/public/current", async (req, res, next) => {
       LEFT JOIN players p2 ON rm.player2_id = p2.id
       LEFT JOIN players w  ON rm.winner_id  = w.id
       WHERE rm.tournament_id = $1
-      ORDER BY rm.round ASC, rm.match_number ASC
+      ORDER BY rm.round ASC, rm.match_order ASC
     `, [t.rows[0].id])
 
     res.json({ ...t.rows[0], matches: matches.rows })
@@ -138,7 +138,7 @@ router.get("/", authenticate, adminOnly, async (req, res, next) => {
 // GET /api/revolution/:id — detail
 router.get("/:id", async (req, res, next) => {
   try {
-    const t = await query("SELECT * FROM revolution_tournaments WHERE id = $1", [req.params.id])
+    const t = await query("SELECT * FROM revolution_tournaments WHERE id = $1", [parseInt(req.params.id)])
     if (!t.rows[0]) return res.status(404).json({ error: "Tournament not found" })
 
     const players = await query(`
@@ -149,7 +149,7 @@ router.get("/:id", async (req, res, next) => {
       LEFT JOIN teams t ON p.team_id = t.id
       WHERE rp.tournament_id = $1
       ORDER BY rp.seed ASC
-    `, [req.params.id])
+    `, [parseInt(req.params.id)])
 
     const matches = await query(`
       SELECT rm.*,
@@ -163,8 +163,8 @@ router.get("/:id", async (req, res, next) => {
       LEFT JOIN players p2 ON rm.player2_id = p2.id
       LEFT JOIN players w  ON rm.winner_id  = w.id
       WHERE rm.tournament_id = $1
-      ORDER BY rm.round ASC, rm.match_number ASC
-    `, [req.params.id])
+      ORDER BY rm.round ASC, rm.match_order ASC
+    `, [parseInt(req.params.id)])
 
     res.json({ ...t.rows[0], players: players.rows, matches: matches.rows })
   } catch (err) { next(err) }
@@ -186,24 +186,25 @@ router.post("/:id/players", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { playerIds } = z.object({ playerIds: z.array(z.number().int().positive()).min(2) }).parse(req.body)
 
+    const tournamentId = parseInt(req.params.id)
     const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
-    const { matches, totalRounds } = generateMatches(shuffled, parseInt(req.params.id))
+    const { matches, totalRounds } = generateMatches(shuffled, tournamentId)
 
     await withTransaction(async ({ query: q }) => {
-      await q("DELETE FROM revolution_players WHERE tournament_id = $1", [req.params.id])
-      await q("DELETE FROM revolution_matches WHERE tournament_id = $1", [req.params.id])
+      await q("DELETE FROM revolution_players WHERE tournament_id = $1", [tournamentId])
+      await q("DELETE FROM revolution_matches WHERE tournament_id = $1", [tournamentId])
 
       for (let i = 0; i < shuffled.length; i++) {
         await q(
           "INSERT INTO revolution_players (tournament_id, player_id, seed) VALUES ($1,$2,$3)",
-          [req.params.id, shuffled[i], i + 1]
+          [tournamentId, shuffled[i], i + 1]
         )
       }
 
       for (const m of matches) {
         await q(`
           INSERT INTO revolution_matches
-            (tournament_id, round, match_number, player1_id, player2_id, winner_id, status)
+            (tournament_id, round, match_order, player1_id, player2_id, winner_id, status)
           VALUES ($1,$2,$3,$4,$5,$6,$7)
         `, [m.tournamentId, m.round, m.matchNumber, m.player1Id, m.player2Id, m.winnerId, m.status])
       }
@@ -214,17 +215,17 @@ router.post("/:id/players", authenticate, adminOnly, async (req, res, next) => {
         const col = bye.matchNumber % 2 !== 0 ? "player1_id" : "player2_id"
         await q(`
           UPDATE revolution_matches SET ${col} = $1
-          WHERE tournament_id = $2 AND round = 2 AND match_number = $3
-        `, [bye.winnerId, req.params.id, Math.ceil(bye.matchNumber / 2)])
+          WHERE tournament_id = $2 AND round = 2 AND match_order = $3
+        `, [bye.winnerId, tournamentId, Math.ceil(bye.matchNumber / 2)])
       }
 
       await q(
         "UPDATE revolution_tournaments SET status = $1, total_rounds = $2, player_count = $3 WHERE id = $4",
-        ["draw", totalRounds, shuffled.length, req.params.id]
+        ["draw", totalRounds, shuffled.length, tournamentId]
       )
     })
 
-    const fresh = await query("SELECT * FROM revolution_tournaments WHERE id = $1", [req.params.id])
+    const fresh = await query("SELECT * FROM revolution_tournaments WHERE id = $1", [parseInt(req.params.id)])
     res.json(fresh.rows[0])
   } catch (err) { next(err) }
 })
@@ -232,7 +233,7 @@ router.post("/:id/players", authenticate, adminOnly, async (req, res, next) => {
 // POST /api/revolution/:id/start
 router.post("/:id/start", authenticate, adminOnly, async (req, res, next) => {
   try {
-    await query("UPDATE revolution_tournaments SET status = 'active' WHERE id = $1", [req.params.id])
+    await query("UPDATE revolution_tournaments SET status = 'active' WHERE id = $1", [parseInt(req.params.id)])
     res.json({ started: true })
   } catch (err) { next(err) }
 })
@@ -270,13 +271,13 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
     // Retract old propagation, propagate new bye
     if (match.round < match.total_rounds) {
       const nextRound = match.round + 1
-      const nextMatchNum = Math.ceil(match.match_number / 2)
-      const col = match.match_number % 2 !== 0 ? "player1_id" : "player2_id"
+      const nextMatchNum = Math.ceil(match.match_order / 2)
+      const col = match.match_order % 2 !== 0 ? "player1_id" : "player2_id"
 
       if (match.winner_id && match.winner_id !== winnerId) {
         await query(`
           UPDATE revolution_matches SET ${col} = NULL
-          WHERE tournament_id = $1 AND round = $2 AND match_number = $3
+          WHERE tournament_id = $1 AND round = $2 AND match_order = $3
             AND status = 'pending' AND ${col} = $4
         `, [match.tournament_id, nextRound, nextMatchNum, match.winner_id])
       }
@@ -284,7 +285,7 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
       if (isBye) {
         await query(`
           UPDATE revolution_matches SET ${col} = $1
-          WHERE tournament_id = $2 AND round = $3 AND match_number = $4
+          WHERE tournament_id = $2 AND round = $3 AND match_order = $4
         `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
       }
     }
@@ -336,11 +337,11 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // Advance winner to next round
     if (winnerId && match.round < match.total_rounds) {
       const nextRound    = match.round + 1
-      const nextMatchNum = Math.ceil(match.match_number / 2)
-      const col          = match.match_number % 2 !== 0 ? "player1_id" : "player2_id"
+      const nextMatchNum = Math.ceil(match.match_order / 2)
+      const col          = match.match_order % 2 !== 0 ? "player1_id" : "player2_id"
       await query(`
         UPDATE revolution_matches SET ${col} = $1
-        WHERE tournament_id = $2 AND round = $3 AND match_number = $4
+        WHERE tournament_id = $2 AND round = $3 AND match_order = $4
       `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
     }
 
@@ -362,9 +363,9 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 router.post("/:id/reset", authenticate, adminOnly, async (req, res, next) => {
   try {
     await withTransaction(async ({ query: q }) => {
-      await q("DELETE FROM revolution_players WHERE tournament_id = $1", [req.params.id])
-      await q("DELETE FROM revolution_matches WHERE tournament_id = $1", [req.params.id])
-      await q("UPDATE revolution_tournaments SET status = 'setup', total_rounds = NULL, player_count = NULL WHERE id = $1", [req.params.id])
+      await q("DELETE FROM revolution_players WHERE tournament_id = $1", [parseInt(req.params.id)])
+      await q("DELETE FROM revolution_matches WHERE tournament_id = $1", [parseInt(req.params.id)])
+      await q("UPDATE revolution_tournaments SET status = 'setup', total_rounds = NULL, player_count = NULL WHERE id = $1", [parseInt(req.params.id)])
     })
     res.json({ reset: true })
   } catch (err) { next(err) }
@@ -373,7 +374,7 @@ router.post("/:id/reset", authenticate, adminOnly, async (req, res, next) => {
 // DELETE /api/revolution/:id
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
-    await query("DELETE FROM revolution_tournaments WHERE id = $1", [req.params.id])
+    await query("DELETE FROM revolution_tournaments WHERE id = $1", [parseInt(req.params.id)])
     res.json({ deleted: true })
   } catch (err) { next(err) }
 })
