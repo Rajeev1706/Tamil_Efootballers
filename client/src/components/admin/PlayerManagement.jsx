@@ -28,14 +28,12 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
   const [trophy5, setTrophy5] = useState(player.trophy5Count ?? 0)
   const [trophy6, setTrophy6] = useState(player.trophy6Count ?? 0)
   const [trophy7, setTrophy7] = useState(player.trophy7Count ?? 0)
-  // "base" values = what was loaded from the server for the currently selected year.
-  // trophyChanged diffs against these, NOT against the stale player prop — so
-  // switching year then editing always produces the correct diff.
+  const [trophy8, setTrophy8] = useState(player.trophy8Count ?? 0)
   const [trophyBase, setTrophyBase] = useState({
     t1: player.trophy1Count ?? 0, t2: player.trophy2Count ?? 0,
     t3: player.trophy3Count ?? 0, t4: player.trophy4Count ?? 0,
     t5: player.trophy5Count ?? 0, t6: player.trophy6Count ?? 0,
-    t7: player.trophy7Count ?? 0,
+    t7: player.trophy7Count ?? 0, t8: player.trophy8Count ?? 0,
   })
 
   const applyTrophyData = (p) => {
@@ -43,11 +41,11 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
       t1: p?.trophy1Count ?? 0, t2: p?.trophy2Count ?? 0,
       t3: p?.trophy3Count ?? 0, t4: p?.trophy4Count ?? 0,
       t5: p?.trophy5Count ?? 0, t6: p?.trophy6Count ?? 0,
-      t7: p?.trophy7Count ?? 0,
+      t7: p?.trophy7Count ?? 0, t8: p?.trophy8Count ?? 0,
     }
     setTrophy1(vals.t1); setTrophy2(vals.t2); setTrophy3(vals.t3)
     setTrophy4(vals.t4); setTrophy5(vals.t5); setTrophy6(vals.t6)
-    setTrophy7(vals.t7)
+    setTrophy7(vals.t7); setTrophy8(vals.t8)
     setTrophyBase(vals)
   }
 
@@ -67,8 +65,8 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
     } else {
       teamsApi.trophyHistoryYear(trophyYear).then(data => {
         const p = data.find(d => d.id === player.id)
-        applyTrophyData(p ?? { trophy1Count:0, trophy2Count:0, trophy3Count:0, trophy4Count:0, trophy5Count:0, trophy6Count:0, trophy7Count:0 })
-      }).catch(() => applyTrophyData({ trophy1Count:0, trophy2Count:0, trophy3Count:0, trophy4Count:0, trophy5Count:0, trophy6Count:0, trophy7Count:0 }))
+        applyTrophyData(p ?? { trophy1Count:0, trophy2Count:0, trophy3Count:0, trophy4Count:0, trophy5Count:0, trophy6Count:0, trophy7Count:0, trophy8Count:0 })
+      }).catch(() => applyTrophyData({ trophy1Count:0, trophy2Count:0, trophy3Count:0, trophy4Count:0, trophy5Count:0, trophy6Count:0, trophy7Count:0, trophy8Count:0 }))
     }
   }, [trophyYear, editing])
   const [confirmDel, setConfirmDel]   = useState(false)
@@ -98,20 +96,16 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
       trophy1 !== trophyBase.t1 || trophy2 !== trophyBase.t2 ||
       trophy3 !== trophyBase.t3 || trophy4 !== trophyBase.t4 ||
       trophy5 !== trophyBase.t5 || trophy6 !== trophyBase.t6 ||
-      trophy7 !== trophyBase.t7
+      trophy7 !== trophyBase.t7 || trophy8 !== trophyBase.t8
     )
 
     if (trophyChanged) {
-      // update-trophy-year handles both current year (players table) and
-      // past years (player_trophy_history) correctly on the backend.
-      // We do NOT also push trophies through updatePlayer.mutate() — that
-      // would double-write them and override whatever update-trophy-year set.
       await teamsApi.updateTrophyYear({
         playerId: player.id,
         year: trophyYear,
         trophy1Count: trophy1, trophy2Count: trophy2, trophy3Count: trophy3,
         trophy4Count: trophy4, trophy5Count: trophy5, trophy6Count: trophy6,
-        trophy7Count: trophy7,
+        trophy7Count: trophy7, trophy8Count: trophy8,
       })
       // Update base so further edits in the same session diff correctly
       setTrophyBase({ t1:trophy1, t2:trophy2, t3:trophy3, t4:trophy4, t5:trophy5, t6:trophy6, t7:trophy7 })
@@ -148,7 +142,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
     }
     setTrophy1(base.t1); setTrophy2(base.t2); setTrophy3(base.t3)
     setTrophy4(base.t4); setTrophy5(base.t5); setTrophy6(base.t6)
-    setTrophy7(base.t7)
+    setTrophy7(base.t7); setTrophy8(base.t8)
     setTrophyBase(base)
   }
 
@@ -417,6 +411,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
                 { label: "Weekly Golden Boot",      value: trophy5, onChange: setTrophy5 },
                 { label: "Team League Golden Boot", value: trophy6, onChange: setTrophy6 },
                 { label: "UCL Golden Boot",         value: trophy7, onChange: setTrophy7 },
+                { label: "Revolution",              value: trophy8, onChange: setTrophy8 },
               ].map(t => (
                 <div key={t.label} className="flex items-center gap-2">
                   <span className="text-xs text-slate-500">{t.label}</span>

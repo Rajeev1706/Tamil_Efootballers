@@ -14,6 +14,7 @@ import uclTrophy          from "../../images/ucl.png"
 import goldenBootTrophy   from "../../images/Golden Boot.png"
 import teamLeagueGBTrophy from "../../images/team league_gb.png"
 import uclGBTrophy        from "../../images/ucl_gb.png"
+import revolutionTrophy   from "../../images/revolution.png"
 
 const TROPHIES = [
   { key: "trophy1Count", image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b" },
@@ -23,6 +24,7 @@ const TROPHIES = [
   { key: "trophy5Count", image: goldenBootTrophy,   label: "Weekly GB",          color: "#fbbf24" },
   { key: "trophy6Count", image: teamLeagueGBTrophy, label: "League GB",          color: "#34d399" },
   { key: "trophy7Count", image: uclGBTrophy,        label: "UCL GB",             color: "#a78bfa" },
+  { key: "trophy8Count", image: revolutionTrophy,   label: "Revolution",         color: "#f43f5e" },
 ]
 
 export default function TrophyCabinet() {
