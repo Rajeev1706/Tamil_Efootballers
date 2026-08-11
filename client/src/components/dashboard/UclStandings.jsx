@@ -34,7 +34,7 @@ export default function UclStandings({ onPlayerClick }) {
     (group?.players ?? []).map(p => p.id)
   )
 
-  // Batch size set by admin — controls how many fixtures unlock at once
+  // Batch size set by admin — controls how many fixtures show at once within the active round
   const batchSize = Math.max(1, parseInt(settings.ucl_fixtures_per_batch || "1"))
 
   const roundsByNumber = fixtures.reduce((acc, f) => {
@@ -43,17 +43,7 @@ export default function UclStandings({ onPlayerClick }) {
   }, {})
   const allRoundNumbers = Object.keys(roundsByNumber).map(Number).sort((a, b) => a - b)
 
-  // Within each round, split fixtures into batches of batchSize.
-  // A batch unlocks once the previous batch is fully completed.
-  // The "current batch" is the first batch that has any incomplete fixtures.
-  const getBatchedFixtures = (roundFixtures) => {
-    const batches = []
-    for (let i = 0; i < roundFixtures.length; i += batchSize) {
-      batches.push(roundFixtures.slice(i, i + batchSize))
-    }
-    return batches
-  }
-
+  // Rounds unlock sequentially — a round only shows once all fixtures in previous rounds are done
   const firstIncompleteRound = allRoundNumbers.find(r =>
     roundsByNumber[r].some(f => f.status !== "completed")
   )
@@ -65,17 +55,24 @@ export default function UclStandings({ onPlayerClick }) {
     ? activeFixtureRound
     : (unlockedRounds[unlockedRounds.length - 1] ?? 1)
 
-  const currentRoundFixtures = roundsByNumber[currentFixtureRound] || []
-  const batches = getBatchedFixtures(currentRoundFixtures)
+  // Within the active (first incomplete) round, only show fixtures in batches of batchSize.
+  // Completed rounds always show all their fixtures.
+  const getVisibleFixtures = (roundNum) => {
+    const roundFixtures = roundsByNumber[roundNum] || []
+    const isActiveRound = roundNum === firstIncompleteRound
+    if (!isActiveRound) return roundFixtures // completed round — show all
 
-  // Find the first batch with incomplete fixtures — that's the active batch
-  const activeBatchIdx = batches.findIndex(batch => batch.some(f => f.status !== "completed"))
-  const visibleBatchIdx = activeBatchIdx === -1 ? batches.length - 1 : activeBatchIdx
+    // Active round: find how many completed fixtures there are,
+    // then show up to the next full batch
+    const completedCount = roundFixtures.filter(f => f.status === "completed").length
+    const visibleCount   = Math.min(
+      Math.ceil((completedCount + 1) / batchSize) * batchSize,
+      roundFixtures.length
+    )
+    return roundFixtures.slice(0, visibleCount)
+  }
 
-  // Show all completed batches + the current active batch
-  const visibleFixtures = batches
-    .slice(0, visibleBatchIdx + 1)
-    .flat()
+  const visibleFixtures = getVisibleFixtures(currentFixtureRound)
 
   const [activeKoRound, setActiveKoRound] = useState(1)
   const [view, setView] = useState("table") // "table" | "scorers" | "knockout"
