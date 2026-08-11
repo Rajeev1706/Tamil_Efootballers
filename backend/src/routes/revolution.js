@@ -73,7 +73,7 @@ router.get("/public/current", async (req, res, next) => {
 
     const matches = await query(`
       SELECT
-        rm.round, rm.match_order AS "matchNumber", rm.status,
+        rm.round, rm.match_order AS "matchNumber", rm.status, rm.is_walkover AS "isWalkover",
         rm.player1_score AS "player1Score", rm.player2_score AS "player2Score",
         p1.id AS "player1Id", p1.name AS "player1Name",
         p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
@@ -310,10 +310,11 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
 // Awards BDR for reaching rounds (same structure as weekly).
 router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { player1Score, player2Score, tieWinnerId } = z.object({
+    const { player1Score, player2Score, tieWinnerId, isWalkover } = z.object({
       player1Score: z.number().int().min(0),
       player2Score: z.number().int().min(0),
       tieWinnerId:  z.number().int().positive().optional(),
+      isWalkover:   z.boolean().optional().default(false),
     }).parse(req.body)
 
     const matchRes = await query(`
@@ -342,20 +343,19 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     const mrRes = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
-      VALUES ($1,$2,$3,$4,'revolution',$5,$6,NOW(),$7)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number, is_walkover)
+      VALUES ($1,$2,$3,$4,'revolution',$5,$6,NOW(),$7,$8)
       RETURNING id
     `, [match.player1_id, match.player2_id,
         winnerId === match.player1_id ? "win" : "loss",
-        oppGrade, player1Score, player2Score, season])
+        oppGrade, player1Score, player2Score, season, isWalkover])
     const mrId = mrRes.rows[0]?.id
 
-    // Update match result
     await query(`
       UPDATE revolution_matches
-      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4
-      WHERE id=$5
-    `, [player1Score, player2Score, winnerId, mrId, req.params.matchId])
+      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4, is_walkover=$5
+      WHERE id=$6
+    `, [player1Score, player2Score, winnerId, mrId, isWalkover, req.params.matchId])
 
     // Delete old match record if this is an edit
     if (oldMrId) await query("DELETE FROM match_records WHERE id = $1", [oldMrId])

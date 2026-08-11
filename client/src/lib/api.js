@@ -92,8 +92,8 @@ export const weeklyApi = {
   create:       (name)        => api.post("/weekly", { name }).then(r => r.data),
   setPlayers:   (id, playerIds) => api.post(`/weekly/${id}/players`, { playerIds }).then(r => r.data),
   start:        (id)          => api.post(`/weekly/${id}/start`).then(r => r.data),
-  saveResult:    (matchId, player1Score, player2Score, tieWinnerId) =>
-    api.patch(`/weekly/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId }).then(r => r.data),
+  saveResult:    (matchId, player1Score, player2Score, tieWinnerId, isWalkover = false) =>
+    api.patch(`/weekly/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId, isWalkover }).then(r => r.data),
   updateMatchPlayers: (matchId, body) =>
     api.patch(`/weekly/matches/${matchId}/players`, body).then(r => r.data),
   reset:        (id)          => api.post(`/weekly/${id}/reset`).then(r => r.data),
@@ -108,8 +108,8 @@ export const revolutionApi = {
   create:       (name)        => api.post("/revolution", { name }).then(r => r.data),
   setPlayers:   (id, playerIds) => api.post(`/revolution/${id}/players`, { playerIds }).then(r => r.data),
   start:        (id)          => api.post(`/revolution/${id}/start`).then(r => r.data),
-  saveResult:    (matchId, player1Score, player2Score, tieWinnerId) =>
-    api.patch(`/revolution/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId }).then(r => r.data),
+  saveResult:    (matchId, player1Score, player2Score, tieWinnerId, isWalkover = false) =>
+    api.patch(`/revolution/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId, isWalkover }).then(r => r.data),
   updateMatchPlayers: (matchId, body) =>
     api.patch(`/revolution/matches/${matchId}/players`, body).then(r => r.data),
   reset:        (id)          => api.post(`/revolution/${id}/reset`).then(r => r.data),
@@ -130,7 +130,7 @@ export const uclApi = {
   activate:          ()              => api.post("/ucl/activate").then(r => r.data),
   fixtures:          ()              => api.get("/ucl/fixtures").then(r => r.data),
   fixturesPublic:    (groupId)       => api.get(`/ucl/fixtures/public/${groupId}`).then(r => r.data),
-  saveFixture:       (id, s1, s2)   => api.patch(`/ucl/fixtures/${id}`, { player1Score: s1, player2Score: s2 }).then(r => r.data),
+  saveFixture:       (id, s1, s2, isWalkover = false) => api.patch(`/ucl/fixtures/${id}`, { player1Score: s1, player2Score: s2, isWalkover }).then(r => r.data),
   clearFixture:      (id)           => api.delete(`/ucl/fixtures/${id}/result`).then(r => r.data),
   resetGroupFixtures:       (id) => api.post(`/ucl/groups/${id}/reset-fixtures`).then(r => r.data),
   regenerateGroupFixtures:  (id) => api.post(`/ucl/groups/${id}/regenerate-fixtures`).then(r => r.data),

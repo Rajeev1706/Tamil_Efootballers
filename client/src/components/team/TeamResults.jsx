@@ -7,6 +7,7 @@ const RESULTS = [
   { value: "win",  label: "Win",  color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
   { value: "draw", label: "Draw", color: "bg-amber-400/15  text-amber-400  border-amber-400/30"  },
   { value: "loss", label: "Loss", color: "bg-rose-500/15   text-rose-400   border-rose-500/30"   },
+  { value: "walkover", label: "Walkover (I gave WO)", color: "bg-orange-400/15 text-orange-400 border-orange-400/30" },
 ]
 
 export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId }) {
@@ -95,13 +96,19 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
   async function submitEntry(entry) {
     if (!entry.myPlayerId || !entry.oppPlayerId || !entry.result) return
     try {
+      const isWalkover  = entry.result === "walkover"
+      const result      = isWalkover ? "loss" : entry.result
+      const playerScore = isWalkover ? 0 : Number(entry.playerScore)
+      const oppScore    = isWalkover ? 3 : Number(entry.oppScore)
+
       await logRecord.mutateAsync({
         playerId:      Number(entry.myPlayerId),
         opponentId:    Number(entry.oppPlayerId),
-        result:        entry.result,
-        playerScore:   Number(entry.playerScore),
-        opponentScore: Number(entry.oppScore),
+        result,
+        playerScore,
+        opponentScore: oppScore,
         fixtureId:     fixture.id,
+        isWalkover,
       })
       setEntries(prev => prev.filter(e => e.id !== entry.id))
       if (entries.length === 1) {
@@ -190,7 +197,11 @@ function LoggedResultRow({ record: r, isMine, onChanged }) {
   const result    = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw")
   const myScore   = isMine ? r.playerScore : r.opponentScore
   const oppScore_ = isMine ? r.opponentScore : r.playerScore
-  const chip = RESULTS.find(x => x.value === result)
+  // A walkover is when this player gave it — result is 'loss' and is_walkover=true from their perspective
+  const isWalkoverGiven = r.isWalkover && result === "loss"
+  const chip = isWalkoverGiven
+    ? { value: "walkover", label: "WO", color: "bg-orange-400/15 text-orange-400 border-orange-400/30" }
+    : RESULTS.find(x => x.value === result)
 
   const [editResult, setEditResult]     = useState(result)
   const [editMyScore, setEditMyScore]   = useState(myScore ?? "")
@@ -250,9 +261,11 @@ function LoggedResultRow({ record: r, isMine, onChanged }) {
     <div className="flex items-center justify-between bg-pitch-800 rounded-lg px-3 py-2">
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-sm text-slate-300 truncate">{myName}</span>
-        {myScore != null && oppScore_ != null && (
+        {r.isWalkover ? (
+          <span className="text-xs font-bold text-orange-400 flex-shrink-0">WO</span>
+        ) : myScore != null && oppScore_ != null ? (
           <span className="text-xs text-slate-500 font-mono flex-shrink-0">{myScore}–{oppScore_}</span>
-        )}
+        ) : null}
         <span className="text-slate-600 text-xs flex-shrink-0">vs</span>
         <span className="text-sm text-slate-300 truncate">{oppName_}</span>
       </div>
@@ -292,7 +305,9 @@ function LoggedResultRow({ record: r, isMine, onChanged }) {
 }
 
 function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, submitting }) {
-  const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result && entry.playerScore !== "" && entry.oppScore !== ""
+  const isWalkover = entry.result === "walkover"
+  const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result &&
+    (isWalkover || (entry.playerScore !== "" && entry.oppScore !== ""))
 
   return (
     <div className="space-y-2 border border-surface-border rounded-xl p-3">
@@ -330,22 +345,29 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
           <option value="win">Win</option>
           <option value="draw">Draw</option>
           <option value="loss">Loss</option>
+          <option value="walkover">Walkover (I gave WO)</option>
         </select>
 
-        <span className="text-xs text-slate-600 flex-shrink-0">Score:</span>
-        <input
-          type="number" min="0" placeholder="0"
-          value={entry.playerScore}
-          onChange={e => onChange("playerScore", e.target.value)}
-          className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
-        />
-        <span className="text-slate-600 text-xs flex-shrink-0">—</span>
-        <input
-          type="number" min="0" placeholder="0"
-          value={entry.oppScore}
-          onChange={e => onChange("oppScore", e.target.value)}
-          className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
-        />
+        {!isWalkover ? (
+          <>
+            <span className="text-xs text-slate-600 flex-shrink-0">Score:</span>
+            <input
+              type="number" min="0" placeholder="0"
+              value={entry.playerScore}
+              onChange={e => onChange("playerScore", e.target.value)}
+              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+            />
+            <span className="text-slate-600 text-xs flex-shrink-0">—</span>
+            <input
+              type="number" min="0" placeholder="0"
+              value={entry.oppScore}
+              onChange={e => onChange("oppScore", e.target.value)}
+              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+            />
+          </>
+        ) : (
+          <span className="text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-1 rounded flex-shrink-0">0 – 3 (WO)</span>
+        )}
       </div>
 
       {/* Row 3: Log + Remove buttons */}

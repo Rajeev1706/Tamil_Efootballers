@@ -9,11 +9,13 @@ const RESULT_COLOR = {
   win:  "bg-emerald-400/10 text-emerald-400 border-emerald-400/25",
   draw: "bg-amber-400/10  text-amber-400  border-amber-400/25",
   loss: "bg-rose-400/10   text-rose-400   border-rose-400/25",
+  walkover: "bg-orange-400/10 text-orange-400 border-orange-400/25",
 }
 
 function AdminEntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, submitting }) {
+  const isWalkover = entry.result === "walkover_home" || entry.result === "walkover_away"
   const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result &&
-    entry.playerScore !== "" && entry.oppScore !== ""
+    (isWalkover || (entry.playerScore !== "" && entry.oppScore !== ""))
 
   return (
     <div className="space-y-2 border border-surface-border rounded-xl p-3 bg-pitch-800/40">
@@ -37,15 +39,24 @@ function AdminEntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, submi
           <option value="win">Win (Home)</option>
           <option value="draw">Draw</option>
           <option value="loss">Loss (Home)</option>
+          <option value="walkover_home">Walkover (Home gave WO)</option>
+          <option value="walkover_away">Walkover (Away gave WO)</option>
         </select>
-        <span className="text-xs text-slate-600 flex-shrink-0">Score:</span>
-        <input type="number" min="0" placeholder="0" value={entry.playerScore}
-          onChange={e => onChange("playerScore", e.target.value)}
-          className="w-14 text-center bg-pitch-900 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40" />
-        <span className="text-slate-600 text-xs">—</span>
-        <input type="number" min="0" placeholder="0" value={entry.oppScore}
-          onChange={e => onChange("oppScore", e.target.value)}
-          className="w-14 text-center bg-pitch-900 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40" />
+        {!isWalkover && (
+          <>
+            <span className="text-xs text-slate-600 flex-shrink-0">Score:</span>
+            <input type="number" min="0" placeholder="0" value={entry.playerScore}
+              onChange={e => onChange("playerScore", e.target.value)}
+              className="w-14 text-center bg-pitch-900 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40" />
+            <span className="text-slate-600 text-xs">—</span>
+            <input type="number" min="0" placeholder="0" value={entry.oppScore}
+              onChange={e => onChange("oppScore", e.target.value)}
+              className="w-14 text-center bg-pitch-900 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40" />
+          </>
+        )}
+        {isWalkover && (
+          <span className="text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-1 rounded flex-shrink-0">0 – 3 (WO)</span>
+        )}
         <button onClick={onSubmit} disabled={!canSubmit || submitting}
           className={cn("px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex-shrink-0",
             canSubmit ? "bg-accent/15 text-accent border border-accent/25 hover:bg-accent/25"
@@ -97,13 +108,21 @@ function FixtureCard({ fixture, allPlayers }) {
     if (!entry.myPlayerId || !entry.oppPlayerId || !entry.result) return
     setSubmitting(true)
     try {
+      const isWalkover = entry.result === "walkover_home" || entry.result === "walkover_away"
+      // walkover_home = home player gave WO → home loses 0-3
+      // walkover_away = away player gave WO → away loses 0-3 (home wins)
+      const result      = isWalkover ? (entry.result === "walkover_home" ? "loss" : "win") : entry.result
+      const playerScore = isWalkover ? (entry.result === "walkover_home" ? 0 : 3) : (Number(entry.playerScore) || 0)
+      const oppScore    = isWalkover ? (entry.result === "walkover_home" ? 3 : 0) : (Number(entry.oppScore) || 0)
+
       await recordsApi.create({
         playerId:      Number(entry.myPlayerId),
         opponentId:    Number(entry.oppPlayerId),
-        result:        entry.result,
+        result,
         matchType:     "league",
-        playerScore:   Number(entry.playerScore) || 0,
-        opponentScore: Number(entry.oppScore)    || 0,
+        playerScore,
+        opponentScore: oppScore,
+        isWalkover,
       })
       setEntries(prev => {
         const remaining = prev.filter(e => e.id !== entry.id)
@@ -172,9 +191,12 @@ function FixtureCard({ fixture, allPlayers }) {
                 return (
                   <div key={r.id} className="flex items-center gap-2 bg-pitch-800 rounded-lg px-3 py-2 text-sm">
                     <span className="text-slate-300 flex-1 truncate">{homeName}</span>
-                    {homeScore != null && <span className="text-xs font-mono text-slate-400 flex-shrink-0">{homeScore}–{awayScore}</span>}
-                    <span className={cn("text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0", chip)}>
-                      {result === "win" ? "HOME WIN" : result === "loss" ? "AWAY WIN" : "DRAW"}
+                    {homeScore != null && !r.isWalkover && <span className="text-xs font-mono text-slate-400 flex-shrink-0">{homeScore}–{awayScore}</span>}
+                    {r.isWalkover && <span className="text-xs font-bold text-orange-400 flex-shrink-0">WO</span>}
+                    <span className={cn("text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0",
+                      r.isWalkover ? RESULT_COLOR.walkover : RESULT_COLOR[result]
+                    )}>
+                      {r.isWalkover ? "WALKOVER" : result === "win" ? "HOME WIN" : result === "loss" ? "AWAY WIN" : "DRAW"}
                     </span>
                     <span className="text-slate-300 flex-1 text-right truncate">{awayName}</span>
                   </div>

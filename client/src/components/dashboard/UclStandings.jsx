@@ -170,9 +170,15 @@ export default function UclStandings({ onPlayerClick }) {
                     </span>
                     <span className="flex-shrink-0 text-xs px-2">
                       {isCompleted ? (
-                        <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
-                          {f.player1Score} - {f.player2Score}
-                        </span>
+                        f.isWalkover ? (
+                          <span className="font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-0.5 rounded text-[10px]">
+                            WO
+                          </span>
+                        ) : (
+                          <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
+                            {f.player1Score} - {f.player2Score}
+                          </span>
+                        )
                       ) : (
                         <span className="text-slate-600">vs</span>
                       )}

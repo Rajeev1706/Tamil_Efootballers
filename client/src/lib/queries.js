@@ -54,10 +54,9 @@ export const useSetWeeklyPlayers = () => {
 export const useSaveWeeklyResult = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId }) =>
-      weeklyApi.saveResult(matchId, player1Score, player2Score, tieWinnerId),
+    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId, isWalkover }) =>
+      weeklyApi.saveResult(matchId, player1Score, player2Score, tieWinnerId, isWalkover),
     onSuccess: (_, { tournamentId }) => {
-      // Invalidate with both string and number forms to be safe
       qc.invalidateQueries({ queryKey: ["weekly-tournament"] })
       qc.invalidateQueries({ queryKey: ["players"] })
     },
@@ -151,8 +150,8 @@ export const useSetRevolutionPlayers = () => {
 export const useSaveRevolutionResult = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId }) =>
-      revolutionApi.saveResult(matchId, player1Score, player2Score, tieWinnerId),
+    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId, isWalkover }) =>
+      revolutionApi.saveResult(matchId, player1Score, player2Score, tieWinnerId, isWalkover),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["revolution-tournament"] })
       qc.invalidateQueries({ queryKey: ["revolution-current"] })

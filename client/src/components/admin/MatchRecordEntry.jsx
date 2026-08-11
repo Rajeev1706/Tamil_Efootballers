@@ -158,10 +158,14 @@ function RecordRow({ record, onDeleted, onEdited }) {
       </div>
       <span className={cn(
         "text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0",
-        record.result === "win"  ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/25"
-        : record.result === "draw" ? "bg-amber-400/10 text-amber-400 border-amber-400/25"
-        : "bg-rose-400/10 text-rose-400 border-rose-400/25"
-      )}>{record.result.toUpperCase()}</span>
+        record.isWalkover && record.result === "loss"
+          ? "bg-orange-400/10 text-orange-400 border-orange-400/25"
+          : record.result === "win"  ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/25"
+          : record.result === "draw" ? "bg-amber-400/10 text-amber-400 border-amber-400/25"
+          : "bg-rose-400/10 text-rose-400 border-rose-400/25"
+      )}>
+        {record.isWalkover && record.result === "loss" ? "WO" : record.result.toUpperCase()}
+      </span>
       <button onClick={() => setEditing(true)}
         className="w-7 h-7 rounded-lg hover:bg-accent/10 flex items-center justify-center text-slate-500 hover:text-accent transition-colors opacity-0 group-hover:opacity-100"
         title="Edit record">
