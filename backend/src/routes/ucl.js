@@ -162,7 +162,7 @@ router.get("/fixtures/public/:groupId", async (req, res, next) => {
       SELECT
         f.id, f.round_number AS "roundNumber",
         f.player1_score AS "player1Score", f.player2_score AS "player2Score",
-        f.status,
+        f.status, f.is_walkover AS "isWalkover",
         p1.id AS "player1Id", p1.name AS "player1Name",
         p2.id AS "player2Id", p2.name AS "player2Name"
       FROM ucl_fixtures f
@@ -182,6 +182,7 @@ router.get("/fixtures", authenticate, adminOnly, async (req, res, next) => {
         f.id, f.group_id AS "groupId", f.round_number AS "roundNumber",
         f.player1_score AS "player1Score", f.player2_score AS "player2Score",
         f.status, f.match_record_id AS "matchRecordId",
+        f.is_walkover AS "isWalkover",
         g.name AS "groupName",
         p1.id AS "player1Id", p1.name AS "player1Name",
         p2.id AS "player2Id", p2.name AS "player2Name"
@@ -198,9 +199,10 @@ router.get("/fixtures", authenticate, adminOnly, async (req, res, next) => {
 // PATCH /api/ucl/fixtures/:id — save or update result
 router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { player1Score, player2Score } = z.object({
+    const { player1Score, player2Score, isWalkover } = z.object({
       player1Score: z.number().int().min(0),
       player2Score: z.number().int().min(0),
+      isWalkover:   z.boolean().optional().default(false),
     }).parse(req.body)
 
     const fixRes = await query(`
@@ -224,19 +226,16 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
 
     const mrRes = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
-      VALUES ($1,$2,$3,$4,'ucl',$5,$6,NOW(),$7)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number, is_walkover)
+      VALUES ($1,$2,$3,$4,'ucl',$5,$6,NOW(),$7,$8)
       RETURNING id
-    `, [fix.player1_id, fix.player2_id, result, oppGrade, player1Score, player2Score, season])
+    `, [fix.player1_id, fix.player2_id, result, oppGrade, player1Score, player2Score, season, isWalkover])
 
-    // Re-point the fixture at the new record BEFORE deleting the old one —
-    // deleting first would violate the match_record_id foreign key while
-    // ucl_fixtures still referenced that row.
     await query(`
       UPDATE ucl_fixtures
-      SET player1_score=$1, player2_score=$2, status='completed', match_record_id=$3
-      WHERE id=$4
-    `, [player1Score, player2Score, mrRes.rows[0].id, req.params.id])
+      SET player1_score=$1, player2_score=$2, status='completed', match_record_id=$3, is_walkover=$4
+      WHERE id=$5
+    `, [player1Score, player2Score, mrRes.rows[0].id, isWalkover, req.params.id])
 
     // Now safe to delete the old match record, if this was an edit
     if (oldMatchRecordId) {

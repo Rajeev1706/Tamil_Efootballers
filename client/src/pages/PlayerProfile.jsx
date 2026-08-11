@@ -263,6 +263,16 @@ export default function PlayerProfile() {
             ))}
           </div>
 
+          {/* Walkovers given — only shown if the player has given at least one */}
+          {(player.record?.walkoversGiven > 0) && (
+            <div className="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-400/5 border border-orange-400/20">
+              <span className="text-xs font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-0.5 rounded">WO</span>
+              <span className="text-sm text-slate-400">
+                Walkover given <span className="text-orange-400 font-bold">{player.record.walkoversGiven}</span> time{player.record.walkoversGiven > 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+
           {showAuctionDelta && !player.isCaptain && (
             <div className="flex items-center gap-3 mt-4">
               <span className={cn(
@@ -316,11 +326,15 @@ export default function PlayerProfile() {
                     </span>
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <span className="text-sm text-slate-300 truncate">vs {m.opponentName}</span>
-                      {m.playerScore !== null && m.playerScore !== undefined && (
+                      {m.isWalkover ? (
+                        <span className="text-xs font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-1.5 py-0.5 rounded flex-shrink-0">
+                          WO
+                        </span>
+                      ) : m.playerScore !== null && m.playerScore !== undefined ? (
                         <span className="text-xs font-mono font-bold text-white px-1.5 py-0.5 rounded bg-pitch-800 border border-surface-border flex-shrink-0">
                           {m.playerScore}-{m.opponentScore}
                         </span>
-                      )}
+                      ) : null}
                       {m.matchType && m.matchType !== "league" && (
                         <span className="text-xs text-slate-500 capitalize hidden sm:inline">
                           · {m.matchType.toUpperCase()}
@@ -329,11 +343,13 @@ export default function PlayerProfile() {
                     </div>
                     <span className={cn(
                       "text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0",
-                      m.result === "win"  ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/25"
-                      : m.result === "draw" ? "bg-amber-400/10 text-amber-400 border-amber-400/25"
-                      : "bg-rose-400/10 text-rose-400 border-rose-400/25"
+                      m.isWalkoverGiven
+                        ? "bg-orange-400/10 text-orange-400 border-orange-400/25"
+                        : m.result === "win"  ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/25"
+                        : m.result === "draw" ? "bg-amber-400/10 text-amber-400 border-amber-400/25"
+                        : "bg-rose-400/10 text-rose-400 border-rose-400/25"
                     )}>
-                      {m.result.toUpperCase()}
+                      {m.isWalkoverGiven ? "WO" : m.result.toUpperCase()}
                     </span>
                   </div>
                 ))}

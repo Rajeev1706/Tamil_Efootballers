@@ -23,10 +23,11 @@ function getRoundLabel(round, totalRounds) {
 function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   const saveResult    = useSaveRevolutionResult()
   const updatePlayers = useUpdateRevolutionMatchPlayers()
-  const [score1, setScore1] = useState("")
-  const [score2, setScore2] = useState("")
-  const [tieWinner, setTieWinner] = useState("")
-  const [editing, setEditing]     = useState(false)
+  const [score1, setScore1]         = useState("")
+  const [score2, setScore2]         = useState("")
+  const [tieWinner, setTieWinner]   = useState("")
+  const [editing, setEditing]       = useState(false)
+  const [walkoverMode, setWalkoverMode] = useState(false)
   const [editingPlayers, setEditingPlayers] = useState(false)
   const [p1Id, setP1Id] = useState(match.player1_id || "")
   const [p2Id, setP2Id] = useState(match.player2_id || "")
@@ -40,6 +41,7 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
     setScore1(isCompleted && match.player1_score != null ? match.player1_score : "")
     setScore2(isCompleted && match.player2_score != null ? match.player2_score : "")
     setTieWinner("")
+    setWalkoverMode(false)
     setEditing(true)
   }
 
@@ -48,16 +50,24 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   const isTied = scoresEntered && s1 === s2
   const canSave = scoresEntered && (!isTied || tieWinner !== "")
 
-  async function handleSave() {
-    if (!canSave) return
+  async function handleSave(isWalkover = false, walkoverGiverId = null) {
+    let p1Score = s1, p2Score = s2
+    if (isWalkover && walkoverGiverId) {
+      p1Score = walkoverGiverId === match.player1_id ? 0 : 3
+      p2Score = walkoverGiverId === match.player1_id ? 3 : 0
+    } else {
+      if (!canSave) return
+    }
     await saveResult.mutateAsync({
       matchId: match.id,
-      player1Score: s1,
-      player2Score: s2,
-      tieWinnerId: isTied ? (tieWinner === "p1" ? match.player1_id : match.player2_id) : undefined,
+      player1Score: p1Score,
+      player2Score: p2Score,
+      tieWinnerId: (!isWalkover && isTied) ? (tieWinner === "p1" ? match.player1_id : match.player2_id) : undefined,
+      isWalkover,
       tournamentId,
     })
     setEditing(false)
+    setWalkoverMode(false)
     setJustSaved(true)
     onSaved?.()
   }
@@ -83,9 +93,13 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
           {isBye ? (
             <span className="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full">BYE</span>
           ) : isCompleted ? (
-            <span className="text-sm font-mono font-bold text-white bg-pitch-800 px-3 py-1 rounded-lg">
-              {match.player1_score} - {match.player2_score}
-            </span>
+            match.isWalkover ? (
+              <span className="text-xs font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2.5 py-1 rounded-full">WO</span>
+            ) : (
+              <span className="text-sm font-mono font-bold text-white bg-pitch-800 px-3 py-1 rounded-lg">
+                {match.player1_score} - {match.player2_score}
+              </span>
+            )
           ) : (
             <span className="text-xs text-slate-600">vs</span>
           )}
@@ -172,14 +186,35 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
             </div>
           )}
 
-          <div className="flex gap-2 max-w-sm mx-auto">
-            <button onClick={() => setEditing(false)} className="flex-1 text-xs py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
-            <button onClick={handleSave}
-              disabled={!canSave || saveResult.isPending}
-              className="flex-1 text-xs py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 font-semibold disabled:opacity-40">
-              {saveResult.isPending ? "…" : "Save"}
-            </button>
-          </div>
+          {walkoverMode ? (
+            <div className="max-w-sm mx-auto space-y-2">
+              <p className="text-xs text-orange-400 font-semibold text-center">Who gave the walkover?</p>
+              <div className="flex gap-2">
+                <button onClick={() => handleSave(true, match.player1_id)} disabled={saveResult.isPending}
+                  className="flex-1 text-xs py-2 rounded-lg bg-orange-400/15 text-orange-400 border border-orange-400/30 font-semibold hover:bg-orange-400/25 transition-colors disabled:opacity-40">
+                  {match.player1Name}
+                </button>
+                <button onClick={() => handleSave(true, match.player2_id)} disabled={saveResult.isPending}
+                  className="flex-1 text-xs py-2 rounded-lg bg-orange-400/15 text-orange-400 border border-orange-400/30 font-semibold hover:bg-orange-400/25 transition-colors disabled:opacity-40">
+                  {match.player2Name}
+                </button>
+              </div>
+              <button onClick={() => setWalkoverMode(false)} className="w-full text-xs py-1.5 rounded-lg border border-surface-border text-slate-400">← Back</button>
+            </div>
+          ) : (
+            <div className="flex gap-2 max-w-sm mx-auto">
+              <button onClick={() => setEditing(false)} className="text-xs py-1.5 px-3 rounded-lg border border-surface-border text-slate-400">Cancel</button>
+              <button onClick={() => setWalkoverMode(true)}
+                className="text-xs py-1.5 px-3 rounded-lg bg-orange-400/10 text-orange-400 border border-orange-400/25 font-semibold hover:bg-orange-400/20 transition-colors">
+                Walkover
+              </button>
+              <button onClick={() => handleSave(false)}
+                disabled={!canSave || saveResult.isPending}
+                className="flex-1 text-xs py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 font-semibold disabled:opacity-40">
+                {saveResult.isPending ? "…" : "Save"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

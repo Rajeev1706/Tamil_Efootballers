@@ -87,6 +87,7 @@ router.get("/public/current", async (req, res, next) => {
       SELECT
         wtm.round, wtm.match_number AS "matchNumber", wtm.status,
         wtm.player1_score AS "player1Score", wtm.player2_score AS "player2Score",
+        wtm.is_walkover AS "isWalkover",
         p1.id AS "player1Id", p1.name AS "player1Name",
         p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
         p2.id AS "player2Id", p2.name AS "player2Name",
@@ -357,10 +358,11 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
 // PATCH /api/weekly/matches/:matchId/result — save match result
 router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { player1Score, player2Score, tieWinnerId } = z.object({
+    const { player1Score, player2Score, tieWinnerId, isWalkover } = z.object({
       player1Score: z.number().int().min(0),
       player2Score: z.number().int().min(0),
       tieWinnerId:  z.number().int().positive().optional(),
+      isWalkover:   z.boolean().optional().default(false),
     }).parse(req.body)
 
     const matchRes = await query(`
@@ -373,18 +375,12 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     if (!match) return res.status(404).json({ error: "Match not found" })
     if (!match.player1_id || !match.player2_id) return res.status(400).json({ error: "Both players required" })
 
-    // Determine winner — if tied, use admin-selected tieWinnerId
     const winnerId = player1Score > player2Score ? match.player1_id
                    : player2Score > player1Score ? match.player2_id
-                   : (tieWinnerId || match.player1_id) // tied: use admin pick or default p1
+                   : (tieWinnerId || match.player1_id)
 
-    // Result for the match_records/player-profile side must reflect who
-    // actually advanced, not just the raw score — otherwise a tie broken in
-    // MR.D's favor still logged as a "draw" on both players' profiles even
-    // though MR.D won the tie-breaker and advanced in the bracket.
     const result = winnerId === match.player1_id ? "win" : "loss"
 
-    // Get current season
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
     const season = parseInt(seasonRes.rows[0]?.value || "6")
 
@@ -393,23 +389,19 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     const oldMatchRecordId = match.match_record_id
 
-    // Log new match record
     const mrRes = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
-      VALUES ($1,$2,$3,$4,'weekly',$5,$6,NOW(),$7)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number, is_walkover)
+      VALUES ($1,$2,$3,$4,'weekly',$5,$6,NOW(),$7,$8)
       RETURNING id
-    `, [match.player1_id, match.player2_id, result, oppGrade, player1Score, player2Score, season])
+    `, [match.player1_id, match.player2_id, result, oppGrade, player1Score, player2Score, season, isWalkover])
     const mrId = mrRes.rows[0]?.id
 
-    // Update the match result to point at the new record BEFORE deleting the
-    // old one — deleting first would violate the match_record_id foreign key
-    // while weekly_tournament_matches still referenced that row.
     await query(`
       UPDATE weekly_tournament_matches
-      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4
-      WHERE id=$5
-    `, [player1Score, player2Score, winnerId, mrId, req.params.matchId])
+      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4, is_walkover=$5
+      WHERE id=$6
+    `, [player1Score, player2Score, winnerId, mrId, isWalkover, req.params.matchId])
 
     // Now safe to delete the old match record, if this was an edit
     if (oldMatchRecordId) {

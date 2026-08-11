@@ -27,6 +27,7 @@ router.get("/season/:season", async (req, res, next) => {
         mr.opponent_score AS "opponentScore",
         mr.recorded_at    AS date,
         mr.season_number  AS "seasonNumber",
+        mr.is_walkover    AS "isWalkover",
         p.id   AS "playerId",   p.name AS "playerName",
         pt.name AS "playerTeam",
         opp.id AS "opponentId", opp.name AS "opponentName",
@@ -78,6 +79,7 @@ router.get("/fixture/:fixtureId", authenticate, async (req, res, next) => {
         mr.player_score   AS "playerScore",
         mr.opponent_score AS "opponentScore",
         mr.recorded_at    AS date,
+        mr.is_walkover    AS "isWalkover",
         p.id              AS "playerId",
         p.name            AS "playerName",
         p.team_id         AS "playerTeamId",
@@ -116,6 +118,7 @@ const createSchema = z.object({
   playerScore:   z.number().int().min(0).optional(),
   opponentScore: z.number().int().min(0).optional(),
   date:          z.string().optional(),
+  isWalkover:    z.boolean().optional().default(false),
 })
 
 // POST /api/records/team — team owner logs a Team League result
@@ -125,13 +128,14 @@ router.post("/team", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "No team associated with your account" })
     }
 
-    const { playerId, opponentId, result, playerScore, opponentScore, fixtureId } = z.object({
+    const { playerId, opponentId, result, playerScore, opponentScore, fixtureId, isWalkover } = z.object({
       playerId:      z.number().int().positive(),
       opponentId:    z.number().int().positive(),
       result:        z.enum(["win", "draw", "loss"]),
       playerScore:   z.number().int().min(0).optional(),
       opponentScore: z.number().int().min(0).optional(),
       fixtureId:     z.number().int().positive(),
+      isWalkover:    z.boolean().optional().default(false),
     }).parse(req.body)
 
     if (playerId === opponentId) {
@@ -168,8 +172,8 @@ router.post("/team", authenticate, async (req, res, next) => {
     const seasonNumber = await getCurrentSeason()
     const ins = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number, fixture_id, team_id)
-      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9,$10,$11)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number, fixture_id, team_id, is_walkover)
+      VALUES ($1,$2,$3,$4,'league',$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *
     `, [
       playerId, opponentId, result, oppCheck.rows[0].grade,
@@ -177,6 +181,7 @@ router.post("/team", authenticate, async (req, res, next) => {
       new Date().toISOString().slice(0, 10),
       req.user.id, seasonNumber, fixtureId,
       playerCheck.rows[0].team_id ?? null,
+      isWalkover ?? false,
     ])
 
     // Live team points/goals — added immediately as each player result comes
@@ -339,14 +344,14 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     const seasonNumber = await getCurrentSeason()
     const ins = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, recorded_by, season_number, is_walkover)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `, [
       playerId, opponentId, result, opponentGrade, matchType,
       playerScore ?? null, opponentScore ?? null,
       date || new Date().toISOString().slice(0, 10),
-      req.user.id, seasonNumber,
+      req.user.id, seasonNumber, isWalkover ?? false,
     ])
 
     const letter = result === "win" ? "W" : result === "draw" ? "D" : "L"

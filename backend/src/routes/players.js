@@ -73,6 +73,13 @@ router.get("/:id", async (req, res, next) => {
         CASE WHEN mr.player_id = $1 THEN mr.opponent_score ELSE mr.player_score   END AS "opponentScore",
         mr.recorded_at AS date,
         mr.season_number AS "seasonNumber",
+        mr.is_walkover AS "isWalkover",
+        -- isWalkoverGiven: true when THIS player gave the walkover (they lost in a WO)
+        CASE
+          WHEN mr.is_walkover = true AND mr.player_id = $1   AND mr.result = 'loss' THEN true
+          WHEN mr.is_walkover = true AND mr.opponent_id = $1 AND mr.result = 'win'  THEN true
+          ELSE false
+        END AS "isWalkoverGiven",
         CASE WHEN mr.player_id = $1 THEN opp.id   ELSE p2.id   END AS "opponentId",
         CASE WHEN mr.player_id = $1 THEN opp.name ELSE p2.name END AS "opponentName",
         CASE WHEN mr.player_id = $1 THEN ot.name  ELSE pt.name END AS "opponentTeam"
@@ -90,10 +97,12 @@ router.get("/:id", async (req, res, next) => {
       wins:   Object.fromEntries(grades.map(g => [g, 0])),
       draws:  Object.fromEntries(grades.map(g => [g, 0])),
       losses: Object.fromEntries(grades.map(g => [g, 0])),
+      walkoversGiven: 0,
     }
     historyRes.rows.forEach(m => {
       const bucket = m.result === "win" ? "wins" : m.result === "draw" ? "draws" : "losses"
       if (record[bucket][m.opponentGrade] !== undefined) record[bucket][m.opponentGrade]++
+      if (m.isWalkoverGiven) record.walkoversGiven++
     })
 
     res.json({ ...player, record, matchHistory: historyRes.rows })
