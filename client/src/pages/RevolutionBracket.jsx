@@ -6,6 +6,7 @@ import { cn } from "../lib/utils"
 import Confetti from "../components/common/Confetti"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
 import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
+import revolutionLogo from "../images/revolution.png"
 
 function getRoundLabel(round, totalRounds) {
   const fromEnd = totalRounds - round
@@ -259,7 +260,7 @@ export default function RevolutionBracket() {
             className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
             <ArrowLeft className="w-4 h-4" /> Admin
           </button>
-          <Trophy className="w-5 h-5 text-accent" />
+          <img src={revolutionLogo} alt="Revolution Trophy" className="w-6 h-6 object-contain flex-shrink-0" />
           <h1 className="text-lg font-extrabold text-white">{tournament.name}</h1>
           {tournament.status === "completed" && (
             <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-2 py-0.5 rounded-full">

@@ -6,6 +6,7 @@ import { TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
 import { useRankChanges } from "../../hooks/useRankChanges"
+import revolutionLogo from "../../../images/revolution.png"
 
 function getRoundLabel(round, totalRounds) {
   const fromEnd = totalRounds - round
@@ -54,9 +55,11 @@ export default function RevolutionDashboard({ onPlayerClick }) {
     <div className="card overflow-hidden relative">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-rose-500/15 flex items-center justify-center flex-shrink-0">
-            <Swords className="w-5 h-5 text-rose-400" />
-          </div>
+          <img
+            src={revolutionLogo}
+            alt="Revolution Trophy"
+            className="w-9 h-9 object-contain flex-shrink-0"
+          />
           <div>
             <p className="section-label mb-0.5">Revolution Trophy</p>
             <h2 className="text-base font-semibold text-white">
