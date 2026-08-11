@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Trophy, Target, Swords } from "lucide-react"
-import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent, useUclFixturesPublic } from "../../lib/queries"
+import { useUclStandings, useUclTopScorers, useUclKnockoutCurrent, useUclFixturesPublic, useSettings } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 import { TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
@@ -23,6 +23,7 @@ export default function UclStandings({ onPlayerClick }) {
   const { data: groups = [], isLoading } = useUclStandings()
   const { data: scorers = [] } = useUclTopScorers()
   const { data: knockout } = useUclKnockoutCurrent()
+  const { data: settings = {} } = useSettings()
   const [activeGroup, setActiveGroup] = useState(0)
   const group = groups[activeGroup] || groups[0]
   const { data: fixtures = [] } = useUclFixturesPublic(group?.id)
@@ -33,20 +34,49 @@ export default function UclStandings({ onPlayerClick }) {
     (group?.players ?? []).map(p => p.id)
   )
 
-  // A round only "unlocks" once every fixture in every round before it is
-  // completed — so admins logging results progressively reveals rounds
-  // one at a time, rather than showing the whole group's schedule upfront.
+  // Batch size set by admin — controls how many fixtures unlock at once
+  const batchSize = Math.max(1, parseInt(settings.ucl_fixtures_per_batch || "1"))
+
   const roundsByNumber = fixtures.reduce((acc, f) => {
     (acc[f.roundNumber] ??= []).push(f)
     return acc
   }, {})
   const allRoundNumbers = Object.keys(roundsByNumber).map(Number).sort((a, b) => a - b)
-  const firstIncompleteRound = allRoundNumbers.find(r => roundsByNumber[r].some(f => f.status !== "completed"))
+
+  // Within each round, split fixtures into batches of batchSize.
+  // A batch unlocks once the previous batch is fully completed.
+  // The "current batch" is the first batch that has any incomplete fixtures.
+  const getBatchedFixtures = (roundFixtures) => {
+    const batches = []
+    for (let i = 0; i < roundFixtures.length; i += batchSize) {
+      batches.push(roundFixtures.slice(i, i + batchSize))
+    }
+    return batches
+  }
+
+  const firstIncompleteRound = allRoundNumbers.find(r =>
+    roundsByNumber[r].some(f => f.status !== "completed")
+  )
   const unlockedRounds = firstIncompleteRound != null
     ? allRoundNumbers.filter(r => r <= firstIncompleteRound)
-    : allRoundNumbers // every round complete — show them all
-  const currentFixtureRound = unlockedRounds.includes(activeFixtureRound) ? activeFixtureRound : (unlockedRounds[unlockedRounds.length - 1] ?? 1)
-  const visibleFixtures = roundsByNumber[currentFixtureRound] || []
+    : allRoundNumbers
+
+  const currentFixtureRound = unlockedRounds.includes(activeFixtureRound)
+    ? activeFixtureRound
+    : (unlockedRounds[unlockedRounds.length - 1] ?? 1)
+
+  const currentRoundFixtures = roundsByNumber[currentFixtureRound] || []
+  const batches = getBatchedFixtures(currentRoundFixtures)
+
+  // Find the first batch with incomplete fixtures — that's the active batch
+  const activeBatchIdx = batches.findIndex(batch => batch.some(f => f.status !== "completed"))
+  const visibleBatchIdx = activeBatchIdx === -1 ? batches.length - 1 : activeBatchIdx
+
+  // Show all completed batches + the current active batch
+  const visibleFixtures = batches
+    .slice(0, visibleBatchIdx + 1)
+    .flat()
+
   const [activeKoRound, setActiveKoRound] = useState(1)
   const [view, setView] = useState("table") // "table" | "scorers" | "knockout"
 

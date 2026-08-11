@@ -15,6 +15,14 @@ export const QK = {
 export const useSettings = () =>
   useQuery({ queryKey: ["settings"], queryFn: settingsApi.get, staleTime: 60000 })
 
+export const useUpdateSettings = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ key, value }) => settingsApi.update(key, value),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+  })
+}
+
 export const useUclGroups = () =>
   useQuery({ queryKey: ["ucl-groups"], queryFn: uclApi.groups })
 

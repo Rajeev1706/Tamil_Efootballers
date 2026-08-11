@@ -1,12 +1,13 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
-import { Plus, Trash2, Pencil, Check, X, Users, ChevronDown, ChevronUp, Zap } from "lucide-react"
+import { Plus, Trash2, Pencil, Check, X, Users, ChevronDown, ChevronUp, Zap, Settings } from "lucide-react"
 import {
   useUclAdminGroups, useUclUnassigned,
   useCreateUclGroup, useGenerateUclGroups,
   useRenameUclGroup, useDeleteUclGroup,
   useAssignUclPlayer, useUnassignUclPlayer, useReplaceUclPlayer,
+  useSettings, useUpdateSettings,
 } from "../../lib/queries"
 import { usePlayers } from "../../lib/queries"
 import { uclApi } from "../../lib/api"
@@ -292,10 +293,25 @@ export default function UclGroupsAdmin() {
   const navigate = useNavigate()
   const { data: groups = [], isLoading } = useUclAdminGroups()
   const { data: unassigned = [] }        = useUclUnassigned()
+  const { data: settings = {} }          = useSettings()
+  const updateSettings                   = useUpdateSettings()
   const createGroup = useCreateUclGroup()
   const [showGenerate, setShowGenerate] = useState(false)
   const [showCreate, setShowCreate]     = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
+  const [batchSize, setBatchSize]       = useState("")
+  const [batchSaved, setBatchSaved]     = useState(false)
+
+  // Sync local input with loaded settings
+  const currentBatch = parseInt(settings.ucl_fixtures_per_batch || "1")
+
+  const handleSaveBatch = () => {
+    const val = parseInt(batchSize)
+    if (!val || val < 1) return
+    updateSettings.mutate({ key: "ucl_fixtures_per_batch", value: String(val) }, {
+      onSuccess: () => { setBatchSaved(true); setBatchSize(""); setTimeout(() => setBatchSaved(false), 2000) }
+    })
+  }
 
   const handleCreate = () => {
     if (!newGroupName.trim()) return
@@ -324,6 +340,36 @@ export default function UclGroupsAdmin() {
           <button onClick={() => { setShowCreate(v => !v); setShowGenerate(false) }}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-pitch-800 text-slate-400 border border-surface-border hover:text-white transition-colors">
             <Plus className="w-3.5 h-3.5" /> Manual
+          </button>
+        </div>
+      </div>
+
+      {/* Fixtures per batch setting */}
+      <div className="card px-5 py-4 flex items-center gap-4 flex-wrap">
+        <Settings className="w-4 h-4 text-slate-500 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white">Fixtures shown per batch</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Controls how many fixtures unlock on the public dashboard at once.
+            Currently: <span className="text-accent font-semibold">{currentBatch}</span> per batch
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={batchSize}
+            onChange={e => setBatchSize(e.target.value)}
+            placeholder={String(currentBatch)}
+            className="w-20 bg-pitch-900 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white text-center focus:outline-none focus:border-accent/40 transition-colors"
+          />
+          <button
+            onClick={handleSaveBatch}
+            disabled={!batchSize || updateSettings.isPending}
+            className="px-3 py-1.5 rounded-lg bg-accent/15 text-accent border border-accent/30 text-sm font-semibold disabled:opacity-40 hover:bg-accent/25 transition-colors"
+          >
+            {batchSaved ? "✓ Saved" : "Set"}
           </button>
         </div>
       </div>
