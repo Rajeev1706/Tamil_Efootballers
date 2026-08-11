@@ -76,6 +76,7 @@ const TROPHY_BONUS = {
   trophy6_count: 15, // Team League Golden Boot
   trophy7_count: 10, // UCL Golden Boot
   trophy5_count: 5,  // Weekly Golden Boot
+  trophy8_count: 15, // Revolution Trophy
 }
 
 function resultWeight(result, ownGrade, opponentGrade) {

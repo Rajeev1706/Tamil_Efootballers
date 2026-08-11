@@ -33,6 +33,7 @@ router.get("/", async (req, res, next) => {
       `SELECT
         id, name, alias, grade, "auctionPrice", "marketValue", "bdrPoints",
         form, "trophy1Count", "trophy2Count", "trophy3Count", "trophy4Count",
+        "trophy5Count", "trophy6Count", "trophy7Count", "trophy8Count",
         "isCaptain", "gradeFloor", "gradeCeiling",
         team, "teamId", "teamLogo",
         "avatarId", "avatarUrl", "imageUrl"

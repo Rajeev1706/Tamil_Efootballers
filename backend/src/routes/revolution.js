@@ -2,6 +2,8 @@ import { Router } from "express"
 import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
+import { recalcMarketValue } from "../services/marketValue.js"
+import { recalcForm } from "../services/form.js"
 
 const router = Router()
 
@@ -304,7 +306,8 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
 })
 
 // PATCH /api/revolution/matches/:matchId/result — save result
-// NO match_records, NO BDR, NO trophies, NO MV/form recalc
+// Creates match_records (match_type='revolution'), recalcs MV + form for both players.
+// Awards BDR for reaching rounds (same structure as weekly).
 router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { player1Score, player2Score, tieWinnerId } = z.object({
@@ -326,15 +329,75 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     const winnerId = player1Score > player2Score ? match.player1_id
                    : player2Score > player1Score ? match.player2_id
                    : (tieWinnerId || match.player1_id)
+    const loserId  = winnerId === match.player1_id ? match.player2_id : match.player1_id
 
-    // Just update the bracket — no match_records, no BDR, no trophies
+    // ── Match record ────────────────────────────────────────────────────────
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season    = parseInt(seasonRes.rows[0]?.value || "1")
+
+    const oppGradeRes = await query("SELECT grade FROM players WHERE id = $1", [match.player2_id])
+    const oppGrade    = oppGradeRes.rows[0]?.grade || "C"
+
+    const oldMrId = match.match_record_id
+
+    const mrRes = await query(`
+      INSERT INTO match_records
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
+      VALUES ($1,$2,$3,$4,'revolution',$5,$6,NOW(),$7)
+      RETURNING id
+    `, [match.player1_id, match.player2_id,
+        winnerId === match.player1_id ? "win" : "loss",
+        oppGrade, player1Score, player2Score, season])
+    const mrId = mrRes.rows[0]?.id
+
+    // Update match result
     await query(`
       UPDATE revolution_matches
-      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed'
-      WHERE id=$4
-    `, [player1Score, player2Score, winnerId, req.params.matchId])
+      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4
+      WHERE id=$5
+    `, [player1Score, player2Score, winnerId, mrId, req.params.matchId])
 
-    // Advance winner to next round
+    // Delete old match record if this is an edit
+    if (oldMrId) await query("DELETE FROM match_records WHERE id = $1", [oldMrId])
+
+    // ── BDR for reaching rounds ─────────────────────────────────────────────
+    const totalRounds = match.total_rounds
+    const finalRound  = totalRounds
+    const sfRound     = totalRounds - 1
+    const qfRound     = totalRounds - 2
+
+    function bdrForReaching(round) {
+      if (round >= finalRound) return 8
+      if (round >= sfRound)    return 5
+      if (round >= qfRound)    return 3
+      return 0
+    }
+
+    function advancementDiff(currentRound) {
+      if (currentRound >= totalRounds) return 0
+      return bdrForReaching(currentRound + 1) - bdrForReaching(currentRound)
+    }
+
+    // Award BDR diff to winner for advancing
+    const bdrDiff = advancementDiff(match.round)
+    if (bdrDiff > 0) {
+      await query("UPDATE players SET bdr_points = bdr_points + $1 WHERE id = $2", [bdrDiff, winnerId])
+    }
+
+    // If final — winner gets champion bonus (+2) and trophy8
+    if (match.round === totalRounds) {
+      await query("UPDATE players SET bdr_points = bdr_points + 2 WHERE id = $1", [winnerId])
+      await query("UPDATE players SET trophy8_count = trophy8_count + 1 WHERE id = $1", [winnerId])
+      // Season-scoped trophy record for MV bonus
+      const sourceKey = `revolution-champion-${match.tournament_id}`
+      await query(`
+        INSERT INTO player_trophies (player_id, trophy_column, season_number, source_key)
+        VALUES ($1, 'trophy8_count', $2, $3)
+        ON CONFLICT (source_key, player_id) DO NOTHING
+      `, [winnerId, season, sourceKey])
+    }
+
+    // ── Advance winner to next round ────────────────────────────────────────
     if (winnerId && match.round < match.total_rounds) {
       const nextRound    = match.round + 1
       const nextMatchNum = Math.ceil(match.match_order / 2)
@@ -345,7 +408,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
     }
 
-    // Check if tournament is complete
+    // ── Check if tournament complete ────────────────────────────────────────
     const remaining = await query(`
       SELECT COUNT(*) FROM revolution_matches
       WHERE tournament_id = $1 AND status = 'pending'
@@ -354,6 +417,12 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE revolution_tournaments SET status = 'completed' WHERE id = $1", [match.tournament_id])
     }
+
+    // ── Recalc MV + form for both players ──────────────────────────────────
+    await recalcMarketValue(match.player1_id)
+    await recalcMarketValue(match.player2_id)
+    await recalcForm(match.player1_id)
+    await recalcForm(match.player2_id)
 
     res.json({ updated: true, winnerId, nextRound: match.round + 1 })
   } catch (err) { next(err) }

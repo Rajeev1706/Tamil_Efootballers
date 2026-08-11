@@ -396,7 +396,8 @@ router.get("/trophy-history", async (req, res, next) => {
         (p.trophy4_count + COALESCE(h.trophy4_total, 0))::int AS "trophy4Count",
         (p.trophy5_count + COALESCE(h.trophy5_total, 0))::int AS "trophy5Count",
         (p.trophy6_count + COALESCE(h.trophy6_total, 0))::int AS "trophy6Count",
-        (p.trophy7_count + COALESCE(h.trophy7_total, 0))::int AS "trophy7Count"
+        (p.trophy7_count + COALESCE(h.trophy7_total, 0))::int AS "trophy7Count",
+        (p.trophy8_count + COALESCE(h.trophy8_total, 0))::int AS "trophy8Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
       LEFT JOIN (
@@ -408,13 +409,13 @@ router.get("/trophy-history", async (req, res, next) => {
           SUM(trophy4_count) AS trophy4_total,
           SUM(trophy5_count) AS trophy5_total,
           SUM(trophy6_count) AS trophy6_total,
-          SUM(trophy7_count) AS trophy7_total
+          SUM(trophy7_count) AS trophy7_total,
+          SUM(trophy8_count) AS trophy8_total
         FROM player_trophy_history
         GROUP BY player_id
       ) h ON h.player_id = p.id
       ORDER BY p.name
     `).catch(async () => {
-      // History table doesn't exist — fall back to players table only
       return await query(`
         SELECT p.id, p.name, p.grade,
           p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
@@ -422,7 +423,7 @@ router.get("/trophy-history", async (req, res, next) => {
           p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
           p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
           p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
-          p.trophy7_count AS "trophy7Count"
+          p.trophy7_count AS "trophy7Count", p.trophy8_count AS "trophy8Count"
         FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
       `)
     })
@@ -433,15 +434,13 @@ router.get("/trophy-history", async (req, res, next) => {
 // POST /api/teams/update-trophy-year — admin only
 // Updates trophy counts for a specific player for a specific year
 // If year = current year → also updates players table
-// Otherwise → only updates player_trophy_history
 router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { playerId, year, trophy1Count, trophy2Count, trophy3Count,
-            trophy4Count, trophy5Count, trophy6Count, trophy7Count } = req.body
+            trophy4Count, trophy5Count, trophy6Count, trophy7Count, trophy8Count } = req.body
 
     if (!playerId || !year) return res.status(400).json({ error: "playerId and year required" })
 
-    // Ensure history table exists
     await query(`
       CREATE TABLE IF NOT EXISTS player_trophy_history (
         id SERIAL PRIMARY KEY,
@@ -454,40 +453,31 @@ router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, nex
         trophy5_count INT DEFAULT 0,
         trophy6_count INT DEFAULT 0,
         trophy7_count INT DEFAULT 0,
+        trophy8_count INT DEFAULT 0,
         UNIQUE(player_id, year)
       )
     `).catch(() => {})
 
-    // Determine current year first — needed to decide which table(s) to write
     const settingsRes = await query(`SELECT value FROM app_settings WHERE key = 'current_year'`)
     const currentYear = parseInt(settingsRes.rows[0]?.value || new Date().getFullYear())
     const isCurrent   = parseInt(year) === currentYear
 
     if (isCurrent) {
-      // Current year: write ONLY to players table.
-      // The trophy-history endpoint computes total as:
-      //   players.trophy_count  (current year)
-      //   + player_trophy_history.trophy_total  (past years)
-      // Writing to BOTH for the current year would double-count every trophy.
-      // player_trophy_history gets the current year's values only when
-      // increment-year archives them at year end.
       await query(`
         UPDATE players SET
           trophy1_count = $1, trophy2_count = $2, trophy3_count = $3,
           trophy4_count = $4, trophy5_count = $5, trophy6_count = $6,
-          trophy7_count = $7
-        WHERE id = $8
+          trophy7_count = $7, trophy8_count = $8
+        WHERE id = $9
       `, [trophy1Count ?? 0, trophy2Count ?? 0, trophy3Count ?? 0,
-          trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0, trophy7Count ?? 0,
-          playerId])
+          trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0,
+          trophy7Count ?? 0, trophy8Count ?? 0, playerId])
     } else {
-      // Past year: write ONLY to player_trophy_history.
-      // The players table holds current-year counts only — past years stay in history.
       await query(`
         INSERT INTO player_trophy_history
           (player_id, year, trophy1_count, trophy2_count, trophy3_count,
-           trophy4_count, trophy5_count, trophy6_count, trophy7_count)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           trophy4_count, trophy5_count, trophy6_count, trophy7_count, trophy8_count)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (player_id, year) DO UPDATE SET
           trophy1_count = EXCLUDED.trophy1_count,
           trophy2_count = EXCLUDED.trophy2_count,
@@ -495,10 +485,12 @@ router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, nex
           trophy4_count = EXCLUDED.trophy4_count,
           trophy5_count = EXCLUDED.trophy5_count,
           trophy6_count = EXCLUDED.trophy6_count,
-          trophy7_count = EXCLUDED.trophy7_count
+          trophy7_count = EXCLUDED.trophy7_count,
+          trophy8_count = EXCLUDED.trophy8_count
       `, [playerId, year,
           trophy1Count ?? 0, trophy2Count ?? 0, trophy3Count ?? 0,
-          trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0, trophy7Count ?? 0])
+          trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0,
+          trophy7Count ?? 0, trophy8Count ?? 0])
     }
 
     res.json({ ok: true, year, playerId, isCurrent: parseInt(year) === currentYear })

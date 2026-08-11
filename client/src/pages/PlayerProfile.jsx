@@ -16,6 +16,7 @@ import uclTrophy          from "../../images/ucl.png"
 import goldenBootTrophy   from "../../images/Golden Boot.png"
 import teamLeagueGBTrophy from "../../images/team league_gb.png"
 import uclGBTrophy        from "../../images/ucl_gb.png"
+import revolutionTrophy   from "../../images/revolution.png"
 
 const FormDot = ({ result }) => {
   const cls = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
@@ -89,6 +90,7 @@ function TrophyCase({ player }) {
     { image: teamLeagueTrophy,   label: "Team League",             count: player.trophy2Count ?? 0 },
     { image: uclTrophy,          label: "UCL",                     count: player.trophy4Count ?? 0 },
     { image: weeklyTrophy,       label: "Weekly",                  count: player.trophy3Count ?? 0 },
+    { image: revolutionTrophy,   label: "Revolution",              count: player.trophy8Count ?? 0 },
     { image: goldenBootTrophy,   label: "Weekly Golden Boot",      count: player.trophy5Count ?? 0 },
     { image: teamLeagueGBTrophy, label: "League Golden Boot",      count: player.trophy6Count ?? 0 },
     { image: uclGBTrophy,        label: "UCL Golden Boot",         count: player.trophy7Count ?? 0 },
