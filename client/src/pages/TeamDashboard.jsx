@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy, Gavel, Target } from "lucide-react"
+import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy, Gavel, Target, RefreshCw } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import TeamHeader from "../components/team/TeamHeader"
 import Squad from "../components/team/Squad"
@@ -11,6 +11,7 @@ import TeamSettings from "../components/team/TeamSettings"
 import FixtureMaker from "../components/team/FixtureMaker"
 import TeamResults from "../components/team/TeamResults"
 import AuctionPlanner from "../components/team/auction/AuctionPlanner"
+import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
 import { useAuthStore } from "../store/authStore"
 import { useTeam, usePlayers, useFixtures, useTrades, useAuctionCurrent } from "../lib/queries"
@@ -20,13 +21,14 @@ import { cn } from "../lib/utils"
 
 const TABS = [
   { id: "squad",    label: "My squad",      icon: Users          },
-  { id: "scouting", label: "Scouting",      icon: Search         },
-  { id: "fixtures", label: "Fixtures",      icon: Calendar       },
-  { id: "results",  label: "Results",       icon: Trophy         },
-  { id: "fixmaker", label: "Fixture maker", icon: ClipboardList  },
-  { id: "trades",   label: "Trades",        icon: ArrowLeftRight },
-  { id: "auction",  label: "Auction",       icon: Target         },
-  { id: "settings", label: "Settings",      icon: Settings       },
+  { id: "scouting",    label: "Scouting",      icon: Search         },
+  { id: "fixtures",    label: "Fixtures",      icon: Calendar       },
+  { id: "results",     label: "Results",       icon: Trophy         },
+  { id: "replacement", label: "Replacement",   icon: RefreshCw      },
+  { id: "fixmaker",    label: "Fixture maker", icon: ClipboardList  },
+  { id: "trades",      label: "Trades",        icon: ArrowLeftRight },
+  { id: "auction",     label: "Auction",       icon: Target         },
+  { id: "settings",    label: "Settings",      icon: Settings       },
 ]
 
 export default function TeamDashboard() {
@@ -165,6 +167,12 @@ export default function TeamDashboard() {
               fixtures={fixtures}
               myPlayers={myPlayers}
               allPlayers={allPlayers}
+              myTeamId={user?.teamId}
+            />
+          )}
+          {activeTab === "replacement" && (
+            <ReplacementModule
+              players={allPlayers}
               myTeamId={user?.teamId}
             />
           )}
