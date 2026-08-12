@@ -14,6 +14,8 @@ import HeadToHead from "../components/player/HeadToHead"
 import SeasonSummary from "../components/player/SeasonSummary"
 import { getAvatarById } from "../lib/avatars"
 import SmartAnalysis from "../components/auction/SmartAnalysis"
+import AuctionIntelPanel from "../components/auction/AuctionIntelPanel"
+import { GradeScarcityCounter, BestRemainingAlert } from "../components/auction/AuctionLiveAlerts"
 import { useAuthStore } from "../store/authStore"
 import { useCachedImage } from "../hooks/useCachedImage"
 
@@ -355,6 +357,12 @@ export default function TeamAuctionLive() {
             <HeadToHead matchHistory={currentPlayer.matchHistory} />
           )}
 
+          {/* Grade Scarcity Counter — live count per grade, warns when running low */}
+          <GradeScarcityCounter pool={pool} />
+
+          {/* Best Remaining Alert — flashes when top-MV player in pool changes */}
+          <BestRemainingAlert pool={pool} />
+
           <SmartAnalysis
             session={session}
             pool={pool}
@@ -366,6 +374,14 @@ export default function TeamAuctionLive() {
             myTeamId={myTeamId}
             targets={targets}
             myPlayers={myPlayers}
+            isAdmin={false}
+          />
+          <AuctionIntelPanel
+            pool={pool}
+            myPlayers={myPlayers}
+            sales={sales}
+            retentions={retentions}
+            myTeamId={myTeamId}
           />
           <PoolPanel pool={pool} clickable />
         </div>

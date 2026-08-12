@@ -1,6 +1,7 @@
 import { useMemo } from "react"
-import { Brain, TrendingUp, Users, Target, AlertTriangle, CheckCircle, Crosshair } from "lucide-react"
+import { Brain, TrendingUp, Users, Target, AlertTriangle, CheckCircle, Crosshair, Zap, Shield, BarChart2, Swords, Gauge } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { usePlayerTargetInterest } from "../../lib/queries"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -510,6 +511,334 @@ function buildAnalysis({ session, pool, sales, teams, retentions, recentBids, cu
 
   insights.push({ section: "Recommendation", icon: "brain", items: rec })
 
+  // ── Section: Spend Rate Warning ────────────────────────────────────────────
+  const totalPlayers   = pool.length
+  const soldCount      = pool.filter(p => p.status !== "pending").length
+  const auctionPct     = totalPlayers > 0 ? soldCount / totalPlayers : 0
+  const spentPct       = budgetPerTeam > 0 ? mySpent / budgetPerTeam : 0
+  const spendRateItems = []
+
+  if (auctionPct > 0.1 && spentPct > auctionPct + 0.25) {
+    spendRateItems.push({
+      type: "warn",
+      text: `You've spent ${Math.round(spentPct * 100)}% of budget but only ${Math.round(auctionPct * 100)}% of the auction is done — you're burning budget faster than the auction progresses. Slow down or you'll have nothing left for late picks.`
+    })
+  } else if (auctionPct > 0.5 && spentPct < auctionPct - 0.3) {
+    spendRateItems.push({
+      type: "info",
+      text: `You've been conservative — spent only ${Math.round(spentPct * 100)}% of budget with ${Math.round(auctionPct * 100)}% of the auction done. You have room to push harder on remaining players.`
+    })
+  } else if (spentPct > 0) {
+    spendRateItems.push({
+      type: "good",
+      text: `Spend rate is healthy — ${Math.round(spentPct * 100)}% of budget used with ${Math.round(auctionPct * 100)}% of auction complete. On track.`
+    })
+  }
+
+  const avgSpentPerPlayer = myPlayerCount > 0 ? Math.round(mySpent / myPlayerCount) : 0
+  if (avgSpentPerPlayer > 0) {
+    spendRateItems.push({
+      type: "info",
+      text: `Your average spend per player so far: ₹${avgSpentPerPlayer}. Remaining budget: ₹${myBudget} across ~${pendingAfter} players.`
+    })
+  }
+
+  if (spendRateItems.length) insights.push({ section: "Spend Rate", icon: "trending", items: spendRateItems })
+
+  // ── Section: Opponent Purse Tracker ───────────────────────────────────────
+  const purseItems  = []
+  const sortedTeams = [...teams]
+    .filter(t => t.id !== myTeamId)
+    .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0))
+
+  const richest  = sortedTeams[0]
+  const poorest  = sortedTeams[sortedTeams.length - 1]
+  const myBudgetRank = [...teams].sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0)).findIndex(t => t.id === myTeamId) + 1
+
+  purseItems.push({
+    type: myBudgetRank <= 2 ? "good" : myBudgetRank >= teams.length - 1 ? "warn" : "info",
+    text: `Your budget rank: #${myBudgetRank} of ${teams.length} teams. You have ₹${myBudget} remaining.`
+  })
+  if (richest) purseItems.push({ type: "info", text: `Richest rival: ${richest.name} with ₹${richest.budget ?? 0} — they can outbid almost anyone.` })
+  if (poorest && (poorest.budget ?? 0) < 50) purseItems.push({ type: "good", text: `${poorest.name} is nearly broke (₹${poorest.budget ?? 0}) — no competition from them on this player.` })
+
+  const brokeTeams = sortedTeams.filter(t => (t.budget ?? 0) < 50)
+  if (brokeTeams.length > 0) purseItems.push({ type: "good", text: `${brokeTeams.length} team${brokeTeams.length > 1 ? "s are" : " is"} effectively out of budget: ${brokeTeams.map(t => t.name).join(", ")}.` })
+
+  insights.push({ section: "Purse Tracker", icon: "shield", items: purseItems })
+
+  // ── Section: Opponent Weakness Detector ───────────────────────────────────
+  const weaknessItems = []
+  const teamSquads    = teams
+    .filter(t => t.id !== myTeamId)
+    .map(t => {
+      const won       = sales.filter(s => s.teamId === t.id)
+      const retained  = retentions.filter(r => r.teamId === t.id)
+      const players   = [...won, ...retained]
+      const grades    = players.map(p => p.grade || p.playerGrade).filter(Boolean)
+      const hasS      = grades.filter(g => g === "S").length
+      const hasA      = grades.filter(g => g === "A" || g === "A+").length
+      const hasB      = grades.filter(g => g === "B").length
+      const total     = players.length
+      return { team: t, hasS, hasA, hasB, total }
+    })
+
+  const needsS = teamSquads.filter(ts => ts.hasS === 0 && ts.total > 0)
+  const needsA = teamSquads.filter(ts => ts.hasA === 0 && ts.total > 1)
+
+  if (needsS.length > 0) weaknessItems.push({ type: "info", text: `Teams with NO S-grade yet: ${needsS.map(ts => ts.team.name).join(", ")} — they'll bid desperately on any S player.` })
+  if (needsA.length > 0) weaknessItems.push({ type: "info", text: `Teams with NO A-grade: ${needsA.map(ts => ts.team.name).join(", ")} — vulnerable on A-grade bids.` })
+  if (needsS.length === 0 && needsA.length === 0) weaknessItems.push({ type: "good", text: `All teams have coverage across grades — no obvious squad gaps to exploit.` })
+
+  // Current player match
+  const wantCurrentGrade = teamSquads.filter(ts => {
+    if (playerGrade === "S") return ts.hasS === 0
+    if (playerGrade === "A" || playerGrade === "A+") return ts.hasA <= 1
+    return false
+  })
+  if (wantCurrentGrade.length > 0) weaknessItems.push({ type: "warn", text: `${wantCurrentGrade.length} rival team${wantCurrentGrade.length > 1 ? "s need" : " needs"} exactly this grade — expect fierce bidding from: ${wantCurrentGrade.map(ts => ts.team.name).join(", ")}.` })
+
+  if (weaknessItems.length) insights.push({ section: "Opponent Weaknesses", icon: "crosshair", items: weaknessItems })
+
+  // ── Section: Bluff Detector ───────────────────────────────────────────────
+  const bluffItems   = []
+  if (recentBids && recentBids.length >= 4) {
+    const last6        = recentBids.slice(-6)
+    const bidderCounts = last6.reduce((acc, b) => { acc[b.teamId] = (acc[b.teamId] || 0) + 1; return acc }, {})
+    const aggressors   = Object.entries(bidderCounts)
+      .filter(([id, count]) => count >= 3 && Number(id) !== myTeamId)
+      .map(([id]) => teams.find(t => t.id === Number(id)))
+      .filter(Boolean)
+
+    if (aggressors.length > 0) {
+      aggressors.forEach(aggressor => {
+        const aggrSquad  = teamSquads.find(ts => ts.team.id === aggressor.id)
+        const needsThisGrade = playerGrade === "S" ? (aggrSquad?.hasS ?? 0) === 0
+          : (playerGrade === "A" || playerGrade === "A+") ? (aggrSquad?.hasA ?? 0) === 0
+          : false
+        if (!needsThisGrade && (aggressor.budget ?? 0) < currentBid * 2) {
+          bluffItems.push({ type: "warn", text: `POSSIBLE BLUFF — ${aggressor.name} is bidding aggressively but doesn't strongly need this grade and is low on budget (₹${aggressor.budget ?? 0}). They may be trying to drain your purse.` })
+        } else if (!needsThisGrade) {
+          bluffItems.push({ type: "info", text: `${aggressor.name} has bid ${bidderCounts[aggressor.id]}x recently but this grade doesn't match their squad needs — possible block bid.` })
+        }
+      })
+    }
+    if (bluffItems.length === 0) bluffItems.push({ type: "good", text: `No suspicious bidding patterns detected — all active bidders appear to genuinely need this player.` })
+  } else {
+    bluffItems.push({ type: "info", text: `Not enough bid history yet to detect patterns.` })
+  }
+  insights.push({ section: "Bluff Detector", icon: "swords", items: bluffItems })
+
+  // ── Section: Threat Level per Team ────────────────────────────────────────
+  const threatItems  = []
+  const teamStrength = teams
+    .filter(t => t.id !== myTeamId)
+    .map(t => {
+      const won      = sales.filter(s => s.teamId === t.id)
+      const retained = retentions.filter(r => r.teamId === t.id)
+      const players  = [...won, ...retained]
+      const mvTotal  = players.reduce((s, p) => s + (p.price || 0), 0)
+      const gradeScore = players.reduce((s, p) => {
+        const g = p.grade || p.playerGrade
+        return s + (g === "S" ? 5 : g === "A" || g === "A+" ? 3 : g === "B" ? 2 : 1)
+      }, 0)
+      const budgetScore = Math.round((t.budget ?? 0) / 100)
+      const total = mvTotal / 10 + gradeScore * 5 + budgetScore * 3
+      return { name: t.name, score: Math.round(total), players: players.length, budget: t.budget ?? 0 }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  if (teamStrength.length > 0) {
+    const tier1 = teamStrength.filter((_, i) => i < 2)
+    const tier2 = teamStrength.filter((_, i) => i >= 2 && i < Math.ceil(teamStrength.length / 2))
+    const tier3 = teamStrength.filter((_, i) => i >= Math.ceil(teamStrength.length / 2))
+
+    if (tier1.length) threatItems.push({ type: "warn",  text: `🔴 Tier 1 (Most Dangerous): ${tier1.map(t => `${t.name} (${t.players} players, ₹${t.budget} left)`).join(", ")}` })
+    if (tier2.length) threatItems.push({ type: "info",  text: `🟡 Tier 2 (Mid Threat): ${tier2.map(t => t.name).join(", ")}` })
+    if (tier3.length) threatItems.push({ type: "good",  text: `🟢 Tier 3 (Low Threat): ${tier3.map(t => `${t.name} (₹${t.budget} left)`).join(", ")}` })
+  }
+  insights.push({ section: "Threat Levels", icon: "barchart", items: threatItems })
+
+  // ── Section: Captain Dependency Score ─────────────────────────────────────
+  const captainItems  = []
+  const myCaptain     = myPlayers.find(p => p.isCaptain)
+  const captainWin    = myWins.find(s => s.playerId === (myCaptain?.id ?? -1))
+
+  if (myCaptain) {
+    const captainMV   = myCaptain.marketValue ?? 0
+    const squadMVTotal = myWins.reduce((s, w) => s + (w.price || 0), 0)
+    const captainPct  = squadMVTotal > 0 ? Math.round((captainWin?.price ?? 0) / squadMVTotal * 100) : 0
+    const captainBDR  = myCaptain.bdrPoints ?? 0
+    const avgBDR      = myPlayers.length > 0 ? Math.round(myPlayers.reduce((s, p) => s + (p.bdrPoints ?? 0), 0) / myPlayers.length) : 0
+    const bdrDep      = avgBDR > 0 ? Math.round(captainBDR / avgBDR * 100) : 0
+
+    if (captainPct > 40) captainItems.push({ type: "warn", text: `HIGH dependency — your captain represents ${captainPct}% of squad spend. Your team's success is heavily tied to one player.` })
+    else if (captainPct > 25) captainItems.push({ type: "info", text: `MODERATE dependency — captain is ${captainPct}% of squad spend. Manageable but worth building depth.` })
+    else captainItems.push({ type: "good", text: `LOW dependency — captain is only ${captainPct}% of squad spend. Well-balanced squad.` })
+
+    if (bdrDep > 200) captainItems.push({ type: "warn", text: `Captain's BDR (${captainBDR}) is ${Math.round(bdrDep / 100)}× the squad average — your performance depends heavily on them.` })
+  } else {
+    captainItems.push({ type: "info", text: `No captain signed yet. Your rival captains are already locked in.` })
+  }
+  insights.push({ section: "Captain Dependency", icon: "users", items: captainItems })
+
+  // ── Section: Predicted Final Squad Strength ───────────────────────────────
+  const predictItems  = []
+  const avgPoolMV     = pendingPool.length > 0
+    ? Math.round(pendingPool.reduce((s, p) => s + (p.marketValue ?? 0), 0) / pendingPool.length)
+    : 0
+  const myProjected   = mySpent + Math.min(myBudget * 0.8, pendingAfter * avgPoolMV * 0.7)
+
+  const teamProjections = teams.map(t => {
+    const won      = sales.filter(s => s.teamId === t.id)
+    const retained = retentions.filter(r => r.teamId === t.id)
+    const spent    = won.reduce((s, w) => s + w.price, 0) + retained.reduce((s, r) => s + r.price, 0)
+    const projected = spent + Math.min((t.budget ?? 0) * 0.8, pendingAfter * avgPoolMV * 0.7)
+    return { name: t.name, projected: Math.round(projected), isMe: t.id === myTeamId }
+  }).sort((a, b) => b.projected - a.projected)
+
+  const myRank = teamProjections.findIndex(t => t.isMe) + 1
+  predictItems.push({
+    type: myRank <= 2 ? "good" : myRank >= teams.length - 1 ? "warn" : "info",
+    text: `Projected squad strength rank: #${myRank} of ${teams.length}. Estimated final squad value: ₹${Math.round(myProjected)}.`
+  })
+
+  const leader = teamProjections[0]
+  if (leader && !leader.isMe) {
+    predictItems.push({ type: "info", text: `Projected strongest squad: ${leader.name} at ₹${leader.projected}. You need to outbid them on key remaining players to close the gap.` })
+  } else if (leader?.isMe) {
+    predictItems.push({ type: "good", text: `You're projected to build the strongest squad. Protect your lead by not overspending on remaining players.` })
+  }
+  insights.push({ section: "Predicted Strength", icon: "trending", items: predictItems })
+
+  // ── Section 13: Should I Bid Calculator ───────────────────────────────────
+  const bidCalcItems = []
+  // Three signals: value, squad need, budget impact
+  const valueSignal  = isGoodValue ? 2 : isOverpriced ? -2 : 0
+  const needSignal   = gradeCount === 0 ? 2 : gradeCount <= 2 ? 1 : -1
+  const budgetSignal = budgetHealthy ? 1 : budgetTight ? -2 : 0
+  const targetSignal = priority === "must_have" ? 2 : priority === "want" ? 1 : priority === "backup" ? 0 : -1
+  const totalSignal  = valueSignal + needSignal + budgetSignal + targetSignal
+
+  const decision = totalSignal >= 3 ? "BID ✅" : totalSignal >= 0 ? "CAUTION ⚠️" : "PASS ❌"
+  const decisionType = totalSignal >= 3 ? "good" : totalSignal >= 0 ? "warn" : "warn"
+
+  bidCalcItems.push({ type: decisionType, text: `${decision}  —  Value: ${valueSignal > 0 ? "✅" : valueSignal < 0 ? "❌" : "—"}  |  Squad Need: ${needSignal > 0 ? "✅" : needSignal < 0 ? "❌" : "—"}  |  Budget: ${budgetSignal > 0 ? "✅" : budgetSignal < 0 ? "❌" : "—"}  |  Target: ${targetSignal > 0 ? "✅" : targetSignal < 0 ? "❌" : "—"}` })
+  bidCalcItems.push({ type: "info", text: `Score: ${totalSignal > 0 ? "+" : ""}${totalSignal} out of +7 possible. ${totalSignal >= 3 ? "Multiple green signals — worth bidding." : totalSignal >= 0 ? "Mixed signals — proceed carefully." : "Too many red flags — consider walking away."}` })
+  insights.push({ section: "Should I Bid?", icon: "gauge", items: bidCalcItems })
+
+  // ── Section 14: What If I Win This ────────────────────────────────────────
+  const whatIfItems  = []
+  const budgetAfter  = myBudget - currentBid
+  const playersLeft  = pendingAfter
+  const perPlayerAfter = playersLeft > 0 ? Math.floor(budgetAfter / playersLeft) : budgetAfter
+  const canStillBid  = perPlayerAfter >= 25
+
+  whatIfItems.push({
+    type: budgetAfter < 0 ? "warn" : canStillBid ? "good" : "warn",
+    text: `If you win at ₹${currentBid}: ₹${Math.max(0, budgetAfter)} remaining for ${playersLeft} more player${playersLeft !== 1 ? "s" : ""}.`
+  })
+  whatIfItems.push({
+    type: canStillBid ? "info" : "warn",
+    text: canStillBid
+      ? `That's ~₹${perPlayerAfter} per remaining player — ${perPlayerAfter >= 80 ? "plenty to work with" : perPlayerAfter >= 40 ? "tight but manageable" : "very tight, budget nearly exhausted"}.`
+      : `You would have less than ₹25 per remaining slot — effectively ending your ability to compete for any more players.`
+  })
+  if (budgetAfter >= 0 && highGradePending > 0) {
+    whatIfItems.push({
+      type: "info",
+      text: `${highGradePending} S/A-grade player${highGradePending !== 1 ? "s" : ""} still in pool — winning this player at ₹${currentBid} leaves you ₹${budgetAfter} to compete for them.`
+    })
+  }
+  insights.push({ section: "What If I Win This?", icon: "zap", items: whatIfItems })
+
+  // ── Section 15: Grade Balance Meter ───────────────────────────────────────
+  const balanceItems = []
+  const IDEAL = { S: 2, A: 3, B: 4, C: 2 }
+  const leagueSquadSize = teams.length > 0
+    ? Math.round((sales.length + retentions.length) / teams.length)
+    : 10
+  const myGrades = { S: 0, A: 0, B: 0, C: 0 }
+  myPlayers.forEach(p => {
+    const g = p.grade === "A+" ? "A" : p.grade
+    if (myGrades[g] !== undefined) myGrades[g]++
+  })
+  const totalMyPlayers = Object.values(myGrades).reduce((s, v) => s + v, 0)
+
+  if (totalMyPlayers > 0) {
+    const imbalances = []
+    Object.entries(myGrades).forEach(([g, count]) => {
+      const idealCount = Math.round((IDEAL[g] ?? 2) / 11 * Math.max(totalMyPlayers, leagueSquadSize))
+      if (count > idealCount + 1) imbalances.push(`heavy on ${g}-grade (${count}, ideal ~${idealCount})`)
+      if (count < idealCount - 1 && idealCount > 1) imbalances.push(`light on ${g}-grade (${count}, ideal ~${idealCount})`)
+    })
+    if (imbalances.length > 0) {
+      balanceItems.push({ type: "warn", text: `Squad imbalance detected: ${imbalances.join("; ")}.` })
+    } else {
+      balanceItems.push({ type: "good", text: `Grade distribution is well balanced across S/A/B/C.` })
+    }
+    balanceItems.push({
+      type: "info",
+      text: `Your squad: S×${myGrades.S} A×${myGrades.A} B×${myGrades.B} C×${myGrades.C}. Signing this ${playerGrade}-grade player ${myGrades[playerGrade === "A+" ? "A" : playerGrade] >= (IDEAL[playerGrade === "A+" ? "A" : playerGrade] ?? 2) ? "would further tilt the balance" : "would help fill a gap"}.`
+    })
+  } else {
+    balanceItems.push({ type: "info", text: `No players won yet — any grade is currently fine to target.` })
+  }
+  insights.push({ section: "Grade Balance", icon: "barchart", items: balanceItems })
+
+  // ── Section 16: When To Walk Away ─────────────────────────────────────────
+  const walkItems    = []
+  const mvWalkaway   = playerMV > 0 ? Math.round(playerMV * 1.15) : null
+  const budgetWalk   = pendingAfter > 0 ? Math.max(25, myBudget - pendingAfter * 25) : myBudget
+  const targetWalk   = maxBid ?? null
+  const walkawayPrice = Math.min(
+    ...[mvWalkaway, budgetWalk, targetWalk].filter(v => v !== null && v > 0)
+  )
+
+  if (walkawayPrice && walkawayPrice > currentBid) {
+    walkItems.push({
+      type: currentBid >= walkawayPrice * 0.85 ? "warn" : "good",
+      text: `Walk away at ₹${walkawayPrice}. ${currentBid >= walkawayPrice * 0.85 ? "⚠️ You are approaching this limit now." : `You have ₹${walkawayPrice - currentBid} more room before the walkaway point.`}`
+    })
+  } else if (walkawayPrice && currentBid >= walkawayPrice) {
+    walkItems.push({ type: "warn", text: `⛔ Current bid (₹${currentBid}) has already crossed your walkaway threshold of ₹${walkawayPrice}. Drop out now.` })
+  }
+
+  const reasons = []
+  if (mvWalkaway) reasons.push(`MV limit: ₹${mvWalkaway} (15% over MV)`)
+  if (targetWalk) reasons.push(`Your max bid: ₹${targetWalk}`)
+  if (budgetWalk < (mvWalkaway ?? 9999)) reasons.push(`Budget constraint: ₹${budgetWalk}`)
+  if (reasons.length) walkItems.push({ type: "info", text: `Walkaway based on: ${reasons.join(" · ")}` })
+
+  insights.push({ section: "Walk Away At", icon: "shield", items: walkItems })
+
+  // ── Section 18: Auction Momentum Score ────────────────────────────────────
+  const momentumItems = []
+  const totalTargets  = targets?.length ?? 0
+  const targetsWon    = myWins.filter(w => targets?.some(t => t.playerId === w.playerId)).length
+  const targetHitRate = totalTargets > 0 ? targetsWon / Math.min(totalTargets, myWins.length || 1) : 0.5
+  const budgetEff     = budgetPerTeam > 0 ? 1 - (mySpent / budgetPerTeam) : 0.5
+  const squadMV       = myWins.reduce((s, w) => s + (w.price || 0), 0)
+  const avgLeagueMV   = teams.length > 0
+    ? teams.reduce((s, t) => s + (t.budget != null ? budgetPerTeam - t.budget : 0), 0) / teams.length
+    : squadMV
+  const strengthScore = avgLeagueMV > 0 ? Math.min(1, squadMV / avgLeagueMV) : 0.5
+
+  const momentum = Math.round(
+    (targetHitRate * 40) + (budgetEff * 30) + (strengthScore * 30)
+  )
+  const momentumLabel = momentum >= 75 ? "🔥 Excellent" : momentum >= 55 ? "✅ On Track" : momentum >= 35 ? "⚠️ Behind" : "❌ Struggling"
+  const momentumType  = momentum >= 75 ? "good" : momentum >= 55 ? "good" : momentum >= 35 ? "warn" : "warn"
+
+  momentumItems.push({ type: momentumType, text: `Momentum: ${momentumLabel} — ${momentum}/100` })
+  momentumItems.push({ type: "info", text: `Target hit rate: ${Math.round(targetHitRate * 100)}%  |  Budget remaining: ${Math.round(budgetEff * 100)}%  |  Squad strength vs league: ${Math.round(strengthScore * 100)}%` })
+  if (momentum < 50 && auctionPct > 0.3) {
+    momentumItems.push({ type: "warn", text: `Your auction is underperforming with ${Math.round((1 - auctionPct) * 100)}% of players still available — push harder on the remaining targets.` })
+  } else if (momentum >= 75) {
+    momentumItems.push({ type: "good", text: `You're having a strong auction — maintain discipline and don't overpay chasing perfection.` })
+  }
+  insights.push({ section: "Auction Momentum", icon: "gauge", items: momentumItems })
+
   return insights
 }
 
@@ -521,6 +850,11 @@ const ICON_MAP = {
   target:    Target,
   brain:     Brain,
   crosshair: Crosshair,
+  shield:    Shield,
+  barchart:  BarChart2,
+  swords:    Swords,
+  zap:       Zap,
+  gauge:     Gauge,
 }
 
 function InsightItem({ type, text }) {
@@ -542,30 +876,71 @@ function InsightItem({ type, text }) {
 
 // ── main export ───────────────────────────────────────────────────────────────
 
-export default function SmartAnalysis({ session, pool, sales, teams, retentions, recentBids, currentPlayer, myTeamId, targets, myPlayers }) {
-  const insights = useMemo(() => buildAnalysis({
-    session, pool, sales, teams, retentions, recentBids, currentPlayer, myTeamId, targets, myPlayers
-  }), [session?.currentPlayerId, session?.currentBid, myTeamId, currentPlayer?.id, targets?.length, recentBids?.length])
+export default function SmartAnalysis({ session, pool, sales, teams, retentions, recentBids, currentPlayer, myTeamId, targets, myPlayers, isAdmin }) {
+  const currentPlayerId = session?.currentPlayerId
+  const { data: interest } = usePlayerTargetInterest(currentPlayerId)
 
-  if (!session?.currentPlayerId || !insights.length) return null
+  const insights = useMemo(() => buildAnalysis({
+    session, pool, sales, teams, retentions, recentBids,
+    currentPlayer, myTeamId, targets, myPlayers,
+  }), [session, pool, sales, teams, retentions, recentBids, currentPlayer, myTeamId, targets, myPlayers])
+
+  if (!session?.currentPlayerId || !myTeamId) return null
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border">
-        <Brain className="w-4 h-4 text-accent" />
-        <h2 className="text-sm font-semibold text-white">Smart Analysis</h2>
-        <span className="ml-auto text-[10px] text-slate-600 uppercase tracking-widest font-semibold">Live</span>
+      <div className="px-5 py-3 border-b border-surface-border">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-accent" />
+          <span className="text-sm font-semibold text-white">Smart Analysis</span>
+        </div>
       </div>
-      <div className="divide-y divide-surface-border/50">
+
+      {/* ── Section 16: Opponents Who Want This ─────────────────────────── */}
+      {interest && (
+        <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/30">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">🎯 Opponent Interest</p>
+          {interest.count === 0 ? (
+            <p className="text-xs text-slate-500">No other team has this player as a target — less competition expected.</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-xs text-amber-400 font-semibold">
+                {interest.count} team{interest.count !== 1 ? "s have" : " has"} this player as a target
+                {interest.mustHave > 0 ? ` · ${interest.mustHave} as Must Have 🔴` : ""}
+                {interest.want > 0 ? ` · ${interest.want} as Want 🟡` : ""}
+              </p>
+              {/* Admin view — show team names */}
+              {isAdmin && interest.teams && interest.teams.map(t => (
+                <div key={t.teamId} className="flex items-center gap-2">
+                  <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded",
+                    t.priority === "must_have" ? "bg-rose-400/15 text-rose-400" :
+                    t.priority === "want"      ? "bg-accent/15 text-accent" :
+                                                 "bg-slate-500/15 text-slate-400"
+                  )}>
+                    {t.priority === "must_have" ? "MUST HAVE" : t.priority === "want" ? "WANT" : "BACKUP"}
+                  </span>
+                  <span className="text-xs text-white">{t.teamName}</span>
+                  {t.maxBid && <span className="text-xs text-slate-500">max ₹{t.maxBid}</span>}
+                </div>
+              ))}
+              {!isAdmin && (
+                <p className="text-xs text-slate-500">Expect competitive bidding — plan your max bid before it heats up.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="divide-y divide-surface-border/30">
         {insights.map((section, i) => {
           const Icon = ICON_MAP[section.icon] || Brain
           return (
-            <div key={i} className="px-5 py-4">
-              <div className="flex items-center gap-1.5 mb-2.5">
-                <Icon className="w-3.5 h-3.5 text-slate-500" />
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{section.section}</p>
+            <div key={i} className="px-5 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{section.section}</span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {section.items.map((item, j) => (
                   <InsightItem key={j} type={item.type} text={item.text} />
                 ))}

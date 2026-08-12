@@ -431,19 +431,41 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
         `, [season])
 
         if (champRes.rows[0]) {
-          const champTeam = champRes.rows[0]
+          const champTeam  = champRes.rows[0]
           const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [champTeam.id])
+          const playerIds  = playersRes.rows.map(r => r.id)
 
           // Award Team League trophy to every player on the champion team
-          for (const player of playersRes.rows) {
-            await reconcileTrophyRoster({
-              playerId: player.id,
-              trophyColumn: "trophy2_count",
-              season,
-              sourceKey: `tl-champion-league-only-s${season}`,
-              teamId: champTeam.id,
-            })
-          }
+          await reconcileTrophyRoster({
+            sourceKey:    `tl-champion-league-only-s${season}`,
+            trophyColumn: "trophy2_count",
+            playerIds,
+            seasonNumber: season,
+          })
+
+          // Award Team League Golden Boot (trophy6_count) to top scorer
+          const { awardOrReassignTrophy } = await import("../services/trophyAwards.js")
+          const goldenBootRes = await query(`
+            SELECT p.id,
+              COALESCE(SUM(CASE
+                WHEN mr.player_id   = p.id THEN mr.player_score
+                WHEN mr.opponent_id = p.id THEN mr.opponent_score
+                ELSE 0 END), 0) AS goals
+            FROM players p
+            LEFT JOIN match_records mr
+              ON (mr.player_id = p.id OR mr.opponent_id = p.id)
+              AND mr.match_type::text = 'league'
+              AND mr.season_number = $1
+            GROUP BY p.id
+            ORDER BY goals DESC LIMIT 1
+          `, [season])
+          const goldenBoot = goldenBootRes.rows[0]
+          await awardOrReassignTrophy({
+            sourceKey:    `tl-golden-boot-league-only-s${season}`,
+            trophyColumn: "trophy6_count",
+            playerId:     goldenBoot?.goals > 0 ? goldenBoot.id : null,
+            seasonNumber: season,
+          })
 
           // Allocate BDR points based on final league standings
           // Use teams.points directly — same source as the league table display

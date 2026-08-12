@@ -1,8 +1,9 @@
-import { useMemo } from "react"
-import { Target, AlertTriangle, CheckCircle, Zap, Wallet, TrendingUp } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Target, AlertTriangle, CheckCircle, Zap, Wallet, TrendingUp, BookOpen } from "lucide-react"
 import { cn } from "../../../lib/utils"
 import TargetBoard from "./TargetBoard"
-import { useAuctionTargets, useAuctionCurrent, useTeams } from "../../../lib/queries"
+import AuctionDossier from "../../auction/AuctionDossier"
+import { useAuctionTargets, useAuctionCurrent, useTeams, usePlayers } from "../../../lib/queries"
 import { useAuctionSocket } from "../../../hooks/useAuctionSocket"
 
 const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
@@ -187,7 +188,9 @@ function QuickStats({ targets, totalBudget }) {
 
 // ── Main AuctionPlanner ───────────────────────────────────────────────────────
 export default function AuctionPlanner({ myTeamId, myPlayers, allPlayers, totalBudget }) {
-  const { data: targets = [] } = useAuctionTargets(myTeamId)
+  const { data: targets = [] }     = useAuctionTargets(myTeamId)
+  const { data: auctionCurrentData } = useAuctionCurrent()
+  const pool = auctionCurrentData?.pool ?? []
 
   return (
     <div className="space-y-4">
@@ -215,13 +218,42 @@ export default function AuctionPlanner({ myTeamId, myPlayers, allPlayers, totalB
       {/* Always-visible: Budget quick stats */}
       <QuickStats targets={targets} totalBudget={totalBudget} />
 
-      {/* Main planner board */}
-      <TargetBoard
+      {/* Tabs: Target Board + Auction Dossier */}
+      <PlannerTabs
         myTeamId={myTeamId}
         myPlayers={myPlayers}
         allPlayers={allPlayers}
         totalBudget={totalBudget}
+        pool={pool}
       />
+    </div>
+  )
+}
+
+function PlannerTabs({ myTeamId, myPlayers, allPlayers, totalBudget, pool }) {
+  const [tab, setTab] = useState("targets")
+  return (
+    <div>
+      <div className="flex border-b border-surface-border mb-4">
+        <button onClick={() => setTab("targets")} className={cn(
+          "flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold transition-colors",
+          tab === "targets" ? "text-accent border-b-2 border-accent" : "text-slate-500 hover:text-white"
+        )}>
+          <Target className="w-4 h-4" /> Target Board
+        </button>
+        <button onClick={() => setTab("dossier")} className={cn(
+          "flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold transition-colors",
+          tab === "dossier" ? "text-accent border-b-2 border-accent" : "text-slate-500 hover:text-white"
+        )}>
+          <BookOpen className="w-4 h-4" /> Auction Dossier
+        </button>
+      </div>
+      {tab === "targets" && (
+        <TargetBoard myTeamId={myTeamId} myPlayers={myPlayers} allPlayers={allPlayers} totalBudget={totalBudget} />
+      )}
+      {tab === "dossier" && (
+        <AuctionDossier pool={pool} allPlayers={allPlayers} />
+      )}
     </div>
   )
 }
