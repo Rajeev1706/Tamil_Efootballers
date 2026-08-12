@@ -224,11 +224,12 @@ export const auctionIntelApi = {
 }
 
 export const auctionTargetsApi = {
-  list:    (teamId)       => api.get("/auction-targets", { params: { teamId } }).then(r => r.data),
-  add:     (body)         => api.post("/auction-targets", body).then(r => r.data),
-  update:  (id, body)     => api.patch(`/auction-targets/${id}`, body).then(r => r.data),
-  remove:  (id)           => api.delete(`/auction-targets/${id}`).then(r => r.data),
-  reorder: (orderedIds)   => api.patch("/auction-targets/reorder", { orderedIds }).then(r => r.data),
+  list:           (teamId)     => api.get("/auction-targets", { params: { teamId } }).then(r => r.data),
+  add:            (body)       => api.post("/auction-targets", body).then(r => r.data),
+  update:         (id, body)   => api.patch(`/auction-targets/${id}`, body).then(r => r.data),
+  remove:         (id)         => api.delete(`/auction-targets/${id}`).then(r => r.data),
+  reorder:        (orderedIds) => api.patch("/auction-targets/reorder", { orderedIds }).then(r => r.data),
+  playerInterest: (playerId)   => api.get(`/auction-targets/player/${playerId}/interest`).then(r => r.data),
 }
 
 export const auctionApi = {
@@ -254,6 +255,7 @@ export const auctionApi = {
   deleteSession: (sessionId)                     => api.delete(`/auction/${sessionId}`).then(r => r.data),
   enter:        (sessionId)                      => api.post("/auction/enter", { sessionId }).then(r => r.data),
   leave:        (sessionId)                      => api.post("/auction/leave", { sessionId }).then(r => r.data),
+  priceHistory: (playerId)                       => api.get(`/auction/price-history/${playerId}`).then(r => r.data),
 }
 export const calendarApi = {
   list:     (month) => api.get(`/calendar?month=${month}`).then(r => r.data),

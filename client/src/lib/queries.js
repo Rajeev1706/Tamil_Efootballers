@@ -372,6 +372,14 @@ export const usePlayerSeasonSummary = (id) =>
 export const useAuctionTargets = (teamId) =>
   useQuery({ queryKey: ["auction-targets", teamId], queryFn: () => auctionTargetsApi.list(teamId), enabled: !!teamId })
 
+export const usePlayerTargetInterest = (playerId) =>
+  useQuery({
+    queryKey: ["player-target-interest", playerId],
+    queryFn:  () => auctionTargetsApi.playerInterest(playerId),
+    enabled:  !!playerId,
+    staleTime: 30000,
+  })
+
 export const useAddAuctionTarget = () => {
   const qc = useQueryClient()
   return useMutation({

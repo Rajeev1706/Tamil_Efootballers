@@ -4,6 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
+import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 
 const router = Router()
 
@@ -387,14 +388,15 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // If final — winner gets champion bonus (+2) and trophy8
     if (match.round === totalRounds) {
       await query("UPDATE players SET bdr_points = bdr_points + 2 WHERE id = $1", [winnerId])
-      await query("UPDATE players SET trophy8_count = trophy8_count + 1 WHERE id = $1", [winnerId])
-      // Season-scoped trophy record for MV bonus
-      const sourceKey = `revolution-champion-${match.tournament_id}`
-      await query(`
-        INSERT INTO player_trophies (player_id, trophy_column, season_number, source_key)
-        VALUES ($1, 'trophy8_count', $2, $3)
-        ON CONFLICT (source_key, player_id) DO NOTHING
-      `, [winnerId, season, sourceKey])
+
+      // Use awardOrReassignTrophy so correcting a Final result later
+      // automatically reverts the wrong winner and awards the correct one.
+      await awardOrReassignTrophy({
+        sourceKey:    `revolution-champion-${match.tournament_id}`,
+        trophyColumn: "trophy8_count",
+        playerId:     winnerId,
+        seasonNumber: season,
+      })
     }
 
     // ── Advance winner to next round ────────────────────────────────────────

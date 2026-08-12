@@ -129,4 +129,36 @@ router.delete("/:id", authenticate, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ── GET /api/auction-targets/player/:playerId/interest ────────────────────────
+// Admin: returns which teams have this player as a target + their priority.
+// Team owner: returns just the count (sanitised — no team names revealed).
+router.get("/player/:playerId/interest", authenticate, async (req, res, next) => {
+  try {
+    const isAdmin = req.user?.role === "admin"
+    const result  = await query(`
+      SELECT
+        at.priority,
+        at.max_bid   AS "maxBid",
+        t.id         AS "teamId",
+        t.name       AS "teamName",
+        t.logo_url   AS "teamLogo"
+      FROM auction_targets at
+      JOIN teams t ON t.id = at.team_id
+      WHERE at.player_id = $1
+      ORDER BY
+        CASE at.priority WHEN 'must_have' THEN 1 WHEN 'want' THEN 2 ELSE 3 END
+    `, [req.params.playerId])
+
+    if (isAdmin) {
+      // Full data for admin
+      res.json({ count: result.rows.length, teams: result.rows })
+    } else {
+      // Sanitised for team owners — count only, no team identities
+      const mustHave = result.rows.filter(r => r.priority === "must_have").length
+      const want     = result.rows.filter(r => r.priority === "want").length
+      res.json({ count: result.rows.length, mustHave, want })
+    }
+  } catch (err) { next(err) }
+})
+
 export default router

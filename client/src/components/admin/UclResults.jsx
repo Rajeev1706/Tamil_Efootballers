@@ -9,11 +9,12 @@ import logoUrl from "../../../images/logo.png"
 
 function FixtureCard({ fix, onChanged }) {
   const qc = useQueryClient()
-  const [score1, setScore1]       = useState(fix.player1Score ?? "")
-  const [score2, setScore2]       = useState(fix.player2Score ?? "")
-  const [editing, setEditing]     = useState(false)
-  const [saving, setSaving]       = useState(false)
+  const [score1, setScore1]         = useState(fix.player1Score ?? "")
+  const [score2, setScore2]         = useState(fix.player2Score ?? "")
+  const [editing, setEditing]       = useState(false)
+  const [saving, setSaving]         = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [walkoverMode, setWalkoverMode] = useState(false) // which player gave WO
 
   const isCompleted = fix.status === "completed"
   const s1 = Number(score1), s2 = Number(score2)
@@ -24,17 +25,26 @@ function FixtureCard({ fix, onChanged }) {
   function openEdit() {
     setScore1(fix.player1Score ?? "")
     setScore2(fix.player2Score ?? "")
+    setWalkoverMode(false)
     setEditing(true)
   }
 
-  async function handleSave() {
-    if (score1 === "" || score2 === "") return
+  async function handleSave(isWalkover = false, walkoverGiverId = null) {
+    let s1val = Number(score1), s2val = Number(score2)
+    if (isWalkover && walkoverGiverId) {
+      // Walkover: giver loses 0-3
+      s1val = walkoverGiverId === fix.player1Id ? 0 : 3
+      s2val = walkoverGiverId === fix.player1Id ? 3 : 0
+    } else {
+      if (score1 === "" || score2 === "") return
+    }
     setSaving(true)
     try {
-      await uclApi.saveFixture(fix.id, Number(score1), Number(score2))
+      await uclApi.saveFixture(fix.id, s1val, s2val, isWalkover)
       qc.invalidateQueries({ queryKey: ["ucl-fixtures"] })
       qc.invalidateQueries({ queryKey: ["ucl-standings"] })
       setEditing(false)
+      setWalkoverMode(false)
       onChanged?.()
     } catch (err) {
       alert(err?.response?.data?.error || "Failed to save")
@@ -54,11 +64,13 @@ function FixtureCard({ fix, onChanged }) {
   }
 
   const resultChip = isCompleted
-    ? fix.player1Score > fix.player2Score
-      ? { label: "HOME WIN", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/25" }
-      : fix.player1Score < fix.player2Score
-        ? { label: "AWAY WIN", color: "text-rose-400 bg-rose-400/10 border-rose-400/25" }
-        : { label: "DRAW",     color: "text-amber-400 bg-amber-400/10 border-amber-400/25" }
+    ? fix.isWalkover
+      ? { label: "WO", color: "text-orange-400 bg-orange-400/10 border-orange-400/25" }
+      : fix.player1Score > fix.player2Score
+        ? { label: "HOME WIN", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/25" }
+        : fix.player1Score < fix.player2Score
+          ? { label: "AWAY WIN", color: "text-rose-400 bg-rose-400/10 border-rose-400/25" }
+          : { label: "DRAW",     color: "text-amber-400 bg-amber-400/10 border-amber-400/25" }
     : null
 
   if (confirmDel) {
@@ -74,29 +86,61 @@ function FixtureCard({ fix, onChanged }) {
   if (editing) {
     return (
       <div className="px-4 py-3 bg-pitch-800 border border-accent/20 rounded-xl space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-white flex-1 truncate font-medium">{fix.player1Name}</span>
-          <input type="number" min="0" placeholder="0" value={score1}
-            onChange={e => setScore1(e.target.value)}
-            className="w-12 text-center bg-pitch-900 border border-surface-border rounded-lg py-1.5 text-sm text-white font-mono focus:outline-none focus:border-accent/40" />
-          <span className="text-slate-600 text-xs">–</span>
-          <input type="number" min="0" placeholder="0" value={score2}
-            onChange={e => setScore2(e.target.value)}
-            className="w-12 text-center bg-pitch-900 border border-surface-border rounded-lg py-1.5 text-sm text-white font-mono focus:outline-none focus:border-accent/40" />
-          <span className="text-sm text-white flex-1 text-right truncate font-medium">{fix.player2Name}</span>
-        </div>
-        {preview && (
-          <p className={cn("text-xs text-center font-semibold",
-            s1 > s2 ? "text-emerald-400" : s1 < s2 ? "text-rose-400" : "text-amber-400"
-          )}>{preview}</p>
+        {/* Walkover picker */}
+        {walkoverMode ? (
+          <>
+            <p className="text-xs text-orange-400 font-semibold text-center">Who gave the walkover?</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSave(true, fix.player1Id)}
+                disabled={saving}
+                className="flex-1 text-xs py-2 rounded-lg bg-orange-400/15 text-orange-400 border border-orange-400/30 font-semibold hover:bg-orange-400/25 transition-colors disabled:opacity-40"
+              >
+                {fix.player1Name}
+              </button>
+              <button
+                onClick={() => handleSave(true, fix.player2Id)}
+                disabled={saving}
+                className="flex-1 text-xs py-2 rounded-lg bg-orange-400/15 text-orange-400 border border-orange-400/30 font-semibold hover:bg-orange-400/25 transition-colors disabled:opacity-40"
+              >
+                {fix.player2Name}
+              </button>
+            </div>
+            <button onClick={() => setWalkoverMode(false)} className="w-full text-xs py-1.5 rounded-lg border border-surface-border text-slate-400">
+              ← Back
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-white flex-1 truncate font-medium">{fix.player1Name}</span>
+              <input type="number" min="0" placeholder="0" value={score1}
+                onChange={e => setScore1(e.target.value)}
+                className="w-12 text-center bg-pitch-900 border border-surface-border rounded-lg py-1.5 text-sm text-white font-mono focus:outline-none focus:border-accent/40" />
+              <span className="text-slate-600 text-xs">–</span>
+              <input type="number" min="0" placeholder="0" value={score2}
+                onChange={e => setScore2(e.target.value)}
+                className="w-12 text-center bg-pitch-900 border border-surface-border rounded-lg py-1.5 text-sm text-white font-mono focus:outline-none focus:border-accent/40" />
+              <span className="text-sm text-white flex-1 text-right truncate font-medium">{fix.player2Name}</span>
+            </div>
+            {preview && (
+              <p className={cn("text-xs text-center font-semibold",
+                s1 > s2 ? "text-emerald-400" : s1 < s2 ? "text-rose-400" : "text-amber-400"
+              )}>{preview}</p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setEditing(false)} className="text-xs py-1.5 px-3 rounded-lg border border-surface-border text-slate-400">Cancel</button>
+              <button onClick={() => setWalkoverMode(true)}
+                className="text-xs py-1.5 px-3 rounded-lg bg-orange-400/10 text-orange-400 border border-orange-400/25 font-semibold hover:bg-orange-400/20 transition-colors">
+                Walkover
+              </button>
+              <button onClick={() => handleSave(false)} disabled={score1 === "" || score2 === "" || saving}
+                className="flex-1 text-xs py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 font-semibold disabled:opacity-40">
+                {saving ? "Saving…" : "Save result"}
+              </button>
+            </div>
+          </>
         )}
-        <div className="flex gap-2">
-          <button onClick={() => setEditing(false)} className="flex-1 text-xs py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
-          <button onClick={handleSave} disabled={score1 === "" || score2 === "" || saving}
-            className="flex-1 text-xs py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 font-semibold disabled:opacity-40">
-            {saving ? "Saving…" : "Save result"}
-          </button>
-        </div>
       </div>
     )
   }

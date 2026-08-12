@@ -617,4 +617,25 @@ router.post("/bid/quick", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /api/auction/price-history/:playerId
+// Returns historical auction sale prices for a player across past sessions.
+router.get("/price-history/:playerId", async (req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        s.price,
+        s.sold_at AS "soldAt",
+        t.name    AS "teamName",
+        sess.season_number AS "seasonNumber"
+      FROM auction_sales s
+      JOIN teams t              ON t.id   = s.team_id
+      JOIN auction_sessions sess ON sess.id = s.session_id
+      WHERE s.player_id = $1
+      ORDER BY s.sold_at DESC
+      LIMIT 5
+    `, [req.params.playerId])
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
 export default router
