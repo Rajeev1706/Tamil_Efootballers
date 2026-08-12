@@ -23,6 +23,8 @@ router.get("/public/current", async (req, res, next) => {
     const matches = await query(`
       SELECT
         km.round, km.match_number AS "matchNumber", km.status,
+        km.player1_score AS "player1Score", km.player2_score AS "player2Score",
+        km.is_walkover AS "isWalkover",
         km.player1_id AS "player1Id", km.player2_id AS "player2Id", km.winner_id AS "winnerId",
         p1.name AS "player1Name", p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
         p2.name AS "player2Name", p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl"
@@ -258,10 +260,11 @@ router.post("/:id/start", authenticate, adminOnly, async (req, res, next) => {
 // PATCH /api/ucl-knockout/matches/:matchId/result — save result + advance winner
 router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { player1Score, player2Score, tieWinnerId } = z.object({
+    const { player1Score, player2Score, tieWinnerId, isWalkover } = z.object({
       player1Score: z.number().int().min(0),
       player2Score: z.number().int().min(0),
       tieWinnerId:  z.number().int().positive().optional(),
+      isWalkover:   z.boolean().optional().default(false),
     }).parse(req.body)
 
     const matchRes = await query(
@@ -276,9 +279,6 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
                    : player2Score > player1Score ? match.player2_id
                    : (tieWinnerId || match.player1_id)
 
-    // Result for match_records/player-profile must reflect who actually
-    // advanced (winnerId), not just the raw score — otherwise a tie broken
-    // in one player's favor still logs as a "draw" on both profiles.
     const result = winnerId === match.player1_id ? "win" : "loss"
 
     const oldMatchRecordId = match.match_record_id
@@ -290,21 +290,17 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     const mrRes = await query(`
       INSERT INTO match_records
-        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
-      VALUES ($1,$2,$3,$4,'ucl',$5,$6,NOW(),$7)
+        (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number, is_walkover)
+      VALUES ($1,$2,$3,$4,'ucl',$5,$6,NOW(),$7,$8)
       RETURNING id
-    `, [match.player1_id, match.player2_id, result, oppGrade, player1Score, player2Score, season])
+    `, [match.player1_id, match.player2_id, result, oppGrade, player1Score, player2Score, season, isWalkover])
 
-    // Re-point the match at the new record BEFORE deleting the old one —
-    // deleting first would violate the match_record_id foreign key while
-    // ucl_knockout_matches still referenced that row.
     await query(`
       UPDATE ucl_knockout_matches
-      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4
-      WHERE id=$5
-    `, [player1Score, player2Score, winnerId, mrRes.rows[0].id, req.params.matchId])
+      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4, is_walkover=$5
+      WHERE id=$6
+    `, [player1Score, player2Score, winnerId, mrRes.rows[0].id, isWalkover, req.params.matchId])
 
-    // Now safe to delete the old match record, if this was an edit
     if (oldMatchRecordId) {
       await query("DELETE FROM match_records WHERE id = $1", [oldMatchRecordId])
     }

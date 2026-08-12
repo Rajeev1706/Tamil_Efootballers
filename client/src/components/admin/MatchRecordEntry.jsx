@@ -189,6 +189,7 @@ export default function MatchRecordEntry({ players, initialRecords }) {
   const [matchType, setMatchType]     = useState("league")
   const [playerScore, setPlayerScore] = useState("")
   const [oppScore, setOppScore]       = useState("")
+  const [isWalkover, setIsWalkover]   = useState(false)
   const [saved, setSaved]             = useState(false)
   const logRecord                     = useLogRecord()
 
@@ -199,14 +200,13 @@ export default function MatchRecordEntry({ players, initialRecords }) {
     if (!canSave) return
 
     const payload = {
-      playerId: parseInt(playerId),
+      playerId:   parseInt(playerId),
       opponentId: parseInt(oppId),
-      result,
+      result:     isWalkover ? "loss" : result,
       matchType,
-    }
-    if (playerScore !== "" && oppScore !== "") {
-      payload.playerScore   = parseInt(playerScore)
-      payload.opponentScore = parseInt(oppScore)
+      isWalkover,
+      playerScore:   isWalkover ? 0 : (playerScore !== "" ? parseInt(playerScore) : undefined),
+      opponentScore: isWalkover ? 3 : (oppScore !== "" ? parseInt(oppScore) : undefined),
     }
 
     logRecord.mutate(payload, {
@@ -216,8 +216,9 @@ export default function MatchRecordEntry({ players, initialRecords }) {
           playerName:    players.find(p => p.id === parseInt(playerId))?.name || "",
           opponentName:  selectedOpp?.name || "",
           opponentGrade: selectedOpp?.grade || "",
-          result,
+          result:        isWalkover ? "loss" : result,
           matchType,
+          isWalkover,
           playerScore:   payload.playerScore ?? null,
           opponentScore: payload.opponentScore ?? null,
           date:          data.record.recorded_at,
@@ -226,6 +227,7 @@ export default function MatchRecordEntry({ players, initialRecords }) {
         setTimeout(() => setSaved(false), 2500)
         setPlayerId(""); setOppId(""); setResult("")
         setMatchType("league"); setPlayerScore(""); setOppScore("")
+        setIsWalkover(false)
         setPage(1)
       },
       onError: (err) => alert(err.response?.data?.error || "Failed to log record"),
@@ -274,11 +276,25 @@ export default function MatchRecordEntry({ players, initialRecords }) {
 
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1.5 block">Result</label>
-            <div className="flex gap-2">
-              <ToggleBtn value="win"  selected={result} onChange={setResult} label="Win"  color="border-emerald-400 text-emerald-400" />
-              <ToggleBtn value="draw" selected={result} onChange={setResult} label="Draw" color="border-amber-400 text-amber-400"   />
-              <ToggleBtn value="loss" selected={result} onChange={setResult} label="Loss" color="border-rose-400 text-rose-400"     />
+            <div className="flex gap-2 flex-wrap">
+              <ToggleBtn value="win"  selected={isWalkover ? "" : result} onChange={v => { setResult(v); setIsWalkover(false) }} label="Win"  color="border-emerald-400 text-emerald-400" />
+              <ToggleBtn value="draw" selected={isWalkover ? "" : result} onChange={v => { setResult(v); setIsWalkover(false) }} label="Draw" color="border-amber-400 text-amber-400"   />
+              <ToggleBtn value="loss" selected={isWalkover ? "" : result} onChange={v => { setResult(v); setIsWalkover(false) }} label="Loss" color="border-rose-400 text-rose-400"     />
+              <button
+                onClick={() => { setIsWalkover(true); setResult("loss"); setPlayerScore(""); setOppScore("") }}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
+                  isWalkover
+                    ? "border-orange-400 text-orange-400 bg-orange-400/10"
+                    : "border-surface-border text-slate-500 hover:text-orange-400 hover:border-orange-400/40"
+                )}
+              >
+                WO (I gave walkover)
+              </button>
             </div>
+            {isWalkover && (
+              <p className="text-xs text-orange-400 mt-1.5">Logged as Loss 0–3 (walkover given)</p>
+            )}
           </div>
 
           <div>
@@ -292,7 +308,8 @@ export default function MatchRecordEntry({ players, initialRecords }) {
             </select>
           </div>
 
-          {/* Optional score */}
+          {/* Score inputs — hidden when walkover (auto 0-3) */}
+          {!isWalkover && (
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1.5 block">
               Match score <span className="text-slate-600"></span>
@@ -310,6 +327,7 @@ export default function MatchRecordEntry({ players, initialRecords }) {
             </div>
             <p className="text-xs text-slate-600 mt-1">For reference only — doesn't affect market value</p>
           </div>
+          )}
 
           {selectedOpp && (
             <div className="bg-pitch-800 rounded-xl p-4 border border-surface-border">

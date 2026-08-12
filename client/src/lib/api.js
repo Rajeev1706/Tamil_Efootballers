@@ -201,8 +201,8 @@ export const uclKnockoutApi = {
   current:      ()             => api.get("/ucl-knockout/public/current").then(r => r.data),
   create:       (name)         => api.post("/ucl-knockout", { name }).then(r => r.data),
   start:        (id)           => api.post(`/ucl-knockout/${id}/start`).then(r => r.data),
-  saveResult:   (matchId, player1Score, player2Score, tieWinnerId) =>
-    api.patch(`/ucl-knockout/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId }).then(r => r.data),
+  saveResult:   (matchId, player1Score, player2Score, tieWinnerId, isWalkover = false) =>
+    api.patch(`/ucl-knockout/matches/${matchId}/result`, { player1Score, player2Score, tieWinnerId, isWalkover }).then(r => r.data),
   updateMatchPlayers: (matchId, body) =>
     api.patch(`/ucl-knockout/matches/${matchId}/players`, body).then(r => r.data),
   reset:        (id)           => api.post(`/ucl-knockout/${id}/reset`).then(r => r.data),
