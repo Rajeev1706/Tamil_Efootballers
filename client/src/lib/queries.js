@@ -805,8 +805,8 @@ export const useCreateUclKnockout = () => {
 export const useSaveUclKnockoutResult = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId }) =>
-      uclKnockoutApi.saveResult(matchId, player1Score, player2Score, tieWinnerId),
+    mutationFn: ({ matchId, player1Score, player2Score, tieWinnerId, isWalkover }) =>
+      uclKnockoutApi.saveResult(matchId, player1Score, player2Score, tieWinnerId, isWalkover),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout"] }),
   })
 }
