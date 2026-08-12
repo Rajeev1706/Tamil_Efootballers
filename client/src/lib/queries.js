@@ -968,3 +968,140 @@ export const useDeleteSpecialEdition = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["special-editions"] }),
   })
 }
+
+// ── Team League Group Knockout ────────────────────────────────────────────
+import { tlgApi } from "./api"
+
+export const useTlgCurrent = () =>
+  useQuery({ queryKey: ["tlg-current"], queryFn: tlgApi.current, staleTime: 30000 })
+
+export const useTlgList = () =>
+  useQuery({ queryKey: ["tlg-list"], queryFn: tlgApi.list, staleTime: 30000 })
+
+export const useTlgSeason = (id) =>
+  useQuery({ queryKey: ["tlg", id], queryFn: () => tlgApi.get(id), enabled: !!id, staleTime: 30000 })
+
+export const useCreateTlg = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name) => tlgApi.create(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-list"] }),
+  })
+}
+
+export const useTlgAssignTeams = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, teamIds }) => tlgApi.assignTeams(id, teamIds),
+    onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: ["tlg", id] }),
+  })
+}
+
+export const useTlgStart = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => tlgApi.start(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["tlg", id] })
+      qc.invalidateQueries({ queryKey: ["tlg-current"] })
+    },
+  })
+}
+
+export const useTlgGenerateKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => tlgApi.generateKnockout(id),
+    onSuccess: (_, id) => qc.invalidateQueries({ queryKey: ["tlg", id] }),
+  })
+}
+
+export const useTlgSaveFixture = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ fixtureId, homeScore, awayScore, seasonId }) =>
+      tlgApi.saveFixture(fixtureId, homeScore, awayScore),
+    onSuccess: (_, { seasonId }) => {
+      qc.invalidateQueries({ queryKey: ["tlg", seasonId] })
+      qc.invalidateQueries({ queryKey: ["tlg-current"] })
+    },
+  })
+}
+
+export const useTlgSaveKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, homeScore, awayScore, tieWinnerId, seasonId }) =>
+      tlgApi.saveKnockout(matchId, homeScore, awayScore, tieWinnerId),
+    onSuccess: (_, { seasonId }) => {
+      qc.invalidateQueries({ queryKey: ["tlg", seasonId] })
+      qc.invalidateQueries({ queryKey: ["tlg-current"] })
+    },
+  })
+}
+
+export const useDeleteTlg = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => tlgApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-list"] }),
+  })
+}
+
+// ── TLG (Team League Group Knockout) ────────────────────────────────────────
+import { tlgApi } from "./api"
+
+export const useTlgCurrent = () =>
+  useQuery({ queryKey: ["tlg-current"], queryFn: tlgApi.current, staleTime: 30000 })
+
+export const useTlgList = () =>
+  useQuery({ queryKey: ["tlg-list"], queryFn: tlgApi.list })
+
+export const useTlgCreate = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => tlgApi.create(),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tlg-list"] }); qc.invalidateQueries({ queryKey: ["tlg-current"] }) },
+  })
+}
+
+export const useTlgDraw = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, teamIds }) => tlgApi.draw(id, teamIds),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tlg-list"] }); qc.invalidateQueries({ queryKey: ["tlg-current"] }) },
+  })
+}
+
+export const useTlgSaveFixture = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, homeScore, awayScore, isWalkover }) => tlgApi.saveFixture(id, homeScore, awayScore, isWalkover),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-current"] }),
+  })
+}
+
+export const useTlgGenerateKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => tlgApi.generateKnockout(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-current"] }),
+  })
+}
+
+export const useTlgSaveKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ phase, seasonId, homeScore, awayScore, isWalkover }) =>
+      tlgApi.saveKnockout(phase, seasonId, homeScore, awayScore, isWalkover),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tlg-current"] }); qc.invalidateQueries({ queryKey: ["players"] }) },
+  })
+}
+
+export const useTlgDelete = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => tlgApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-list"] }),
+  })
+}

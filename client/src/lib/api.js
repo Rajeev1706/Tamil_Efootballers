@@ -291,3 +291,32 @@ export async function uploadImage(file, folder = "general") {
     reader.readAsDataURL(file)
   })
 }
+
+export const tlgApi = {
+  list:            ()              => api.get("/tlg").then(r => r.data),
+  current:         ()              => api.get("/tlg/current").then(r => r.data),
+  get:             (id)            => api.get(`/tlg/${id}`).then(r => r.data),
+  create:          (name)          => api.post("/tlg", { name }).then(r => r.data),
+  assignTeams:     (id, teamIds)   => api.post(`/tlg/${id}/teams`, { teamIds }).then(r => r.data),
+  start:           (id)            => api.post(`/tlg/${id}/start`).then(r => r.data),
+  generateKnockout:(id)            => api.post(`/tlg/${id}/knockout`).then(r => r.data),
+  saveFixture:     (fId, h, a)     => api.patch(`/tlg/fixture/${fId}`, { homeScore: h, awayScore: a }).then(r => r.data),
+  clearFixture:    (fId)           => api.delete(`/tlg/fixture/${fId}/result`).then(r => r.data),
+  saveKnockout:    (mId, h, a, tw) => api.patch(`/tlg/knockout/${mId}`, { homeScore: h, awayScore: a, tieWinnerId: tw }).then(r => r.data),
+  delete:          (id)            => api.delete(`/tlg/${id}`).then(r => r.data),
+}
+
+export const tlgApi = {
+  list:             ()                      => api.get("/tlg/list").then(r => r.data),
+  current:          ()                      => api.get("/tlg/current").then(r => r.data),
+  get:              (id)                    => api.get(`/tlg/${id}`).then(r => r.data),
+  create:           ()                      => api.post("/tlg").then(r => r.data),
+  draw:             (id, teamIds)           => api.post(`/tlg/${id}/draw`, { teamIds }).then(r => r.data),
+  saveFixture:      (id, homeScore, awayScore, isWalkover) =>
+    api.patch(`/tlg/fixtures/${id}`, { homeScore, awayScore, isWalkover }).then(r => r.data),
+  clearFixture:     (id)                   => api.delete(`/tlg/fixtures/${id}/result`).then(r => r.data),
+  generateKnockout: (id)                   => api.post(`/tlg/${id}/generate-knockout`).then(r => r.data),
+  saveKnockout:     (phase, seasonId, homeScore, awayScore, isWalkover) =>
+    api.patch(`/tlg/knockout/${phase}`, { seasonId, homeScore, awayScore, isWalkover }).then(r => r.data),
+  delete:           (id)                   => api.delete(`/tlg/${id}`).then(r => r.data),
+}

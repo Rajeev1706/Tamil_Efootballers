@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -15,6 +15,8 @@ import UclResults from "../components/admin/UclResults"
 import UclKnockoutAdmin from "../components/admin/UclKnockoutAdmin"
 import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import RevolutionAdmin from "../components/admin/RevolutionTournament"
+import TlgAdmin from "../components/admin/TlgAdmin"
+import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
 import api, { teamsApi } from "../lib/api"
@@ -394,6 +396,8 @@ const TABS = [
   { id: "uclknockout",  label: "UCL Knockout",  icon: Trophy },
   { id: "weekly",     label: "Weekly",       icon: Trophy          },
   { id: "revolution", label: "Revolution",  icon: Trophy          },
+  { id: "tlg",        label: "TLG",         icon: Trophy          },
+  { id: "replacement",label: "Replacement", icon: RefreshCw       },
   { id: "fixtures",   label: "Fixtures",     icon: Calendar        },
   { id: "teamresults",label: "Team Results", icon: Users           },
   { id: "trades",     label: "Trades",       icon: ArrowLeftRight  },
@@ -551,6 +555,12 @@ export default function AdminPage() {
         )}
         {activeTab === "revolution" && (
           <RevolutionAdmin />
+        )}
+        {activeTab === "tlg" && (
+          <TlgAdmin />
+        )}
+        {activeTab === "replacement" && (
+          <ReplacementModule players={players} />
         )}
         {activeTab === "fixtures" && !isLoading && (
           <FixtureResults fixtures={fixtures} />

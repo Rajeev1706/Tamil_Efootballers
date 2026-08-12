@@ -12,6 +12,7 @@ import PlayerTrophyCabinet  from "./pages/PlayerTrophyCabinet"
 import WeeklyDraw       from "./pages/WeeklyDraw"
 import WeeklyBracket    from "./pages/WeeklyBracket"
 import RevolutionDraw    from "./pages/RevolutionDraw"
+import TlgDraw from "./pages/TlgDraw"
 import RevolutionBracket from "./pages/RevolutionBracket"
 import UclDraw          from "./pages/UclDraw"
 import UclKODraw    from "./pages/UclKODraw"
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/weekly/draw/:id"    element={<WeeklyDraw />} />
         <Route path="/weekly/bracket/:id" element={<WeeklyBracket />} />
         <Route path="/revolution/draw/:id"    element={<RevolutionDraw />} />
+        <Route path="/tlg-draw/:id" element={<TlgDraw />} />
         <Route path="/revolution/bracket/:id" element={<RevolutionBracket />} />
         <Route path="/ucl/draw"                element={<UclDraw />} />
         <Route path="/ucl-knockout/draw/:id"    element={<UclKODraw />} />
