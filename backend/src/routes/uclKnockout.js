@@ -6,6 +6,7 @@ import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 const TOTAL_ROUNDS = 5   // R32 → R16 → QF → SF → Final
@@ -428,10 +429,34 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         playerId: topScorer?.goals > 0 ? topScorer.id : null,
         seasonNumber: season,
       })
-    }
 
-    // Store UCL completion timestamp for 48-hour celebration window
-    if (match.round === 5 && winnerId) {
+      // ── Ballon d'Or — player with most BDR points ──────────────────────────
+      const ballondorRes = await query(
+        "SELECT id, name FROM players ORDER BY bdr_points DESC LIMIT 1"
+      )
+      const ballondorWinner = ballondorRes.rows[0]
+      if (ballondorWinner) {
+        await awardOrReassignTrophy({
+          sourceKey:    `ballondor_season_${season}`,
+          trophyColumn: "trophy1_count",
+          playerId:     ballondorWinner.id,
+          seasonNumber: season,
+        })
+      }
+
+      // ── UCL winner name ────────────────────────────────────────────────────
+      const uclWinnerNameRes = await query(
+        "SELECT name FROM players WHERE id = $1",
+        [finalRes.rows[0]?.winner_id]
+      )
+
+      // ── Auto-fill season record (UCL + Ballon d'Or fields only) ───────────
+      await updateSeasonRecord(season, {
+        ucl_winner:       uclWinnerNameRes.rows[0]?.name ?? null,
+        ballondor_winner: ballondorWinner?.name ?? null,
+      })
+
+      // Store UCL completion timestamp for 48-hour celebration window
       await query(
         `INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`,
         [`ucl_champion_completed_at_${match.tournament_id}`, new Date().toISOString()]

@@ -4,6 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
+import { addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 
@@ -308,6 +309,55 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       for (const pid of playerIds) {
         await recalcMarketValue(pid)
         await recalcForm(pid)
+      }
+
+      // ── BDR for knockout rounds ───────────────────────────────────────────
+      // Only award when this is a knockout match (has knockout_round)
+      if (fix.knockout_round && winnerPairId) {
+        const loserPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
+        const loserPair   = winnerPairId === fix.home_pair_id ? awayPair : homePair
+        const winnerPair  = winnerPairId === fix.home_pair_id ? homePair : awayPair
+
+        // BDR per round (for loser — reaching that round)
+        const LOSER_BDR = { qf: 4, sf: 6, final: 8 }
+        // BDR for winner of final
+        const WINNER_BDR = { final: 10 }
+
+        const loserBdr  = LOSER_BDR[fix.knockout_round]
+        const winnerBdr = WINNER_BDR[fix.knockout_round]
+
+        // Award loser BDR (for reaching this round)
+        if (loserBdr) {
+          await addBdr(loserPair.set1_player_id, loserBdr)
+          await addBdr(loserPair.set2_player_id, loserBdr)
+        }
+
+        // Award winner BDR (champion only)
+        if (winnerBdr) {
+          await addBdr(winnerPair.set1_player_id, winnerBdr)
+          await addBdr(winnerPair.set2_player_id, winnerBdr)
+        }
+
+        // Runner-up (Final loser) gets 8 already above.
+        // SF losers get 6, QF losers get 4 — handled above.
+
+        // ── Golden Boot — top individual scorer in this tournament ───────────
+        if (fix.knockout_round === "final") {
+          const seasonNum = homePair.season_number
+          const gbRes = await q(`
+            SELECT mr.player_id,
+              SUM(mr.player_score) AS goals
+            FROM match_records mr
+            WHERE mr.match_type = 'duo'
+              AND mr.season_number = $1
+            GROUP BY mr.player_id
+            ORDER BY goals DESC LIMIT 1
+          `, [seasonNum])
+          const topScorer = gbRes.rows[0]
+          if (topScorer?.goals > 0) {
+            await addBdr(topScorer.player_id, 4)
+          }
+        }
       }
     })
 

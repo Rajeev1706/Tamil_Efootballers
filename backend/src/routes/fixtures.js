@@ -4,6 +4,8 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { addBdr } from "../services/bdrAwards.js"
+import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 
@@ -497,6 +499,13 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
             INSERT INTO app_settings (key, value) VALUES ('league_champion_completed_at', $1)
             ON CONFLICT (key) DO UPDATE SET value = $1
           `, [new Date().toISOString()])
+
+          // ── Auto-fill season record — team league winner ─────────────────
+          const tlPlayersRes = await query("SELECT name FROM players WHERE team_id = $1", [champTeam.id])
+          await updateSeasonRecord(season, {
+            team_league_winner:  champTeam.name,
+            team_league_players: tlPlayersRes.rows.map(r => r.name),
+          })
         }
       } else {
         // League + Knockout: generate the playoff bracket as before
