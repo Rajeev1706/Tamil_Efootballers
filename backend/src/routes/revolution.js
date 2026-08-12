@@ -308,7 +308,7 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
 
 // PATCH /api/revolution/matches/:matchId/result — save result
 // Creates match_records (match_type='revolution'), recalcs MV + form for both players.
-// Awards BDR for reaching rounds (same structure as weekly).
+// No BDR awarded for Revolution — trophy8 awarded to champion only.
 router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { player1Score, player2Score, tieWinnerId, isWalkover } = z.object({
@@ -361,36 +361,8 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // Delete old match record if this is an edit
     if (oldMrId) await query("DELETE FROM match_records WHERE id = $1", [oldMrId])
 
-    // ── BDR for reaching rounds ─────────────────────────────────────────────
-    const totalRounds = match.total_rounds
-    const finalRound  = totalRounds
-    const sfRound     = totalRounds - 1
-    const qfRound     = totalRounds - 2
-
-    function bdrForReaching(round) {
-      if (round >= finalRound) return 8
-      if (round >= sfRound)    return 5
-      if (round >= qfRound)    return 3
-      return 0
-    }
-
-    function advancementDiff(currentRound) {
-      if (currentRound >= totalRounds) return 0
-      return bdrForReaching(currentRound + 1) - bdrForReaching(currentRound)
-    }
-
-    // Award BDR diff to winner for advancing
-    const bdrDiff = advancementDiff(match.round)
-    if (bdrDiff > 0) {
-      await query("UPDATE players SET bdr_points = bdr_points + $1 WHERE id = $2", [bdrDiff, winnerId])
-    }
-
-    // If final — winner gets champion bonus (+2) and trophy8
+    // If final — award trophy8 only (no BDR for Revolution)
     if (match.round === totalRounds) {
-      await query("UPDATE players SET bdr_points = bdr_points + 2 WHERE id = $1", [winnerId])
-
-      // Use awardOrReassignTrophy so correcting a Final result later
-      // automatically reverts the wrong winner and awards the correct one.
       await awardOrReassignTrophy({
         sourceKey:    `revolution-champion-${match.tournament_id}`,
         trophyColumn: "trophy8_count",

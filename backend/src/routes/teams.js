@@ -6,6 +6,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 
@@ -1278,6 +1279,16 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
         trophyColumn: "trophy6_count",
         playerId: topScorer?.goals > 0 ? topScorer.id : null,
         seasonNumber: match.season_number,
+      })
+
+      // ── Auto-fill season record — team league winner (playoff format) ──────
+      const winnerTeamRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
+      const winnerPlayerNames = rosterRes.rows.length > 0
+        ? (await query("SELECT name FROM players WHERE team_id = $1", [winnerId])).rows.map(r => r.name)
+        : []
+      await updateSeasonRecord(match.season_number, {
+        team_league_winner:  winnerTeamRes.rows[0]?.name ?? null,
+        team_league_players: winnerPlayerNames,
       })
     }
 

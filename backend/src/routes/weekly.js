@@ -6,6 +6,7 @@ import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 
@@ -545,6 +546,18 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         playerId: weeklyTopScorer?.goals > 0 ? weeklyTopScorer.id : null,
         seasonNumber: season,
       })
+
+      // ── Auto-fill season record — weekly winner field ──────────────────────
+      if (finalMatchRes.rows[0]?.winner_id) {
+        const winnerNameRes = await query(
+          "SELECT name FROM players WHERE id = $1",
+          [finalMatchRes.rows[0].winner_id]
+        )
+        const winnerName = winnerNameRes.rows[0]?.name
+        if (winnerName) {
+          await updateSeasonRecord(season, { weekly_winner: winnerName })
+        }
+      }
     }
 
     res.json({ updated: true, winnerId, nextRound: match.round + 1 })

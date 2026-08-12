@@ -11,6 +11,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { addBdr } from "../services/bdrAwards.js"
+import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 // BDR for final standings — same as regular Team League playoffs
 const TLG_BDR = {
@@ -339,6 +340,14 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
         })
       }
       await query("UPDATE tlg_seasons SET status='completed' WHERE id=$1", [seasonId])
+
+      // ── Auto-fill season record — TLG team league winner ──────────────────
+      const tlgWinnerTeamRes = await query("SELECT name FROM teams WHERE id=$1", [winnerId])
+      const tlgWinnerPlayersRes = await query("SELECT name FROM players WHERE team_id=$1", [winnerId])
+      await updateSeasonRecord(season, {
+        team_league_winner:  tlgWinnerTeamRes.rows[0]?.name ?? null,
+        team_league_players: tlgWinnerPlayersRes.rows.map(r => r.name),
+      })
     }
 
     if (phase === "third_place") {
