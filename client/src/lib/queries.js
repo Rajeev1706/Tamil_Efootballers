@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi, winrateApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi, winrateApi, specialEditionsApi, tlgApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -940,7 +940,6 @@ export const useScoutingReport = (myTeamId, oppTeamId) =>
     enabled: !!myTeamId && !!oppTeamId,
   })
 // ── Special Editions ─────────────────────────────────────────────────────────
-import { specialEditionsApi } from "./api"
 
 export const useSpecialEditions = () =>
   useQuery({ queryKey: ["special-editions"], queryFn: specialEditionsApi.list, staleTime: 1000 * 60 * 5 })
@@ -969,87 +968,7 @@ export const useDeleteSpecialEdition = () => {
   })
 }
 
-// ── Team League Group Knockout ────────────────────────────────────────────
-import { tlgApi } from "./api"
-
-export const useTlgCurrent = () =>
-  useQuery({ queryKey: ["tlg-current"], queryFn: tlgApi.current, staleTime: 30000 })
-
-export const useTlgList = () =>
-  useQuery({ queryKey: ["tlg-list"], queryFn: tlgApi.list, staleTime: 30000 })
-
-export const useTlgSeason = (id) =>
-  useQuery({ queryKey: ["tlg", id], queryFn: () => tlgApi.get(id), enabled: !!id, staleTime: 30000 })
-
-export const useCreateTlg = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (name) => tlgApi.create(name),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-list"] }),
-  })
-}
-
-export const useTlgAssignTeams = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, teamIds }) => tlgApi.assignTeams(id, teamIds),
-    onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: ["tlg", id] }),
-  })
-}
-
-export const useTlgStart = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id) => tlgApi.start(id),
-    onSuccess: (_, id) => {
-      qc.invalidateQueries({ queryKey: ["tlg", id] })
-      qc.invalidateQueries({ queryKey: ["tlg-current"] })
-    },
-  })
-}
-
-export const useTlgGenerateKnockout = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id) => tlgApi.generateKnockout(id),
-    onSuccess: (_, id) => qc.invalidateQueries({ queryKey: ["tlg", id] }),
-  })
-}
-
-export const useTlgSaveFixture = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ fixtureId, homeScore, awayScore, seasonId }) =>
-      tlgApi.saveFixture(fixtureId, homeScore, awayScore),
-    onSuccess: (_, { seasonId }) => {
-      qc.invalidateQueries({ queryKey: ["tlg", seasonId] })
-      qc.invalidateQueries({ queryKey: ["tlg-current"] })
-    },
-  })
-}
-
-export const useTlgSaveKnockout = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ matchId, homeScore, awayScore, tieWinnerId, seasonId }) =>
-      tlgApi.saveKnockout(matchId, homeScore, awayScore, tieWinnerId),
-    onSuccess: (_, { seasonId }) => {
-      qc.invalidateQueries({ queryKey: ["tlg", seasonId] })
-      qc.invalidateQueries({ queryKey: ["tlg-current"] })
-    },
-  })
-}
-
-export const useDeleteTlg = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id) => tlgApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-list"] }),
-  })
-}
-
 // ── TLG (Team League Group Knockout) ────────────────────────────────────────
-import { tlgApi } from "./api"
 
 export const useTlgCurrent = () =>
   useQuery({ queryKey: ["tlg-current"], queryFn: tlgApi.current, staleTime: 30000 })

@@ -293,20 +293,6 @@ export async function uploadImage(file, folder = "general") {
 }
 
 export const tlgApi = {
-  list:            ()              => api.get("/tlg").then(r => r.data),
-  current:         ()              => api.get("/tlg/current").then(r => r.data),
-  get:             (id)            => api.get(`/tlg/${id}`).then(r => r.data),
-  create:          (name)          => api.post("/tlg", { name }).then(r => r.data),
-  assignTeams:     (id, teamIds)   => api.post(`/tlg/${id}/teams`, { teamIds }).then(r => r.data),
-  start:           (id)            => api.post(`/tlg/${id}/start`).then(r => r.data),
-  generateKnockout:(id)            => api.post(`/tlg/${id}/knockout`).then(r => r.data),
-  saveFixture:     (fId, h, a)     => api.patch(`/tlg/fixture/${fId}`, { homeScore: h, awayScore: a }).then(r => r.data),
-  clearFixture:    (fId)           => api.delete(`/tlg/fixture/${fId}/result`).then(r => r.data),
-  saveKnockout:    (mId, h, a, tw) => api.patch(`/tlg/knockout/${mId}`, { homeScore: h, awayScore: a, tieWinnerId: tw }).then(r => r.data),
-  delete:          (id)            => api.delete(`/tlg/${id}`).then(r => r.data),
-}
-
-export const tlgApi = {
   list:             ()                      => api.get("/tlg/list").then(r => r.data),
   current:          ()                      => api.get("/tlg/current").then(r => r.data),
   get:              (id)                    => api.get(`/tlg/${id}`).then(r => r.data),
