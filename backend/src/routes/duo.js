@@ -159,10 +159,25 @@ router.get("/current", async (req, res, next) => {
       ORDER BY df.knockout_round NULLS FIRST, df.match_number ASC, df.id ASC
     `, [seasonNum])
 
+    // Top scorers (Golden Boot)
+    const topScorers = await query(`
+      SELECT
+        p.id, p.name, p.grade,
+        COALESCE(SUM(mr.player_score), 0)::int AS goals
+      FROM players p
+      JOIN match_records mr ON mr.player_id = p.id
+      WHERE mr.match_type = 'duo'
+        AND mr.season_number = $1
+      GROUP BY p.id, p.name, p.grade
+      ORDER BY goals DESC, p.name ASC
+      LIMIT 10
+    `, [seasonNum]).catch(() => ({ rows: [] }))
+
     res.json({
       seasonNumber: seasonNum,
       groups: groups.rows,
       fixtures: fixtures.rows,
+      topScorers: topScorers.rows,
     })
   } catch (err) { next(err) }
 })

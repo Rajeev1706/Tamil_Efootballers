@@ -22,16 +22,22 @@ const CARD_COLORS = { silver: "border-slate-400 text-slate-300", gold: "border-g
 
 // ── Screen 0: no session yet ────────────────────────────────────────────
 function StartScreen() {
-  const [budget, setBudget] = useState(1100)
+  const { data: teams = [] } = useTeams()
   const startAuction = useStartAuction()
+
+  // Use the budget already set on teams (from the Teams admin tab)
+  const budget = teams[0]?.budget ?? 1000
+
   return (
     <div className="max-w-md mx-auto mt-20 card p-6 text-center">
       <Gavel className="w-8 h-8 text-accent mx-auto mb-3" />
       <h2 className="text-lg font-bold text-white mb-1">Start a new Player Auction</h2>
       <p className="text-sm text-slate-500 mb-5">This releases every non-captain player back into the pool for a full re-draft.</p>
-      <label className="text-xs text-slate-500 block mb-1 text-left">Budget per team (₹)</label>
-      <input type="number" value={budget} onChange={e => setBudget(Number(e.target.value))}
-        className="w-full bg-pitch-800 border border-surface-border rounded-lg px-3 py-2 text-white mb-4" />
+      <div className="flex items-center justify-center gap-2 mb-5 bg-pitch-800 border border-surface-border rounded-xl px-4 py-3">
+        <span className="text-slate-400 text-sm">Auction budget per team:</span>
+        <span className="text-white font-bold text-lg font-mono">₹{budget}</span>
+      </div>
+      <p className="text-xs text-slate-600 mb-4">To change the budget, go to Admin → Teams → Common Auction Budget.</p>
       <button onClick={() => startAuction.mutate(budget)} disabled={startAuction.isPending}
         className="w-full py-2.5 rounded-xl bg-accent text-white font-semibold disabled:opacity-50">
         {startAuction.isPending ? "Starting…" : "Start Auction"}

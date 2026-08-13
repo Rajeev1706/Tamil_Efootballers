@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Users, Trophy } from "lucide-react"
+import { Users } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import api from "../lib/api"
 import { cn } from "../lib/utils"
+import duoTrophy from "../../images/duo.png"
 
 const ROUND_LABELS = { r16: "Round of 16", qf: "Quarter Finals", sf: "Semi Finals", final: "Final" }
 
@@ -39,14 +40,8 @@ function GroupTable({ groupName, members }) {
               <td className="px-4 py-2.5">
                 <p className="font-semibold text-white text-sm">{m.duoName}</p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border", GRADE_COLORS[m.set1Grade] || GRADE_COLORS.C)}>
-                    {m.set1Grade}
-                  </span>
                   <span className="text-slate-500 text-[10px]">{m.set1Name}</span>
                   <span className="text-slate-600 text-[10px]">+</span>
-                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border", GRADE_COLORS[m.set2Grade] || GRADE_COLORS.C)}>
-                    {m.set2Grade}
-                  </span>
                   <span className="text-slate-500 text-[10px]">{m.set2Name}</span>
                 </div>
               </td>
@@ -132,12 +127,10 @@ export default function DuoTournament() {
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center">
-            <Users className="w-5 h-5 text-accent" />
-          </div>
+          <img src={duoTrophy} alt="Duo Tournament" className="w-10 h-10 object-contain flex-shrink-0" />
           <div>
             <h1 className="text-2xl font-extrabold text-white">Duo Tournament</h1>
-            <p className="text-sm text-slate-500">Season {data?.seasonNumber} · S/A+ /A paired with B/C players</p>
+            <p className="text-sm text-slate-500">Season {data?.seasonNumber}</p>
           </div>
         </div>
 

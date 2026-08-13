@@ -62,6 +62,7 @@ export const teamsApi = {
   updateSeasonRecord: (id, body) => api.patch(`/teams/season-records/${id}`, body).then(r => r.data),
   deleteSeasonRecord: (id)   => api.delete(`/teams/season-records/${id}`).then(r => r.data),
   championship:    ()        => api.get("/teams/championship").then(r => r.data),
+  bulkBudget:      (budget)  => api.patch("/teams/bulk-budget", { budget }).then(r => r.data),
 }
 
 export const playersApi = {

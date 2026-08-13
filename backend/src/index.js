@@ -127,6 +127,21 @@ app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
 })
 
 // ── League Info ────────────────────────────────────────────────────────────────
+// Ensure table exists (not in base migrate.js)
+;(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS league_info (
+        id         SERIAL PRIMARY KEY,
+        title      TEXT NOT NULL,
+        content    TEXT,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)
+  } catch (e) { console.error("[league_info] migration:", e.message) }
+})()
+
 app.get("/api/league-info", async (_req, res) => {
   try {
     const result = await query("SELECT * FROM league_info ORDER BY sort_order ASC, id ASC")
