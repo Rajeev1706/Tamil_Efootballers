@@ -6,6 +6,7 @@ import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
@@ -444,16 +445,35 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         })
       }
 
+      // ── Auto-award Championship trophy to the UCL winner's team ──────────
+      let championshipTeamName = null
+      if (finalRes.rows[0]?.winner_id) {
+        const uclWinnerTeamRes = await query(
+          "SELECT p.team_id, t.name AS team_name FROM players p LEFT JOIN teams t ON t.id = p.team_id WHERE p.id = $1",
+          [finalRes.rows[0].winner_id]
+        )
+        const uclWinnerTeamId = uclWinnerTeamRes.rows[0]?.team_id ?? null
+        championshipTeamName  = uclWinnerTeamRes.rows[0]?.team_name ?? null
+        await reconcileTeamTrophy({
+          tournament:   "championship",
+          teamId:       uclWinnerTeamId,
+          seasonNumber: season,
+        })
+      } else {
+        await reconcileTeamTrophy({ tournament: "championship", teamId: null, seasonNumber: season })
+      }
+
       // ── UCL winner name ────────────────────────────────────────────────────
       const uclWinnerNameRes = await query(
         "SELECT name FROM players WHERE id = $1",
         [finalRes.rows[0]?.winner_id]
       )
 
-      // ── Auto-fill season record (UCL + Ballon d'Or fields only) ───────────
+      // ── Auto-fill season record (UCL + Ballon d'Or + Championship fields) ─
       await updateSeasonRecord(season, {
-        ucl_winner:       uclWinnerNameRes.rows[0]?.name ?? null,
-        ballondor_winner: ballondorWinner?.name ?? null,
+        ucl_winner:           uclWinnerNameRes.rows[0]?.name ?? null,
+        ballondor_winner:     ballondorWinner?.name ?? null,
+        championship_winner:  championshipTeamName,
       })
 
       // Store UCL completion timestamp for 48-hour celebration window

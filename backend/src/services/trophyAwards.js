@@ -33,6 +33,8 @@ const VALID_TROPHY_COLUMNS = new Set([
   "trophy7_count", // UCL Golden Boot
   "trophy8_count", // Revolution
   "trophy9_count", // Europa (Team League Group KO format)
+  "trophy10_count", // Duo Tournament
+  "trophy11_count", // Duo Golden Boot
 ])
 
 function assertValidColumn(col) {

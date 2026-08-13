@@ -14,7 +14,7 @@ import AuctionPlanner from "../components/team/auction/AuctionPlanner"
 import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
 import { useAuthStore } from "../store/authStore"
-import { useTeam, usePlayers, useFixtures, useTrades, useAuctionCurrent } from "../lib/queries"
+import { useTeam, usePlayers, useFixtures, useTrades, useAuctionCurrent, useChampionship } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 import { useTeamColor } from "../lib/teamColor"
 import { cn } from "../lib/utils"
@@ -35,6 +35,7 @@ export default function TeamDashboard() {
   const navigate                  = useNavigate()
   const user                      = useAuthStore(s => s.user)
   const { data: auctionData } = useAuctionCurrent()
+  const { data: championship = [] } = useChampionship()
   useAuctionSocket()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get("tab") || "squad"
@@ -58,6 +59,11 @@ export default function TeamDashboard() {
   const myTeamName    = teamData?.name || ""
   const myPurse       = teamData?.purse ?? teamData?.budget ?? 0
   const pendingReceived = trades.filter(t => t.direction === "received" && t.status === "pending_team").length
+
+  // Championship ranking
+  const myChampionshipEntry = championship.find(t => t.id === user?.teamId)
+  const myChampionshipRank  = championship.findIndex(t => t.id === user?.teamId) + 1
+  const myChampionshipBdr   = myChampionshipEntry?.totalBdr ?? 0
 
   if (teamLoading) return <Layout><Loading /></Layout>
 
@@ -96,6 +102,29 @@ export default function TeamDashboard() {
         )}
 
         <TeamHeader team={myTeam} myPlayers={myPlayers} teamColor={teamColor} />
+
+        {/* Championship standing banner */}
+        {myChampionshipRank > 0 && (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer hover:border-amber-400/40 transition-colors"
+            style={{ background: "rgba(251,191,36,0.05)", borderColor: "rgba(251,191,36,0.2)" }}
+            onClick={() => navigate("/championship")}
+          >
+            <div className="w-8 h-8 rounded-lg bg-amber-400/15 flex items-center justify-center flex-shrink-0">
+              <Trophy className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-amber-400 font-semibold">Team of Champions Standing</p>
+              <p className="text-sm text-white font-bold">
+                #{myChampionshipRank} of {championship.length} teams
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-xl font-extrabold font-mono text-amber-400">{myChampionshipBdr}</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">Team BDR</p>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div

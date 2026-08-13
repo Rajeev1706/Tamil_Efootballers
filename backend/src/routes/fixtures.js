@@ -5,6 +5,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { addBdr } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
@@ -499,6 +500,13 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
             INSERT INTO app_settings (key, value) VALUES ('league_champion_completed_at', $1)
             ON CONFLICT (key) DO UPDATE SET value = $1
           `, [new Date().toISOString()])
+
+          // ── Auto-award Team League trophy to winning team (league-only format) ──
+          await reconcileTeamTrophy({
+            tournament:   "team_league",
+            teamId:       champTeam.id,
+            seasonNumber: season,
+          })
 
           // ── Auto-fill season record — team league winner ─────────────────
           const tlPlayersRes = await query("SELECT name FROM players WHERE team_id = $1", [champTeam.id])

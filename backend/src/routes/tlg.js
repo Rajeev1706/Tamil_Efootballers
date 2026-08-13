@@ -10,6 +10,7 @@ import { Router } from "express"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { addBdr } from "../services/bdrAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
@@ -341,6 +342,13 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
       }
       await query("UPDATE tlg_seasons SET status='completed' WHERE id=$1", [seasonId])
 
+      // ── Auto-award Team League trophy to winning team (TLG groups+knockout format) ──
+      await reconcileTeamTrophy({
+        tournament:   "team_league",
+        teamId:       winnerId,
+        seasonNumber: season,
+      })
+
       // ── Auto-fill season record — TLG team league winner ──────────────────
       const tlgWinnerTeamRes = await query("SELECT name FROM teams WHERE id=$1", [winnerId])
       const tlgWinnerPlayersRes = await query("SELECT name FROM players WHERE team_id=$1", [winnerId])
@@ -365,6 +373,12 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
         seasonNumber: season,
       })
       await query("UPDATE teams SET europa_wins = COALESCE(europa_wins, 0) + 1 WHERE id=$1", [winnerId])
+      // ── Auto-award Europa trophy to winning team ──────────────────────────
+      await reconcileTeamTrophy({
+        tournament:   "europa",
+        teamId:       winnerId,
+        seasonNumber: season,
+      })
     }
 
     if (phase === "seventh_place") {

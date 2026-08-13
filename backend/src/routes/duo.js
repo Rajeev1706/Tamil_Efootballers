@@ -5,8 +5,52 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { addBdr } from "../services/bdrAwards.js"
+import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
+
+// ── Inline column migration — add trophy10/11 if not already present ──────────
+;(async () => {
+  try {
+    // Ensure all extended trophy columns exist (trophy8/9 may not be in base migrate.js)
+    await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy8_count  INT DEFAULT 0`)
+    await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy9_count  INT DEFAULT 0`)
+    await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy10_count INT DEFAULT 0`)
+    await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy11_count INT DEFAULT 0`)
+    await query(`
+      CREATE OR REPLACE VIEW players_full AS
+      SELECT
+        p.id, p.name, p.alias, p.grade,
+        p.auction_price AS "auctionPrice",
+        p.market_value  AS "marketValue",
+        p.bdr_points    AS "bdrPoints",
+        p.form,
+        p.trophy1_count  AS "trophy1Count",
+        p.trophy2_count  AS "trophy2Count",
+        p.trophy3_count  AS "trophy3Count",
+        p.trophy4_count  AS "trophy4Count",
+        p.trophy5_count  AS "trophy5Count",
+        p.trophy6_count  AS "trophy6Count",
+        p.trophy7_count  AS "trophy7Count",
+        p.trophy8_count  AS "trophy8Count",
+        p.trophy9_count  AS "trophy9Count",
+        p.trophy10_count AS "trophy10Count",
+        p.trophy11_count AS "trophy11Count",
+        p.is_captain     AS "isCaptain",
+        p.grade_floor    AS "gradeFloor",
+        p.grade_ceiling  AS "gradeCeiling",
+        t.name           AS team,
+        p.team_id        AS "teamId",
+        t.logo_url       AS "teamLogo",
+        p.avatar_id      AS "avatarId",
+        p.avatar_url     AS "avatarUrl",
+        p.avatar_bg_url  AS "avatarBgUrl"
+      FROM players p
+      LEFT JOIN teams t ON p.team_id = t.id
+    `)
+  } catch (e) { console.error("[duo] trophy10/11 migration:", e.message) }
+})()
 
 const GROUP_NAMES  = ["Group A","Group B","Group C","Group D","Group E","Group F","Group G","Group H"]
 const SET1_GRADES  = ["S","A+","A"]
@@ -344,6 +388,23 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
         // ── Golden Boot — top individual scorer in this tournament ───────────
         if (fix.knockout_round === "final") {
           const seasonNum = homePair.season_number
+
+          // ── Duo champion trophy (trophy10) — both players of the winning pair ──
+          await reconcileTrophyRoster({
+            sourceKey:    `duo_champion_s${seasonNum}`,
+            trophyColumn: "trophy10_count",
+            playerIds:    [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean),
+            seasonNumber: seasonNum,
+          })
+
+          // ── Auto-fill season record — duo winner ───────────────────────────
+          const duoWinnerNamesRes = await query(
+            "SELECT name FROM players WHERE id = ANY($1::int[])",
+            [[winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)]
+          )
+          const duoWinnerLabel = duoWinnerNamesRes.rows.map(r => r.name).join(" & ")
+          await updateSeasonRecord(seasonNum, { duo_winner: duoWinnerLabel })
+
           const gbRes = await q(`
             SELECT mr.player_id,
               SUM(mr.player_score) AS goals
@@ -356,6 +417,13 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           const topScorer = gbRes.rows[0]
           if (topScorer?.goals > 0) {
             await addBdr(topScorer.player_id, 4)
+            // ── Duo Golden Boot trophy (trophy11) ─────────────────────────────
+            await awardOrReassignTrophy({
+              sourceKey:    `duo_golden_boot_s${seasonNum}`,
+              trophyColumn: "trophy11_count",
+              playerId:     topScorer.player_id,
+              seasonNumber: seasonNum,
+            })
           }
         }
       }

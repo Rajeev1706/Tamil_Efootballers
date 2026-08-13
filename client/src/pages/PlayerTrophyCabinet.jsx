@@ -14,15 +14,23 @@ import uclTrophy          from "../../images/ucl.png"
 import goldenBootTrophy   from "../../images/Golden Boot.png"
 import teamLeagueGBTrophy from "../../images/team league_gb.png"
 import uclGBTrophy        from "../../images/ucl_gb.png"
+import duoTrophy          from "../../images/duo.png"
+import duoBootTrophy      from "../../images/duoboot.png"
+import revolutionTrophy   from "../../images/revolution.png"
+import europaTrophy       from "../../images/europa.png"
 
 const TROPHY_TYPES = [
-  { key: "trophy1Count", image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b", glow: "rgba(245,158,11,0.45)"  },
-  { key: "trophy2Count", image: teamLeagueTrophy,   label: "Team League",        color: "#10b981", glow: "rgba(16,185,129,0.45)"  },
-  { key: "trophy4Count", image: uclTrophy,          label: "UCL",                color: "#818cf8", glow: "rgba(129,140,248,0.45)" },
-  { key: "trophy3Count", image: weeklyTrophy,       label: "Weekly",             color: "#38bdf8", glow: "rgba(56,189,248,0.45)"  },
-  { key: "trophy5Count", image: goldenBootTrophy,   label: "Weekly Golden Boot", color: "#fbbf24", glow: "rgba(251,191,36,0.45)"  },
-  { key: "trophy6Count", image: teamLeagueGBTrophy, label: "League Golden Boot", color: "#34d399", glow: "rgba(52,211,153,0.45)"  },
-  { key: "trophy7Count", image: uclGBTrophy,        label: "UCL Golden Boot",    color: "#a78bfa", glow: "rgba(167,139,250,0.45)" },
+  { key: "trophy1Count",  image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b", glow: "rgba(245,158,11,0.45)"  },
+  { key: "trophy2Count",  image: teamLeagueTrophy,   label: "Team League",        color: "#10b981", glow: "rgba(16,185,129,0.45)"  },
+  { key: "trophy4Count",  image: uclTrophy,          label: "UCL",                color: "#818cf8", glow: "rgba(129,140,248,0.45)" },
+  { key: "trophy3Count",  image: weeklyTrophy,       label: "Weekly",             color: "#38bdf8", glow: "rgba(56,189,248,0.45)"  },
+  { key: "trophy5Count",  image: goldenBootTrophy,   label: "Weekly Golden Boot", color: "#fbbf24", glow: "rgba(251,191,36,0.45)"  },
+  { key: "trophy6Count",  image: teamLeagueGBTrophy, label: "League Golden Boot", color: "#34d399", glow: "rgba(52,211,153,0.45)"  },
+  { key: "trophy7Count",  image: uclGBTrophy,        label: "UCL Golden Boot",    color: "#a78bfa", glow: "rgba(167,139,250,0.45)" },
+  { key: "trophy8Count",  image: revolutionTrophy,   label: "Revolution",         color: "#f43f5e", glow: "rgba(244,63,94,0.45)"   },
+  { key: "trophy9Count",  image: europaTrophy,        label: "Europa",             color: "#8b5cf6", glow: "rgba(139,92,246,0.45)"  },
+  { key: "trophy10Count", image: duoTrophy,          label: "Duo Tournament",     color: "#fb923c", glow: "rgba(251,146,60,0.45)"  },
+  { key: "trophy11Count", image: duoBootTrophy,      label: "Duo Golden Boot",    color: "#f97316", glow: "rgba(249,115,22,0.45)"  },
 ]
 
 const TROPHIES_PER_SHELF = 5  // keeps 5 per shelf - better mobile fit
@@ -133,16 +141,17 @@ export default function PlayerTrophyCabinet() {
   const yearPlayer    = yearData.find(p => p.id === player.id)
   const trophySource  = yearFilter === "overall"
     ? (allTimePlayer || player)
-    : (yearPlayer || { trophy1Count: 0, trophy2Count: 0, trophy3Count: 0, trophy4Count: 0, trophy5Count: 0, trophy6Count: 0, trophy7Count: 0 })
+    : (yearPlayer || { trophy1Count: 0, trophy2Count: 0, trophy3Count: 0, trophy4Count: 0, trophy5Count: 0, trophy6Count: 0, trophy7Count: 0, trophy8Count: 0, trophy9Count: 0, trophy10Count: 0, trophy11Count: 0 })
 
 
   // Trophy category groups
   const TROPHY_GROUPS = {
-    all:      ["trophy1Count","trophy2Count","trophy3Count","trophy4Count","trophy5Count","trophy6Count","trophy7Count"],
+    all:      ["trophy1Count","trophy2Count","trophy3Count","trophy4Count","trophy5Count","trophy6Count","trophy7Count","trophy8Count","trophy9Count","trophy10Count","trophy11Count"],
     bdr:      ["trophy1Count"],
-    league:   ["trophy2Count","trophy6Count"],  // Team League title + League Golden Boot
-    ucl:      ["trophy4Count","trophy7Count"],  // UCL title + UCL Golden Boot
-    weekly:   ["trophy3Count","trophy5Count"],  // Weekly title + Weekly Golden Boot
+    league:   ["trophy2Count","trophy6Count"],
+    ucl:      ["trophy4Count","trophy7Count"],
+    weekly:   ["trophy3Count","trophy5Count"],
+    duo:      ["trophy10Count","trophy11Count"],
   }
 
   const activeTrophyKeys = new Set(TROPHY_GROUPS[trophyFilter] || TROPHY_GROUPS.all)
@@ -219,6 +228,7 @@ export default function PlayerTrophyCabinet() {
           { id: "league", label: "Team League" },
           { id: "ucl",    label: "UCL" },
           { id: "weekly", label: "Weekly" },
+          { id: "duo",    label: "Duo" },
         ].map(f => (
           <button
             key={f.id}

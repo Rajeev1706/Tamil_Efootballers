@@ -16,7 +16,8 @@ const MENU_ITEMS = [
   { value: "trophycab", label: "Trophy Cabinet",        icon: Trophy, link: "/trophy-cabinet" },
   { value: "calendar",  label: "Season Calendar",       icon: Calendar, link: "/calendar" },
   { value: "teamtrophies", label: "Team Trophy Cabinet",  icon: Trophy,  link: "/team-trophies" },
-  { value: "duo",  label: "Duo Tournament", icon: Users, link: "/duo-tournament" },
+  { value: "duo",          label: "Duo Tournament",       icon: Users,   link: "/duo-tournament" },
+  { value: "championship", label: "Championship",         icon: Trophy,  link: "/championship" },
 ]
 
 export default function Navbar() {

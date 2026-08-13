@@ -24,7 +24,7 @@ import teamLeagueTrophyLogo from "../../images/Team League.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
-import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic } from "../lib/queries"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 
 // Resolves a player's chosen avatar — custom upload takes priority,
@@ -38,8 +38,11 @@ function resolveAvatar(obj) {
   }
 }
 
-const StatCard = ({ label, value, sub, icon: Icon, accent }) => (
-  <div className="card p-4 flex items-start gap-3">
+const StatCard = ({ label, value, sub, icon: Icon, accent, onClick }) => (
+  <div
+    className={cn("card p-4 flex items-start gap-3", onClick && "cursor-pointer hover:border-accent/30 transition-colors")}
+    onClick={onClick}
+  >
     <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${accent}`}>
       <Icon className="w-4 h-4" />
     </div>
@@ -168,6 +171,7 @@ export default function CommonDashboard() {
   useAuctionSocket()
   const { data: teams   = [], isLoading: teamsLoading   } = useTeams()
   const { data: players = [], isLoading: playersLoading } = usePlayers()
+  const { data: championship = [] }                       = useChampionship()
   const { data: seasonRecords = [] }                      = useSeasonRecords()
   const { data: settings = {} }                          = useSettings()
   const { data: weeklyTournament }                        = useWeeklyCurrent()
@@ -697,10 +701,11 @@ export default function CommonDashboard() {
             <>
               {/* Stat cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                <StatCard label="BDR Leader"  value={leader?.bdrPoints ?? "—"} sub={leader?.name}    icon={Trophy}    accent="bg-gold/15 text-gold"              />
-                <StatCard label="Highest MV"  value={topMV?.marketValue ?? "—"}                   sub={topMV?.name}     icon={TrendingUp} accent="bg-accent/15 text-accent"        />
-                <StatCard label="Teams"       value={teams.length}                                 sub="in the league"   icon={Users}      accent="bg-violet-400/15 text-violet-400" />
-                <StatCard label="Players"     value={players.length}                               sub="registered"      icon={Activity}   accent="bg-blue-400/15 text-blue-400"    />
+                <StatCard label="BDR Leader"    value={leader?.bdrPoints ?? "—"} sub={leader?.name}    icon={Trophy}    accent="bg-gold/15 text-gold"              />
+                <StatCard label="Highest MV"    value={topMV?.marketValue ?? "—"}                      sub={topMV?.name}     icon={TrendingUp} accent="bg-accent/15 text-accent"        />
+                <StatCard label="Teams"         value={teams.length}                                   sub="in the league"   icon={Users}      accent="bg-violet-400/15 text-violet-400" />
+                <StatCard label="Team of Champions"  value={championship[0]?.totalBdr ?? "—"}               sub={championship[0]?.name} icon={Trophy} accent="bg-amber-400/15 text-amber-400"
+                  onClick={() => navigate("/championship")} />
               </div>
 
               {/* Panel */}
