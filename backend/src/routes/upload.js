@@ -15,7 +15,7 @@ cloudinary.config({
 // POST /api/upload
 // Body: { data: "data:image/jpeg;base64,..." , folder: "avatars" | "squads" | "logos" | "special" }
 // Returns: { url: "https://res.cloudinary.com/..." }
-router.post("/", authenticate, async (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
     const { data, folder = "general" } = req.body
 
