@@ -192,6 +192,10 @@ export default function AuctionPlanner({ myTeamId, myPlayers, allPlayers, totalB
   const { data: auctionCurrentData } = useAuctionCurrent()
   const pool = auctionCurrentData?.pool ?? []
 
+  // Always use the admin-set budgetPerTeam from the active session as the
+  // source of truth — this bypasses any stale team.budget/purse values.
+  const effectiveBudget = auctionCurrentData?.session?.budgetPerTeam ?? totalBudget
+
   return (
     <div className="space-y-4">
 
@@ -209,21 +213,21 @@ export default function AuctionPlanner({ myTeamId, myPlayers, allPlayers, totalB
       {/* Always-visible: Smart Alerts */}
       <SmartAlerts
         targets={targets}
-        totalBudget={totalBudget}
+        totalBudget={effectiveBudget}
         myPlayers={myPlayers}
         allPlayers={allPlayers}
         myTeamId={myTeamId}
       />
 
       {/* Always-visible: Budget quick stats */}
-      <QuickStats targets={targets} totalBudget={totalBudget} />
+      <QuickStats targets={targets} totalBudget={effectiveBudget} />
 
       {/* Tabs: Target Board + Auction Dossier */}
       <PlannerTabs
         myTeamId={myTeamId}
         myPlayers={myPlayers}
         allPlayers={allPlayers}
-        totalBudget={totalBudget}
+        totalBudget={effectiveBudget}
         pool={pool}
       />
     </div>
