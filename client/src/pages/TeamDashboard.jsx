@@ -57,7 +57,8 @@ export default function TeamDashboard() {
 
   const myPlayers     = teamData?.players || []
   const myTeamName    = teamData?.name || ""
-  const myPurse       = teamData?.purse ?? teamData?.budget ?? 0
+  // Use the admin-set auction budget when a session is active; fall back to team purse
+  const myPurse       = auctionData?.session?.budgetPerTeam ?? teamData?.purse ?? teamData?.budget ?? 0
   const pendingReceived = trades.filter(t => t.direction === "received" && t.status === "pending_team").length
 
   // Championship ranking

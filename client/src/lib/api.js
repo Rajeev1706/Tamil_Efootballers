@@ -236,7 +236,7 @@ export const auctionTargetsApi = {
 
 export const auctionApi = {
   current:      ()                              => api.get("/auction/current").then(r => r.data),
-  start:        (budgetPerTeam)                 => api.post("/auction/start", { budgetPerTeam }).then(r => r.data),
+  start:        (budgetPerTeam, teamIds)          => api.post("/auction/start", { budgetPerTeam, teamIds }).then(r => r.data),
   retain:       (sessionId, teamId, playerId, price) =>
     api.post("/auction/retain", { sessionId, teamId, playerId, price }).then(r => r.data),
   removeRetention: (id)                         => api.delete(`/auction/retain/${id}`).then(r => r.data),
@@ -255,6 +255,7 @@ export const auctionApi = {
   extraTime:    (sessionId)                      => api.post("/auction/extra-time", { sessionId }).then(r => r.data),
   undoLastSale: (sessionId)                      => api.post("/auction/undo-last-sale", { sessionId }).then(r => r.data),
   deleteSession: (sessionId)                     => api.delete(`/auction/${sessionId}`).then(r => r.data),
+  updateTeamIds: (sessionId, teamIds)              => api.patch(`/auction/${sessionId}/team-ids`, { teamIds }).then(r => r.data),
   enter:        (sessionId)                      => api.post("/auction/enter", { sessionId }).then(r => r.data),
   leave:        (sessionId)                      => api.post("/auction/leave", { sessionId }).then(r => r.data),
   priceHistory: (playerId)                       => api.get(`/auction/price-history/${playerId}`).then(r => r.data),

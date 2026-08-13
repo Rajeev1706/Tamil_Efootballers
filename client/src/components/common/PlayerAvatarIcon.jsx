@@ -13,6 +13,14 @@ import { useCachedImage } from "../../hooks/useCachedImage"
 // Preset avatars (from avatars.js import.meta.glob) are already bundled
 // locally and go through useCachedImage too — it no-ops for non-https URLs.
 export default function PlayerAvatarIcon({ player, size = "w-[43px] h-[43px]", className }) {
+  // Support both named sizes (sm/md/lg) and raw Tailwind class strings
+  const sizeClass = {
+    sm: "w-8 h-8",
+    md: "w-[43px] h-[43px]",
+    lg: "w-16 h-16",
+    xl: "w-20 h-20",
+  }[size] ?? size
+
   const preset = getAvatarById(player?.avatarId)
   const rawSrc = player?.avatarUrl || preset?.thumb || null
 
@@ -26,7 +34,7 @@ export default function PlayerAvatarIcon({ player, size = "w-[43px] h-[43px]", c
     <img
       src={cachedSrc}
       alt={player.name ? `${player.name} avatar` : "Player avatar"}
-      className={cn("inline-block rounded-md object-cover flex-shrink-0 align-middle", size, className)}
+      className={cn("inline-block rounded-md object-cover flex-shrink-0 align-middle", sizeClass, className)}
     />
   )
 }

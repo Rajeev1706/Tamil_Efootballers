@@ -111,7 +111,7 @@ function AuctionStagePanel({ session, teamLogoById, teamNameById, currentPlayer,
               <p className="text-sm text-slate-300 mb-1">"{session.currentPlayerAlias}"</p>
             )}
             {currentPlayer?.imageUrl && (
-              <img src={currentPlayer.imageUrl} alt={currentPlayer.name} className="w-full max-w-md mx-auto object-contain rounded-xl border border-surface-border mb-4" />
+              <img src={currentPlayer.imageUrl} alt={currentPlayer.name} className="w-20 h-20 rounded-xl object-cover border border-surface-border mb-4 mx-auto" />
             )}
             <div className="max-w-sm mx-auto mb-5">
               <div className="flex items-center justify-center gap-2 mb-3">

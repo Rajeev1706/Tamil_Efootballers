@@ -7,7 +7,7 @@ import {
   useAuctionCurrent, useStartAuction, useRetainPlayer, useRemoveRetention,
   useAddToPool, useRemoveFromPool, useBuildAuctionPool, useNextAuctionPlayer, usePlaceBid, useSellPlayer,
   useMarkUnsold, useAdvanceAuctionRound, useCompleteAuction,
-  useSetBidder, useReduceBid, useExtraTime, useUndoLastSale, useDeleteAuctionSession, useEnterAuction, useLeaveAuction,
+  useSetBidder, useReduceBid, useExtraTime, useUndoLastSale, useDeleteAuctionSession, useUpdateAuctionTeamIds, useEnterAuction, useLeaveAuction,
 } from "../lib/queries"
 import { cn } from "../lib/utils"
 import { findMostExpensiveSale } from "../lib/auctionNarrative"
@@ -25,22 +25,100 @@ function StartScreen() {
   const { data: teams = [] } = useTeams()
   const startAuction = useStartAuction()
 
-  // Use the budget already set on teams (from the Teams admin tab)
-  const budget = teams[0]?.budget ?? 1000
+  // Budget is editable — don't read from teams[0].budget which is 0 after
+  // a completed auction. Default to 1500 as a sensible starting point;
+  // admin can change it here or via Admin → Teams → Common Auction Budget.
+  const [budget, setBudget] = useState(1500)
+  const [selectedTeams, setSelectedTeams] = useState([])
+
+  // Pre-select all teams on load
+  useState(() => {
+    if (teams.length > 0 && selectedTeams.length === 0) {
+      setSelectedTeams(teams.map(t => t.id))
+    }
+  })
+
+  function toggleTeam(id) {
+    setSelectedTeams(prev =>
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    )
+  }
+
+  function handleStart() {
+    if (!budget || budget <= 0) return
+    startAuction.mutate({ budget, teamIds: selectedTeams })
+  }
 
   return (
-    <div className="max-w-md mx-auto mt-20 card p-6 text-center">
-      <Gavel className="w-8 h-8 text-accent mx-auto mb-3" />
-      <h2 className="text-lg font-bold text-white mb-1">Start a new Player Auction</h2>
-      <p className="text-sm text-slate-500 mb-5">This releases every non-captain player back into the pool for a full re-draft.</p>
-      <div className="flex items-center justify-center gap-2 mb-5 bg-pitch-800 border border-surface-border rounded-xl px-4 py-3">
-        <span className="text-slate-400 text-sm">Auction budget per team:</span>
-        <span className="text-white font-bold text-lg font-mono">₹{budget}</span>
+    <div className="max-w-md mx-auto mt-10 card p-6">
+      <div className="text-center mb-6">
+        <Gavel className="w-8 h-8 text-accent mx-auto mb-3" />
+        <h2 className="text-lg font-bold text-white mb-1">Start a new Player Auction</h2>
+        <p className="text-sm text-slate-500">Select which teams participate in this auction.</p>
       </div>
-      <p className="text-xs text-slate-600 mb-4">To change the budget, go to Admin → Teams → Common Auction Budget.</p>
-      <button onClick={() => startAuction.mutate(budget)} disabled={startAuction.isPending}
+
+      {/* Budget input — editable */}
+      <div className="flex items-center gap-3 mb-5 bg-pitch-800 border border-surface-border rounded-xl px-4 py-3">
+        <span className="text-slate-400 text-sm flex-shrink-0">Auction budget per team:</span>
+        <div className="flex items-center gap-1 ml-auto">
+          <span className="text-white font-bold text-lg">₹</span>
+          <input
+            type="number"
+            min="1"
+            value={budget}
+            onChange={e => setBudget(Number(e.target.value))}
+            className="w-24 bg-transparent text-white font-bold text-lg font-mono text-right focus:outline-none border-b border-slate-600 focus:border-accent"
+          />
+        </div>
+      </div>
+
+      {/* Team selection */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-white">Participating Teams</p>
+          <div className="flex gap-2">
+            <button onClick={() => setSelectedTeams(teams.map(t => t.id))}
+              className="text-xs text-accent hover:underline">All</button>
+            <span className="text-slate-600 text-xs">·</span>
+            <button onClick={() => setSelectedTeams([])}
+              className="text-xs text-slate-500 hover:underline">None</button>
+          </div>
+        </div>
+        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+          {teams.map(team => {
+            const selected = selectedTeams.includes(team.id)
+            return (
+              <button key={team.id} onClick={() => toggleTeam(team.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left",
+                  selected
+                    ? "bg-accent/10 border-accent/40 text-white"
+                    : "bg-pitch-800/40 border-surface-border text-slate-400 hover:text-white"
+                )}>
+                <div className={cn(
+                  "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                  selected ? "bg-accent border-accent" : "border-slate-600"
+                )}>
+                  {selected && <span className="text-white text-[10px] font-bold">✓</span>}
+                </div>
+                <span className="text-sm font-medium">{team.name}</span>
+                {team.budget > 0 && (
+                  <span className="ml-auto text-xs text-slate-500">₹{team.budget}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-xs text-slate-600 mt-2">
+          {selectedTeams.length} of {teams.length} teams selected
+        </p>
+      </div>
+
+      <p className="text-xs text-slate-600 mb-4 text-center">To change the budget, go to Admin → Teams → Common Auction Budget.</p>
+      <button onClick={handleStart}
+        disabled={startAuction.isPending || selectedTeams.length === 0}
         className="w-full py-2.5 rounded-xl bg-accent text-white font-semibold disabled:opacity-50">
-        {startAuction.isPending ? "Starting…" : "Start Auction"}
+        {startAuction.isPending ? "Starting…" : `Start Auction (${selectedTeams.length} teams)`}
       </button>
       {startAuction.error && <p className="text-xs text-rose-400 mt-2">{startAuction.error.response?.data?.error}</p>}
     </div>
@@ -61,10 +139,19 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
 
   const retainedIds = new Set(retentions.map(r => r.playerId))
   const pooledIds = new Set(pool.map(p => p.playerId))
-  const eligibleForPool = allPlayers.filter(p =>
-    !p.isCaptain && !retainedIds.has(p.id) && !pooledIds.has(p.id) &&
-    p.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const participatingTeamIds = new Set(teams.map(t => t.id))
+
+  // A player is eligible if:
+  // - Not retained, not already in pool, matches search
+  // - AND either: not a captain, OR is a captain of a NON-PARTICIPATING team
+  //   (non-participating captains become free agents in the auction)
+  const isEligible = (p) => {
+    if (retainedIds.has(p.id) || pooledIds.has(p.id)) return false
+    if (!p.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (p.isCaptain && participatingTeamIds.has(p.teamId)) return false
+    return true
+  }
+  const eligibleForPool = allPlayers.filter(isEligible)
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -92,7 +179,7 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
                 <select value={pick.playerId || ""} onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, playerId: e.target.value } }))}
                   className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                   <option value="">Select player…</option>
-                  {allPlayers.filter(p => !p.isCaptain && !retainedIds.has(p.id) && !pooledIds.has(p.id)).map(p => (
+                  {allPlayers.filter(p => !retainedIds.has(p.id) && !pooledIds.has(p.id) && !(p.isCaptain && participatingTeamIds.has(p.teamId))).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
@@ -202,6 +289,77 @@ function RtmModal({ player, currentBidderName, currentBid, prevTeamName, onResol
         <button onClick={onClose} className="mt-3 text-xs text-slate-500 w-full text-center">Cancel</button>
       </div>
     </div>
+  )
+}
+
+// ── Wrapper that handles the "which teams are in this auction?" question
+// for live sessions that may have a null team_ids (created before the fix).
+// Shows a one-time team picker until the admin saves the selection,
+// then passes only the selected teams down to LiveAuctionScreen.
+function ActiveAuctionWrapper({ session, pool, sales, allTeams, retentions }) {
+  const updateTeamIds = useUpdateAuctionTeamIds()
+  const [confirmed, setConfirmed] = useState(!!session.teamIds)
+  const [selected, setSelected] = useState(
+    session.teamIds ?? allTeams.map(t => t.id)
+  )
+
+  function toggle(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function save() {
+    updateTeamIds.mutate(
+      { sessionId: session.id, teamIds: selected },
+      { onSuccess: () => setConfirmed(true) }
+    )
+  }
+
+  if (!confirmed) {
+    return (
+      <div className="max-w-md mx-auto mt-10 card p-6">
+        <h2 className="text-base font-bold text-white mb-1">Which teams are in this auction?</h2>
+        <p className="text-xs text-slate-500 mb-4">This wasn't saved when the auction started. Select the participating teams — non-participants will be hidden from the panels.</p>
+        <div className="space-y-1.5 max-h-72 overflow-y-auto mb-4">
+          {allTeams.map(t => {
+            const isSelected = selected.includes(t.id)
+            return (
+              <button key={t.id} onClick={() => toggle(t.id)}
+                className={"w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors " +
+                  (isSelected ? "bg-accent/10 border-accent/40 text-white" : "bg-pitch-800/40 border-surface-border text-slate-400 hover:text-white")}>
+                <div className={"w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 " +
+                  (isSelected ? "bg-accent border-accent" : "border-slate-600")}>
+                  {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
+                </div>
+                <span className="text-sm font-medium flex-1">{t.name}</span>
+                <span className="text-xs text-slate-500">₹{t.budget} left</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setSelected(allTeams.map(t => t.id))} className="text-xs text-accent hover:underline">All</button>
+          <span className="text-slate-600 text-xs">·</span>
+          <button onClick={() => setSelected([])} className="text-xs text-slate-500 hover:underline">None</button>
+          <span className="flex-1" />
+          <span className="text-xs text-slate-500">{selected.length} selected</span>
+        </div>
+        <button onClick={save} disabled={updateTeamIds.isPending || selected.length === 0}
+          className="mt-3 w-full py-2.5 rounded-xl bg-accent text-white font-semibold text-sm disabled:opacity-50">
+          {updateTeamIds.isPending ? "Saving…" : `Confirm & Continue (${selected.length} teams)`}
+        </button>
+      </div>
+    )
+  }
+
+  const participatingTeams = allTeams.filter(t => selected.includes(t.id))
+  return (
+    <LiveAuctionScreen
+      session={session}
+      pool={pool}
+      sales={sales}
+      teams={participatingTeams}
+      retentions={retentions}
+    />
   )
 }
 
@@ -496,11 +654,32 @@ function CompletedScreen({ sales = [] }) {
 // ── Overview / landing screen — shown first, matching the UCL Knockout
 // pattern: current status + an explicit "Enter Auction" button, rather
 // than dropping straight into the live screens on every visit.
-function AuctionOverview({ session, pool = [], onEnter, enterError, entering }) {
+function AuctionOverview({ session, pool = [], teams = [], onEnter, enterError, entering }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [selectedTeams, setSelectedTeams] = useState(null)
   const deleteSession = useDeleteAuctionSession()
+  const updateTeamIds = useUpdateAuctionTeamIds()
   const isPreparing = session.status === "retention"
   const pending = pool.filter(p => p.status === "pending").length
+
+  // Initialise selectedTeams from session once we know them
+  const currentTeamIds = session.teamIds ?? teams.map(t => t.id)
+  const activeSelected = selectedTeams ?? currentTeamIds
+
+  function toggleTeam(id) {
+    setSelectedTeams(prev => {
+      const base = prev ?? currentTeamIds
+      return base.includes(id) ? base.filter(x => x !== id) : [...base, id]
+    })
+  }
+
+  function saveTeams() {
+    updateTeamIds.mutate(
+      { sessionId: session.id, teamIds: activeSelected },
+      { onSuccess: () => { setEditing(false); setSelectedTeams(null) } }
+    )
+  }
 
   return (
     <div className="max-w-md mx-auto mt-20 card p-6 text-center">
@@ -510,6 +689,51 @@ function AuctionOverview({ session, pool = [], onEnter, enterError, entering }) 
         <p className="text-sm text-slate-400 mb-5">Preparing — {pool.length} players in the pool, not yet started</p>
       ) : (
         <p className="text-sm text-slate-400 mb-5">Live — Round {session.round}, {pending} players pending</p>
+      )}
+
+      {/* Team selection — visible when editing or when teamIds is null (not set yet) */}
+      {(editing || !session.teamIds) && teams.length > 0 && (
+        <div className="mb-4 text-left">
+          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
+            {editing ? "Edit Participating Teams" : "⚠️ Teams not set — select participating teams:"}
+          </p>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {teams.map(t => (
+              <button
+                key={t.id}
+                onClick={() => toggleTeam(t.id)}
+                className={"w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors " +
+                  (activeSelected.includes(t.id)
+                    ? "bg-accent/15 border-accent/30 text-accent"
+                    : "border-surface-border text-slate-400 hover:text-white")}
+              >
+                <span className={"w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 " +
+                  (activeSelected.includes(t.id) ? "bg-accent border-accent" : "border-slate-500")}>
+                  {activeSelected.includes(t.id) && <span className="text-white text-[10px]">✓</span>}
+                </span>
+                {t.name}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button onClick={saveTeams} disabled={updateTeamIds.isPending || activeSelected.length === 0}
+              className="flex-1 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold disabled:opacity-50">
+              {updateTeamIds.isPending ? "Saving…" : `Save (${activeSelected.length} teams)`}
+            </button>
+            {editing && (
+              <button onClick={() => { setEditing(false); setSelectedTeams(null) }}
+                className="px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 text-xs">
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {!editing && session.teamIds && (
+        <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
+          <span>{session.teamIds.length} teams participating</span>
+          <button onClick={() => setEditing(true)} className="text-accent hover:underline">Edit</button>
+        </div>
       )}
 
       <button onClick={onEnter} disabled={entering} className="w-full py-2.5 rounded-xl bg-accent text-white font-semibold mb-2 disabled:opacity-50">
@@ -578,16 +802,17 @@ export default function AuctionAdmin() {
         <AuctionOverview
           session={data.session}
           pool={data.pool}
+          teams={data.teams || teams}
           onEnter={() => enterAuction.mutate(data.session.id, { onSuccess: () => setEntered(true) })}
           enterError={enterAuction.error}
           entering={enterAuction.isPending}
         />
       )}
       {hasInProgressSession && entered && data.session.status === "retention" && (
-        <RetentionScreen session={data.session} teams={teams} allPlayers={allPlayers} retentions={data.retentions || []} pool={data.pool || []} />
+        <RetentionScreen session={data.session} teams={data.teams || teams} allPlayers={allPlayers} retentions={data.retentions || []} pool={data.pool || []} />
       )}
       {hasInProgressSession && entered && data.session.status === "active" && (
-        <LiveAuctionScreen session={data.session} pool={data.pool || []} sales={data.sales || []} teams={data.teams || []} retentions={data.retentions || []} />
+        <ActiveAuctionWrapper session={data.session} pool={data.pool || []} sales={data.sales || []} allTeams={data.teams || []} retentions={data.retentions || []} />
       )}
     </div>
   )
