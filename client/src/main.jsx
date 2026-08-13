@@ -22,9 +22,11 @@ const queryClient = new QueryClient({
   },
 })
 
-// Prefetch the most-used home page data immediately on app load.
-// By the time the user navigates to the dashboard all this is already cached.
+// Prefetch home page data only after auth is ready
 function prefetchHomeData() {
+  const token = localStorage.getItem("token")
+  if (!token) return // not logged in — skip prefetch
+
   const prefetch = (key, fn) =>
     queryClient.prefetchQuery({ queryKey: key, queryFn: fn })
 
