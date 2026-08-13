@@ -70,13 +70,16 @@ const MATCH_VALUE_CEILING = 450      // ceiling on match-performance only, not t
 // directly. (trophy1Count/Ballon d'Or intentionally excluded from bonuses —
 // already reflected via BDR.)
 const TROPHY_BONUS = {
-  trophy2_count: 25, // Team League
-  trophy4_count: 20, // UCL
-  trophy3_count: 15, // Weekly
-  trophy6_count: 15, // Team League Golden Boot
-  trophy7_count: 10, // UCL Golden Boot
-  trophy5_count: 5,  // Weekly Golden Boot
-  trophy8_count: 15, // Revolution Trophy
+  trophy2_count:  25, // Team League
+  trophy4_count:  20, // UCL
+  trophy3_count:  15, // Weekly
+  trophy6_count:  15, // Team League Golden Boot
+  trophy7_count:  10, // UCL Golden Boot
+  trophy5_count:  5,  // Weekly Golden Boot
+  trophy8_count:  15, // Revolution Trophy
+  trophy9_count:  10, // Europa Trophy
+  trophy10_count: 15, // Duo Tournament
+  trophy11_count: 8,  // Duo Golden Boot
 }
 
 function resultWeight(result, ownGrade, opponentGrade) {

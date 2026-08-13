@@ -8,11 +8,29 @@ import api from "../lib/api"
 import { cn } from "../lib/utils"
 
 import teamLeagueTrophy from "../../images/Team League.png"
+import championshipImg  from "../../images/championship.png"
+import europaTrophy     from "../../images/europa.png"
+
+const TROPHY_MINI = [
+  { key: "teamLeagueCount",  image: teamLeagueTrophy, label: "Team League",  color: "#10b981" },
+  { key: "championshipCount", image: championshipImg, label: "Team of Champions", color: "#f59e0b" },
+  { key: "europaCount",      image: europaTrophy,     label: "Europa",       color: "#818cf8" },
+]
+
+function TrophyPip({ image, label, count, color }) {
+  if (!count) return null
+  return (
+    <div className="flex items-center gap-1" title={`${label}: ${count}`}>
+      <img src={image} alt={label} className="w-5 h-5 object-contain flex-shrink-0" />
+      <span className="text-xs font-extrabold font-mono" style={{ color }}>{count}</span>
+    </div>
+  )
+}
 
 function TeamRow({ team }) {
   const navigate = useNavigate()
   const logoSrc  = useCachedImage(team.logoUrl)
-  const count    = team.totalTrophies || 0
+  const total    = team.totalTrophies || 0
 
   return (
     <button
@@ -30,14 +48,28 @@ function TeamRow({ team }) {
       {/* Name */}
       <div className="flex-1 text-left min-w-0">
         <p className="font-bold text-white text-sm">{team.name}</p>
+        {/* Trophy breakdown row */}
+        {total > 0 && (
+          <div className="flex items-center gap-3 mt-1">
+            {TROPHY_MINI.map(t => (
+              <TrophyPip
+                key={t.key}
+                image={t.image}
+                label={t.label}
+                count={team[t.key]}
+                color={t.color}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Title count — always show, 0 for teams with no titles */}
+      {/* Total count */}
       <span className={cn(
         "font-extrabold font-mono text-lg flex-shrink-0",
-        count > 0 ? "text-gold" : "text-slate-700"
+        total > 0 ? "text-gold" : "text-slate-700"
       )}>
-        {count}
+        {total || "—"}
       </span>
 
       <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 flex-shrink-0" />
@@ -57,7 +89,6 @@ export default function TeamTrophyCabinet() {
     queryKey: ["team-trophies", yearFilter],
     queryFn:  () => api.get(`/team-trophies${yearFilter !== "overall" ? `?year=${yearFilter}` : ""}`).then(r => r.data),
   })
-  // seasons is now [{season_number, year}] — year comes from season_calendar
 
   return (
     <Layout>
@@ -70,11 +101,21 @@ export default function TeamTrophyCabinet() {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-white">Team Trophy Cabinet</h1>
-            <p className="text-sm text-slate-500">Team League champions by season</p>
+            <p className="text-sm text-slate-500">Team League · Team of Champions · Europa</p>
           </div>
         </div>
 
-        {/* Season filter */}
+        {/* Legend */}
+        <div className="flex items-center gap-4 flex-wrap">
+          {TROPHY_MINI.map(t => (
+            <div key={t.key} className="flex items-center gap-1.5">
+              <img src={t.image} alt={t.label} className="w-5 h-5 object-contain" />
+              <span className="text-xs text-slate-500">{t.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Year filter */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setYearFilter("overall")}
@@ -103,7 +144,7 @@ export default function TeamTrophyCabinet() {
           ))}
         </div>
 
-        {/* Teams list — all teams ordered by title count */}
+        {/* Teams list */}
         <div className="card overflow-hidden">
           {isLoading ? (
             <div className="py-12 text-center text-slate-500 text-sm">Loading...</div>

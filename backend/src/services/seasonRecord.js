@@ -19,9 +19,15 @@ import { query } from "../db/pool.js"
  *   weekly_winner        — string (one weekly winner to APPEND to the array)
  *   ucl_winner           — string (player name)
  *   ballondor_winner     — string (player name)
+ *   duo_winner           — string (duo pair label, e.g. "Sidhu & Sathyan")
+ *   championship_winner  — string (team name — UCL winner's team)
  */
 export async function updateSeasonRecord(season, fields) {
   try {
+    // Ensure new columns exist (safe to call repeatedly — ADD COLUMN IF NOT EXISTS is idempotent)
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner          TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner TEXT`).catch(() => {})
+
     const existing = await query(
       "SELECT id, weekly_winners FROM season_records WHERE season_number = $1 ORDER BY id DESC LIMIT 1",
       [season]
@@ -40,7 +46,6 @@ export async function updateSeasonRecord(season, fields) {
         sets.push(`team_league_players = $${i++}`); vals.push(fields.team_league_players)
       }
       if (fields.weekly_winner !== undefined) {
-        // Append to existing array
         const existing_winners = existing.rows[0].weekly_winners || []
         const updated = [...existing_winners, fields.weekly_winner]
         sets.push(`weekly_winners = $${i++}`); vals.push(updated)
@@ -50,6 +55,12 @@ export async function updateSeasonRecord(season, fields) {
       }
       if (fields.ballondor_winner !== undefined) {
         sets.push(`ballondor_winner = $${i++}`); vals.push(fields.ballondor_winner)
+      }
+      if (fields.duo_winner !== undefined) {
+        sets.push(`duo_winner = $${i++}`); vals.push(fields.duo_winner)
+      }
+      if (fields.championship_winner !== undefined) {
+        sets.push(`championship_winner = $${i++}`); vals.push(fields.championship_winner)
       }
 
       if (sets.length > 0) {
@@ -68,20 +79,23 @@ export async function updateSeasonRecord(season, fields) {
           team_league_winner, team_league_players,
           weekly_winners,
           ucl_winner,
-          ballondor_winner
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+          ballondor_winner,
+          duo_winner,
+          championship_winner
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       `, [
         season,
         new Date().getFullYear(),
-        fields.team_league_winner ?? null,
-        fields.team_league_players ?? [],
+        fields.team_league_winner    ?? null,
+        fields.team_league_players   ?? [],
         weekly,
-        fields.ucl_winner ?? null,
-        fields.ballondor_winner ?? null,
+        fields.ucl_winner            ?? null,
+        fields.ballondor_winner      ?? null,
+        fields.duo_winner            ?? null,
+        fields.championship_winner   ?? null,
       ])
     }
   } catch (err) {
-    // Non-fatal — season record is informational, never block result saving
     console.error("[seasonRecord] update failed:", err.message)
   }
 }

@@ -13,7 +13,7 @@ const EMPTY = {
   highestMvPlayer: "", highestMv: "",
   longestStreakPlayer: "", longestStreak: "",
   ballondorWinner: "", teamLeagueWinner: "",
-  uclWinner: "",
+  uclWinner: "", duoWinner: "", championshipWinner: "",
   weeklyWinners: ["", "", "", ""],
   teamLeaguePlayers: [""],
   notes: ""
@@ -84,6 +84,8 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
         <div className="grid grid-cols-2 gap-3 mb-4">
           <Field label="Ballon d'Or Winner" value={form.ballondorWinner} onChange={set("ballondorWinner")} placeholder="Sidhu" />
           <Field label="UCL Winner" value={form.uclWinner} onChange={set("uclWinner")} placeholder="Gnana" />
+          <Field label="Team of Champions (Team)" value={form.championshipWinner} onChange={set("championshipWinner")} placeholder="Germany" />
+          <Field label="Duo Tournament Winner" value={form.duoWinner} onChange={set("duoWinner")} placeholder="Sidhu & Sathyan" />
         </div>
 
         {/* Team League — team name + squad players */}
@@ -306,6 +308,8 @@ export default function SeasonRecordsAdmin() {
       teamLeagueWinner:    form.teamLeagueWinner || null,
       teamLeaguePlayers:   form.teamLeaguePlayers || [],
       uclWinner:           form.uclWinner || null,
+      duoWinner:           form.duoWinner || null,
+      championshipWinner:  form.championshipWinner || null,
       weeklyWinners:       form.weeklyWinners || ["", "", "", ""],
       notes:               form.notes || null,
     }
@@ -384,6 +388,8 @@ export default function SeasonRecordsAdmin() {
                                      ? editingRecord.team_league_players
                                      : [""],
               uclWinner:           editingRecord.ucl_winner ?? "",
+              duoWinner:           editingRecord.duo_winner ?? "",
+              championshipWinner:  editingRecord.championship_winner ?? "",
               weeklyWinners:       editingRecord.weekly_winners?.length
                                      ? editingRecord.weekly_winners
                                      : editingRecord.weekly_winner

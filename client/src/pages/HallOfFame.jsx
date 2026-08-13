@@ -5,12 +5,14 @@ import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import { useSeasonRecords, useLeagueInfo, useSpecialEditions } from "../lib/queries"
 import { cn } from "../lib/utils"
-import ballondorImg  from "../../images/ballondor.png"
-import teamLeagueImg from "../../images/Team League.png"
-import weeklyImg     from "../../images/Weekly.png"
-import uclImg        from "../../images/ucl.png"
-import goldenBootImg from "../../images/Golden Boot.png"
-import epicmatchImg  from "../../images/epicmatch.jpeg"
+import ballondorImg      from "../../images/ballondor.png"
+import teamLeagueImg     from "../../images/Team League.png"
+import weeklyImg         from "../../images/Weekly.png"
+import uclImg            from "../../images/ucl.png"
+import goldenBootImg     from "../../images/Golden Boot.png"
+import epicmatchImg      from "../../images/epicmatch.jpeg"
+import duoImg            from "../../images/duo.png"
+import championshipImg   from "../../images/championship.png"
 
 // Maps the image_url key stored in DB → actual bundled image import.
 // Add a new entry here whenever a new image is dropped into client/images/.
@@ -73,15 +75,17 @@ function SeasonDetail({ record }) {
           <p className="text-sm font-semibold text-white">Trophy Winners</p>
         </div>
         <div className="px-5 py-2">
-          <TrophyRow image={ballondorImg}  label="Ballon d'Or"  winner={record.ballondor_winner} />
-          <TrophyRow image={goldenBootImg} label="Golden Boot"  winner={record.top_scorer} sub={`${record.top_scorer_goals ?? 0} goals`} />
+          <TrophyRow image={ballondorImg}     label="Ballon d'Or"    winner={record.ballondor_winner} />
+          <TrophyRow image={goldenBootImg}    label="Golden Boot"    winner={record.top_scorer} sub={`${record.top_scorer_goals ?? 0} goals`} />
           <TrophyRow
             image={teamLeagueImg}
             label="Team League"
             winner={record.team_league_winner}
             sub={squadPlayers.length > 0 ? `Squad: ${squadPlayers.join(", ")}` : null}
           />
-          <TrophyRow image={uclImg} label="UCL" winner={record.ucl_winner} />
+          <TrophyRow image={uclImg}           label="UCL"            winner={record.ucl_winner} />
+          <TrophyRow image={championshipImg}  label="Team of Champions"   winner={record.championship_winner} />
+          <TrophyRow image={duoImg}           label="Duo Tournament" winner={record.duo_winner} />
           {/* Weekly — per week */}
           {weeklyWinners.length > 0 && (
             <div className="flex items-start gap-3 py-3">

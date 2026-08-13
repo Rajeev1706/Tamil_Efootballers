@@ -6,6 +6,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
@@ -27,16 +28,22 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
       seasonNumber, seasonName, year, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
-      ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners, notes
+      ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners,
+      duoWinner, championshipWinner, notes
     } = req.body
+
+    // Ensure new columns exist
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner          TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner TEXT`).catch(() => {})
 
     const result = await query(`
       INSERT INTO season_records (
         season_number, season_name, year, champion_team, champion_pts,
         top_scorer, top_scorer_goals, highest_mv_player, highest_mv,
         longest_streak_player, longest_streak,
-        ballondor_winner, team_league_winner, team_league_players, ucl_winner, weekly_winners, notes
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        ballondor_winner, team_league_winner, team_league_players, ucl_winner, weekly_winners,
+        duo_winner, championship_winner, notes
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
       RETURNING *
     `, [
       seasonNumber, seasonName, year || new Date().getFullYear(),
@@ -44,7 +51,8 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers || [],
-      uclWinner, weeklyWinners || [], notes
+      uclWinner, weeklyWinners || [],
+      duoWinner || null, championshipWinner || null, notes
     ])
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
@@ -57,8 +65,12 @@ router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, ne
       seasonNumber, seasonName, year, championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
-      ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners, notes
+      ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners,
+      duoWinner, championshipWinner, notes
     } = req.body
+
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner          TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner TEXT`).catch(() => {})
 
     const result = await query(`
       UPDATE season_records SET
@@ -69,15 +81,16 @@ router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, ne
         longest_streak_player = $10, longest_streak = $11,
         ballondor_winner = $12, team_league_winner = $13,
         team_league_players = $14, ucl_winner = $15,
-        weekly_winners = $16, notes = $17
-      WHERE id = $18 RETURNING *
+        weekly_winners = $16, duo_winner = $17, championship_winner = $18, notes = $19
+      WHERE id = $20 RETURNING *
     `, [
       seasonNumber, seasonName, year || new Date().getFullYear(),
       championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers || [],
-      uclWinner, weeklyWinners || [], notes,
+      uclWinner, weeklyWinners || [],
+      duoWinner || null, championshipWinner || null, notes,
       req.params.id
     ])
     if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })
@@ -391,27 +404,33 @@ router.get("/trophy-history", async (req, res, next) => {
         p.team_id        AS "teamId",
         t.name           AS team,
         t.logo_url       AS "teamLogo",
-        (p.trophy1_count + COALESCE(h.trophy1_total, 0))::int AS "trophy1Count",
-        (p.trophy2_count + COALESCE(h.trophy2_total, 0))::int AS "trophy2Count",
-        (p.trophy3_count + COALESCE(h.trophy3_total, 0))::int AS "trophy3Count",
-        (p.trophy4_count + COALESCE(h.trophy4_total, 0))::int AS "trophy4Count",
-        (p.trophy5_count + COALESCE(h.trophy5_total, 0))::int AS "trophy5Count",
-        (p.trophy6_count + COALESCE(h.trophy6_total, 0))::int AS "trophy6Count",
-        (p.trophy7_count + COALESCE(h.trophy7_total, 0))::int AS "trophy7Count",
-        (p.trophy8_count + COALESCE(h.trophy8_total, 0))::int AS "trophy8Count"
+        (p.trophy1_count  + COALESCE(h.trophy1_total,  0))::int AS "trophy1Count",
+        (p.trophy2_count  + COALESCE(h.trophy2_total,  0))::int AS "trophy2Count",
+        (p.trophy3_count  + COALESCE(h.trophy3_total,  0))::int AS "trophy3Count",
+        (p.trophy4_count  + COALESCE(h.trophy4_total,  0))::int AS "trophy4Count",
+        (p.trophy5_count  + COALESCE(h.trophy5_total,  0))::int AS "trophy5Count",
+        (p.trophy6_count  + COALESCE(h.trophy6_total,  0))::int AS "trophy6Count",
+        (p.trophy7_count  + COALESCE(h.trophy7_total,  0))::int AS "trophy7Count",
+        (p.trophy8_count  + COALESCE(h.trophy8_total,  0))::int AS "trophy8Count",
+        (p.trophy9_count  + COALESCE(h.trophy9_total,  0))::int AS "trophy9Count",
+        (p.trophy10_count + COALESCE(h.trophy10_total, 0))::int AS "trophy10Count",
+        (p.trophy11_count + COALESCE(h.trophy11_total, 0))::int AS "trophy11Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
       LEFT JOIN (
         SELECT
           player_id,
-          SUM(trophy1_count) AS trophy1_total,
-          SUM(trophy2_count) AS trophy2_total,
-          SUM(trophy3_count) AS trophy3_total,
-          SUM(trophy4_count) AS trophy4_total,
-          SUM(trophy5_count) AS trophy5_total,
-          SUM(trophy6_count) AS trophy6_total,
-          SUM(trophy7_count) AS trophy7_total,
-          SUM(trophy8_count) AS trophy8_total
+          SUM(trophy1_count)  AS trophy1_total,
+          SUM(trophy2_count)  AS trophy2_total,
+          SUM(trophy3_count)  AS trophy3_total,
+          SUM(trophy4_count)  AS trophy4_total,
+          SUM(trophy5_count)  AS trophy5_total,
+          SUM(trophy6_count)  AS trophy6_total,
+          SUM(trophy7_count)  AS trophy7_total,
+          SUM(trophy8_count)  AS trophy8_total,
+          SUM(COALESCE(trophy9_count,  0)) AS trophy9_total,
+          SUM(COALESCE(trophy10_count, 0)) AS trophy10_total,
+          SUM(COALESCE(trophy11_count, 0)) AS trophy11_total
         FROM player_trophy_history
         GROUP BY player_id
       ) h ON h.player_id = p.id
@@ -424,7 +443,10 @@ router.get("/trophy-history", async (req, res, next) => {
           p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
           p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
           p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
-          p.trophy7_count AS "trophy7Count", p.trophy8_count AS "trophy8Count"
+          p.trophy7_count AS "trophy7Count", p.trophy8_count AS "trophy8Count",
+          COALESCE(p.trophy9_count,  0) AS "trophy9Count",
+          COALESCE(p.trophy10_count, 0) AS "trophy10Count",
+          COALESCE(p.trophy11_count, 0) AS "trophy11Count"
         FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
       `)
     })
@@ -438,7 +460,8 @@ router.get("/trophy-history", async (req, res, next) => {
 router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { playerId, year, trophy1Count, trophy2Count, trophy3Count,
-            trophy4Count, trophy5Count, trophy6Count, trophy7Count, trophy8Count } = req.body
+            trophy4Count, trophy5Count, trophy6Count, trophy7Count, trophy8Count,
+            trophy9Count, trophy10Count, trophy11Count } = req.body
 
     if (!playerId || !year) return res.status(400).json({ error: "playerId and year required" })
 
@@ -447,17 +470,24 @@ router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, nex
         id SERIAL PRIMARY KEY,
         player_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
         year INT NOT NULL,
-        trophy1_count INT DEFAULT 0,
-        trophy2_count INT DEFAULT 0,
-        trophy3_count INT DEFAULT 0,
-        trophy4_count INT DEFAULT 0,
-        trophy5_count INT DEFAULT 0,
-        trophy6_count INT DEFAULT 0,
-        trophy7_count INT DEFAULT 0,
-        trophy8_count INT DEFAULT 0,
+        trophy1_count  INT DEFAULT 0,
+        trophy2_count  INT DEFAULT 0,
+        trophy3_count  INT DEFAULT 0,
+        trophy4_count  INT DEFAULT 0,
+        trophy5_count  INT DEFAULT 0,
+        trophy6_count  INT DEFAULT 0,
+        trophy7_count  INT DEFAULT 0,
+        trophy8_count  INT DEFAULT 0,
+        trophy9_count  INT DEFAULT 0,
+        trophy10_count INT DEFAULT 0,
+        trophy11_count INT DEFAULT 0,
         UNIQUE(player_id, year)
       )
     `).catch(() => {})
+    // Add columns to existing history table if they don't exist yet
+    await query(`ALTER TABLE player_trophy_history ADD COLUMN IF NOT EXISTS trophy9_count  INT DEFAULT 0`).catch(() => {})
+    await query(`ALTER TABLE player_trophy_history ADD COLUMN IF NOT EXISTS trophy10_count INT DEFAULT 0`).catch(() => {})
+    await query(`ALTER TABLE player_trophy_history ADD COLUMN IF NOT EXISTS trophy11_count INT DEFAULT 0`).catch(() => {})
 
     const settingsRes = await query(`SELECT value FROM app_settings WHERE key = 'current_year'`)
     const currentYear = parseInt(settingsRes.rows[0]?.value || new Date().getFullYear())
@@ -466,32 +496,39 @@ router.post("/update-trophy-year", authenticate, adminOnly, async (req, res, nex
     if (isCurrent) {
       await query(`
         UPDATE players SET
-          trophy1_count = $1, trophy2_count = $2, trophy3_count = $3,
-          trophy4_count = $4, trophy5_count = $5, trophy6_count = $6,
-          trophy7_count = $7, trophy8_count = $8
-        WHERE id = $9
+          trophy1_count = $1,  trophy2_count = $2,  trophy3_count = $3,
+          trophy4_count = $4,  trophy5_count = $5,  trophy6_count = $6,
+          trophy7_count = $7,  trophy8_count = $8,  trophy9_count = $9,
+          trophy10_count = $10, trophy11_count = $11
+        WHERE id = $12
       `, [trophy1Count ?? 0, trophy2Count ?? 0, trophy3Count ?? 0,
           trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0,
-          trophy7Count ?? 0, trophy8Count ?? 0, playerId])
+          trophy7Count ?? 0, trophy8Count ?? 0, trophy9Count ?? 0,
+          trophy10Count ?? 0, trophy11Count ?? 0, playerId])
     } else {
       await query(`
         INSERT INTO player_trophy_history
           (player_id, year, trophy1_count, trophy2_count, trophy3_count,
-           trophy4_count, trophy5_count, trophy6_count, trophy7_count, trophy8_count)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           trophy4_count, trophy5_count, trophy6_count, trophy7_count,
+           trophy8_count, trophy9_count, trophy10_count, trophy11_count)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (player_id, year) DO UPDATE SET
-          trophy1_count = EXCLUDED.trophy1_count,
-          trophy2_count = EXCLUDED.trophy2_count,
-          trophy3_count = EXCLUDED.trophy3_count,
-          trophy4_count = EXCLUDED.trophy4_count,
-          trophy5_count = EXCLUDED.trophy5_count,
-          trophy6_count = EXCLUDED.trophy6_count,
-          trophy7_count = EXCLUDED.trophy7_count,
-          trophy8_count = EXCLUDED.trophy8_count
+          trophy1_count  = EXCLUDED.trophy1_count,
+          trophy2_count  = EXCLUDED.trophy2_count,
+          trophy3_count  = EXCLUDED.trophy3_count,
+          trophy4_count  = EXCLUDED.trophy4_count,
+          trophy5_count  = EXCLUDED.trophy5_count,
+          trophy6_count  = EXCLUDED.trophy6_count,
+          trophy7_count  = EXCLUDED.trophy7_count,
+          trophy8_count  = EXCLUDED.trophy8_count,
+          trophy9_count  = EXCLUDED.trophy9_count,
+          trophy10_count = EXCLUDED.trophy10_count,
+          trophy11_count = EXCLUDED.trophy11_count
       `, [playerId, year,
           trophy1Count ?? 0, trophy2Count ?? 0, trophy3Count ?? 0,
           trophy4Count ?? 0, trophy5Count ?? 0, trophy6Count ?? 0,
-          trophy7Count ?? 0, trophy8Count ?? 0])
+          trophy7Count ?? 0, trophy8Count ?? 0, trophy9Count ?? 0,
+          trophy10Count ?? 0, trophy11Count ?? 0])
     }
 
     res.json({ ok: true, year, playerId, isCurrent: parseInt(year) === currentYear })
@@ -1281,6 +1318,13 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
         seasonNumber: match.season_number,
       })
 
+      // ── Auto-award Team League trophy to winning team (league+knockout format) ──
+      await reconcileTeamTrophy({
+        tournament:   "team_league",
+        teamId:       winnerId,
+        seasonNumber: match.season_number,
+      })
+
       // ── Auto-fill season record — team league winner (playoff format) ──────
       const winnerTeamRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
       const winnerPlayerNames = rosterRes.rows.length > 0
@@ -1306,6 +1350,35 @@ router.post("/playoffs/reset", authenticate, adminOnly, async (req, res, next) =
     const season = await getCurrentSeason()
     await query("DELETE FROM team_league_playoffs WHERE season_number = $1", [season])
     res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// GET /api/teams/championship — team BDR standings (sum of all player BDR)
+router.get("/championship", async (_req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        t.id,
+        t.name,
+        t.logo_url       AS "logoUrl",
+        COALESCE(SUM(p.bdr_points), 0)::int AS "totalBdr",
+        COUNT(p.id)::int AS "playerCount",
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'id',        p.id,
+            'name',      p.name,
+            'grade',     p.grade,
+            'bdrPoints', p.bdr_points,
+            'avatarId',  p.avatar_id,
+            'avatarUrl', p.avatar_url
+          ) ORDER BY p.bdr_points DESC
+        ) FILTER (WHERE p.id IS NOT NULL) AS players
+      FROM teams t
+      LEFT JOIN players p ON p.team_id = t.id
+      GROUP BY t.id, t.name, t.logo_url
+      ORDER BY "totalBdr" DESC
+    `)
+    res.json(result.rows)
   } catch (err) { next(err) }
 })
 

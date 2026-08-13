@@ -34,6 +34,7 @@ router.get("/", async (req, res, next) => {
         id, name, alias, grade, "auctionPrice", "marketValue", "bdrPoints",
         form, "trophy1Count", "trophy2Count", "trophy3Count", "trophy4Count",
         "trophy5Count", "trophy6Count", "trophy7Count", "trophy8Count",
+        "trophy9Count", "trophy10Count", "trophy11Count",
         "isCaptain", "gradeFloor", "gradeCeiling",
         team, "teamId", "teamLogo",
         "avatarId", "avatarUrl", "imageUrl"
