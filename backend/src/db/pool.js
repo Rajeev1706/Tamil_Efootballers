@@ -9,12 +9,15 @@ const { Pool, types } = pg
 // shifts when the server/client are in different timezones (e.g. UTC vs IST).
 types.setTypeParser(1082, val => val)  // 1082 = DATE type OID
 
+// Supabase free tier allows max 15 connections in session mode.
+// We keep the pool well under that limit so migrations + API calls
+// don't exhaust it on startup.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 8,                      // stay well under Supabase's 15-connection limit
+  idleTimeoutMillis: 10000,    // release idle connections faster
+  connectionTimeoutMillis: 5000,
 })
 
 pool.on("error", (err) => {
