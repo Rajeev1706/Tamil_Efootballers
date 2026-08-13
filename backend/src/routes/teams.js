@@ -790,6 +790,19 @@ const createTeamSchema = z.object({
 router.post("/", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { name, ownerUsername, ownerEmail, ownerPassword } = createTeamSchema.parse(req.body)
+
+    // Check for duplicate email or username BEFORE creating the team
+    // so we don't leave an orphan team if the user insert fails
+    const dupCheck = await query(
+      "SELECT email, username FROM users WHERE email=$1 OR username=$2",
+      [ownerEmail, ownerUsername]
+    )
+    if (dupCheck.rows.length > 0) {
+      const dup = dupCheck.rows[0]
+      if (dup.email === ownerEmail)    return res.status(400).json({ error: `Email "${ownerEmail}" is already in use.` })
+      if (dup.username === ownerUsername) return res.status(400).json({ error: `Username "${ownerUsername}" is already taken.` })
+    }
+
     const teamRes = await query(
       "INSERT INTO teams (name) VALUES ($1) RETURNING id, name", [name]
     )
@@ -800,7 +813,12 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
       [ownerUsername, ownerEmail, hash, team.id]
     )
     res.status(201).json({ team, owner: { username: ownerUsername, email: ownerEmail } })
-  } catch (err) { next(err) }
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(400).json({ error: "Email or username is already in use. Please choose different credentials." })
+    }
+    next(err)
+  }
 })
 
 // PATCH /api/teams/:id — admin edits team name or stats
