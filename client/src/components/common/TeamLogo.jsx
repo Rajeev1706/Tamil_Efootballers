@@ -5,14 +5,15 @@ import { useCachedImage } from "../../hooks/useCachedImage"
 // "RANGERS" in the players directory). Renders nothing when the team has no
 // logo_url — the row falls back to exactly what it looked like before.
 export function TeamLogoIcon({ logoUrl, name, size = "w-8 h-8", className }) {
+  const sizeClass = { sm: "w-8 h-8", md: "w-10 h-10", lg: "w-16 h-16", xl: "w-20 h-20" }[size] ?? size
   const cachedSrc = useCachedImage(logoUrl)
   if (!logoUrl) return null
-  if (!cachedSrc) return <div className={cn("inline-block rounded-md flex-shrink-0 bg-surface-border animate-pulse align-middle", size, className)} />
+  if (!cachedSrc) return <div className={cn("inline-block rounded-md flex-shrink-0 bg-surface-border animate-pulse align-middle", sizeClass, className)} />
   return (
     <img
       src={cachedSrc}
       alt={name ? `${name} logo` : "Team logo"}
-      className={cn("inline-block rounded-md object-contain flex-shrink-0 align-middle", size, className)}
+      className={cn("inline-block rounded-md object-contain flex-shrink-0 align-middle", sizeClass, className)}
     />
   )
 }

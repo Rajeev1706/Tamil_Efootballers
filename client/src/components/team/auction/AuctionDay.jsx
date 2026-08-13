@@ -113,7 +113,7 @@ export default function AuctionDay({ targets, myTeamId, totalBudget, myPlayers, 
     const preAvgGrade  = myPlayers.length ? myPlayers.reduce((a,p)=>a+(GRADE_NUM[p.grade]||1),0)/myPlayers.length : 0
     const postAvgGrade = postSquad.length ? postSquad.reduce((a,p)=>a+(GRADE_NUM[p.grade]||1),0)/postSquad.length : 0
 
-    return { won, lost, waiting, totalSpent, remaining: totalBudget-totalSpent, preAvgGrade:+preAvgGrade.toFixed(2), postAvgGrade:+postAvgGrade.toFixed(2), myBuys }
+    return { won, lost, waiting, totalSpent, remaining: Math.max(0, totalBudget-totalSpent), preAvgGrade:+preAvgGrade.toFixed(2), postAvgGrade:+postAvgGrade.toFixed(2), myBuys }
   }, [session, enriched, sales, myTeamId, myPlayers, totalBudget])
 
   // ── Confidence Score ──────────────────────────────────────────────────────
@@ -195,8 +195,9 @@ export default function AuctionDay({ targets, myTeamId, totalBudget, myPlayers, 
                 ...teamSales.map(s => ({ ...s, source: "bought" })),
                 ...teamRetentions.map(r => ({ ...r, playerName: r.playerName, price: r.price, source: "retained" })),
               ]
-              const spent      = budgetPerTeam - (team.budget ?? budgetPerTeam)
-              const remaining  = team.budget ?? 0
+              // Calculate spent from actual sales+retentions — avoids stale team.budget values
+              const spent      = allAcquired.reduce((a, s) => a + (s.price || 0), 0)
+              const remaining  = Math.max(0, budgetPerTeam - spent)
               const spentPct   = budgetPerTeam > 0 ? Math.min(100, Math.round(spent / budgetPerTeam * 100)) : 0
               const isMyTeam   = team.id === myTeamId
               const isExpanded = expandedTeam === team.id

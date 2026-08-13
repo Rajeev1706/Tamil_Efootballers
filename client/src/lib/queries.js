@@ -856,7 +856,7 @@ function useAuctionMutation(fn) {
   })
 }
 
-export const useStartAuction    = () => useAuctionMutation((budgetPerTeam) => auctionApi.start(budgetPerTeam))
+export const useStartAuction    = () => useAuctionMutation(({ budget, teamIds }) => auctionApi.start(budget, teamIds))
 export const useRetainPlayer    = () => useAuctionMutation(({ sessionId, teamId, playerId, price }) => auctionApi.retain(sessionId, teamId, playerId, price))
 export const useRemoveRetention = () => useAuctionMutation((id) => auctionApi.removeRetention(id))
 export const useAddToPool       = () => useAuctionMutation(({ sessionId, playerId }) => auctionApi.addToPool(sessionId, playerId))
@@ -925,6 +925,7 @@ export const useReduceBid    = () => useAuctionMutation((sessionId) => auctionAp
 export const useExtraTime    = () => useAuctionMutation((sessionId) => auctionApi.extraTime(sessionId))
 export const useUndoLastSale = () => useAuctionMutation((sessionId) => auctionApi.undoLastSale(sessionId))
 export const useDeleteAuctionSession = () => useAuctionMutation((sessionId) => auctionApi.deleteSession(sessionId))
+export const useUpdateAuctionTeamIds = () => useAuctionMutation(({ sessionId, teamIds }) => auctionApi.updateTeamIds(sessionId, teamIds))
 export const useEnterAuction = () => useAuctionMutation((sessionId) => auctionApi.enter(sessionId))
 export const useLeaveAuction = () => useAuctionMutation((sessionId) => auctionApi.leave(sessionId))
 // ── Player comparison & performance zones ────────────────────────────────

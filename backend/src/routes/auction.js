@@ -22,6 +22,7 @@ async function getFullAuctionState() {
     SELECT
       s.id, s.season_number AS "seasonNumber", s.status, s.round,
       s.budget_per_team AS "budgetPerTeam",
+      s.team_ids AS "teamIds",
       s.current_player_id AS "currentPlayerId",
       s.current_bid AS "currentBid",
       s.current_bidder_team_id AS "currentBidderTeamId",
@@ -65,6 +66,14 @@ async function getFullAuctionState() {
     ORDER BY s.sold_at DESC
   `, [session.id])
 
+  // When team_ids is set, filter to exactly those teams.
+  // When team_ids is NULL (sessions created before team selection was saved),
+  // fall back to teams with budget > 0 — non-participating teams were set to
+  // budget=0 during build-pool, so this correctly excludes them.
+  const teamIdsFilter = session.team_ids && session.team_ids.length > 0
+    ? `WHERE t.id = ANY(ARRAY[${session.team_ids.map(Number).join(",")}]::int[])`
+    : "WHERE t.budget > 0"
+
   const teamsRes = await query(`
     SELECT t.id, t.name, t.budget, t.logo_url AS "logoUrl",
       COALESCE(
@@ -74,6 +83,7 @@ async function getFullAuctionState() {
       ) AS captains
     FROM teams t
     LEFT JOIN players p ON p.team_id = t.id AND p.is_captain = true
+    ${teamIdsFilter}
     GROUP BY t.id, t.name, t.budget, t.logo_url
     ORDER BY t.name
   `)
@@ -116,15 +126,18 @@ router.get("/current", async (req, res, next) => {
 // their real current team.
 router.post("/start", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { budgetPerTeam } = z.object({ budgetPerTeam: z.number().int().positive().default(1100) }).parse(req.body)
+    const { budgetPerTeam, teamIds } = z.object({
+      budgetPerTeam: z.number().int().positive().default(1100),
+      teamIds: z.array(z.number().int().positive()).optional(),
+    }).parse(req.body)
     const activeRes = await query("SELECT id FROM auction_sessions WHERE status != 'completed' LIMIT 1")
     if (activeRes.rows.length > 0) {
       return res.status(400).json({ error: "An auction is already in progress. Complete or delete it first." })
     }
     const season = await getCurrentSeason()
     const result = await query(
-      "INSERT INTO auction_sessions (season_number, status, budget_per_team) VALUES ($1, 'retention', $2) RETURNING id",
-      [season, budgetPerTeam]
+      "INSERT INTO auction_sessions (season_number, status, budget_per_team, team_ids) VALUES ($1, 'retention', $2, $3) RETURNING id",
+      [season, budgetPerTeam, teamIds ? JSON.stringify(teamIds) : null]
     )
     res.json({ sessionId: result.rows[0].id })
     broadcastAuctionUpdate(getFullAuctionState)
@@ -186,7 +199,16 @@ router.post("/pool/add", authenticate, adminOnly, async (req, res, next) => {
     const playerRes = await query("SELECT team_id, grade, is_captain FROM players WHERE id = $1", [playerId])
     const player = playerRes.rows[0]
     if (!player) return res.status(404).json({ error: "Player not found" })
-    if (player.is_captain) return res.status(400).json({ error: "Captains aren't auctioned." })
+
+    // Captains of PARTICIPATING teams cannot be auctioned.
+    // Captains of NON-PARTICIPATING teams are free agents and CAN be auctioned.
+    if (player.is_captain && player.team_id) {
+      const sessionRes2 = await query("SELECT team_ids FROM auction_sessions WHERE id=$1", [sessionId])
+      const teamIds = sessionRes2.rows[0]?.team_ids
+      if (!teamIds || teamIds.includes(player.team_id)) {
+        return res.status(400).json({ error: "Captains of participating teams aren't auctioned." })
+      }
+    }
 
     const retainedRes = await query("SELECT 1 FROM auction_retentions WHERE session_id=$1 AND player_id=$2", [sessionId, playerId])
     if (retainedRes.rows.length > 0) return res.status(400).json({ error: "This player is already retained — can't also add them to the pool." })
@@ -250,12 +272,24 @@ router.post("/build-pool", authenticate, adminOnly, async (req, res, next) => {
       [sessionId]
     )
 
-    // Set every team's budget to the session's budget_per_team, then deduct
-    // whatever they already spent on retained players. This is the authoritative
-    // moment where the admin-set budget actually takes effect — it was stored
-    // in auction_sessions but never applied to teams.budget until now.
+    // Set budget only for participating teams. Non-participating teams get 0.
     const session = sessionRes.rows[0]
-    await query("UPDATE teams SET budget = $1", [session.budget_per_team])
+    const participatingTeamIds = session.team_ids ?? null
+
+    if (participatingTeamIds && participatingTeamIds.length > 0) {
+      // Reset all teams to 0 first
+      await query("UPDATE teams SET budget = 0")
+      // Then set budget only for participating teams
+      const idList = participatingTeamIds.map(Number)
+      await query(
+        `UPDATE teams SET budget = $1 WHERE id = ANY(ARRAY[${idList.join(",")}]::int[])`,
+        [session.budget_per_team]
+      )
+    } else {
+      // No team selection made — apply to all teams (backward compatible)
+      await query("UPDATE teams SET budget = $1", [session.budget_per_team])
+    }
+
     await query(`
       UPDATE teams t SET budget = budget - COALESCE((
         SELECT SUM(r.price) FROM auction_retentions r
@@ -523,6 +557,23 @@ router.post("/undo-last-sale", authenticate, adminOnly, async (req, res, next) =
 
     res.json({ success: true, restoredAsCurrent: true })
     broadcastAuctionUpdate(getFullAuctionState, { skipReveal: true })
+  } catch (err) { next(err) }
+})
+
+
+// PATCH /api/auction/:sessionId/team-ids — updates which teams participate
+// in an existing session. Useful when team_ids was NULL due to a prior bug.
+router.patch("/:sessionId/team-ids", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { teamIds } = z.object({
+      teamIds: z.array(z.number().int().positive()),
+    }).parse(req.body)
+    await query(
+      "UPDATE auction_sessions SET team_ids = $1 WHERE id = $2",
+      [JSON.stringify(teamIds), req.params.sessionId]
+    )
+    res.json({ success: true })
+    broadcastAuctionUpdate(getFullAuctionState)
   } catch (err) { next(err) }
 })
 
