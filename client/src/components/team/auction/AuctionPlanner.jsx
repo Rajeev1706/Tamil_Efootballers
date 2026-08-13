@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Target, AlertTriangle, CheckCircle, Zap, Wallet, TrendingUp, BookOpen } from "lucide-react"
 import { cn } from "../../../lib/utils"
 import TargetBoard from "./TargetBoard"
 import AuctionDossier from "../../auction/AuctionDossier"
-import { useAuctionTargets, useAuctionCurrent, useTeams, usePlayers } from "../../../lib/queries"
+import { useAuctionTargets, useAuctionCurrent, useTeams, usePlayers, useTeam } from "../../../lib/queries"
 import { useAuctionSocket } from "../../../hooks/useAuctionSocket"
 
 const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
@@ -192,9 +192,40 @@ export default function AuctionPlanner({ myTeamId, myPlayers, allPlayers, totalB
   const { data: auctionCurrentData } = useAuctionCurrent()
   const pool = auctionCurrentData?.pool ?? []
 
-  // Always use the admin-set budgetPerTeam from the active session as the
-  // source of truth — this bypasses any stale team.budget/purse values.
-  const effectiveBudget = auctionCurrentData?.session?.budgetPerTeam ?? totalBudget
+  // Fetch team directly to get the freshest budget value
+  const { data: myTeamData } = useTeam(myTeamId)
+
+  // Captain can manually set their auction budget in the planner.
+  // Stored in localStorage so it persists across refreshes.
+  const storageKey = `auction_budget_${myTeamId}`
+  const adminBudget = auctionCurrentData?.session?.budgetPerTeam
+  const defaultBudget = adminBudget ?? myTeamData?.budget ?? myTeamData?.purse ?? totalBudget ?? 1500
+
+  const [budgetInput, setBudgetInput] = useState(() => {
+    const saved = localStorage.getItem(storageKey)
+    return saved ? parseInt(saved) : null
+  })
+  const [editing, setEditing] = useState(false)
+  const [editVal, setEditVal] = useState("")
+
+  // When admin sets a budget, use that as the floor
+  useEffect(() => {
+    if (adminBudget && !budgetInput) {
+      setBudgetInput(adminBudget)
+      localStorage.setItem(storageKey, adminBudget)
+    }
+  }, [adminBudget])
+
+  const effectiveBudget = budgetInput ?? defaultBudget
+
+  function saveBudget() {
+    const val = parseInt(editVal)
+    if (val > 0) {
+      setBudgetInput(val)
+      localStorage.setItem(storageKey, val)
+    }
+    setEditing(false)
+  }
 
   return (
     <div className="space-y-4">
@@ -204,9 +235,36 @@ export default function AuctionPlanner({ myTeamId, myPlayers, allPlayers, totalB
         <div className="w-9 h-9 rounded-xl bg-gold/10 border border-gold/25 flex items-center justify-center">
           <Target className="w-4 h-4 text-gold" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-base sm:text-lg font-bold text-white">Auction Planner</h2>
           <p className="text-xs sm:text-sm text-slate-500">Build your target list and plan your bids before the auction</p>
+        </div>
+        {/* Captain sets their own budget */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {editing ? (
+            <div className="flex items-center gap-1">
+              <span className="text-white font-bold">₹</span>
+              <input
+                type="number"
+                autoFocus
+                value={editVal}
+                onChange={e => setEditVal(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveBudget(); if (e.key === "Escape") setEditing(false) }}
+                className="w-20 bg-pitch-800 border border-accent/40 rounded-lg px-2 py-1 text-white text-sm font-mono focus:outline-none"
+                placeholder="1500"
+              />
+              <button onClick={saveBudget} className="text-xs bg-accent text-white px-2 py-1 rounded-lg font-semibold">Set</button>
+              <button onClick={() => setEditing(false)} className="text-xs text-slate-500 hover:text-white px-1">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setEditVal(effectiveBudget?.toString() || ""); setEditing(true) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-border hover:border-accent/40 transition-colors text-xs text-slate-400 hover:text-white"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              Set Budget
+            </button>
+          )}
         </div>
       </div>
 
