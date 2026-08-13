@@ -326,6 +326,9 @@ export const useHallOfFame = () =>
 export const useSeasonRecords = () =>
   useQuery({ queryKey: ["season-records"], queryFn: teamsApi.seasonRecords })
 
+export const useChampionship = () =>
+  useQuery({ queryKey: ["championship"], queryFn: teamsApi.championship, staleTime: 60000 })
+
 export const useCreateSeasonRecord = () => {
   const qc = useQueryClient()
   return useMutation({
