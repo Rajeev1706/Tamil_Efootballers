@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Users, Swords } from "lucide-react"
+import { Swords } from "lucide-react"
+import duoTrophy  from "../../../images/duo.png"
+import duoBoot    from "../../../images/duoboot.png"
 import api from "../../lib/api"
 import { cn } from "../../lib/utils"
 
@@ -22,7 +24,7 @@ export default function DuoDashboard() {
 
   if (!data || !data.groups?.length) return (
     <div className="card px-6 py-14 text-center">
-      <Users className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+      <img src={duoTrophy} alt="Duo Tournament" className="w-12 h-12 object-contain mx-auto mb-3 opacity-30" />
       <p className="text-slate-400 font-medium">Duo Tournament not set up yet</p>
       <p className="text-sm text-slate-600 mt-1">Check back once the admin creates the group stage</p>
     </div>
@@ -64,6 +66,8 @@ export default function DuoDashboard() {
     ? `${selectedGroupName} — Standings`
     : view === "fixtures"
     ? `${selectedGroupName} — Fixtures`
+    : view === "golden-boot"
+    ? "Golden Boot"
     : "Knockout Stage"
 
   return (
@@ -71,9 +75,11 @@ export default function DuoDashboard() {
       {/* Header */}
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center flex-shrink-0">
-            <Users className="w-5 h-5 text-accent" />
-          </div>
+          <img
+            src={view === "golden-boot" ? duoBoot : duoTrophy}
+            alt={view === "golden-boot" ? "Golden Boot" : "Duo Tournament"}
+            className="w-9 h-9 object-contain flex-shrink-0"
+          />
           <div>
             <p className="section-label mb-0.5">Duo Tournament · Season {data.seasonNumber}</p>
             <h2 className="text-base font-semibold text-white">{headerTitle}</h2>
@@ -87,6 +93,7 @@ export default function DuoDashboard() {
           <option value="table">Group table</option>
           <option value="fixtures">Fixtures</option>
           <option value="knockout">Knockout</option>
+          <option value="golden-boot">Golden Boot</option>
         </select>
       </div>
 
@@ -291,6 +298,36 @@ export default function DuoDashboard() {
               </div>
             )}
           </>
+        )
+      )}
+      {/* GOLDEN BOOT view */}
+      {view === "golden-boot" && (
+        !(data.topScorers?.length > 0) ? (
+          <div className="px-5 py-10 text-center">
+            <img src={duoBoot} alt="Golden Boot" className="w-10 h-10 object-contain mx-auto mb-3 opacity-30" />
+            <p className="text-sm text-slate-500">No goals scored yet</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-surface-border/50">
+            {data.topScorers.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-4 px-5 py-3">
+                <span className={cn("text-sm font-bold font-mono w-6 text-center flex-shrink-0",
+                  i === 0 ? "text-gold" : "text-slate-500"
+                )}>{i + 1}</span>
+                {i === 0 && (
+                  <img src={duoBoot} alt="Golden Boot" className="w-7 h-7 object-contain flex-shrink-0" />
+                )}
+                <div className={cn("flex-1 min-w-0", i !== 0 && "ml-9")}>
+                  <p className={cn("font-semibold text-sm", i === 0 ? "text-gold" : "text-white")}>{p.name}</p>
+                  <p className="text-xs text-slate-500">{p.grade} grade</p>
+                </div>
+                <span className={cn("font-extrabold font-mono text-lg flex-shrink-0",
+                  i === 0 ? "text-gold" : "text-slate-300"
+                )}>{p.goals}</span>
+                <span className="text-xs text-slate-500 flex-shrink-0">goals</span>
+              </div>
+            ))}
+          </div>
         )
       )}
     </div>

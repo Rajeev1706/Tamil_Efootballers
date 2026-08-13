@@ -43,10 +43,10 @@ function SingleTrophy({ type }) {
   return (
     <div className="flex flex-col items-center gap-0 group flex-shrink-0 -mt-1">
       <div
-        className="transition-all duration-300 group-hover:scale-105 sm:group-hover:-translate-y-2 mt-4"
-        style={{ filter: `drop-shadow(0 4px 10px ${type.glow.replace("0.45)", "0.2)")})` }}
+        className="transition-all duration-300 group-hover:scale-105 sm:group-hover:-translate-y-2 mt-4 flex items-end justify-center"
+        style={{ height: "80px", filter: `drop-shadow(0 4px 10px ${type.glow.replace("0.45)", "0.2)")})` }}
       >
-        <img src={type.image} alt={type.label} className="w-10 h-10 sm:w-20 sm:h-20 object-contain" />
+        <img src={type.image} alt={type.label} className="w-10 sm:w-20 object-contain max-h-full" />
       </div>
       <div
         className="mt-1 px-2 py-0.5 rounded text-center"

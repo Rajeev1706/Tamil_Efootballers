@@ -26,6 +26,7 @@ import ManageTeams from "../components/admin/ManageTeams"
 import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
 import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
+import AdminTeamsTab from "../components/admin/AdminTeamsTab"
 
 function ResetMVCard() {
   const [confirm, setConfirm] = useState(false)
@@ -389,6 +390,7 @@ function DeleteSeasonCard() {
 const TABS = [
   { id: "setup",      label: "Setup",        icon: Settings        },
   { id: "overview",   label: "Overview",     icon: LayoutDashboard },
+  { id: "teams",      label: "Teams",        icon: Shield          },
   { id: "players",    label: "Players",      icon: Users           },
   { id: "records",    label: "Match records", icon: Activity       },
   { id: "uclgroups",    label: "UCL Groups",    icon: Trophy },
@@ -536,6 +538,7 @@ export default function AdminPage() {
         {activeTab === "overview" && (
           <AdminOverview stats={stats} activity={adminActivity} onNavigate={setActiveTab} />
         )}
+{activeTab === "teams" && <AdminTeamsTab />}
 {activeTab === "players" && !isLoading && (
           <PlayerManagement players={players} onPlayerClick={p => navigate(`/player/${p.id}?ctx=admin&${searchParams.toString()}`)} />
         )}

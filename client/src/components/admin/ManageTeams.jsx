@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Pencil, Trash2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react"
 import { useTeams, useDeleteTeam, useUpdateTeam, useUnassignPlayer, useChangeTeamPassword } from "../../lib/queries"
 import PlayerAvatar from "../common/PlayerAvatar"
@@ -68,6 +68,9 @@ function TeamRow({ team, players }) {
   const updateTeam                      = useUpdateTeam()
   const deleteTeam                      = useDeleteTeam()
   const changePassword                  = useChangeTeamPassword()
+
+  // Sync budget state when team data is refreshed (e.g. after bulk budget update)
+  useEffect(() => { setBudget(team.budget ?? 1000) }, [team.budget])
 
   const roster = players.filter(p => p.teamId === team.id)
 

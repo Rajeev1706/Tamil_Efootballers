@@ -367,7 +367,7 @@ router.get("/", async (req, res, next) => {
         GROUP BY team_id
       )
       SELECT
-        t.id, t.name, t.logo_url AS "logoUrl", t.anthem_url AS "anthemUrl", t.score_points, t.created_at,
+        t.id, t.name, t.logo_url AS "logoUrl", t.anthem_url AS "anthemUrl", t.score_points, t.created_at, t.budget, t.budget AS purse,
         COALESCE(ts.played, 0) AS played,
         COALESCE(ts.won, 0)    AS won,
         COALESCE(ts.drawn, 0)  AS drawn,
@@ -804,6 +804,29 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 })
 
 // PATCH /api/teams/:id — admin edits team name or stats
+// PATCH /api/teams/bulk-budget — admin sets auction budget per team
+// Updates the active/retention auction session's budget_per_team.
+// Also updates teams.budget directly so it shows current value in admin.
+router.patch("/bulk-budget", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { budget } = req.body
+    if (!budget || isNaN(budget)) return res.status(400).json({ error: "budget required" })
+    const b = Number(budget)
+
+    // Update active auction session if one exists
+    const sessionRes = await query(
+      "SELECT id FROM auction_sessions WHERE status != 'completed' ORDER BY id DESC LIMIT 1"
+    )
+    if (sessionRes.rows[0]) {
+      await query("UPDATE auction_sessions SET budget_per_team = $1 WHERE id = $2", [b, sessionRes.rows[0].id])
+    }
+
+    // Also update teams.budget so it reflects the new starting amount
+    await query("UPDATE teams SET budget = $1", [b])
+    res.json({ success: true, budget: b })
+  } catch (err) { next(err) }
+})
+
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { name, played, won, drawn, lost, gf, ga, budget } = req.body

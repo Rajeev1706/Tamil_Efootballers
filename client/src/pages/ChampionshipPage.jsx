@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Trophy, ChevronDown, ChevronUp, Star } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Star } from "lucide-react"
 import { useChampionship } from "../lib/queries"
 import { cn } from "../lib/utils"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
 import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
 import Layout from "../components/layout/Layout"
+import championshipImg from "../../images/championship.png"
 
 function Loading() {
   return (
@@ -126,7 +127,7 @@ export default function ChampionshipPage() {
         </button>
 
         <div className="card px-6 py-8 text-center">
-          <Trophy className="w-10 h-10 text-gold mx-auto mb-3" />
+          <img src={championshipImg} alt="Championship" className="w-24 h-24 object-contain mx-auto mb-3" />
           <h1 className="text-2xl font-extrabold text-white">Championship</h1>
           <p className="text-slate-400 text-sm mt-1">Team BDR Standings — Season Total</p>
           {leader && (

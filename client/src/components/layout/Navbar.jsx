@@ -9,15 +9,13 @@ const MENU_ITEMS = [
   { value: "players",   label: "Total Players",         icon: Users },
   { value: "teams",     label: "Teams",                 icon: Shield },
   { value: "bdr",       label: "BDR Rankings",          icon: Award },
+  { value: "championship", label: "Championship",       icon: Trophy,  link: "/championship" },
   { value: "winrate",   label: "Win Rate",              icon: TrendingUp, link: "/win-rate-ranking" },
   { value: "market",    label: "Market Value",          icon: TrendingUp },
   { value: "compare",   label: "Compare Players",       icon: GitCompare },
   { value: "trophies",  label: "Trophy (Current Year)", icon: Trophy },
   { value: "trophycab", label: "Trophy Cabinet",        icon: Trophy, link: "/trophy-cabinet" },
-  { value: "calendar",  label: "Season Calendar",       icon: Calendar, link: "/calendar" },
   { value: "teamtrophies", label: "Team Trophy Cabinet",  icon: Trophy,  link: "/team-trophies" },
-  { value: "duo",          label: "Duo Tournament",       icon: Users,   link: "/duo-tournament" },
-  { value: "championship", label: "Championship",         icon: Trophy,  link: "/championship" },
 ]
 
 export default function Navbar() {
