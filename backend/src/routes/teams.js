@@ -646,6 +646,33 @@ router.get("/trophy-years", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+router.get("/championship", async (_req, res, next) => {
+  try {
+    const result = await query(`
+      SELECT
+        t.id,
+        t.name,
+        t.logo_url       AS "logoUrl",
+        COALESCE(SUM(p.bdr_points), 0)::int AS "totalBdr",
+        COUNT(p.id)::int AS "playerCount",
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'id',        p.id,
+            'name',      p.name,
+            'grade',     p.grade,
+            'bdrPoints', p.bdr_points,
+            'avatarId',  p.avatar_id,
+            'avatarUrl', p.avatar_url
+          ) ORDER BY p.bdr_points DESC
+        ) FILTER (WHERE p.id IS NOT NULL) AS players
+      FROM teams t
+      LEFT JOIN players p ON p.team_id = t.id
+      GROUP BY t.id, t.name, t.logo_url
+      ORDER BY "totalBdr" DESC
+    `)
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
 router.get("/:id", authenticate, async (req, res, next) => {
   try {
     const season = await getCurrentSeason()
@@ -1354,33 +1381,6 @@ router.post("/playoffs/reset", authenticate, adminOnly, async (req, res, next) =
 })
 
 // GET /api/teams/championship — team BDR standings (sum of all player BDR)
-router.get("/championship", async (_req, res, next) => {
-  try {
-    const result = await query(`
-      SELECT
-        t.id,
-        t.name,
-        t.logo_url       AS "logoUrl",
-        COALESCE(SUM(p.bdr_points), 0)::int AS "totalBdr",
-        COUNT(p.id)::int AS "playerCount",
-        JSON_AGG(
-          JSON_BUILD_OBJECT(
-            'id',        p.id,
-            'name',      p.name,
-            'grade',     p.grade,
-            'bdrPoints', p.bdr_points,
-            'avatarId',  p.avatar_id,
-            'avatarUrl', p.avatar_url
-          ) ORDER BY p.bdr_points DESC
-        ) FILTER (WHERE p.id IS NOT NULL) AS players
-      FROM teams t
-      LEFT JOIN players p ON p.team_id = t.id
-      GROUP BY t.id, t.name, t.logo_url
-      ORDER BY "totalBdr" DESC
-    `)
-    res.json(result.rows)
-  } catch (err) { next(err) }
-})
 
 export default router
 // POST /api/teams/increment-year — admin only
