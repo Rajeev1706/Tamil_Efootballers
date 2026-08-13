@@ -10,21 +10,31 @@ export default function CreateTeam({ onSuccess }) {
   const [password, setPassword] = useState("")
   const [showPw, setShowPw]     = useState(false)
   const [done, setDone]         = useState(null)
+  const [errorMsg, setErrorMsg] = useState("")
   const createTeam              = useCreateTeam()
 
   const canSubmit = name && username && email && password
 
   const handleSubmit = () => {
     if (!canSubmit) return
+    setErrorMsg("")
     createTeam.mutate(
       { name, ownerUsername: username, ownerEmail: email, ownerPassword: password },
       {
         onSuccess: (data) => {
           setDone(data)
-          setName(""); setUsername(""); setEmail(""); setPassword("")
+          setName(""); setUsername(""); setEmail(""); setPassword(""); setErrorMsg("")
           onSuccess?.()
         },
-        onError: (err) => alert(err.response?.data?.error || "Failed to create team"),
+        onError: (err) => {
+          const msg = err.response?.data?.error || "Failed to create team"
+          // Give a helpful hint for duplicate record errors
+          if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exists") || msg.toLowerCase().includes("unique")) {
+            setErrorMsg("Username or email is already in use — try a different username or email address.")
+          } else {
+            setErrorMsg(msg)
+          }
+        },
       }
     )
   }
@@ -46,6 +56,12 @@ export default function CreateTeam({ onSuccess }) {
             <span className="text-white font-medium">{done.team.name}</span> created.
             Owner login: <span className="font-medium text-white">{done.owner.email}</span>
           </p>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="bg-rose-400/10 border border-rose-400/25 rounded-xl px-4 py-3 text-xs text-rose-400">
+          ⚠ {errorMsg}
         </div>
       )}
 
