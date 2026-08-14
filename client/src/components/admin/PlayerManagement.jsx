@@ -89,6 +89,11 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
     if (!isCaptain && parseInt(auctionPrice) !== player.auctionPrice) {
       body.auctionPrice = parseInt(auctionPrice) || 0
     }
+    // Grade ceiling / floor — send whenever they differ from what's stored
+    const savedCeiling = player.gradeCeiling ?? ""
+    const savedFloor   = player.gradeFloor   ?? ""
+    if (gradeCeiling !== savedCeiling) body.gradeCeiling = gradeCeiling || null
+    if (gradeFloor   !== savedFloor)   body.gradeFloor   = gradeFloor   || null
     // Diff trophy counts against the values that were loaded for this year
     // (trophyBase), NOT the stale player prop — so switching year then saving
     // always saves the right values for the right year.
