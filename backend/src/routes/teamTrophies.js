@@ -179,8 +179,7 @@ router.get("/:teamId", async (req, res, next) => {
         )::int AS losses
       FROM fixtures f
       WHERE (f.home_team_id = $1 OR f.away_team_id = $1)
-        AND f.status = 'closed'
-        AND f.is_walkover IS NOT TRUE
+        AND f.status = 'completed'
     `, [req.params.teamId])
 
     const wr = winRateRes.rows[0] || {}
