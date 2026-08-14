@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Gavel, Trophy, Sparkles } from "lucide-react"
@@ -31,12 +31,12 @@ function StartScreen() {
   const [budget, setBudget] = useState(1500)
   const [selectedTeams, setSelectedTeams] = useState([])
 
-  // Pre-select all teams on load
-  useState(() => {
+  // Pre-select all teams once they load
+  useEffect(() => {
     if (teams.length > 0 && selectedTeams.length === 0) {
       setSelectedTeams(teams.map(t => t.id))
     }
-  })
+  }, [teams])
 
   function toggleTeam(id) {
     setSelectedTeams(prev =>
