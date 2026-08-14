@@ -176,7 +176,7 @@ export default function TeamTrophyDetail() {
 
   if (!data?.team) return <Layout><p className="text-slate-500 text-center py-16">Team not found</p></Layout>
 
-  const { team, trophies = [], history = [], stats = {} } = data
+  const { team, trophies = [], history = [], stats = {}, winRate = {} } = data
 
   // Build trophy shelf instances — one entry per trophy, using the correct image per tournament
   const trophyInstances = trophies.map(t => TEAM_TROPHY_TYPES[t.tournament] || TEAM_TROPHY_TYPES.team_league)
@@ -237,7 +237,7 @@ export default function TeamTrophyDetail() {
       </div>
 
       {/* ── Summary stat cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
         <div className="card p-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
             <img src={teamLeagueTrophy} alt="Team League" className="w-5 h-5 object-contain" />
@@ -262,6 +262,19 @@ export default function TeamTrophyDetail() {
         <div className="card p-4 text-center">
           <p className="text-2xl font-extrabold text-rose-400 font-mono">{relegationCount}</p>
           <p className="text-xs text-slate-500 mt-1">Relegations</p>
+        </div>
+        {/* Win Rate */}
+        <div className="card p-4 text-center col-span-2 sm:col-span-1">
+          <p className="text-2xl font-extrabold font-mono"
+            style={{ color: winRate.rate >= 60 ? "#10b981" : winRate.rate >= 45 ? "#f59e0b" : "#f43f5e" }}>
+            {winRate.rate !== null && winRate.rate !== undefined ? `${winRate.rate}%` : "—"}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">Win Rate</p>
+          {winRate.played > 0 && (
+            <p className="text-[10px] text-slate-600 mt-0.5">
+              {winRate.wins}W · {winRate.draws}D · {winRate.losses}L
+            </p>
+          )}
         </div>
       </div>
 

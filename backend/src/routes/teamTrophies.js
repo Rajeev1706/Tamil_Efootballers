@@ -164,6 +164,30 @@ router.get("/:teamId", async (req, res, next) => {
       ORDER BY tsh.season_number ASC
     `, [req.params.teamId])
 
+    // Win rate from all completed fixtures (all-time)
+    const winRateRes = await query(`
+      SELECT
+        COUNT(*)::int AS played,
+        COUNT(*) FILTER (WHERE
+          (f.home_team_id = $1 AND f.home_score > f.away_score) OR
+          (f.away_team_id = $1 AND f.away_score > f.home_score)
+        )::int AS wins,
+        COUNT(*) FILTER (WHERE f.home_score = f.away_score)::int AS draws,
+        COUNT(*) FILTER (WHERE
+          (f.home_team_id = $1 AND f.home_score < f.away_score) OR
+          (f.away_team_id = $1 AND f.away_score < f.home_score)
+        )::int AS losses
+      FROM fixtures f
+      WHERE (f.home_team_id = $1 OR f.away_team_id = $1)
+        AND f.status = 'closed'
+        AND f.is_walkover IS NOT TRUE
+    `, [req.params.teamId])
+
+    const wr = winRateRes.rows[0] || {}
+    const winRate = wr.played > 0
+      ? Math.round((wr.wins / wr.played) * 1000) / 10
+      : null
+
     // Summary stats
     const statsRes = await query(`
       SELECT
@@ -180,6 +204,13 @@ router.get("/:teamId", async (req, res, next) => {
       trophies: trophyRes.rows,
       history:  historyRes.rows,
       stats:    statsRes.rows[0] || {},
+      winRate: {
+        played: wr.played || 0,
+        wins:   wr.wins   || 0,
+        draws:  wr.draws  || 0,
+        losses: wr.losses || 0,
+        rate:   winRate,
+      },
     })
   } catch (err) { next(err) }
 })
