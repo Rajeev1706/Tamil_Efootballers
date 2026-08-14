@@ -1022,13 +1022,12 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       )
       SELECT
         p.id, p.name,
-        p.grade AS current_grade, p.grade_floor,
+        p.grade AS current_grade, p.grade_floor, p.grade_ceiling,
         c.matches, c.wins,
         ROUND(c.wins::numeric / NULLIF(c.matches,0) * 100, 2) AS win_rate
       FROM combined c
       JOIN players p ON p.id = c.pid
-      WHERE p.is_captain IS NOT TRUE
-        AND c.matches >= 20
+      WHERE c.matches >= 20
       ORDER BY win_rate DESC, wins DESC
     `, [targetSeason])
 
@@ -1036,7 +1035,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
 
     const rankToGrade = (rank) => {
       if (rank <= 10) return "S"
-      if (rank <= 25) return "A"
+      if (rank <= 20) return "A"
       if (rank <= 50) return "B"
       return "C"
     }
@@ -1045,6 +1044,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
     for (let i = 0; i < eligible.length; i++) {
       const player      = eligible[i]
       const rank        = i + 1
+
       const targetGrade = rankToGrade(rank)
       const current     = player.current_grade
       const floor       = player.grade_floor
@@ -1092,8 +1092,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
     const ineligibleRes = await query(`
       SELECT p.id, p.name, p.grade AS current_grade, p.grade_floor, p.grade_ceiling
       FROM players p
-      WHERE p.is_captain IS NOT TRUE
-        AND (p.grade_floor IS NOT NULL OR p.grade_ceiling IS NOT NULL)
+      WHERE (p.grade_floor IS NOT NULL OR p.grade_ceiling IS NOT NULL)
         AND p.id NOT IN (${eligible.length > 0 ? eligible.map(e => e.id).join(",") : "0"})
     `)
 
@@ -1172,7 +1171,6 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       JOIN match_records mr
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.season_number = $1
-      WHERE p.is_captain IS NOT TRUE
       GROUP BY p.id, p.name, p.grade, p.grade_floor, p.grade_ceiling
       HAVING COUNT(*) >= 20
       ORDER BY win_rate DESC, wins DESC
@@ -1183,7 +1181,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     // Assign target grade by rank position
     const rankToGrade = (rank) => {
       if (rank <= 10) return "S"
-      if (rank <= 25) return "A"
+      if (rank <= 20) return "A"
       if (rank <= 50) return "B"
       return "C"
     }
@@ -1229,8 +1227,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     const ineligibleRes2 = await query(`
       SELECT p.id, p.name, p.grade AS current_grade, p.grade_floor, p.grade_ceiling
       FROM players p
-      WHERE p.is_captain IS NOT TRUE
-        AND (p.grade_floor IS NOT NULL OR p.grade_ceiling IS NOT NULL)
+      WHERE (p.grade_floor IS NOT NULL OR p.grade_ceiling IS NOT NULL)
         AND p.id NOT IN (${eligible.length > 0 ? eligible.map(e => e.id).join(",") : "0"})
     `)
 
