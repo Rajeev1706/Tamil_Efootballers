@@ -125,7 +125,7 @@ function QuickStats({ targets, totalBudget }) {
   const mustTotal  = targets.filter(t => t.priority === "must_have").reduce((a, t) => a + (t.maxBid || 0), 0)
   const wantTotal  = targets.filter(t => t.priority === "want").reduce((a, t) => a + (t.maxBid || 0), 0)
   const backupTotal= targets.filter(t => t.priority === "backup").reduce((a, t) => a + (t.maxBid || 0), 0)
-  const planned    = mustTotal + wantTotal + backupTotal
+  const planned    = mustTotal + wantTotal
   const buffer     = Math.max(0, totalBudget - planned)
   const pct        = totalBudget > 0 ? Math.min(100, Math.round(planned / totalBudget * 100)) : 0
   const over       = planned > totalBudget
