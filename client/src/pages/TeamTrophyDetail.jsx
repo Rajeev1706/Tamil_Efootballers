@@ -266,9 +266,22 @@ export default function TeamTrophyDetail() {
       </div>
 
       {/* ── Trophy Cabinet ── */}
-      {totalTrophies > 0 && (
-        <div className="mb-6">
-          <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-3">Trophy Cabinet</p>
+      <div className="mb-6">
+        <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-3">Trophy Cabinet</p>
+
+        {totalTrophies === 0 ? (
+          <div
+            className="rounded-2xl p-16 text-center"
+            style={{
+              background: "linear-gradient(180deg, #080d14 0%, #0d1520 100%)",
+              border: "1px solid rgba(255,255,255,0.05)",
+            }}
+          >
+            <div className="text-6xl mb-4 opacity-10">🏆</div>
+            <p className="text-slate-600 font-semibold">No trophies yet</p>
+            <p className="text-slate-700 text-sm mt-1">The cabinet awaits its first glory</p>
+          </div>
+        ) : (
           <div className="rounded-2xl overflow-hidden" style={{ background: "transparent" }}>
             {/* Header plate */}
             <div
@@ -322,8 +335,8 @@ export default function TeamTrophyDetail() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Season-by-season history ── */}
       <div>
