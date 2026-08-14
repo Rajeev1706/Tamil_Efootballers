@@ -9,6 +9,17 @@ const router = express.Router()
 ;(async () => {
   try {
     await query(`
+      CREATE TABLE IF NOT EXISTS season_calendar (
+        id           SERIAL PRIMARY KEY,
+        season_number INT,
+        event_date   DATE,
+        tournament   TEXT,
+        round_label  TEXT,
+        notes        TEXT,
+        status       TEXT DEFAULT 'upcoming'
+      )
+    `)
+    await query(`
       CREATE TABLE IF NOT EXISTS team_trophies (
         id            SERIAL PRIMARY KEY,
         team_id       INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -23,6 +34,7 @@ const router = express.Router()
         id               SERIAL PRIMARY KEY,
         team_id          INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
         season_number    INT NOT NULL,
+        year             INT,
         team_league_pos  INT,
         championship_pos INT,
         relegated        BOOLEAN DEFAULT FALSE,
@@ -30,6 +42,8 @@ const router = express.Router()
         UNIQUE(team_id, season_number)
       )
     `)
+    // Add year column if it doesn't exist (for existing deployments)
+    await query(`ALTER TABLE team_season_history ADD COLUMN IF NOT EXISTS year INT`)
   } catch (e) { console.error("[teamTrophies] migration:", e.message) }
 })()
 
@@ -144,13 +158,9 @@ router.get("/:teamId", async (req, res, next) => {
 
     // Full season history (positions + relegation)
     const historyRes = await query(`
-      SELECT
-        tsh.*,
-        EXTRACT(YEAR FROM MIN(sc.event_date))::int AS year
+      SELECT tsh.*
       FROM team_season_history tsh
-      LEFT JOIN season_calendar sc ON sc.season_number = tsh.season_number
       WHERE tsh.team_id = $1
-      GROUP BY tsh.id
       ORDER BY tsh.season_number ASC
     `, [req.params.teamId])
 

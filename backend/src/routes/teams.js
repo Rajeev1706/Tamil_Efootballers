@@ -1249,7 +1249,59 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       }
     }
 
-    // ── Step 3: Reset season data and advance season number ─────────────────
+    // ── Step 3: Snapshot team standings into team_season_history ────────────
+    // Capture each team's final league position, championship position, and
+    // relegation status BEFORE the season data is wiped in Step 4.
+    const currentYear = new Date().getFullYear()
+    const standingsRes = await query(`
+      SELECT
+        t.id                                       AS team_id,
+        t.wins, t.draws, t.losses,
+        t.points,
+        ROW_NUMBER() OVER (ORDER BY t.points DESC, t.wins DESC, (t.wins - t.losses) DESC) AS league_pos
+      FROM teams t
+      WHERE t.points > 0 OR t.wins > 0 OR t.draws > 0 OR t.losses > 0
+    `)
+
+    // Get championship positions — ranked by total team BDR points
+    const champRes = await query(`
+      SELECT
+        t.id AS team_id,
+        ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(p.bdr_points), 0) DESC) AS champ_pos
+      FROM teams t
+      LEFT JOIN players p ON p.team_id = t.id
+      GROUP BY t.id
+    `).catch(() => ({ rows: [] }))
+
+    const champMap = {}
+    for (const row of champRes.rows) champMap[row.team_id] = row.champ_pos
+
+    // Determine relegated teams (bottom 2 of league if 8+ teams played)
+    const playedTeams = standingsRes.rows
+    const relegationCutoff = playedTeams.length >= 8 ? playedTeams.length - 1 : null
+
+    for (const team of playedTeams) {
+      const relegated = relegationCutoff ? team.league_pos >= relegationCutoff : false
+      await query(`
+        INSERT INTO team_season_history
+          (team_id, season_number, year, team_league_pos, championship_pos, relegated)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (team_id, season_number) DO UPDATE SET
+          year             = EXCLUDED.year,
+          team_league_pos  = EXCLUDED.team_league_pos,
+          championship_pos = EXCLUDED.championship_pos,
+          relegated        = EXCLUDED.relegated
+      `, [
+        team.team_id,
+        endingSeason,
+        currentYear,
+        team.league_pos,
+        champMap[team.team_id] || null,
+        relegated,
+      ])
+    }
+
+    // ── Step 4: Reset season data and advance season number ─────────────────
     await tx(async ({ query: q }) => {
       await clearCurrentSeasonData(q)
       await q(`
