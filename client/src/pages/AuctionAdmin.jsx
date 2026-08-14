@@ -141,14 +141,20 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
   const pooledIds = new Set(pool.map(p => p.playerId))
   const participatingTeamIds = new Set(teams.map(t => t.id))
 
+  // Build the set of captain IDs directly from the teams data returned by
+  // the server — this is always fresh and doesn't rely on the allPlayers
+  // React Query cache which may be stale if a captain was assigned recently.
+  const captainIds = new Set(
+    teams.flatMap(t => (t.captains || []).map(c => c.id))
+  )
+
   // A player is eligible if:
   // - Not retained, not already in pool, matches search
-  // - AND either: not a captain, OR is a captain of a NON-PARTICIPATING team
-  //   (non-participating captains become free agents in the auction)
+  // - AND either: not a captain of a participating team
   const isEligible = (p) => {
     if (retainedIds.has(p.id) || pooledIds.has(p.id)) return false
     if (!p.name.toLowerCase().includes(search.toLowerCase())) return false
-    if (p.isCaptain && participatingTeamIds.has(p.teamId)) return false
+    if (captainIds.has(p.id)) return false
     return true
   }
   const eligibleForPool = allPlayers.filter(isEligible)
@@ -179,7 +185,7 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
                 <select value={pick.playerId || ""} onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, playerId: e.target.value } }))}
                   className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                   <option value="">Select player…</option>
-                  {allPlayers.filter(p => !retainedIds.has(p.id) && !pooledIds.has(p.id) && !(p.isCaptain && participatingTeamIds.has(p.teamId))).map(p => (
+                  {allPlayers.filter(p => !retainedIds.has(p.id) && !pooledIds.has(p.id) && !captainIds.has(p.id)).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
