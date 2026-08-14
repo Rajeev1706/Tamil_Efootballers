@@ -9,6 +9,16 @@ const router = express.Router()
 ;(async () => {
   try {
     await query(`
+      CREATE TABLE IF NOT EXISTS team_trophies (
+        id            SERIAL PRIMARY KEY,
+        team_id       INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        season_number INT NOT NULL,
+        tournament    TEXT NOT NULL DEFAULT 'team_league',
+        awarded_at    TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(team_id, season_number, tournament)
+      )
+    `)
+    await query(`
       CREATE TABLE IF NOT EXISTS team_season_history (
         id               SERIAL PRIMARY KEY,
         team_id          INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -20,7 +30,7 @@ const router = express.Router()
         UNIQUE(team_id, season_number)
       )
     `)
-  } catch (e) { console.error("[team_season_history] migration:", e.message) }
+  } catch (e) { console.error("[teamTrophies] migration:", e.message) }
 })()
 
 // GET /api/team-trophies?season=7&year=2026 — all teams with trophy counts
