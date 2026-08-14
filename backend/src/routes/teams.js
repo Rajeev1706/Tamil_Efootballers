@@ -1084,6 +1084,45 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       }
     }
 
+    // ── Second pass: apply floor/ceiling to players with < 20 matches ────────
+    // These players are skipped by the main loop (not enough data to rank),
+    // but their floor/ceiling constraints must still be honoured.
+    // e.g. a player with floor=A and grade=C should be bumped to A even if
+    // they've only played 5 games this season.
+    const ineligibleRes = await query(`
+      SELECT p.id, p.name, p.grade AS current_grade, p.grade_floor, p.grade_ceiling
+      FROM players p
+      WHERE p.is_captain IS NOT TRUE
+        AND (p.grade_floor IS NOT NULL OR p.grade_ceiling IS NOT NULL)
+        AND p.id NOT IN (${eligible.length > 0 ? eligible.map(e => e.id).join(",") : "0"})
+    `)
+
+    for (const player of ineligibleRes.rows) {
+      const current     = player.current_grade
+      const floor       = player.grade_floor
+      const ceiling     = player.grade_ceiling
+      const currentNum  = GRADE_NUM[current] || 1
+      const floorNum    = floor   ? (GRADE_NUM[floor]   || 1) : null
+      const ceilingNum  = ceiling ? (GRADE_NUM[ceiling] || 4) : null
+
+      let finalGrade = current
+      if (floorNum   !== null && currentNum < floorNum)   finalGrade = floor
+      if (ceilingNum !== null && currentNum > ceilingNum) finalGrade = ceiling
+
+      if (finalGrade !== current) {
+        await query(`UPDATE players SET grade = $1 WHERE id = $2`, [finalGrade, player.id])
+        gradeUpdateLog.push({
+          name:    player.name,
+          from:    current,
+          to:      finalGrade,
+          rank:    null,
+          winRate: null,
+          matches: null,
+          floor:   floor || null,
+        })
+      }
+    }
+
     res.json({
       success: true,
       season: targetSeason,
