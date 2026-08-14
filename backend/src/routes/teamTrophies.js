@@ -53,7 +53,7 @@ router.get("/", async (req, res, next) => {
         COUNT(DISTINCT CASE WHEN tt_all.tournament = 'championship' THEN tt_all.id END)::int AS "championshipCount",
         COUNT(DISTINCT CASE WHEN tt_all.tournament = 'europa'       THEN tt_all.id END)::int AS "europaCount",
         ARRAY_AGG(tt2.season_number ORDER BY tt2.season_number) FILTER (WHERE tt2.id IS NOT NULL) AS seasons,
-        ARRAY_AGG(DISTINCT EXTRACT(YEAR FROM sc.event_date)::int) FILTER (WHERE tt_all.id IS NOT NULL) AS years,
+        array_remove(array_agg(DISTINCT CASE WHEN tt_all.id IS NOT NULL AND sc.event_date IS NOT NULL THEN EXTRACT(YEAR FROM sc.event_date)::int END), NULL) AS years,
         COUNT(DISTINCT CASE WHEN tsh.relegated = true THEN tsh.id END)::int AS "relegationCount"
       FROM teams t
       LEFT JOIN team_trophies tt_all ON tt_all.team_id = t.id
