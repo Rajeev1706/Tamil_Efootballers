@@ -1040,7 +1040,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       if (rank <= 50) return "B"
       return "C"
     }
-    const GRADE_NUM = { S: 4, "A+": 3.5, A: 3, B: 2, C: 1 }
+    const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
 
     for (let i = 0; i < eligible.length; i++) {
       const player      = eligible[i]
@@ -1156,6 +1156,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         p.name,
         p.grade                                                      AS current_grade,
         p.grade_floor,
+        p.grade_ceiling,
         COUNT(*)::int                                                AS matches,
         COUNT(*) FILTER (WHERE
           (mr.player_id   = p.id AND mr.result = 'win') OR
@@ -1172,7 +1173,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         ON (mr.player_id = p.id OR mr.opponent_id = p.id)
         AND mr.season_number = $1
       WHERE p.is_captain IS NOT TRUE
-      GROUP BY p.id, p.name, p.grade, p.grade_floor
+      GROUP BY p.id, p.name, p.grade, p.grade_floor, p.grade_ceiling
       HAVING COUNT(*) >= 20
       ORDER BY win_rate DESC, wins DESC
     `, [endingSeason])
@@ -1190,32 +1191,64 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
 
     for (let i = 0; i < eligible.length; i++) {
-      const player     = eligible[i]
-      const rank       = i + 1
+      const player      = eligible[i]
+      const rank        = i + 1
       const targetGrade = rankToGrade(rank)
-      const current    = player.current_grade
-      const curNum     = GRADE_NUM[current] || 1
-      const tgtNum     = GRADE_NUM[targetGrade] || 1
+      const current     = player.current_grade
+      const tgtNum      = GRADE_NUM[targetGrade] || 1
+      const floor       = player.grade_floor
+      const ceiling     = player.grade_ceiling
 
-      let finalGrade = current // default: no change
-      const floor    = player.grade_floor  // NULL = pure auto, 'S'/'A'/'B'/'C' = admin floor
-
-      if (floor) {
-        // Admin set a floor — player can promote freely but NEVER drop below floor
+      let finalGrade = current
+      if (floor && ceiling) {
+        const floorNum   = GRADE_NUM[floor]   || 1
+        const ceilingNum = GRADE_NUM[ceiling] || 4
+        finalGrade = Math.min(ceilingNum, Math.max(floorNum, tgtNum)) === tgtNum ? targetGrade : (tgtNum > ceilingNum ? ceiling : floor)
+      } else if (floor) {
         const floorNum = GRADE_NUM[floor] || 1
         finalGrade = tgtNum >= floorNum ? targetGrade : floor
+      } else if (ceiling) {
+        const ceilingNum = GRADE_NUM[ceiling] || 4
+        finalGrade = tgtNum <= ceilingNum ? targetGrade : ceiling
       } else {
-        // Pure auto — no floor, free movement in any direction
         finalGrade = targetGrade
       }
 
       if (finalGrade !== current) {
         await query(
-          `UPDATE players SET grade = $1, grade_floor = CASE WHEN grade_floor IS NOT NULL THEN grade_floor ELSE NULL END WHERE id = $2`,
+          `UPDATE players SET grade = $1 WHERE id = $2`,
           [finalGrade, player.id]
         )
-        const floorTag = floor ? ` [floor: ${floor}]` : ' [auto]'
-        gradeUpdateLog.push(`${player.name}: ${current} → ${finalGrade} (rank #${rank}, ${player.win_rate}% WR)${floorTag}`)
+        const tag = floor ? ` [floor: ${floor}]` : ceiling ? ` [ceiling: ${ceiling}]` : ' [auto]'
+        gradeUpdateLog.push(`${player.name}: ${current} → ${finalGrade} (rank #${rank}, ${player.win_rate}% WR)${tag}`)
+      }
+    }
+
+    // ── Second pass: apply floor/ceiling to players with < 20 matches ────────
+    // Skipped by the main loop but their floor/ceiling must still be honoured.
+    const ineligibleRes2 = await query(`
+      SELECT p.id, p.name, p.grade AS current_grade, p.grade_floor, p.grade_ceiling
+      FROM players p
+      WHERE p.is_captain IS NOT TRUE
+        AND (p.grade_floor IS NOT NULL OR p.grade_ceiling IS NOT NULL)
+        AND p.id NOT IN (${eligible.length > 0 ? eligible.map(e => e.id).join(",") : "0"})
+    `)
+
+    for (const player of ineligibleRes2.rows) {
+      const current     = player.current_grade
+      const floor       = player.grade_floor
+      const ceiling     = player.grade_ceiling
+      const currentNum  = GRADE_NUM[current] || 1
+      const floorNum    = floor   ? (GRADE_NUM[floor]   || 1) : null
+      const ceilingNum  = ceiling ? (GRADE_NUM[ceiling] || 4) : null
+
+      let finalGrade = current
+      if (floorNum   !== null && currentNum < floorNum)   finalGrade = floor
+      if (ceilingNum !== null && currentNum > ceilingNum) finalGrade = ceiling
+
+      if (finalGrade !== current) {
+        await query(`UPDATE players SET grade = $1 WHERE id = $2`, [finalGrade, player.id])
+        gradeUpdateLog.push(`${player.name}: ${current} → ${finalGrade} [floor/ceiling enforced, <20 matches]`)
       }
     }
 
