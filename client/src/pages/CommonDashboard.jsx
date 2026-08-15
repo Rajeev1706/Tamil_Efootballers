@@ -12,6 +12,7 @@ import UclStandings from "../components/dashboard/UclStandings"
 import WeeklyDashboard from "../components/dashboard/WeeklyDashboard"
 import RevolutionDashboard from "../components/dashboard/RevolutionDashboard"
 import DuoDashboard from "../components/dashboard/DuoDashboard"
+import TeamKnockoutDashboard from "../components/dashboard/TeamKnockoutDashboard"
 import PlayersDirectory from "../components/dashboard/PlayersDirectory"
 import PastSeasonDashboard from "../components/dashboard/PastSeasonDashboard"
 import PlayerComparison from "../components/dashboard/PlayerComparison"
@@ -151,11 +152,12 @@ function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
 }
 
 const PANEL_OPTIONS = [
-  { value: "standings",   label: "League table"      },
-  { value: "ucl",         label: "UCL"               },
-  { value: "weekly",      label: "Weekly"            },
-  { value: "revolution",  label: "Revolution Trophy" },
-  { value: "duo",         label: "Duo Tournament"    },
+  { value: "standings",     label: "League table"      },
+  { value: "ucl",           label: "UCL"               },
+  { value: "weekly",        label: "Weekly"            },
+  { value: "revolution",    label: "Revolution Trophy" },
+  { value: "duo",           label: "Duo Tournament"    },
+  { value: "teamknockout",  label: "Team Knockout"     },
 ]
 
 
@@ -743,6 +745,7 @@ export default function CommonDashboard() {
                 {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "revolution" && <RevolutionDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "duo"        && <DuoDashboard />}
+                {activePanel === "teamknockout" && <TeamKnockoutDashboard />}
                 {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}

@@ -18,6 +18,7 @@ import RevolutionBracket from "./pages/RevolutionBracket"
 import UclDraw          from "./pages/UclDraw"
 import UclKODraw    from "./pages/UclKODraw"
 import UclKOBracket from "./pages/UclKOBracket"
+import TeamKnockoutBracket from "./pages/TeamKnockoutBracket"
 import AuctionAdmin from "./pages/AuctionAdmin"
 import AuctionLive from "./pages/AuctionLive"
 import TeamAuctionLive from "./pages/TeamAuctionLive"
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/ucl/draw"                element={<UclDraw />} />
         <Route path="/ucl-knockout/draw/:id"    element={<UclKODraw />} />
         <Route path="/ucl-knockout/bracket/:id" element={<UclKOBracket />} />
+        <Route path="/team-knockout" element={<TeamKnockoutBracket />} />
         <Route path="/admin/auction"            element={<ProtectedRoute role="admin"><AuctionAdmin /></ProtectedRoute>} />
         <Route path="/auction/live"             element={<AuctionLive />} />
         <Route path="/calendar"                   element={<SeasonCalendar />} />

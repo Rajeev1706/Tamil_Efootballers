@@ -505,7 +505,7 @@ router.post("/extra-time", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { sessionId } = z.object({ sessionId: z.number().int() }).parse(req.body)
     await query(
-      "UPDATE auction_sessions SET timer_started_at = timer_started_at + INTERVAL '30 seconds', version = version + 1 WHERE id=$1",
+      "UPDATE auction_sessions SET timer_started_at = COALESCE(timer_started_at, NOW()) + INTERVAL '30 seconds', version = version + 1 WHERE id=$1",
       [sessionId]
     )
     res.json({ success: true })
@@ -551,8 +551,8 @@ router.post("/undo-last-sale", authenticate, adminOnly, async (req, res, next) =
     // in progress on that other player is discarded (they simply remain
     // in the pending pool and can be drawn again via "Start Auction").
     await query(
-      "UPDATE auction_sessions SET current_player_id=$1, current_bid=$2, current_bidder_team_id=NULL, timer_started_at=$3, version = version + 1 WHERE id=$4",
-      [lastSale.player_id, STARTING_BID, new Date(), sessionId]
+      "UPDATE auction_sessions SET current_player_id=$1, current_bid=$2, current_bidder_team_id=NULL, timer_started_at=NULL, version = version + 1 WHERE id=$3",
+      [lastSale.player_id, STARTING_BID, sessionId]
     )
 
     res.json({ success: true, restoredAsCurrent: true })

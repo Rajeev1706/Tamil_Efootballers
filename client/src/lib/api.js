@@ -309,3 +309,10 @@ export const tlgApi = {
     api.patch(`/tlg/knockout/${phase}`, { seasonId, homeScore, awayScore, isWalkover }).then(r => r.data),
   delete:           (id)                   => api.delete(`/tlg/${id}`).then(r => r.data),
 }
+
+export const teamKnockoutApi = {
+  current:     ()                                       => api.get("/team-knockout/current").then(r => r.data),
+  generate:    ()                                       => api.post("/team-knockout/generate").then(r => r.data),
+  saveLeg:     (matchId, leg, team1Score, team2Score)  => api.patch(`/team-knockout/matches/${matchId}/leg`, { leg, team1Score, team2Score }).then(r => r.data),
+  deleteCurrent: ()                                     => api.delete("/team-knockout/current").then(r => r.data),
+}
