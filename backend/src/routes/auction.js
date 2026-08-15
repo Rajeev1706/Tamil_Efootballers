@@ -363,9 +363,9 @@ router.post("/next-player", authenticate, adminOnly, async (req, res, next) => {
          thunder_reveal_count = thunder_reveal_count + $4,
          last_thunder_reveal_index = CASE WHEN $4=1 THEN $3 ELSE last_thunder_reveal_index END,
          is_thunder=$5, thunder_from=$6, thunder_to=$7,
-         timer_started_at = $8
-      , version = version + 1 WHERE id=$9`,
-      [playerId, STARTING_BID, newRevealIndex, isThunder ? 1 : 0, isThunder, thunderFrom, thunderTo, new Date(), sessionId]
+         timer_started_at = NULL
+      , version = version + 1 WHERE id=$8`,
+      [playerId, STARTING_BID, newRevealIndex, isThunder ? 1 : 0, isThunder, thunderFrom, thunderTo, sessionId]
     )
     res.json({ success: true, playerId })
     broadcastAuctionUpdate(getFullAuctionState)

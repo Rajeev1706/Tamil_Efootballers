@@ -80,7 +80,7 @@ function PrevTeamLogo({ session, teamLogoById, teamNameById }) {
 
 
 // Full auction stage panel with player bg image as hero background
-function AuctionStagePanel({ session, teamLogoById, teamNameById, currentPlayer, bidBumping, timerActive, timeLeft }) {
+function AuctionStagePanel({ session, teamLogoById, teamNameById, currentPlayer, bidBumping, timerActive, waitingForBid, timeLeft }) {
   const preset    = getAvatarById(session.currentPlayerAvatarId)
   const rawAvatar = session.currentPlayerAvatarUrl   || preset?.thumb || null
   const rawBg     = session.currentPlayerAvatarBgUrl || preset?.bg    || null
@@ -152,6 +152,9 @@ function AuctionStagePanel({ session, teamLogoById, teamNameById, currentPlayer,
                 <>Highest bid: <span className="text-white font-semibold">{session.currentBidderTeamName}</span></>
               ) : "Waiting for bids…"}
             </p>
+            {waitingForBid && (
+              <div className="auction-timer" style={{ color: "#94a3b8" }}>Waiting for first bid…</div>
+            )}
             {timerActive && (
               <div className={cn("auction-timer", timeLeft <= 5 && "red")}>⏱ {timeLeft}s</div>
             )}
@@ -264,7 +267,7 @@ export default function TeamAuctionLive() {
   const { data: allPlayers = [] } = usePlayers()
   const { data } = useAuctionCurrent()
   const { data: currentPlayer } = usePlayer(data?.session?.currentPlayerId)
-  const { timeLeft, timerActive } = useAuctionTimer(data?.session)
+  const { timeLeft, timerActive, waitingForBid } = useAuctionTimer(data?.session)
   const bidBumping = useBumpOnChange(data?.session?.currentBid)
   useAuctionReveal(data, { showMilestoneBanners: false })
   useAuctionSocket()
@@ -343,7 +346,7 @@ export default function TeamAuctionLive() {
         <div className="space-y-4">
           {/* Current player */}
           {/* Resolve player bg for the hero panel */}
-          {session && <AuctionStagePanel session={session} teamLogoById={teamLogoById} teamNameById={teamNameById} currentPlayer={currentPlayer} bidBumping={bidBumping} timerActive={timerActive} timeLeft={timeLeft} />}
+          {session && <AuctionStagePanel session={session} teamLogoById={teamLogoById} teamNameById={teamNameById} currentPlayer={currentPlayer} bidBumping={bidBumping} timerActive={timerActive} waitingForBid={waitingForBid} timeLeft={timeLeft} />}
 
           {/* Overall career record — total wins/draws/losses, games
               played, goals, filterable by match type. Distinct from the
