@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi, winrateApi, specialEditionsApi, tlgApi } from "./api"
+import { teamsApi, playersApi, recordsApi, fixturesApi, tradesApi, lineupsApi, favoritesApi, settingsApi, leagueInfoApi, uclApi, weeklyApi, uclKnockoutApi, auctionApi, revolutionApi, scoutingApi, auctionTargetsApi, auctionIntelApi, winrateApi, specialEditionsApi, tlgApi, teamKnockoutApi } from "./api"
 
 export const QK = {
   teams:    ["teams"],
@@ -1026,5 +1026,36 @@ export const useTlgDelete = () => {
   return useMutation({
     mutationFn: (id) => tlgApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tlg-list"] }),
+  })
+}
+// ── Team Knockout ─────────────────────────────────────────────────────────────
+export const useTeamKnockoutCurrent = () =>
+  useQuery({ queryKey: ["team-knockout-current"], queryFn: teamKnockoutApi.current })
+
+export const useGenerateTeamKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => teamKnockoutApi.generate(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-knockout-current"] }),
+  })
+}
+
+export const useSaveTeamKnockoutLeg = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, leg, team1Score, team2Score }) =>
+      teamKnockoutApi.saveLeg(matchId, leg, team1Score, team2Score),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-knockout-current"] })
+      qc.invalidateQueries({ queryKey: ["players"] })
+    },
+  })
+}
+
+export const useDeleteTeamKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => teamKnockoutApi.deleteCurrent(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-knockout-current"] }),
   })
 }

@@ -34,7 +34,7 @@ export function useAuctionTimer(session) {
   // never from a locally-incremented counter, so it can never drift.
   useEffect(() => {
     if (!session?.currentPlayerId || !startedAtKey) {
-      setState({ timeLeft: DURATION, timerActive: false })
+      setState(computeTimeLeft(session))
       return
     }
     const tick = () => setState(computeTimeLeft(session))

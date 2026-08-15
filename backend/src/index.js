@@ -19,6 +19,7 @@ import weeklyRoutes      from "./routes/weekly.js"
 import revolutionRoutes  from "./routes/revolution.js"
 import scoutingRoutes    from "./routes/scouting.js"
 import uclKnockoutRoutes from "./routes/uclKnockout.js"
+import teamKnockoutRoutes from "./routes/teamKnockout.js"
 import auctionRoutes     from "./routes/auction.js"
 import auctionTargetRoutes from "./routes/auctionTargets.js"
 import auctionIntelRoutes  from "./routes/auctionIntel.js"
@@ -69,6 +70,7 @@ app.use("/api/weekly",       weeklyRoutes)
 app.use("/api/revolution",   revolutionRoutes)
 app.use("/api/scouting",     scoutingRoutes)
 app.use("/api/ucl-knockout", uclKnockoutRoutes)
+app.use("/api/team-knockout", teamKnockoutRoutes)
 app.use("/api/auction",         auctionRoutes)
 app.use("/api/auction-targets", auctionTargetRoutes)
 app.use("/api/auction-intel",   auctionIntelRoutes)

@@ -10,6 +10,14 @@ import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 
+// ── Auto-add group_stage column to fixtures if not present ───────────────────
+;(async () => {
+  try {
+    await query(`ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS group_stage BOOLEAN DEFAULT FALSE`)
+    await query(`ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS grp CHAR(1)`)
+  } catch (e) { console.error("[fixtures] migration:", e.message) }
+})()
+
 // Classic "circle method" round-robin: fix one team, rotate the rest each
 // round. Produces N-1 rounds (N/2 matches each) covering every pairing
 // exactly once — the first half of the season. The second half is derived
@@ -188,11 +196,62 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
     }
 
     // Save the chosen format so close-fixture knows what to do at season end
-    const format = req.body.format === "league" ? "league" : "league_knockout"
+    const format = req.body.format === "league" ? "league"
+                 : req.body.format === "group_knockout" ? "group_knockout"
+                 : "league_knockout"
     await query(`
       INSERT INTO app_settings (key, value) VALUES ('team_league_format', $1)
       ON CONFLICT (key) DO UPDATE SET value = $1
     `, [format])
+
+    if (format === "group_knockout") {
+      // Randomly split teams into 2 groups of 4
+      if (teamIds.length !== 8) {
+        return res.status(400).json({ error: "Group + Knockout format requires exactly 8 teams" })
+      }
+      // Shuffle and split
+      const shuffled = [...teamIds].sort(() => Math.random() - 0.5)
+      const groupA = shuffled.slice(0, 4)
+      const groupB = shuffled.slice(4, 8)
+
+      const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+      const season = parseInt(seasonRes.rows[0]?.value || "1")
+
+      // Store group assignments
+      for (const tid of groupA) {
+        await query(`
+          INSERT INTO fixture_groups (team_id, season_number, grp)
+          VALUES ($1, $2, 'A')
+          ON CONFLICT (team_id, season_number) DO UPDATE SET grp = 'A'
+        `, [tid, season])
+      }
+      for (const tid of groupB) {
+        await query(`
+          INSERT INTO fixture_groups (team_id, season_number, grp)
+          VALUES ($1, $2, 'B')
+          ON CONFLICT (team_id, season_number) DO UPDATE SET grp = 'B'
+        `, [tid, season])
+      }
+
+      // Generate home+away within each group
+      const generateGroupFixtures = async (groupTeams, grpLetter) => {
+        const groupRounds = generateDoubleRoundRobin(groupTeams)
+        for (let i = 0; i < groupRounds.length; i++) {
+          for (const [homeId, awayId] of groupRounds[i]) {
+            await query(
+              "INSERT INTO fixtures (home_team_id, away_team_id, round, scheduled_date, group_stage, grp) VALUES ($1, $2, $3, CURRENT_DATE, true, $4)",
+              [homeId, awayId, i + 1, grpLetter]
+            )
+            fixturesCreated++
+          }
+        }
+      }
+
+      await generateGroupFixtures(groupA, "A")
+      await generateGroupFixtures(groupB, "B")
+
+      return res.json({ success: true, format, groupA, groupB, fixturesGenerated: fixturesCreated })
+    }
 
     const rounds = generateDoubleRoundRobin(teamIds)
     let fixturesCreated = 0

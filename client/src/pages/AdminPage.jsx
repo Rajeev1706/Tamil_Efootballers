@@ -16,6 +16,7 @@ import UclKnockoutAdmin from "../components/admin/UclKnockoutAdmin"
 import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import RevolutionAdmin from "../components/admin/RevolutionTournament"
 import TlgAdmin from "../components/admin/TlgAdmin"
+import TeamKnockoutAdmin from "../components/admin/TeamKnockoutAdmin"
 import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
@@ -395,7 +396,8 @@ const TABS = [
   { id: "records",    label: "Match records", icon: Activity       },
   { id: "uclgroups",    label: "UCL Groups",    icon: Trophy },
   { id: "uclresults",   label: "UCL Results",   icon: Trophy },
-  { id: "uclknockout",  label: "UCL Knockout",  icon: Trophy },
+  { id: "uclknockout",   label: "UCL Knockout",   icon: Trophy },
+  { id: "teamknockout",  label: "Team Knockout",  icon: Trophy },
   { id: "weekly",     label: "Weekly",       icon: Trophy          },
   { id: "revolution", label: "Revolution",  icon: Trophy          },
   { id: "tlg",        label: "TLG",         icon: Trophy          },
@@ -559,9 +561,8 @@ export default function AdminPage() {
         {activeTab === "revolution" && (
           <RevolutionAdmin />
         )}
-        {activeTab === "tlg" && (
-          <TlgAdmin />
-        )}
+        {activeTab === "tlg" && <TlgAdmin />}
+        {activeTab === "teamknockout" && <TeamKnockoutAdmin />}
         {activeTab === "replacement" && (
           <ReplacementModule players={players} />
         )}
