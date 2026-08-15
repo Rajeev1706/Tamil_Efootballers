@@ -215,7 +215,7 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
           className="w-full bg-pitch-800 border border-surface-border rounded-lg px-3 py-2 text-sm text-white mb-3" />
         <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
           {eligibleForPool.map(p => (
-            <button key={p.id} onClick={() => addToPool.mutate({ sessionId: session.id, playerId: p.id })}
+            <button key={p.id} onClick={() => { addToPool.mutate({ sessionId: session.id, playerId: p.id }); setSearch("") }}
               className={cn("flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors",
                 CARD_COLORS[GRADE_TO_CARD[p.grade] || "silver"], "border-current/30 hover:bg-white/5"
               )}>
