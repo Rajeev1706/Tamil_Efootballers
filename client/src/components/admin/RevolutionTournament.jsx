@@ -27,7 +27,11 @@ function CreateForm({ onClose }) {
   )
 
   function togglePlayer(id) {
-    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    setSelected(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      setSearch("")
+      return [...prev, id]
+    })
   }
 
   async function handleCreate() {
