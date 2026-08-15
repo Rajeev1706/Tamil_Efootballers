@@ -432,7 +432,7 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
   const [customBids, setCustomBids] = useState({}) // teamId -> string amount
   const [showRtm, setShowRtm] = useState(false)
 
-  const { timeLeft, timerActive, shake, goingText } = useAuctionTimer(session)
+  const { timeLeft, timerActive, waitingForBid, shake, goingText } = useAuctionTimer(session)
   const bidBumping = useBumpOnChange(session.currentBid)
 
   const teamNameById = Object.fromEntries(teams.map(t => [t.id, t.name]))
@@ -498,6 +498,9 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
               <div>👑 <strong>Leading:</strong> {session.currentBidderTeamName || "None"}</div>
             </div>
 
+            {waitingForBid && (
+              <div className="auction-timer" style={{ color: "#94a3b8" }}>Waiting for first bid…</div>
+            )}
             {timerActive && (
               <div className={cn("auction-timer", timeLeft <= 5 && "red")}>⏱ {timeLeft}s</div>
             )}

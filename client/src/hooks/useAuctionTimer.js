@@ -4,11 +4,12 @@ import { tickSound, buzzerSound } from "../lib/legacyReveal"
 const DURATION = 20
 
 function computeTimeLeft(session) {
-  if (!session?.currentPlayerId || !session?.timerStartedAt) return { timeLeft: DURATION, timerActive: false }
+  if (!session?.currentPlayerId) return { timeLeft: DURATION, timerActive: false, waitingForBid: false }
+  if (!session?.timerStartedAt)  return { timeLeft: DURATION, timerActive: false, waitingForBid: true }
   const startedAt = new Date(session.timerStartedAt).getTime()
   const elapsedSeconds = (Date.now() - startedAt) / 1000
   const timeLeft = Math.max(0, Math.ceil(DURATION - elapsedSeconds))
-  return { timeLeft, timerActive: timeLeft > 0 }
+  return { timeLeft, timerActive: timeLeft > 0, waitingForBid: false }
 }
 
 /**
@@ -23,7 +24,7 @@ function computeTimeLeft(session) {
  * and the public live view.
  */
 export function useAuctionTimer(session) {
-  const [{ timeLeft, timerActive }, setState] = useState(() => computeTimeLeft(session))
+  const [{ timeLeft, timerActive, waitingForBid }, setState] = useState(() => computeTimeLeft(session))
   const [shake, setShake] = useState(false)
   const [goingText, setGoingText] = useState("")
   const lastCheckedRef = useRef(null)
@@ -78,5 +79,5 @@ export function useAuctionTimer(session) {
     }
   }, [timeLeft])
 
-  return { timeLeft, timerActive, shake, goingText }
+  return { timeLeft, timerActive, waitingForBid, shake, goingText }
 }

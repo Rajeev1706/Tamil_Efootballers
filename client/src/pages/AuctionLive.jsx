@@ -63,7 +63,7 @@ function PrevTeamLogo({ session, teamLogoById, teamNameById }) {
 
 
 // Full auction stage panel with player bg image as hero background
-function AuctionStagePanel({ session, teamLogoById, teamNameById, bidBumping, timerActive, timeLeft }) {
+function AuctionStagePanel({ session, teamLogoById, teamNameById, bidBumping, timerActive, waitingForBid, timeLeft }) {
   const preset    = getAvatarById(session.currentPlayerAvatarId)
   const rawAvatar = session.currentPlayerAvatarUrl   || preset?.thumb || null
   const rawBg     = session.currentPlayerAvatarBgUrl || preset?.bg    || null
@@ -97,6 +97,9 @@ function AuctionStagePanel({ session, teamLogoById, teamNameById, bidBumping, ti
                 <>Highest bid: <span className="text-white font-semibold">{session.currentBidderTeamName}</span></>
               ) : "Waiting for bids…"}
             </p>
+            {waitingForBid && (
+              <div className="auction-timer" style={{ color: "#94a3b8" }}>Waiting for first bid…</div>
+            )}
             {timerActive && (
               <div className={cn("auction-timer", timeLeft <= 5 && "red")}>⏱ {timeLeft}s</div>
             )}
@@ -115,7 +118,7 @@ function AuctionStagePanel({ session, teamLogoById, teamNameById, bidBumping, ti
 export default function AuctionLive() {
   const navigate = useNavigate()
   const { data } = useAuctionCurrent()
-  const { timeLeft, timerActive } = useAuctionTimer(data?.session)
+  const { timeLeft, timerActive, waitingForBid } = useAuctionTimer(data?.session)
   const bidBumping = useBumpOnChange(data?.session?.currentBid)
   const [narratives, setNarratives] = useState([])
   useAuctionReveal(data, {
@@ -222,7 +225,7 @@ export default function AuctionLive() {
 
           {/* Current player */}
           {/* Resolve player bg for the hero panel */}
-          <AuctionStagePanel session={session} teamLogoById={teamLogoById} teamNameById={teamNameById} bidBumping={bidBumping} timerActive={timerActive} timeLeft={timeLeft} />
+          <AuctionStagePanel session={session} teamLogoById={teamLogoById} teamNameById={teamNameById} bidBumping={bidBumping} timerActive={timerActive} waitingForBid={waitingForBid} timeLeft={timeLeft} />
 
           {/* Recent sales */}
           <div className="card p-4">
