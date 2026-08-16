@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Trophy, Target, ArrowRight, Crown } from "lucide-react"
+import { Trophy, Target, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useSeasonMatchRecords } from "../../lib/queries"
 import ballondorImg  from "../../../images/ballondor.png"
@@ -46,10 +46,10 @@ export default function PastSeasonDashboard({ record, season }) {
   const topScorers = [...sortedPlayers].sort((a, b) => b.goals - a.goals).slice(0, 10)
 
   const TABS = [
-    { id: "overview",  label: "Overview"       },
-    { id: "records",   label: `Match Records (${matchRecords.length})` },
-    { id: "players",   label: "Player Stats"   },
-    { id: "scorers",   label: "Top Scorers"    },
+    { id: "overview",  label: "Overview"    },
+    { id: "winrate",   label: "Win Rate"    },
+    { id: "players",   label: "Player Stats" },
+    { id: "scorers",   label: "Top Scorers" },
   ]
 
   return (
@@ -153,38 +153,50 @@ export default function PastSeasonDashboard({ record, season }) {
         </div>
       )}
 
-      {/* Match Records tab */}
-      {tab === "records" && (
+      {/* Win Rate tab */}
+      {tab === "winrate" && (
         <div className="card overflow-hidden">
           <div className="px-5 py-4 border-b border-surface-border">
-            <p className="text-sm font-semibold text-white">{matchRecords.length} match records logged this season</p>
+            <p className="text-sm font-semibold text-white">Win Rate Ranking — Season {season}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Min. 20 matches · ranked by win %</p>
           </div>
-          {recordsLoading ? (
-            <p className="text-center py-8 text-slate-500 text-sm">Loading...</p>
-          ) : matchRecords.length === 0 ? (
-            <p className="text-center py-8 text-slate-500 text-sm">No match records found for this season</p>
+          {sortedPlayers.length === 0 ? (
+            <p className="text-center py-8 text-slate-500 text-sm">No data for this season</p>
           ) : (
-            <div className="divide-y divide-surface-border/50 max-h-96 overflow-y-auto">
-              {matchRecords.map(r => (
-                <div key={r.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-white truncate">{r.playerName}</span>
-                      {r.playerScore != null && (
-                        <span className="text-xs font-mono text-slate-400 flex-shrink-0">{r.playerScore}–{r.opponentScore}</span>
-                      )}
-                      <ArrowRight className="w-3 h-3 text-slate-600 flex-shrink-0" />
-                      <span className="text-slate-400 truncate">{r.opponentName}</span>
+            <div className="divide-y divide-surface-border/50">
+              {[...sortedPlayers]
+                .filter(p => (p.w + p.d + p.l) >= 20)
+                .sort((a, b) => {
+                  const wrA = a.w / (a.w + a.d + a.l)
+                  const wrB = b.w / (b.w + b.d + b.l)
+                  return wrB - wrA || b.w - a.w
+                })
+                .map((p, i) => {
+                  const total = p.w + p.d + p.l
+                  const wr = total > 0 ? ((p.w / total) * 100).toFixed(1) : "0.0"
+                  const pct = parseFloat(wr)
+                  return (
+                    <div key={p.name + i} className="flex items-center gap-3 px-5 py-3">
+                      <span className={cn("text-sm font-bold w-6 text-center flex-shrink-0",
+                        i === 0 ? "text-gold" : i === 1 ? "text-slate-300" : i === 2 ? "text-amber-600" : "text-slate-500"
+                      )}>{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{p.name}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <div className="flex-1 h-1.5 bg-pitch-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-500 flex-shrink-0">
+                            {p.w}W {p.d}D {p.l}L
+                          </span>
+                        </div>
+                      </div>
+                      <span className={cn("text-lg font-extrabold font-mono flex-shrink-0",
+                        pct >= 60 ? "text-emerald-400" : pct >= 45 ? "text-amber-400" : "text-rose-400"
+                      )}>{wr}%</span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {r.playerTeam} vs {r.opponentTeam} · {r.date?.slice(0, 10)}
-                    </p>
-                  </div>
-                  <span className={cn("text-xs font-bold px-2 py-0.5 rounded border flex-shrink-0", RESULT_COLOR[r.result])}>
-                    {r.result.toUpperCase()}
-                  </span>
-                </div>
-              ))}
+                  )
+                })}
             </div>
           )}
         </div>
