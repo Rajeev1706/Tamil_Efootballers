@@ -26,7 +26,6 @@ router.get("/public/current", async (req, res, next) => {
       SELECT
         km.round, km.match_number AS "matchNumber", km.status,
         km.player1_score AS "player1Score", km.player2_score AS "player2Score",
-        km.is_walkover AS "isWalkover",
         km.player1_id AS "player1Id", km.player2_id AS "player2Id", km.winner_id AS "winnerId",
         p1.name AS "player1Name", p1.avatar_id AS "player1AvatarId", p1.avatar_url AS "player1AvatarUrl", p1.avatar_bg_url AS "player1AvatarBgUrl",
         p2.name AS "player2Name", p2.avatar_id AS "player2AvatarId", p2.avatar_url AS "player2AvatarUrl", p2.avatar_bg_url AS "player2AvatarBgUrl"
@@ -304,9 +303,9 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     await query(`
       UPDATE ucl_knockout_matches
-      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4, is_walkover=$5
-      WHERE id=$6
-    `, [player1Score, player2Score, winnerId, mrRes.rows[0].id, isWalkover, req.params.matchId])
+      SET player1_score=$1, player2_score=$2, winner_id=$3, status='completed', match_record_id=$4
+      WHERE id=$5
+    `, [player1Score, player2Score, winnerId, mrRes.rows[0].id, req.params.matchId])
 
     if (oldMatchRecordId) {
       await query("DELETE FROM match_records WHERE id = $1", [oldMatchRecordId])
