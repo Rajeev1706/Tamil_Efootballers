@@ -257,6 +257,9 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
     )
     if (parseInt(remainingRes.rows[0].count) === 0) {
       if (await claimAward("ucl_group", fix.group_id)) {
+        const seasonRes2 = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+        const currentSeason = parseInt(seasonRes2.rows[0]?.value || "1")
+
         const standingsRes = await query(`
           SELECT
             p.id,
@@ -265,10 +268,12 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
             SUM(CASE WHEN p.id=mr.player_id THEN COALESCE(mr.player_score,0) ELSE COALESCE(mr.opponent_score,0) END) AS gf,
             SUM(CASE WHEN p.id=mr.player_id THEN COALESCE(mr.opponent_score,0) ELSE COALESCE(mr.player_score,0) END) AS ga
           FROM players p
-          LEFT JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='ucl'
+          LEFT JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id)
+            AND mr.match_type='ucl'
+            AND mr.season_number = $2
           WHERE p.ucl_group_id = $1
           GROUP BY p.id
-        `, [fix.group_id])
+        `, [fix.group_id, currentSeason])
 
         const ranked = standingsRes.rows
           .map(r => ({
