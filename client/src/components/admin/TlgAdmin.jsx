@@ -397,7 +397,7 @@ export default function TlgAdmin() {
                         <p className="text-sm font-bold text-white">Group {group.name}</p>
                       </div>
                       {/* Mini standings */}
-                      <div className="px-4 py-2 border-b border-surface-border/50">
+                      <div className="px-4 py-2">
                         <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 text-[10px] text-slate-600 font-semibold uppercase mb-1 px-1">
                           <span>Team</span><span>P</span><span>GD</span><span>GF</span><span>Pts</span>
                         </div>
@@ -417,24 +417,6 @@ export default function TlgAdmin() {
                           </div>
                         ))}
                         <p className="text-[10px] text-slate-600 mt-1 px-1">🔵 Top 2 → Champions · 🟡 Bottom 2 → Europa</p>
-                      </div>
-                      {/* Fixtures by round */}
-                      <div>
-                        {groupFixtures(group).map(({ round, fixtures }) => (
-                          <div key={round}>
-                            <div className="px-4 py-1.5 bg-pitch-900/40">
-                              <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Round {round}</span>
-                            </div>
-                            {fixtures.map(f => (
-                              <FixtureRow
-                                key={f.id}
-                                fixture={f}
-                                onSave={(id, h, a, wo) => saveFixture.mutateAsync({ id, homeScore: h, awayScore: a, isWalkover: wo })}
-                                onClear={(id) => saveFixture.mutateAsync({ id, homeScore: null, awayScore: null, isWalkover: false }).catch(() => {})}
-                              />
-                            ))}
-                          </div>
-                        ))}
                       </div>
                     </div>
                   ))}
