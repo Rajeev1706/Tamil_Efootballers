@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Target, Trophy, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic } from "../../lib/queries"
+import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic, useGroupStandings } from "../../lib/queries"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
@@ -57,8 +57,10 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
   const setView = onViewChange || setInternalView
   const { data: scorers = [] } = useTopScorers()
   const { data: formatData }  = useLeagueFormatPublic()
-  const leagueFormat = formatData?.format || "league_knockout"
-  const isLeagueOnly = leagueFormat === "league"
+  const leagueFormat   = formatData?.format || "league_knockout"
+  const isLeagueOnly   = leagueFormat === "league"
+  const isGroupKnockout = leagueFormat === "group_knockout"
+  const { data: groupStandings } = useGroupStandings()
   const scorerRankChanges = useRankChanges("league-golden-boot", scorers.map(s => s.id))
   const { data: playoffsData } = useTeamLeaguePlayoffs()
   const { data: fixtures = [] } = useFixtures()
@@ -226,8 +228,101 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
         })()
       )}
 
+      {/* Group Standings — shown when format is group_knockout */}
+      {view === "table" && isGroupKnockout && (() => {
+        const grpA = groupStandings?.A || []
+        const grpB = groupStandings?.B || []
+        const renderGroupTable = (rows, label) => (
+          <div className="mb-2">
+            <div className="px-4 py-2 border-b border-surface-border/60 flex items-center gap-2">
+              <span className={cn("text-xs font-bold uppercase tracking-widest",
+                label === "A" ? "text-gold" : "text-violet-400"
+              )}>Group {label}</span>
+              <span className="text-[10px] text-slate-500">
+                {label === "A" ? "Top 2 → Champions KO" : "Top 2 → Champions KO"}
+                {" · "}3rd & 4th → Europa KO
+              </span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border">
+                  {["#","Team","P","W","D","L","GF","GA","GD","Pts"].map(h => (
+                    <th key={h} className={cn(
+                      "py-2 text-xs font-semibold text-slate-500 tracking-wide",
+                      h === "Team" ? "text-left px-4" : "text-center px-2",
+                      h === "Pts" && "text-gold"
+                    )}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((team, idx) => {
+                  const isTop2 = idx < 2
+                  return (
+                    <tr key={team.teamId}
+                      onClick={() => navigate(`/team-roster/${team.teamId}?${searchParams.toString()}`)}
+                      className={cn(
+                        "border-b border-surface-border/50 cursor-pointer table-row-hover",
+                        isTop2 && "bg-gold/5 border-l-2 border-l-emerald-400/60"
+                      )}
+                    >
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={cn("text-sm font-medium",
+                          isTop2 ? "text-emerald-400" : "text-violet-400"
+                        )}>{idx + 1}</span>
+                      </td>
+                      <td className="py-2.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <TeamAvatar logoUrl={team.logoUrl} name={team.teamName} />
+                          <span className={cn("font-medium", isTop2 ? "text-white" : "text-slate-300")}>
+                            {team.teamName}
+                          </span>
+                        </div>
+                      </td>
+                      {[team.played, team.won, team.drawn, team.lost, team.gf, team.ga].map((val, i) => (
+                        <td key={i} className="py-2.5 px-2 text-center text-slate-400">{val}</td>
+                      ))}
+                      <td className={cn("py-2.5 px-2 text-center font-medium text-sm",
+                        team.gd > 0 ? "text-emerald-400" : team.gd < 0 ? "text-rose-400" : "text-slate-400"
+                      )}>
+                        {team.gd > 0 ? `+${team.gd}` : team.gd}
+                      </td>
+                      <td className={cn("py-2.5 px-2 text-center font-bold text-sm",
+                        isTop2 ? "text-gold" : "text-white"
+                      )}>{team.pts}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+        return (
+          <div className="overflow-x-auto">
+            {grpA.length === 0 && grpB.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <p className="text-sm text-slate-500">Group stage fixtures not yet generated</p>
+              </div>
+            ) : (
+              <>
+                {renderGroupTable(grpA, "A")}
+                {renderGroupTable(grpB, "B")}
+                <div className="px-5 py-3 border-t border-surface-border/60 flex items-center gap-4 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400/60" /> Top 2 → Champions Knockout
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-violet-400/60" /> 3rd & 4th → Europa Knockout
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })()}
+
       {/* League Table View */}
-      {view === "table" && (
+      {view === "table" && !isGroupKnockout && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -308,7 +403,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
           </table>
         </div>
       )}
-      {view === "table" && teams.length >= 4 && (
+      {view === "table" && !isGroupKnockout && teams.length >= 4 && (
         <div className="px-5 py-3 border-t border-surface-border/60 flex items-center gap-4 text-xs text-slate-500">
           {isLeagueOnly
             ? <span className="flex items-center gap-1.5"><Crown className="w-3 h-3 text-gold" /> Table topper wins the Team League</span>

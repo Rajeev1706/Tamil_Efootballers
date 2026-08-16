@@ -169,6 +169,7 @@ export const fixturesApi = {
   changeFormat:   (format)              => api.patch("/fixtures/format", { format }).then(r => r.data),
   getFormat:      ()                    => api.get("/fixtures/format").then(r => r.data),
   getFormatPublic:()                    => api.get("/fixtures/format/public").then(r => r.data),
+  groupStandings: ()                    => api.get("/fixtures/group-standings").then(r => r.data),
   update:     (id, body)                => api.patch(`/fixtures/${id}`, body).then(r => r.data),
   updateRoundDate: (round, date)        => api.patch(`/fixtures/round/${round}/date`, { date }).then(r => r.data),
   delete:     (id)                      => api.delete(`/fixtures/${id}`).then(r => r.data),

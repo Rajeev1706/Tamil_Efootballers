@@ -12,18 +12,18 @@ function TeamCard({ team, revealed, position }) {
       revealed ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95"
     )}>
       <div className={cn(
-        "rounded-xl border px-4 py-3 flex items-center gap-3 bg-gradient-to-r from-pitch-800 to-pitch-900 border-surface-border",
-        revealed && "border-accent/30 shadow-lg shadow-accent/5"
+        "rounded-2xl border px-5 py-4 flex items-center gap-4 bg-gradient-to-r from-pitch-800 to-pitch-900",
+        revealed ? "border-accent/40 shadow-lg shadow-accent/10" : "border-surface-border"
       )}>
-        <span className="text-xs text-slate-600 w-4">{position}</span>
+        <span className="text-sm text-slate-500 font-bold w-5 flex-shrink-0">{position}</span>
         {team.logoUrl ? (
-          <TeamLogoIcon src={team.logoUrl} size="md" />
+          <TeamLogoIcon logoUrl={team.logoUrl} name={team.name} size="w-10 h-10" />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-pitch-700 flex items-center justify-center">
-            <span className="text-xs font-bold text-slate-400">{team.name?.[0]}</span>
+          <div className="w-10 h-10 rounded-xl bg-pitch-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-base font-bold text-slate-400">{team.name?.[0]}</span>
           </div>
         )}
-        <span className="text-sm font-semibold text-white">{team.name}</span>
+        <span className="text-base font-bold text-white tracking-wide">{team.name}</span>
       </div>
     </div>
   )
@@ -93,11 +93,11 @@ export default function TlgDraw() {
       )}
 
       {(phase === "draw" || phase === "complete") && (
-        <div className="w-full max-w-lg space-y-6">
+        <div className="w-full max-w-2xl space-y-6">
           {phase === "draw" && (
             <div className="text-center">
               <div className={cn(
-                "inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-bold transition-all duration-300",
+                "inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-bold transition-all duration-300",
                 currentGroup === "A" ? "bg-accent/20 border-accent/40 text-accent" : "bg-gold/20 border-gold/40 text-gold"
               )}>
                 <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
@@ -106,32 +106,32 @@ export default function TlgDraw() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-8">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
-                  <span className="text-xs font-extrabold text-accent">A</span>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center">
+                  <span className="text-sm font-extrabold text-accent">A</span>
                 </div>
-                <span className="text-sm font-bold text-white">Group A</span>
+                <span className="text-base font-bold text-white">Group A</span>
                 {phase === "draw" && currentGroup === "A" && <div className="w-2 h-2 rounded-full bg-accent animate-pulse ml-auto" />}
               </div>
               {allTeamsA.map((t, i) => <TeamCard key={t.id} team={t} revealed={i < revealedA} position={i + 1} />)}
               {Array.from({ length: Math.max(0, 4 - allTeamsA.length) }).map((_, i) => (
-                <div key={i} className="h-12 rounded-xl border border-dashed border-surface-border/40 bg-pitch-900/30" />
+                <div key={i} className="h-16 rounded-2xl border border-dashed border-surface-border/40 bg-pitch-900/30" />
               ))}
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-gold/20 border border-gold/40 flex items-center justify-center">
-                  <span className="text-xs font-extrabold text-gold">B</span>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-gold/20 border border-gold/40 flex items-center justify-center">
+                  <span className="text-sm font-extrabold text-gold">B</span>
                 </div>
-                <span className="text-sm font-bold text-white">Group B</span>
+                <span className="text-base font-bold text-white">Group B</span>
                 {phase === "draw" && currentGroup === "B" && <div className="w-2 h-2 rounded-full bg-gold animate-pulse ml-auto" />}
               </div>
               {allTeamsB.map((t, i) => <TeamCard key={t.id} team={t} revealed={i < revealedB} position={i + 1} />)}
               {Array.from({ length: Math.max(0, 4 - allTeamsB.length) }).map((_, i) => (
-                <div key={i} className="h-12 rounded-xl border border-dashed border-surface-border/40 bg-pitch-900/30" />
+                <div key={i} className="h-16 rounded-2xl border border-dashed border-surface-border/40 bg-pitch-900/30" />
               ))}
             </div>
           </div>

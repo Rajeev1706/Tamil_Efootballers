@@ -7,8 +7,8 @@
 //   team_knockout_matches — the SF + Final matches for both competitions
 //
 // Match types:
-//   champions_sf1, champions_sf2, champions_final
-//   europa_sf1,    europa_sf2,    europa_final
+//   champions_sf1, champions_sf2, champions_final, champions_3rd
+//   europa_sf1,    europa_sf2,    europa_final,    europa_7th
 
 import { Router } from "express"
 import { z } from "zod"
@@ -201,12 +201,14 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
     // Champions: A1 vs B2, B1 vs A2 → Final
     // Europa:    A3 vs B4, B3 vs A4 → Final
     const matchesToCreate = [
-      { match_type: "champions_sf1", team1_id: A[0].team_id, team2_id: B[1].team_id },
-      { match_type: "champions_sf2", team1_id: B[0].team_id, team2_id: A[1].team_id },
-      { match_type: "champions_final", team1_id: null,       team2_id: null          },
-      { match_type: "europa_sf1",    team1_id: A[2].team_id, team2_id: B[3].team_id },
-      { match_type: "europa_sf2",    team1_id: B[2].team_id, team2_id: A[3].team_id },
-      { match_type: "europa_final",  team1_id: null,         team2_id: null          },
+      { match_type: "champions_sf1",   team1_id: A[0].team_id, team2_id: B[1].team_id },
+      { match_type: "champions_sf2",   team1_id: B[0].team_id, team2_id: A[1].team_id },
+      { match_type: "champions_final", team1_id: null,          team2_id: null          },
+      { match_type: "champions_3rd",   team1_id: null,          team2_id: null          },
+      { match_type: "europa_sf1",      team1_id: A[2].team_id, team2_id: B[3].team_id },
+      { match_type: "europa_sf2",      team1_id: B[2].team_id, team2_id: A[3].team_id },
+      { match_type: "europa_final",    team1_id: null,          team2_id: null          },
+      { match_type: "europa_7th",      team1_id: null,          team2_id: null          },
     ]
 
     for (const m of matchesToCreate) {
@@ -277,40 +279,59 @@ router.patch("/matches/:matchId/leg", authenticate, adminOnly, async (req, res, 
           [winnerId, match.id]
         )
 
-        // Advance winner to the Final
+        // Advance winner to Final, loser to 3rd/4th or 7th/8th place match
         const sfToFinalMap = {
           champions_sf1:  "champions_final",
           champions_sf2:  "champions_final",
           europa_sf1:     "europa_final",
           europa_sf2:     "europa_final",
         }
+        const sfTo3rdMap = {
+          champions_sf1:  "champions_3rd",
+          champions_sf2:  "champions_3rd",
+          europa_sf1:     "europa_7th",
+          europa_sf2:     "europa_7th",
+        }
         const finalType = sfToFinalMap[match.match_type]
+        const thirdType = sfTo3rdMap[match.match_type]
+
         if (finalType) {
           const seasonNumber = match.season_number
-          // Determine which slot to fill (team1 = first SF winner, team2 = second SF winner)
           const isSF1 = match.match_type.endsWith("_sf1")
-          const col   = isSF1 ? "team1_id" : "team2_id"
+          const winnerCol = isSF1 ? "team1_id" : "team2_id"
+          const loserCol  = isSF1 ? "team1_id" : "team2_id"
+
+          // Loser = the other team
+          const loserId = winnerId === fresh.team1_id ? fresh.team2_id : fresh.team1_id
+
+          // Advance winner to Final
           await query(
-            `UPDATE team_knockout_matches SET ${col} = $1 WHERE season_number = $2 AND match_type = $3`,
+            `UPDATE team_knockout_matches SET ${winnerCol} = $1 WHERE season_number = $2 AND match_type = $3`,
             [winnerId, seasonNumber, finalType]
           )
+          // Advance loser to 3rd/4th or 7th/8th
+          if (thirdType) {
+            await query(
+              `UPDATE team_knockout_matches SET ${loserCol} = $1 WHERE season_number = $2 AND match_type = $3`,
+              [loserId, seasonNumber, thirdType]
+            )
+          }
         }
 
         // Check if this is a Final — award trophies
-        if (match.match_type === "champions_final" || match.match_type === "europa_final") {
+        const finalMatches = ["champions_final", "champions_3rd", "europa_final", "europa_7th"]
+        if (finalMatches.includes(match.match_type)) {
           const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
           const season = parseInt(seasonRes.rows[0]?.value || "1")
-          const tournament = match.match_type === "champions_final" ? "team_league" : "europa"
-
-          await reconcileTeamTrophy({ tournament, teamId: winnerId, seasonNumber: season })
-
-          // Update season record
-          const winnerNameRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
-          const winnerName = winnerNameRes.rows[0]?.name ?? null
 
           if (match.match_type === "champions_final") {
-            await updateSeasonRecord(season, { team_league_winner: winnerName })
+            await reconcileTeamTrophy({ tournament: "team_league", teamId: winnerId, seasonNumber: season })
+            const winnerNameRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
+            await updateSeasonRecord(season, { team_league_winner: winnerNameRes.rows[0]?.name ?? null })
+          } else if (match.match_type === "europa_final") {
+            await reconcileTeamTrophy({ tournament: "europa", teamId: winnerId, seasonNumber: season })
           }
+          // 3rd/4th and 7th/8th place — no trophy, just completion
         }
       }
     }
