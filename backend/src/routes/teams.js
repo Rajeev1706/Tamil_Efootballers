@@ -1272,11 +1272,11 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     const standingsRes = await query(`
       SELECT
         t.id                                       AS team_id,
-        t.wins, t.draws, t.losses,
+        t.won, t.drawn, t.lost,
         t.points,
-        ROW_NUMBER() OVER (ORDER BY t.points DESC, t.wins DESC, (t.wins - t.losses) DESC) AS league_pos
+        ROW_NUMBER() OVER (ORDER BY t.points DESC, t.won DESC, (t.won - t.lost) DESC) AS league_pos
       FROM teams t
-      WHERE t.points > 0 OR t.wins > 0 OR t.draws > 0 OR t.losses > 0
+      WHERE t.points > 0 OR t.won > 0 OR t.drawn > 0 OR t.lost > 0
     `)
 
     // Get championship positions — ranked by total team BDR points
