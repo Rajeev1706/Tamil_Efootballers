@@ -582,6 +582,9 @@ export const useLeagueFormat = () =>
 export const useLeagueFormatPublic = () =>
   useQuery({ queryKey: ["league-format-public"], queryFn: () => fixturesApi.getFormatPublic() })
 
+export const useGroupStandings = () =>
+  useQuery({ queryKey: ["group-standings"], queryFn: () => fixturesApi.groupStandings() })
+
 export const useUpdateFixture = () => {
   const qc = useQueryClient()
   return useMutation({
@@ -827,6 +830,18 @@ export const useResetUclKnockout = () => {
   return useMutation({
     mutationFn: (id) => uclKnockoutApi.reset(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ucl-knockout-list"] }),
+  })
+}
+
+export const useStartUclKnockout = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => uclKnockoutApi.start(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ucl-knockout-list"] })
+      qc.invalidateQueries({ queryKey: ["ucl-knockout"] })
+      qc.invalidateQueries({ queryKey: ["ucl-knockout-current"] })
+    },
   })
 }
 
