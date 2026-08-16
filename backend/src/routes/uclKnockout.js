@@ -43,6 +43,9 @@ router.get("/public/current", async (req, res, next) => {
 
 // Helper: get top 4 from each active UCL group by standings
 async function getGroupStandings() {
+  const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+  const season = parseInt(seasonRes.rows[0]?.value || "1")
+
   const result = await query(`
     SELECT
       p.id, p.name, p.ucl_group_id AS "groupId",
@@ -57,11 +60,13 @@ async function getGroupStandings() {
     FROM players p
     JOIN ucl_groups g ON p.ucl_group_id = g.id AND g.status = 'active'
     LEFT JOIN match_records mr
-      ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.match_type = 'ucl'
+      ON (mr.player_id = p.id OR mr.opponent_id = p.id)
+      AND mr.match_type = 'ucl'
+      AND mr.season_number = $1
       AND NOT EXISTS (SELECT 1 FROM ucl_knockout_matches km WHERE km.match_record_id = mr.id)
     GROUP BY p.id, p.name, p.ucl_group_id, g.name
     ORDER BY g.name ASC, points DESC, gd DESC, gf DESC
-  `)
+  `, [season])
 
   // Group by groupId, take top 4
   const byGroup = {}
@@ -417,12 +422,14 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
           COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
           COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
         FROM players p
-        JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='ucl'
+        JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id)
+          AND mr.match_type='ucl'
+          AND mr.season_number = $2
         WHERE p.ucl_group_id IS NOT NULL
         GROUP BY p.id
         ORDER BY goals DESC, conceded ASC
         LIMIT 1
-      `)
+      `, [match.tournament_id, season])
       const topScorer = combinedGoldenBootRes.rows[0]
       await awardOrReassignTrophy({
         sourceKey: `ucl_golden_boot_tournament_${match.tournament_id}`,
