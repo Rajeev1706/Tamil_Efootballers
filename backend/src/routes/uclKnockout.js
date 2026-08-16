@@ -431,12 +431,11 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         FROM players p
         JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id)
           AND mr.match_type='ucl'
-          AND mr.season_number = $2
-        WHERE p.ucl_group_id IS NOT NULL
+          AND mr.season_number = $1
         GROUP BY p.id
         ORDER BY goals DESC, conceded ASC
         LIMIT 1
-      `, [match.tournament_id, season])
+      `, [season])
       const topScorer = combinedGoldenBootRes.rows[0]
       await awardOrReassignTrophy({
         sourceKey: `ucl_golden_boot_tournament_${match.tournament_id}`,
