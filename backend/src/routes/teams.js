@@ -6,7 +6,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
-import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
+import { recalcMarketValue } from "../services/marketValue.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
@@ -1122,17 +1122,29 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       }
     }
 
+    // ── Recalculate market value for ALL players ──────────────────────────────
+    // Grades just changed — MV uses current grade in its matrices so every
+    // player's MV must be refreshed, not just those whose grade changed.
+    // Run this after both grade update passes so the new grades are committed.
+    const allPlayersRes = await query("SELECT id FROM players")
+    let mvRecalcCount = 0
+    for (const p of allPlayersRes.rows) {
+      try {
+        await recalcMarketValue(p.id)
+        mvRecalcCount++
+      } catch (e) {
+        console.error(`[recalcGrades] MV recalc failed for player ${p.id}:`, e.message)
+      }
+    }
+
     res.json({
       success: true,
       season: targetSeason,
       eligible: eligible.length,
       updated: gradeUpdateLog.length,
       changes: gradeUpdateLog,
+      mvRecalculated: mvRecalcCount,
     })
-  } catch (err) { next(err) }
-})
-
-// POST /api/teams/season-reset — admin only
 // Archives current season by clearing its fixtures/UCL/team-stats, then
 // ADVANCES the season number by one.
 // Also auto-updates player grades based on completed season win rates.
@@ -1315,6 +1327,15 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       `)
     })
 
+    // ── Recalculate MV for ALL players after grade changes ───────────────────
+    const allPRes = await query("SELECT id FROM players")
+    let mvCount = 0
+    for (const p of allPRes.rows) {
+      try { await recalcMarketValue(p.id); mvCount++ } catch (e) {
+        console.error(`[season-reset] MV recalc failed for player ${p.id}:`, e.message)
+      }
+    }
+
     res.json({
       success: true,
       message: "Season reset complete. Team stats, fixtures, trades, the entire UCL competition, and everyone's BDR points were cleared. Match history and trophies are preserved.",
@@ -1322,7 +1343,8 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
         eligible: eligible.length,
         changed: gradeUpdateLog.length,
         log: gradeUpdateLog,
-      }
+      },
+      mvRecalculated: mvCount,
     })
   } catch (err) { next(err) }
 })
