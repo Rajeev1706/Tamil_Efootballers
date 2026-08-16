@@ -16,6 +16,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
+import { claimAward, addBdr } from "../services/bdrAwards.js"
 
 const router = Router()
 
@@ -328,10 +329,65 @@ router.patch("/matches/:matchId/leg", authenticate, adminOnly, async (req, res, 
             await reconcileTeamTrophy({ tournament: "team_league", teamId: winnerId, seasonNumber: season })
             const winnerNameRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
             await updateSeasonRecord(season, { team_league_winner: winnerNameRes.rows[0]?.name ?? null })
+
+            // BDR for Champions: need 3rd/4th match to also be done
+            const thirdMatch = await query(
+              "SELECT winner_id, team1_id, team2_id FROM team_knockout_matches WHERE season_number=$1 AND match_type='champions_3rd'",
+              [season]
+            )
+            const third = thirdMatch.rows[0]
+            if (third?.winner_id && await claimAward("team_knockout_champion_bdr", season)) {
+              const loserId = fresh.team1_id === winnerId ? fresh.team2_id : fresh.team1_id
+              const thirdId  = third.winner_id
+              const fourthId = third.winner_id === third.team1_id ? third.team2_id : third.team1_id
+
+              const placements = [
+                { teamId: winnerId, bdr: 12 }, // 1st — Champions Final winner
+                { teamId: loserId,  bdr: 9  }, // 2nd — Champions Final loser
+                { teamId: thirdId,  bdr: 7  }, // 3rd — 3rd/4th match winner
+                { teamId: fourthId, bdr: 5  }, // 4th — 3rd/4th match loser
+              ]
+              for (const { teamId, bdr } of placements) {
+                const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
+                for (const p of playersRes.rows) await addBdr(p.id, bdr)
+              }
+            }
+
+          } else if (match.match_type === "champions_3rd") {
+            // Also try to fire BDR if Champions Final is already done
+            const champFinal = await query(
+              "SELECT winner_id, team1_id, team2_id FROM team_knockout_matches WHERE season_number=$1 AND match_type='champions_final'",
+              [season]
+            )
+            const cf = champFinal.rows[0]
+            if (cf?.winner_id && await claimAward("team_knockout_champion_bdr", season)) {
+              const champWinnerId = cf.winner_id
+              const champLoserId  = cf.winner_id === cf.team1_id ? cf.team2_id : cf.team1_id
+              const thirdId  = winnerId
+              const fourthId = fresh.team1_id === winnerId ? fresh.team2_id : fresh.team1_id
+
+              const placements = [
+                { teamId: champWinnerId, bdr: 12 },
+                { teamId: champLoserId,  bdr: 9  },
+                { teamId: thirdId,       bdr: 7  },
+                { teamId: fourthId,      bdr: 5  },
+              ]
+              for (const { teamId, bdr } of placements) {
+                const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
+                for (const p of playersRes.rows) await addBdr(p.id, bdr)
+              }
+            }
+
           } else if (match.match_type === "europa_final") {
             await reconcileTeamTrophy({ tournament: "europa", teamId: winnerId, seasonNumber: season })
+
+            // +4 BDR to all players in the Europa winning team
+            if (await claimAward("team_knockout_europa_bdr", season)) {
+              const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
+              for (const p of playersRes.rows) await addBdr(p.id, 4)
+            }
           }
-          // 3rd/4th and 7th/8th place — no trophy, just completion
+          // champions_3rd and europa_7th — no trophy, just BDR handled above
         }
       }
     }
