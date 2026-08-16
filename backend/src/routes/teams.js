@@ -7,6 +7,7 @@ import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { recalcMarketValue } from "../services/marketValue.js"
+import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
@@ -1145,6 +1146,9 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       changes: gradeUpdateLog,
       mvRecalculated: mvRecalcCount,
     })
+  } catch (err) { next(err) }
+})
+
 // Archives current season by clearing its fixtures/UCL/team-stats, then
 // ADVANCES the season number by one.
 // Also auto-updates player grades based on completed season win rates.
