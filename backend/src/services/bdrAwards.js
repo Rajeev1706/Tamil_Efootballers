@@ -1,6 +1,21 @@
 // services/bdrAwards.js
 import { query } from "../db/pool.js"
 
+// Auto-create the bdr_awards_log table if it doesn't exist
+;(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS bdr_awards_log (
+        id           SERIAL PRIMARY KEY,
+        award_type   TEXT NOT NULL,
+        reference_id INT  NOT NULL,
+        awarded_at   TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(award_type, reference_id)
+      )
+    `)
+  } catch (e) { console.error("[bdrAwards] migration:", e.message) }
+})()
+
 // Attempts to claim a one-time award slot for a specific season/tournament/
 // group. Returns true the FIRST time this is called for that exact
 // (awardType, referenceId) pair — caller should then actually hand out the
