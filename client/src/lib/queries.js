@@ -114,7 +114,7 @@ export const useWeeklyCurrent = () =>
   useQuery({ queryKey: ["weekly-current"], queryFn: weeklyApi.current })
 
 export const useUclKnockoutCurrent = () =>
-  useQuery({ queryKey: ["ucl-knockout-current"], queryFn: uclKnockoutApi.current })
+  useQuery({ queryKey: ["ucl-knockout-current"], queryFn: uclKnockoutApi.current, staleTime: 0 })
 
 export const useWeeklyTopScorers = (enabled = true) =>
   useQuery({ queryKey: ["weekly-top-scorers"], queryFn: weeklyApi.topScorers, enabled, staleTime: 1000 * 60 * 2 })
