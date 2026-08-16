@@ -746,92 +746,49 @@ export default function FixtureResults({ fixtures }) {
 
   const format = leagueFormat?.format || "league_knockout"
 
-  // ── Group Knockout format — show TLG fixtures instead ──────────────────
+  // ── Group Knockout format — uses fixtures table grouped by A/B ─────────────
   if (format === "group_knockout") {
+    const hasGroupFixtures = fixtures.some(f => f.groupStage)
+    const groupAFixtures = fixtures.filter(f => f.grp === "A" || f.grp === "A ")
+    const groupBFixtures = fixtures.filter(f => f.grp === "B" || f.grp === "B ")
+    const roundsA = [...new Set(groupAFixtures.map(f => f.round))].sort((a, b) => a - b)
+    const roundsB = [...new Set(groupBFixtures.map(f => f.round))].sort((a, b) => a - b)
+
     return (
       <div className="space-y-4">
-        <GenerateSeasonCard hasExistingFixtures={false} />
-        {!tlg ? (
+        <GenerateSeasonCard hasExistingFixtures={hasGroupFixtures} />
+        {!hasGroupFixtures ? (
           <div className="card px-6 py-10 text-center">
-            <p className="text-slate-400 text-sm">No TLG season created yet.</p>
-            <p className="text-xs text-slate-600 mt-1">Go to the TLG tab to create a season and run the draw.</p>
+            <p className="text-slate-400 text-sm">No group stage fixtures yet.</p>
+            <p className="text-xs text-slate-600 mt-1">First do the TLG draw, then click "+ Auto-generate schedule" above.</p>
           </div>
         ) : (
           <>
-            {/* Group Stage Fixtures */}
-            {tlg.groups?.map(group => (
-              <div key={group.id} className="card overflow-hidden">
-                <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center gap-2">
-                  <span className="text-sm font-bold text-white">Group {group.name}</span>
+            {[{ label: "Group A", grpFixtures: groupAFixtures, rounds: roundsA },
+              { label: "Group B", grpFixtures: groupBFixtures, rounds: roundsB }].map(({ label, grpFixtures, rounds }) => (
+              <div key={label} className="card overflow-hidden">
+                <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center gap-3">
+                  <span className="text-sm font-bold text-white">{label}</span>
                   <span className="text-xs text-slate-500">
-                    {group.fixtures.filter(f => f.status === "completed").length}/{group.fixtures.length} completed
+                    {grpFixtures.filter(f => f.status === "completed").length}/{grpFixtures.length} completed
                   </span>
                 </div>
-                <div className="divide-y divide-surface-border/50">
-                  {[1, 2, 3].map(round => {
-                    const roundFixtures = group.fixtures.filter(f => f.round === round)
-                    if (!roundFixtures.length) return null
-                    return (
-                      <div key={round}>
-                        <div className="px-5 py-1.5 bg-pitch-900/40">
-                          <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Round {round}</span>
-                        </div>
-                        {roundFixtures.map(f => (
-                          <div key={f.id} className="flex items-center gap-3 px-5 py-3">
-                            <span className="flex-1 text-sm text-white">{f.homeTeamName}</span>
-                            <span className={cn("text-sm font-mono font-bold px-2 py-0.5 rounded",
-                              f.status === "completed" ? "bg-pitch-900 text-white" : "text-slate-600"
-                            )}>
-                              {f.status === "completed"
-                                ? f.is_walkover ? "WO" : `${f.home_score} – ${f.away_score}`
-                                : "vs"}
-                            </span>
-                            <span className="flex-1 text-sm text-white text-right">{f.awayTeamName}</span>
-                          </div>
-                        ))}
+                {rounds.map(round => {
+                  const roundFix = grpFixtures.filter(f => f.round === round)
+                  if (!roundFix.length) return null
+                  return (
+                    <div key={round}>
+                      <div className="px-5 py-2 bg-pitch-900/40 flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Round {round}</span>
                       </div>
-                    )
-                  })}
-                </div>
+                      {roundFix.map(f => (
+                        <FixtureCard key={f.id} fixture={f} />
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
             ))}
-
-            {/* Knockout Fixtures */}
-            {tlg.knockout && Object.keys(tlg.knockout).length > 0 && (
-              <div className="card overflow-hidden">
-                <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40">
-                  <span className="text-sm font-bold text-white">Knockout Stage</span>
-                </div>
-                <div className="divide-y divide-surface-border/50">
-                  {[
-                    { phase: "champions_sf1",   label: "Champions SF1" },
-                    { phase: "champions_sf2",   label: "Champions SF2" },
-                    { phase: "champions_final", label: "🏆 Champions Final" },
-                    { phase: "third_place",     label: "3rd Place" },
-                    { phase: "europa_qr1",      label: "Europa QR1" },
-                    { phase: "europa_qr2",      label: "Europa QR2" },
-                    { phase: "europa_final",    label: "🌍 Europa Final" },
-                    { phase: "seventh_place",   label: "7th Place" },
-                  ].filter(({ phase }) => tlg.knockout[phase]).map(({ phase, label }) => {
-                    const m = tlg.knockout[phase]
-                    return (
-                      <div key={phase} className="flex items-center gap-3 px-5 py-3">
-                        <span className="text-xs text-slate-500 w-32 flex-shrink-0">{label}</span>
-                        <span className="flex-1 text-sm text-white">{m.homeTeamName ?? "TBD"}</span>
-                        <span className={cn("text-sm font-mono font-bold px-2 py-0.5 rounded",
-                          m.status === "completed" ? "bg-pitch-900 text-white" : "text-slate-600"
-                        )}>
-                          {m.status === "completed"
-                            ? m.is_walkover ? "WO" : `${m.home_score} – ${m.away_score}`
-                            : "vs"}
-                        </span>
-                        <span className="flex-1 text-sm text-white text-right">{m.awayTeamName ?? "TBD"}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

@@ -12,9 +12,11 @@ const MATCH_LABELS = {
   champions_sf1:   "Semi-Final 1",
   champions_sf2:   "Semi-Final 2",
   champions_final: "Final",
+  champions_3rd:   "3rd/4th Place",
   europa_sf1:      "Semi-Final 1",
   europa_sf2:      "Semi-Final 2",
   europa_final:    "Final",
+  europa_7th:      "7th/8th Place",
 }
 
 function TeamRow({ name, logoUrl, isWinner, leg1, leg2, side = "left" }) {
@@ -102,12 +104,12 @@ function BracketSection({ title, icon, matches, color }) {
   const sf1   = matches.find(m => m.match_type?.endsWith("_sf1"))
   const sf2   = matches.find(m => m.match_type?.endsWith("_sf2"))
   const final = matches.find(m => m.match_type?.endsWith("_final"))
+  const third = matches.find(m => m.match_type?.endsWith("_3rd") || m.match_type?.endsWith("_7th"))
 
   if (!sf1 && !sf2 && !final) return null
 
   return (
     <div className="mb-8">
-      {/* Section header */}
       <div className={cn("flex items-center gap-2 mb-4 pb-2 border-b", color === "gold" ? "border-gold/20" : "border-violet-400/20")}>
         <img src={icon} alt={title} className="w-6 h-6 object-contain" />
         <h2 className={cn("font-bold text-base", color === "gold" ? "text-gold" : "text-violet-400")}>{title}</h2>
@@ -116,21 +118,16 @@ function BracketSection({ title, icon, matches, color }) {
         </span>
       </div>
 
-      {/* Bracket grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-        {/* SF1 */}
-        <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+        {/* SFs */}
+        <div className="space-y-3">
           {sf1 && <MatchCard match={sf1} label={MATCH_LABELS[sf1.match_type]} />}
-        </div>
-
-        {/* Final — center */}
-        <div className="sm:mt-6">
-          {final && <MatchCard match={final} label={MATCH_LABELS[final.match_type]} />}
-        </div>
-
-        {/* SF2 */}
-        <div>
           {sf2 && <MatchCard match={sf2} label={MATCH_LABELS[sf2.match_type]} />}
+        </div>
+        {/* Final + 3rd/4th */}
+        <div className="space-y-3">
+          {final && <MatchCard match={final} label={MATCH_LABELS[final.match_type]} />}
+          {third && <MatchCard match={third} label={MATCH_LABELS[third.match_type]} />}
         </div>
       </div>
     </div>

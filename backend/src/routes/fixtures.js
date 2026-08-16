@@ -128,7 +128,10 @@ const FIXTURE_SELECT = `
     COALESCE((
       SELECT COUNT(*) FROM match_records mr
       WHERE mr.fixture_id = f.id AND mr.match_type = 'league'
-    ), 0) AS "liveResultsLogged"
+    ), 0) AS "liveResultsLogged",
+
+    f.group_stage AS "groupStage",
+    f.grp
 
   FROM fixtures f
   JOIN teams ht ON f.home_team_id = ht.id
@@ -204,20 +207,34 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
       ON CONFLICT (key) DO UPDATE SET value = $1
     `, [format])
 
-    if (format === "group_knockout") {
-      // Randomly split teams into 2 groups of 4
-      if (teamIds.length !== 8) {
-        return res.status(400).json({ error: "Group + Knockout format requires exactly 8 teams" })
-      }
-      // Shuffle and split
-      const shuffled = [...teamIds].sort(() => Math.random() - 0.5)
-      const groupA = shuffled.slice(0, 4)
-      const groupB = shuffled.slice(4, 8)
+    let fixturesCreated = 0
 
+    if (format === "group_knockout") {
       const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
       const season = parseInt(seasonRes.rows[0]?.value || "1")
 
-      // Store group assignments
+      // Read group assignments from TLG (most recent TLG season)
+      const tlgRes = await query(`
+        SELECT gt.team_id, g.name AS grp
+        FROM tlg_group_teams gt
+        JOIN tlg_groups g ON g.id = gt.group_id
+        JOIN tlg_seasons s ON s.id = g.season_id
+        WHERE s.season_number = $1
+        ORDER BY g.name ASC, gt.seed ASC
+      `, [season])
+
+      if (tlgRes.rows.length === 0) {
+        return res.status(400).json({ error: "No TLG group assignments found for this season. Please do the TLG draw first." })
+      }
+
+      const groupA = tlgRes.rows.filter(r => r.grp === "A").map(r => r.team_id)
+      const groupB = tlgRes.rows.filter(r => r.grp === "B").map(r => r.team_id)
+
+      if (groupA.length !== 4 || groupB.length !== 4) {
+        return res.status(400).json({ error: `TLG groups must have exactly 4 teams each (Group A: ${groupA.length}, Group B: ${groupB.length})` })
+      }
+
+      // Store group assignments in fixture_groups for knockout use
       for (const tid of groupA) {
         await query(`
           INSERT INTO fixture_groups (team_id, season_number, grp)
@@ -233,7 +250,7 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
         `, [tid, season])
       }
 
-      // Generate home+away within each group
+      // Generate home+away fixtures within each group
       const generateGroupFixtures = async (groupTeams, grpLetter) => {
         const groupRounds = generateDoubleRoundRobin(groupTeams)
         for (let i = 0; i < groupRounds.length; i++) {
@@ -254,7 +271,6 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
     }
 
     const rounds = generateDoubleRoundRobin(teamIds)
-    let fixturesCreated = 0
     for (let i = 0; i < rounds.length; i++) {
       const roundNumber = i + 1
       for (const [homeId, awayId] of rounds[i]) {
@@ -585,7 +601,68 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /api/fixtures/format/public — public version for the common dashboard
+// GET /api/fixtures/group-standings — public group standings for group_knockout format
+router.get("/group-standings", async (req, res, next) => {
+  try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "1")
+
+    const result = await query(`
+      SELECT
+        fg.grp,
+        t.id           AS "teamId",
+        t.name         AS "teamName",
+        t.logo_url     AS "logoUrl",
+        COUNT(f.id) FILTER (WHERE f.status = 'completed')::int                                    AS played,
+        COUNT(f.id) FILTER (WHERE f.status = 'completed' AND (
+          (f.home_team_id = t.id AND f.home_score > f.away_score) OR
+          (f.away_team_id = t.id AND f.away_score > f.home_score)
+        ))::int                                                                                    AS won,
+        COUNT(f.id) FILTER (WHERE f.status = 'completed' AND
+          f.home_score = f.away_score)::int                                                        AS drawn,
+        COUNT(f.id) FILTER (WHERE f.status = 'completed' AND (
+          (f.home_team_id = t.id AND f.home_score < f.away_score) OR
+          (f.away_team_id = t.id AND f.away_score < f.home_score)
+        ))::int                                                                                    AS lost,
+        COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.home_score
+                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.away_score
+                          ELSE 0 END), 0)::int                                                    AS gf,
+        COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.away_score
+                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.home_score
+                          ELSE 0 END), 0)::int                                                    AS ga,
+        COALESCE(SUM(
+          CASE
+            WHEN f.status='completed' AND (f.home_team_id=t.id AND f.home_score > f.away_score) THEN 3
+            WHEN f.status='completed' AND (f.away_team_id=t.id AND f.away_score > f.home_score) THEN 3
+            WHEN f.status='completed' AND f.home_score = f.away_score                            THEN 1
+            ELSE 0
+          END
+        ), 0)::int                                                                                 AS pts
+      FROM fixture_groups fg
+      JOIN teams t ON t.id = fg.team_id
+      LEFT JOIN fixtures f
+        ON (f.home_team_id = t.id OR f.away_team_id = t.id)
+        AND f.group_stage = true
+        AND f.status IN ('upcoming', 'completed')
+      WHERE fg.season_number = $1
+      GROUP BY fg.grp, t.id, t.name, t.logo_url
+      ORDER BY fg.grp ASC, pts DESC,
+        (COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.home_score - f.away_score
+                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.away_score - f.home_score
+                          ELSE 0 END), 0)) DESC,
+        (COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.home_score
+                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.away_score
+                          ELSE 0 END), 0)) DESC
+    `, [season])
+
+    const groups = { A: [], B: [] }
+    for (const row of result.rows) {
+      const grp = row.grp?.trim()
+      if (groups[grp]) groups[grp].push({ ...row, gd: row.gf - row.ga })
+    }
+    res.json(groups)
+  } catch (err) { next(err) }
+})
 router.get("/format/public", async (req, res, next) => {
   try {
     const [formatRes, champRes] = await Promise.all([

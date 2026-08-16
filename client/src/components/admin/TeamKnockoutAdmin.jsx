@@ -9,18 +9,22 @@ const MATCH_LABELS = {
   champions_sf1:   "Champions SF 1",
   champions_sf2:   "Champions SF 2",
   champions_final: "Champions Final",
+  champions_3rd:   "3rd/4th Place",
   europa_sf1:      "Europa SF 1",
   europa_sf2:      "Europa SF 2",
   europa_final:    "Europa Final",
+  europa_7th:      "7th/8th Place",
 }
 
 const MATCH_COLORS = {
   champions_sf1:   "border-amber-500/30 bg-amber-500/5",
   champions_sf2:   "border-amber-500/30 bg-amber-500/5",
   champions_final: "border-gold/50 bg-gold/10",
+  champions_3rd:   "border-slate-500/30 bg-slate-500/5",
   europa_sf1:      "border-violet-500/30 bg-violet-500/5",
   europa_sf2:      "border-violet-500/30 bg-violet-500/5",
   europa_final:    "border-violet-400/50 bg-violet-400/10",
+  europa_7th:      "border-slate-500/30 bg-slate-500/5",
 }
 
 function LegInput({ label, value, onChange, disabled }) {
@@ -240,8 +244,13 @@ export default function TeamKnockoutAdmin() {
             🏆 Champions Bracket
             <span className="text-xs text-slate-500 font-normal">(Top 2 from each group)</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {champMatches.map(m => <MatchCard key={m.id} match={m} />)}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-3">
+              {champMatches.filter(m => m.match_type.endsWith("_sf1") || m.match_type.endsWith("_sf2")).map(m => <MatchCard key={m.id} match={m} />)}
+            </div>
+            <div className="space-y-3">
+              {champMatches.filter(m => m.match_type === "champions_final" || m.match_type === "champions_3rd").map(m => <MatchCard key={m.id} match={m} />)}
+            </div>
           </div>
         </div>
       )}
@@ -253,8 +262,13 @@ export default function TeamKnockoutAdmin() {
             🥈 Europa Bracket
             <span className="text-xs text-slate-500 font-normal">(3rd & 4th from each group)</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {europaMatches.map(m => <MatchCard key={m.id} match={m} />)}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-3">
+              {europaMatches.filter(m => m.match_type.endsWith("_sf1") || m.match_type.endsWith("_sf2")).map(m => <MatchCard key={m.id} match={m} />)}
+            </div>
+            <div className="space-y-3">
+              {europaMatches.filter(m => m.match_type === "europa_final" || m.match_type === "europa_7th").map(m => <MatchCard key={m.id} match={m} />)}
+            </div>
           </div>
         </div>
       )}
