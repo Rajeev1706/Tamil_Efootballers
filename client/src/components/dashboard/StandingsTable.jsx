@@ -235,9 +235,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
         const renderGroupTable = (rows, label) => (
           <div className="mb-2">
             <div className="px-4 py-2 border-b border-surface-border/60 flex items-center gap-2">
-              <span className={cn("text-xs font-bold uppercase tracking-widest",
-                label === "A" ? "text-gold" : "text-violet-400"
-              )}>Group {label}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-gold">Group {label}</span>
               <span className="text-[10px] text-slate-500">
                 {label === "A" ? "Top 2 → Champions KO" : "Top 2 → Champions KO"}
                 {" · "}3rd & 4th → Europa KO
