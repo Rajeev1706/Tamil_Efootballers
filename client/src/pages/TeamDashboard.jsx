@@ -190,7 +190,13 @@ export default function TeamDashboard() {
             />
           )}
           {activeTab === "fixtures" && (
-            <TeamFixtures fixtures={fixtures} myTeamName={myTeamName} />
+            <TeamFixtures
+              fixtures={fixtures}
+              myTeamName={myTeamName}
+              myTeamId={user?.teamId}
+              myPlayers={myPlayers}
+              allPlayers={allPlayers}
+            />
           )}
           {activeTab === "results" && (
             <TeamResults
