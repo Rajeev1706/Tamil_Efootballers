@@ -8,6 +8,7 @@ const RESULTS = [
   { value: "draw", label: "Draw", color: "bg-amber-400/15  text-amber-400  border-amber-400/30"  },
   { value: "loss", label: "Loss", color: "bg-rose-500/15   text-rose-400   border-rose-500/30"   },
   { value: "walkover", label: "Walkover (I gave WO)", color: "bg-orange-400/15 text-orange-400 border-orange-400/30" },
+  { value: "walkover_opp", label: "Walkover (Opp gave WO)", color: "bg-emerald-400/15 text-emerald-400 border-emerald-400/30" },
 ]
 
 export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId }) {
@@ -115,10 +116,10 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
   async function submitEntry(entry) {
     if (!entry.myPlayerId || !entry.oppPlayerId || !entry.result) return
     try {
-      const isWalkover  = entry.result === "walkover"
-      const result      = isWalkover ? "loss" : entry.result
-      const playerScore = isWalkover ? 0 : Number(entry.playerScore)
-      const oppScore    = isWalkover ? 3 : Number(entry.oppScore)
+      const isWalkover  = entry.result === "walkover" || entry.result === "walkover_opp"
+      const result      = entry.result === "walkover" ? "loss" : entry.result === "walkover_opp" ? "win" : entry.result
+      const playerScore = entry.result === "walkover" ? 0 : entry.result === "walkover_opp" ? 3 : Number(entry.playerScore)
+      const oppScore    = entry.result === "walkover" ? 3 : entry.result === "walkover_opp" ? 0 : Number(entry.oppScore)
 
       await logRecord.mutateAsync({
         playerId:      Number(entry.myPlayerId),
@@ -365,6 +366,7 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
           <option value="draw">Draw</option>
           <option value="loss">Loss</option>
           <option value="walkover">Walkover (I gave WO)</option>
+          <option value="walkover_opp">Walkover (Opp gave WO)</option>
         </select>
 
         {!isWalkover ? (
@@ -385,7 +387,9 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
             />
           </>
         ) : (
-          <span className="text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-1 rounded flex-shrink-0">0 – 3 (WO)</span>
+          <span className={entry.result === "walkover_opp" ? "text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-2 py-1 rounded flex-shrink-0" : "text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-1 rounded flex-shrink-0"}>
+              {entry.result === "walkover_opp" ? "3 – 0 (WO)" : "0 – 3 (WO)"}
+            </span>
         )}
       </div>
 
