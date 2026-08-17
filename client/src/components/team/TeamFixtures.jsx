@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Calendar, Clock, ChevronDown, ChevronUp, Check, X } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useLineup, useFixtureRecords, useLogTeamRecord, useUpdateTeamRecord, useDeleteTeamRecord } from "../../lib/queries"
+import { useLineup, useFixtureRecords, useLogTeamRecord, useEditTeamRecord, useDeleteTeamRecord } from "../../lib/queries"
 
 // ── Result button strip ───────────────────────────────────────────────────────
 function ResultBtn({ label, value, selected, onClick, disabled }) {
@@ -26,7 +26,7 @@ function ResultBtn({ label, value, selected, onClick, disabled }) {
 // ── Single matchup row ────────────────────────────────────────────────────────
 function MatchupRow({ slot, myPlayer, oppPlayer, fixtureId, myTeamId, existingRecord, allPlayers, myPlayers, oppTeamId }) {
   const logRecord    = useLogTeamRecord()
-  const updateRecord = useUpdateTeamRecord()
+  const updateRecord = useEditTeamRecord()
   const deleteRecord = useDeleteTeamRecord()
 
   const [result, setResult]         = useState(existingRecord?.result ?? null)
