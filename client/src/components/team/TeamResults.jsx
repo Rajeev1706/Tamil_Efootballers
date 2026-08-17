@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CheckCircle, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Save } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { useLogTeamRecord, useFixtureRecords, useEditTeamRecord, useDeleteTeamRecord } from "../../lib/queries"
+import { useLogTeamRecord, useFixtureRecords, useEditTeamRecord, useDeleteTeamRecord, useLineup } from "../../lib/queries"
 
 const RESULTS = [
   { value: "win",  label: "Win",  color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -53,9 +53,32 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
   const oppPlayers = allPlayers.filter(p => p.teamId === oppTeamId)
 
   const { data: existingRecords = [], refetch } = useFixtureRecords(fixture.id)
+  const { data: lineup = [] } = useLineup(fixture.id)
   const logRecord = useLogTeamRecord()
 
-  // Players already used in logged records for this fixture (both sides)
+  // Pre-fill entries from saved lineup if available
+  const buildInitialEntries = () => {
+    if (lineup.length > 0) {
+      return lineup.map((m, i) => ({
+        id:          i + 1,
+        myPlayerId:  isHome ? (m.myPlayerId  ?? "") : (m.oppPlayerId ?? ""),
+        oppPlayerId: isHome ? (m.oppPlayerId ?? "") : (m.myPlayerId  ?? ""),
+        result:      "",
+        playerScore: "",
+        oppScore:    "",
+      }))
+    }
+    return [{ id: 1, myPlayerId: "", oppPlayerId: "", result: "", playerScore: "", oppScore: "" }]
+  }
+
+  const [entries, setEntries] = useState(buildInitialEntries)
+
+  // Re-fill when lineup loads (async)
+  useEffect(() => {
+    if (lineup.length > 0 && entries.every(e => !e.myPlayerId && !e.oppPlayerId)) {
+      setEntries(buildInitialEntries())
+    }
+  }, [lineup.length])
   const usedMyIds  = existingRecords.flatMap(r => [
     myPlayers.find(p => p.id === r.playerId)?.id,
     myPlayers.find(p => p.id === r.opponentId)?.id,
@@ -64,10 +87,6 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
     oppPlayers.find(p => p.id === r.playerId)?.id,
     oppPlayers.find(p => p.id === r.opponentId)?.id,
   ]).filter(Boolean)
-
-  const [entries, setEntries] = useState([
-    { id: 1, myPlayerId: "", oppPlayerId: "", result: "", playerScore: "", oppScore: "" }
-  ])
 
   function addEntry() {
     setEntries(prev => [...prev, {
