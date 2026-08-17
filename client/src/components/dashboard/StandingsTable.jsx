@@ -93,7 +93,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
             className="w-9 h-9 object-contain flex-shrink-0"
           />
           <div>
-            <p className="section-label mb-0.5">League table</p>
+            <p className="section-label mb-0.5">Dshann League</p>
             <h2 className="text-base font-semibold text-white">
               {view === "table" ? "Season standings" : view === "fixtures" ? "Fixtures" : view === "playoffs" ? "Playoffs" : "Golden Boot"}
             </h2>
