@@ -362,7 +362,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     if (oldMrId) await query("DELETE FROM match_records WHERE id = $1", [oldMrId])
 
     // If final — award trophy8 only (no BDR for Revolution)
-    if (match.round === totalRounds) {
+    if (match.round === match.total_rounds) {
       await awardOrReassignTrophy({
         sourceKey:    `revolution-champion-${match.tournament_id}`,
         trophyColumn: "trophy8_count",
