@@ -106,7 +106,17 @@ router.get("/:id", async (req, res, next) => {
       if (m.isWalkoverGiven) record.walkoversGiven++
     })
 
-    res.json({ ...player, record, matchHistory: historyRes.rows })
+    const currentSeasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const currentSeason = parseInt(currentSeasonRes.rows[0]?.value || "1")
+
+    const allSeasonsRes = await query(`
+      SELECT DISTINCT season_number FROM match_records
+      WHERE player_id=$1 OR opponent_id=$1
+      ORDER BY season_number DESC
+    `, [req.params.id])
+    const availableSeasons = allSeasonsRes.rows.map(r => r.season_number)
+
+    res.json({ ...player, record, matchHistory: historyRes.rows, currentSeason, availableSeasons })
   } catch (err) { next(err) }
 })
 
@@ -705,6 +715,129 @@ router.get("/:id/percentiles", async (req, res, next) => {
     console.error("[percentiles] Error:", err.message)
     next(err)
   }
+})
+
+// GET /api/players/:id/mv-debug — full market value calculation breakdown
+// Shows exactly what goes into the MV so you can verify correctness.
+router.get("/:id/mv-debug", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const playerId = parseInt(req.params.id)
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "1")
+
+    const playerRes = await query(
+      "SELECT id, name, grade, bdr_points, market_value FROM players WHERE id = $1", [playerId]
+    )
+    const player = playerRes.rows[0]
+    if (!player) return res.status(404).json({ error: "Player not found" })
+
+    const matchesRes = await query(`
+      SELECT
+        mr.id,
+        mr.recorded_at,
+        mr.match_type,
+        CASE
+          WHEN mr.player_id = $1 THEN mr.result
+          WHEN mr.result = 'win'  THEN 'loss'
+          WHEN mr.result = 'loss' THEN 'win'
+          ELSE 'draw'
+        END AS result,
+        CASE
+          WHEN mr.player_id = $1 THEN mr.opponent_grade
+          ELSE (SELECT grade FROM players WHERE id = mr.player_id)
+        END AS opponent_grade,
+        CASE WHEN mr.player_id = $1 THEN opp.name ELSE own.name END AS opponent_name
+      FROM match_records mr
+      LEFT JOIN players own ON own.id = mr.player_id
+      LEFT JOIN players opp ON opp.id = mr.opponent_id
+      WHERE (mr.player_id = $1 OR mr.opponent_id = $1)
+        AND mr.season_number = $2
+      ORDER BY mr.recorded_at DESC
+    `, [playerId, season])
+
+    // WIN_WEIGHT / DRAW / LOSS matrices
+    const WIN_WEIGHT   = { S: 1.5, A: 0.9, B: 0.7, C: 0.6 }
+    const DRAW_MATRIX  = {
+      S: { S: 0.2,  A: 0.2,  B: -0.5, C: -0.8 },
+      A: { S: 0.5,  A: 0.4,  B: -0.3, C: -0.4 },
+      B: { S: 0.7,  A: 0.6,  B: 0.4,  C: -0.2 },
+      C: { S: 0.9,  A: 0.8,  B: 0.6,  C: 0.3  },
+    }
+    const LOSS_MATRIX  = {
+      S: { S: -0.5, A: -0.7,  B: -1.0, C: -1.5 },
+      A: { S: -0.4, A: -0.75, B: -0.7, C: -1.0 },
+      B: { S: -0.4, A: -0.6,  B: -0.4, C: -0.7 },
+      C: { S: -0.3, A: -0.4,  B: -0.3, C: -0.7 },
+    }
+    const BDR_SWING_RATE = 18 / 120
+    const MATCH_CEILING  = 450
+
+    const ownGrade = player.grade ?? "C"
+    let ewRaw = 0
+    const matchBreakdown = []
+
+    for (const m of matchesRes.rows) {
+      let weight = 0
+      if (m.result === "win")  weight = WIN_WEIGHT[m.opponent_grade] ?? 0
+      if (m.result === "draw") weight = DRAW_MATRIX[ownGrade]?.[m.opponent_grade] ?? 0
+      if (m.result === "loss") weight = LOSS_MATRIX[ownGrade]?.[m.opponent_grade] ?? 0
+      ewRaw += weight
+      matchBreakdown.push({
+        opponent: m.opponent_name,
+        opponentGrade: m.opponent_grade,
+        result: m.result,
+        weight: weight,
+        runningEw: parseFloat(ewRaw.toFixed(3)),
+        matchType: m.match_type,
+        date: m.recorded_at,
+      })
+    }
+
+    const ew           = Math.max(ewRaw, 0)
+    const pp           = ew * 3
+    const winPct       = Math.max(ew / 14, 0)
+    const matchValue   = Math.min(pp * 5 + winPct * 85, MATCH_CEILING)
+    const bdrPoints    = player.bdr_points ?? 0
+    const bdrSwing     = ewRaw > 0 ? bdrPoints * BDR_SWING_RATE : 0
+    const mvRaw        = matchValue + bdrSwing
+    const baseValue    = Math.max(50, Math.round(mvRaw / 5) * 5)
+
+    const trophiesRes = await query(
+      "SELECT trophy_column, COUNT(*)::int AS count FROM player_trophies WHERE player_id=$1 AND season_number=$2 GROUP BY trophy_column",
+      [playerId, season]
+    )
+    const TROPHY_BONUS = { trophy2_count: 25, trophy4_count: 20, trophy3_count: 15, trophy6_count: 15, trophy7_count: 10, trophy5_count: 5, trophy8_count: 15, trophy9_count: 10, trophy10_count: 15, trophy11_count: 8 }
+    let trophyBonus = 0
+    const trophyBreakdown = []
+    for (const row of trophiesRes.rows) {
+      const bonus = TROPHY_BONUS[row.trophy_column] ?? 0
+      trophyBonus += row.count * bonus
+      trophyBreakdown.push({ column: row.trophy_column, count: row.count, bonus, total: row.count * bonus })
+    }
+
+    const expectedMV = baseValue + trophyBonus
+
+    res.json({
+      player: { id: player.id, name: player.name, grade: ownGrade, bdrPoints, storedMV: player.market_value },
+      season,
+      totalMatchesThisSeason: matchesRes.rows.length,
+      calculation: {
+        ewRaw: parseFloat(ewRaw.toFixed(3)),
+        ew:    parseFloat(ew.toFixed(3)),
+        pp:    parseFloat(pp.toFixed(3)),
+        winPct: parseFloat(winPct.toFixed(3)),
+        matchValue: parseFloat(matchValue.toFixed(2)),
+        bdrSwing:   parseFloat(bdrSwing.toFixed(2)),
+        mvRaw:      parseFloat(mvRaw.toFixed(2)),
+        baseValue,
+        trophyBonus,
+        expectedMV,
+      },
+      verdict: expectedMV === player.market_value ? "✅ CORRECT" : `❌ STALE — should be ${expectedMV}, stored is ${player.market_value}`,
+      matchBreakdown,
+      trophyBreakdown,
+    })
+  } catch (err) { next(err) }
 })
 
 export default router

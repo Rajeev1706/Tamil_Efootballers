@@ -31,26 +31,33 @@ function Dropdown({ value, onChange, options }) {
 }
 
 export default function SeasonSummary({ player }) {
-  const [seasonFilter, setSeasonFilter] = useState("overall")
+  const [seasonFilter, setSeasonFilter] = useState("current")
   const [typeFilter, setTypeFilter] = useState("all")
 
   const allHistory = player?.matchHistory || []
 
-  // Build available seasons from match history
-  const seasons = [...new Set(allHistory.map(m => m.seasonNumber).filter(Boolean))].sort((a, b) => b - a)
-  const currentSeason = seasons[0] ?? null
+  // Use availableSeasons from backend (all seasons with match records)
+  // Fall back to deriving from match history if not available
+  const availableSeasons = player?.availableSeasons?.length
+    ? [...player.availableSeasons].sort((a, b) => b - a)
+    : [...new Set(allHistory.map(m => m.seasonNumber).filter(Boolean))].sort((a, b) => b - a)
+
+  // Current season = highest season from backend data
+  const currentSeasonNum = player?.currentSeason ?? availableSeasons[0] ?? null
 
   const seasonOptions = [
     { value: "overall", label: "Overall (All-time)" },
-    { value: "current", label: "Current Season" },
-    ...seasons.slice(1).map(s => ({ value: String(s), label: `Season ${s}` })),
+    { value: "current", label: `Current Season (S${currentSeasonNum ?? ""})` },
+    ...availableSeasons
+      .filter(s => s !== currentSeasonNum)
+      .map(s => ({ value: String(s), label: `Season ${s}` })),
   ]
 
   // First filter by season
   const seasonFiltered = seasonFilter === "overall"
     ? allHistory
     : seasonFilter === "current"
-      ? allHistory.filter(m => m.seasonNumber === currentSeason)
+      ? allHistory.filter(m => m.seasonNumber === currentSeasonNum)
       : allHistory.filter(m => m.seasonNumber === parseInt(seasonFilter))
 
   // Then filter by match type
