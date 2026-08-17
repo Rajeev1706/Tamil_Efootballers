@@ -746,13 +746,11 @@ export default function FixtureResults({ fixtures }) {
 
   const format = leagueFormat?.format || "league_knockout"
 
-  // ── Group Knockout format — uses fixtures table grouped by A/B ─────────────
+  // ── Group Knockout format — round-by-round like UCL Results ───────────────
   if (format === "group_knockout") {
     const hasGroupFixtures = fixtures.some(f => f.groupStage)
-    const groupAFixtures = fixtures.filter(f => f.grp === "A" || f.grp === "A ")
-    const groupBFixtures = fixtures.filter(f => f.grp === "B" || f.grp === "B ")
-    const roundsA = [...new Set(groupAFixtures.map(f => f.round))].sort((a, b) => a - b)
-    const roundsB = [...new Set(groupBFixtures.map(f => f.round))].sort((a, b) => a - b)
+    const groupFixtures = fixtures.filter(f => f.groupStage)
+    const allRounds = [...new Set(groupFixtures.map(f => f.round))].sort((a, b) => a - b)
 
     return (
       <div className="space-y-4">
@@ -764,31 +762,21 @@ export default function FixtureResults({ fixtures }) {
           </div>
         ) : (
           <>
-            {[{ label: "Group A", grpFixtures: groupAFixtures, rounds: roundsA },
-              { label: "Group B", grpFixtures: groupBFixtures, rounds: roundsB }].map(({ label, grpFixtures, rounds }) => (
-              <div key={label} className="card overflow-hidden">
-                <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center gap-3">
-                  <span className="text-sm font-bold text-white">{label}</span>
-                  <span className="text-xs text-slate-500">
-                    {grpFixtures.filter(f => f.status === "completed").length}/{grpFixtures.length} completed
-                  </span>
+            {allRounds.map(round => {
+              const roundFix = groupFixtures.filter(f => f.round === round)
+              const completed = roundFix.filter(f => f.status === "completed").length
+              return (
+                <div key={round} className="card overflow-hidden">
+                  <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center gap-3">
+                    <span className="text-sm font-bold text-white">Round {round}</span>
+                    <span className="text-xs text-slate-500">{completed}/{roundFix.length} completed</span>
+                  </div>
+                  {roundFix.map(f => (
+                    <FixtureCard key={f.id} fixture={f} />
+                  ))}
                 </div>
-                {rounds.map(round => {
-                  const roundFix = grpFixtures.filter(f => f.round === round)
-                  if (!roundFix.length) return null
-                  return (
-                    <div key={round}>
-                      <div className="px-5 py-2 bg-pitch-900/40 flex items-center justify-between">
-                        <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Round {round}</span>
-                      </div>
-                      {roundFix.map(f => (
-                        <FixtureCard key={f.id} fixture={f} />
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
+              )
+            })}
           </>
         )}
       </div>
