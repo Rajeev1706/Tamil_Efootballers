@@ -79,7 +79,7 @@ function SeasonDetail({ record }) {
           <TrophyRow image={goldenBootImg}    label="Golden Boot"    winner={record.top_scorer} sub={`${record.top_scorer_goals ?? 0} goals`} />
           <TrophyRow
             image={teamLeagueImg}
-            label="Team League"
+            label="Dshann League"
             winner={record.team_league_winner}
             sub={squadPlayers.length > 0 ? `Squad: ${squadPlayers.join(", ")}` : null}
           />

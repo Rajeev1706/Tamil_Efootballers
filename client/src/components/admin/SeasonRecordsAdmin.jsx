@@ -90,7 +90,7 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
 
         {/* Team League — team name + squad players */}
         <div className="bg-pitch-800 border border-surface-border rounded-xl p-4 mb-4">
-          <p className="text-xs text-slate-400 font-semibold mb-3">Team League Winner</p>
+          <p className="text-xs text-slate-400 font-semibold mb-3">Dshann League Winner</p>
           <Field label="Winning Team Name" value={form.teamLeagueWinner} onChange={set("teamLeagueWinner")} placeholder="Japan" />
           <div className="mt-3">
             <p className="text-xs text-slate-500 font-medium mb-2">Squad Players</p>
@@ -233,7 +233,7 @@ function SeasonCard({ record, onEdit, onDelete }) {
               ["Highest MV", record.highest_mv_player, `MV ${record.highest_mv ?? 0}`],
               ["Win Streak", record.longest_streak_player, `${record.longest_streak ?? 0} wins`],
               ["Ballon d'Or", record.ballondor_winner, "Winner"],
-              ["Team League", record.team_league_winner, "Winner"],
+              ["Dshann League", record.team_league_winner, "Winner"],
               ["UCL", record.ucl_winner, "Winner"],
             ].filter(([, val]) => val).map(([label, val, sub]) => (
               <div key={label} className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
@@ -247,7 +247,7 @@ function SeasonCard({ record, onEdit, onDelete }) {
           {/* Team League squad */}
           {record.team_league_winner && Array.isArray(record.team_league_players) && record.team_league_players.filter(Boolean).length > 0 && (
             <div className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
-              <p className="text-xs text-slate-500 mb-2">Team League Champions Squad — {record.team_league_winner}</p>
+              <p className="text-xs text-slate-500 mb-2">Dshann League Champions Squad — {record.team_league_winner}</p>
               <div className="flex flex-wrap gap-1.5">
                 {record.team_league_players.filter(Boolean).map((p, i) => (
                   <span key={i} className="text-xs bg-pitch-900 border border-surface-border rounded-full px-2.5 py-1 text-slate-300">

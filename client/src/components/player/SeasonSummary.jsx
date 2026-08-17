@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils"
 
 const MATCH_TYPE_OPTIONS = [
   { value: "all",    label: "Total matches" },
-  { value: "league", label: "Team League"   },
+  { value: "league", label: "Dshann League"   },
   { value: "ucl",    label: "UCL"           },
   { value: "weekly", label: "Weekly"        },
 ]

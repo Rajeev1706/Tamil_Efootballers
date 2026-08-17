@@ -5,7 +5,7 @@ import { useLogRecord, useDeleteRecord, useEditRecord } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 
 const MATCH_TYPES = [
-  { value: "league", label: "Team League" },
+  { value: "league", label: "Dshann League" },
   { value: "ucl",    label: "UCL"         },
   { value: "weekly", label: "Weekly"      },
 ]

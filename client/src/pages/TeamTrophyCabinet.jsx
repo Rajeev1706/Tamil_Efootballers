@@ -12,7 +12,7 @@ import championshipImg  from "../../images/championship.png"
 import europaTrophy     from "../../images/europa.png"
 
 const TROPHY_MINI = [
-  { key: "teamLeagueCount",  image: teamLeagueTrophy, label: "Team League",  color: "#10b981" },
+  { key: "teamLeagueCount",  image: teamLeagueTrophy, label: "Dshann League",  color: "#10b981" },
   { key: "championshipCount", image: championshipImg, label: "Team of Champions", color: "#f59e0b" },
   { key: "europaCount",      image: europaTrophy,     label: "Europa",       color: "#818cf8" },
 ]
@@ -101,7 +101,7 @@ export default function TeamTrophyCabinet() {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-white">Team Trophy Cabinet</h1>
-            <p className="text-sm text-slate-500">Team League · Team of Champions · Europa</p>
+            <p className="text-sm text-slate-500">Dshann League · Team of Champions · Europa</p>
           </div>
         </div>
 

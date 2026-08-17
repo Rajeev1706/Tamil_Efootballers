@@ -21,7 +21,7 @@ import europaTrophy       from "../../images/europa.png"
 
 const TROPHY_TYPES = [
   { key: "trophy1Count",  image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b", glow: "rgba(245,158,11,0.45)"  },
-  { key: "trophy2Count",  image: teamLeagueTrophy,   label: "Team League",        color: "#10b981", glow: "rgba(16,185,129,0.45)"  },
+  { key: "trophy2Count",  image: teamLeagueTrophy,   label: "Dshann League",        color: "#10b981", glow: "rgba(16,185,129,0.45)"  },
   { key: "trophy4Count",  image: uclTrophy,          label: "UCL",                color: "#818cf8", glow: "rgba(129,140,248,0.45)" },
   { key: "trophy3Count",  image: weeklyTrophy,       label: "Weekly",             color: "#38bdf8", glow: "rgba(56,189,248,0.45)"  },
   { key: "trophy5Count",  image: goldenBootTrophy,   label: "Weekly Golden Boot", color: "#fbbf24", glow: "rgba(251,191,36,0.45)"  },
@@ -225,7 +225,7 @@ export default function PlayerTrophyCabinet() {
         {[
           { id: "all",    label: "All" },
           { id: "bdr",    label: "Ballon d'Or" },
-          { id: "league", label: "Team League" },
+          { id: "league", label: "Dshann League" },
           { id: "ucl",    label: "UCL" },
           { id: "weekly", label: "Weekly" },
           { id: "duo",    label: "Duo" },

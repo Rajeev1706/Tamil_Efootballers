@@ -1,5 +1,5 @@
 /**
- * TlgAdmin.jsx — Admin panel for Team League Group Knockout format.
+ * TlgAdmin.jsx — Admin panel for Dshann League Group Knockout format.
  * Tabs: Setup → Group Stage → Knockout
  */
 import { useState } from "react"
@@ -275,7 +275,7 @@ export default function TlgAdmin() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-gold" />
-          <h2 className="text-sm font-semibold text-white">Team League Group Knockout</h2>
+          <h2 className="text-sm font-semibold text-white">Dshann League Group Knockout</h2>
           {tlg && (
             <span className={cn("text-xs px-2 py-0.5 rounded-full border font-semibold",
               tlg.status === "completed" ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/25" :
