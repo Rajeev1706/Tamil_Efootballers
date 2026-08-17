@@ -447,7 +447,13 @@ function FixtureCard({ fixture, myTeamName, myTeamId, myPlayers, allPlayers, tea
             <span className="text-sm font-bold text-white">vs {opponent}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <p className="text-xs text-slate-500">Round {fixture.round} · {formattedDate}</p>
+            <p className="text-xs text-slate-500">
+              Round {fixture.round} · {formattedDate}
+              {fixture.grp && <span className="ml-2 px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-bold">Group {fixture.grp}</span>}
+              <span className={`ml-2 text-[10px] font-bold ${isHome ? "text-emerald-400" : "text-amber-400"}`}>
+                {isHome ? "HOME" : "AWAY"}
+              </span>
+            </p>
             {applied && (
               <span className="text-[9px] font-bold text-accent">✓ Applied</span>
             )}
