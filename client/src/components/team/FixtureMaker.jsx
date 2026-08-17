@@ -179,19 +179,25 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H,
         </div>
       </div>
 
-      {/* Player avatars — shown when active. Squad photo (imageUrl) is not
-          included in the player list payload to keep it lightweight; avatar
-          is already there and serves the same visual purpose here. */}
+      {/* Player previews — shown when image button clicked */}
       {isActive && bothSelected && (
         <div className="bg-pitch-900/60 border-b border-surface-border/50 px-5 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col items-center gap-2">
               <p className="text-xs font-semibold text-accent">{myP.name}</p>
-              <PlayerAvatarIcon player={myP} size="w-16 h-16" className="rounded-xl" />
+              {myP.imageUrl ? (
+                <img src={myP.imageUrl} alt={myP.name} className="w-24 h-24 object-cover rounded-xl border border-surface-border" />
+              ) : (
+                <PlayerAvatarIcon player={myP} size="w-16 h-16" className="rounded-xl" />
+              )}
             </div>
             <div className="flex flex-col items-center gap-2">
               <p className="text-xs font-semibold text-rose-400">{oppP.name}</p>
-              <PlayerAvatarIcon player={oppP} size="w-16 h-16" className="rounded-xl" />
+              {oppP.imageUrl ? (
+                <img src={oppP.imageUrl} alt={oppP.name} className="w-24 h-24 object-cover rounded-xl border border-surface-border" />
+              ) : (
+                <PlayerAvatarIcon player={oppP} size="w-16 h-16" className="rounded-xl" />
+              )}
             </div>
           </div>
         </div>
