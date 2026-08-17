@@ -15,7 +15,7 @@ import uclGBTrophy        from "../../../images/ucl_gb.png"
 
 const TROPHY_DEFS = [
   { key: "trophy1_count", image: ballondorTrophy,    label: "Ballon d'Or"   },
-  { key: "trophy2_count", image: teamLeagueTrophy,   label: "Team League"   },
+  { key: "trophy2_count", image: teamLeagueTrophy,   label: "Dshann League"   },
   { key: "trophy4_count", image: uclTrophy,          label: "UCL"           },
   { key: "trophy3_count", image: weeklyTrophy,       label: "Weekly"        },
   { key: "trophy5_count", image: goldenBootTrophy,   label: "Wkly GB"       },

@@ -228,7 +228,7 @@ export default function CreatePlayer({ onSuccess }) {
           <div className="grid grid-cols-4 gap-3">
             {[
               { label: "Ballon d'Or", value: trophy1, onChange: setTrophy1 },
-              { label: "Team League", value: trophy2, onChange: setTrophy2 },
+              { label: "Dshann League", value: trophy2, onChange: setTrophy2 },
               { label: "UCL",         value: trophy4, onChange: setTrophy4 },
               { label: "Weekly",      value: trophy3, onChange: setTrophy3 },
             ].map(t => (

@@ -87,7 +87,7 @@ import PercentileDashboard from "../components/player/PercentileDashboard"
 function TrophyCase({ player }) {
   const trophies = [
     { image: ballondorTrophy,    label: "Ballon d'Or",             count: player.trophy1Count ?? 0 },
-    { image: teamLeagueTrophy,   label: "Team League",             count: player.trophy2Count ?? 0 },
+    { image: teamLeagueTrophy,   label: "Dshann League",             count: player.trophy2Count ?? 0 },
     { image: uclTrophy,          label: "UCL",                     count: player.trophy4Count ?? 0 },
     { image: weeklyTrophy,       label: "Weekly",                  count: player.trophy3Count ?? 0 },
     { image: revolutionTrophy,   label: "Revolution",              count: player.trophy8Count ?? 0 },

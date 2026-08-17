@@ -96,7 +96,7 @@ function TeamHistorySection({ team }) {
           {/* ── Team League Trophies ── */}
           <div>
             <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-2 flex items-center gap-2">
-              <Trophy className="w-3.5 h-3.5 text-gold" /> Team League Titles
+              <Trophy className="w-3.5 h-3.5 text-gold" /> Dshann League Titles
             </p>
             <div className="flex flex-wrap gap-2 mb-3">
               {trophies.length === 0
@@ -228,7 +228,7 @@ export default function AdminTeamTrophies() {
 
       {/* Quick-award trophy form */}
       <div className="card p-4">
-        <p className="text-sm font-semibold text-white mb-3">Award Team League Title</p>
+        <p className="text-sm font-semibold text-white mb-3">Award Dshann League Title</p>
         <div className="flex gap-3 flex-wrap">
           <select value={teamId} onChange={e => setTeamId(e.target.value)}
             className="bg-pitch-900 border border-surface-border rounded-lg px-3 py-2 text-sm text-white flex-1 min-w-[160px]">

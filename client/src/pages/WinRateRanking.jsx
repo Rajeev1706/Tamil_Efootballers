@@ -11,7 +11,7 @@ import { useRankChanges } from "../hooks/useRankChanges"
 
 const TYPES = [
   { id: "overall", label: "Overall"     },
-  { id: "league",  label: "Team League" },
+  { id: "league",  label: "Dshann League" },
   { id: "weekly",  label: "Weekly"      },
   { id: "ucl",     label: "UCL"         },
 ]

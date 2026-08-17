@@ -132,7 +132,7 @@ function TeamCard({ team }) {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <img src={teamLeagueTrophy} className="w-5 h-5 object-contain" />
-                  <p className="text-xs font-bold text-white">Team League Titles</p>
+                  <p className="text-xs font-bold text-white">Dshann League Titles</p>
                   <span className="text-xs text-accent font-bold ml-1">{teamLeagueWins.length}</span>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">

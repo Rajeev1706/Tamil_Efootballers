@@ -39,7 +39,7 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
     return (
       <div className="card px-5 py-4">
         <p className="text-sm font-semibold text-white mb-1">Choose competition format</p>
-        <p className="text-xs text-slate-500 mb-4">This decides how the Team League champion is determined at the end of the season.</p>
+        <p className="text-xs text-slate-500 mb-4">This decides how the Dshann League champion is determined at the end of the season.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <button onClick={() => setFormat("league")}
             className={`rounded-xl border p-4 text-left transition-colors ${format === "league" ? "border-accent bg-accent/10" : "border-surface-border hover:border-accent/40"}`}>
@@ -647,7 +647,7 @@ function FixtureExportCard({ round, fixtures, exportRef, visible }) {
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, position: "relative" }}>
         <img src={logoUrl} alt="TEC" style={{ width: 44, height: 44, objectFit: "contain" }} />
         <div>
-          <p style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>Tamil Efootballers · Team League</p>
+          <p style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>Tamil Efootballers · Dshann League</p>
           <p style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
         </div>
       </div>

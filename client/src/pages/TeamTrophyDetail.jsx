@@ -34,7 +34,7 @@ function positionStyle(pos) {
 
 // ── Trophy shelf (mirrors player cabinet) ─────────────────────────────────────
 const TEAM_TROPHY_TYPES = {
-  team_league:  { key: "team_league",  image: teamLeagueTrophy, label: "Team League",  color: "#10b981", glow: "rgba(16,185,129,0.45)"  },
+  team_league:  { key: "team_league",  image: teamLeagueTrophy, label: "Dshann League",  color: "#10b981", glow: "rgba(16,185,129,0.45)"  },
   championship: { key: "championship", image: championshipImg,  label: "Team of Champions", color: "#f59e0b", glow: "rgba(245,158,11,0.45)"   },
   europa:       { key: "europa",       image: europaTrophy,     label: "Europa",       color: "#818cf8", glow: "rgba(129,140,248,0.45)"  },
 }
@@ -240,7 +240,7 @@ export default function TeamTrophyDetail() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
         <div className="card p-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <img src={teamLeagueTrophy} alt="Team League" className="w-5 h-5 object-contain" />
+            <img src={teamLeagueTrophy} alt="Dshann League" className="w-5 h-5 object-contain" />
             <p className="text-2xl font-extrabold text-accent font-mono">{teamLeagueCount}</p>
           </div>
           <p className="text-xs text-slate-500">Team League</p>

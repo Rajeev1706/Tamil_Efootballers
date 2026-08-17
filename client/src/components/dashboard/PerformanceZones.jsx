@@ -7,7 +7,7 @@ import { cn } from "../../lib/utils"
 
 const RESULT_COLOR = { win: "#10b981", draw: "#f59e0b", loss: "#ef4444" }
 const COMP_COLOR   = { league: "#10b981", ucl: "#3b82f6", weekly: "#f59e0b" }
-const COMP_LABEL   = { league: "Team League", ucl: "UCL", weekly: "Weekly" }
+const COMP_LABEL   = { league: "Dshann League", ucl: "UCL", weekly: "Weekly" }
 
 const CustomDot = ({ cx, cy, payload }) => {
   if (cx == null || cy == null || !payload?.result) return null

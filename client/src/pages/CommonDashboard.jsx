@@ -557,9 +557,9 @@ export default function CommonDashboard() {
       ) : showTeamCelebration && displayTeamChampion ? (
         <ChampionCelebration
           trophyImage={teamLeagueTrophyLogo}
-          eyebrow="Team League"
+          eyebrow="Dshann League"
           title={displayTeamChampion}
-          subtitle="are the Team League Champions! 🏆"
+          subtitle="are the Dshann League Champions! 🏆"
           badgeImage={displayTeamLogo}
           anthemUrl={displayTeamAnthem}
         >

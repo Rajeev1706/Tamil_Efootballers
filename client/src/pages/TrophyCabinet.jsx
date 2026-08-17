@@ -18,7 +18,7 @@ import revolutionTrophy   from "../../images/revolution.png"
 
 const TROPHIES = [
   { key: "trophy1Count", image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b" },
-  { key: "trophy2Count", image: teamLeagueTrophy,   label: "Team League",        color: "#10b981" },
+  { key: "trophy2Count", image: teamLeagueTrophy,   label: "Dshann League",        color: "#10b981" },
   { key: "trophy4Count", image: uclTrophy,          label: "UCL",                color: "#818cf8" },
   { key: "trophy3Count", image: weeklyTrophy,       label: "Weekly",             color: "#38bdf8" },
   { key: "trophy5Count", image: goldenBootTrophy,   label: "Weekly GB",          color: "#fbbf24" },

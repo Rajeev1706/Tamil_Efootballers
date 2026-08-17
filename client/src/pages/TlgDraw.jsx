@@ -69,10 +69,10 @@ export default function TlgDraw() {
   return (
     <div className="min-h-screen bg-pitch-950 flex flex-col items-center px-4 py-10">
       <div className="flex items-center gap-3 mb-10">
-        <img src={teamLeagueLogo} alt="Team League" className="w-10 h-10 object-contain" />
+        <img src={teamLeagueLogo} alt="Dshann League" className="w-10 h-10 object-contain" />
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-widest">Tamil Efootballers</p>
-          <p className="text-xl font-extrabold text-white">Team League Group Draw</p>
+          <p className="text-xl font-extrabold text-white">Dshann League Group Draw</p>
         </div>
       </div>
 

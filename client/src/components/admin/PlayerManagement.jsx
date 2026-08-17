@@ -410,11 +410,11 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
               </div>
               {[
                 { label: "Ballon d'Or",             value: trophy1, onChange: setTrophy1 },
-                { label: "Team League",             value: trophy2, onChange: setTrophy2 },
+                { label: "Dshann League",             value: trophy2, onChange: setTrophy2 },
                 { label: "UCL",                     value: trophy4, onChange: setTrophy4 },
                 { label: "Weekly",                  value: trophy3, onChange: setTrophy3 },
                 { label: "Weekly Golden Boot",      value: trophy5, onChange: setTrophy5 },
-                { label: "Team League Golden Boot", value: trophy6, onChange: setTrophy6 },
+                { label: "Dshann League Golden Boot", value: trophy6, onChange: setTrophy6 },
                 { label: "UCL Golden Boot",         value: trophy7, onChange: setTrophy7 },
                 { label: "Revolution",              value: trophy8, onChange: setTrophy8 },
               ].map(t => (
