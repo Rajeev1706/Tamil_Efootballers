@@ -4,6 +4,12 @@ import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, T
 import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
+// Links shown in the sidebar on mobile only (hidden from the top navbar on small screens)
+const MOBILE_ONLY_NAV = [
+  { link: "/hall-of-fame", label: "Hall of Fame", icon: Trophy },
+  { link: "/calendar",     label: "Calendar",     icon: Calendar },
+]
+
 const MENU_ITEMS = [
   { value: "standings", label: "Home",                  icon: Home },
   { value: "players",   label: "Total Players",         icon: Users },
@@ -66,9 +72,13 @@ export default function Navbar() {
 
           {/* Nav */}
           <nav className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+            {/* Dashboard always visible */}
             <NavLink to="/" label="Dashboard" icon={BarChart2} active={pathname === "/"} />
-            <NavLink to="/hall-of-fame" label="Hall of Fame" icon={Trophy} active={pathname === "/hall-of-fame"} />
-            <NavLink to="/calendar" label="Calendar" icon={Calendar} active={pathname === "/calendar"} />
+            {/* These links are hidden on mobile — they're accessible via the hamburger sidebar */}
+            <span className="hidden sm:contents">
+              <NavLink to="/hall-of-fame" label="Hall of Fame" icon={Trophy} active={pathname === "/hall-of-fame"} />
+              <NavLink to="/calendar" label="Calendar" icon={Calendar} active={pathname === "/calendar"} />
+            </span>
 
             {!user && (
               <NavLink to="/login" label="Login" icon={LogIn} active={pathname === "/login"} />
@@ -120,6 +130,27 @@ export default function Navbar() {
 
             {/* Menu items */}
             <nav className="p-3 space-y-1">
+              {/* Hall of Fame + Calendar — hidden from top navbar on mobile, so surfaced here */}
+              {MOBILE_ONLY_NAV.map(item => {
+                const Icon = item.icon
+                const isActive = pathname === item.link
+                return (
+                  <Link
+                    key={item.link}
+                    to={item.link}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "sm:hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all border",
+                      isActive
+                        ? "bg-accent/15 text-accent border-accent/25"
+                        : "text-slate-400 hover:text-white hover:bg-surface border-transparent"
+                    )}
+                  >
+                    <Icon className="w-4.5 h-4.5 flex-shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
               {MENU_ITEMS.map(item => {
                 const Icon = item.icon
                 const isActive = item.link ? pathname === item.link : activeView === item.value

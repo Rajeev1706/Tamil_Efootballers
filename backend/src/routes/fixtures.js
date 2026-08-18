@@ -607,58 +607,136 @@ router.get("/group-standings", async (req, res, next) => {
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
     const season = parseInt(seasonRes.rows[0]?.value || "1")
 
+    // Mirrors the teams-list CTE: for COMPLETED fixtures, use the stored
+    // home_score/away_score (which are the summed match-points totals).
+    // For UPCOMING fixtures that already have player results being logged,
+    // derive the live score from match_records — exactly how the main
+    // league table works so both views stay in sync.
     const result = await query(`
+      WITH fixture_scores AS (
+        SELECT
+          f.id,
+          f.home_team_id,
+          f.away_team_id,
+          f.status,
+          f.home_goals,
+          f.away_goals,
+          -- Home match-points: use stored value once closed, else sum live records
+          CASE
+            WHEN f.status = 'completed' THEN COALESCE(f.home_score, 0)
+            ELSE COALESCE(SUM(
+              CASE
+                WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id
+                  THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+                WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id
+                  THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+                ELSE 0
+              END
+            ), 0)
+          END AS home_pts,
+          -- Away match-points
+          CASE
+            WHEN f.status = 'completed' THEN COALESCE(f.away_score, 0)
+            ELSE COALESCE(SUM(
+              CASE
+                WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id
+                  THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+                WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id
+                  THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
+                ELSE 0
+              END
+            ), 0)
+          END AS away_pts,
+          -- Goals for home side
+          CASE
+            WHEN f.status = 'completed' THEN COALESCE(f.home_goals, 0)
+            ELSE COALESCE(SUM(
+              CASE
+                WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score
+                WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.opponent_score
+                ELSE 0
+              END
+            ), 0)
+          END AS live_home_goals,
+          -- Goals for away side
+          CASE
+            WHEN f.status = 'completed' THEN COALESCE(f.away_goals, 0)
+            ELSE COALESCE(SUM(
+              CASE
+                WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score
+                WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.opponent_score
+                ELSE 0
+              END
+            ), 0)
+          END AS live_away_goals,
+          CASE WHEN f.status = 'completed' THEN 1 ELSE COUNT(mr.id) END AS results_logged
+        FROM fixtures f
+        LEFT JOIN match_records mr
+          ON mr.fixture_id = f.id
+          AND mr.match_type = 'league'
+          AND mr.season_number = $1
+        LEFT JOIN players p ON p.id = mr.player_id
+        WHERE f.group_stage = true
+        GROUP BY f.id, f.home_team_id, f.away_team_id, f.status,
+                 f.home_score, f.away_score, f.home_goals, f.away_goals
+      ),
+      fixture_outcomes AS (
+        SELECT *,
+          CASE
+            WHEN results_logged = 0 THEN NULL
+            WHEN home_pts > away_pts THEN 'home'
+            WHEN away_pts > home_pts THEN 'away'
+            ELSE 'draw'
+          END AS outcome
+        FROM fixture_scores
+      ),
+      per_team AS (
+        -- Home side perspective
+        SELECT home_team_id AS team_id, live_home_goals AS gf, live_away_goals AS ga, home_pts AS pts, outcome,
+          (outcome = 'home') AS won, (outcome = 'draw') AS drawn, (outcome = 'away') AS lost
+        FROM fixture_outcomes WHERE outcome IS NOT NULL
+        UNION ALL
+        -- Away side perspective
+        SELECT away_team_id AS team_id, live_away_goals AS gf, live_home_goals AS ga, away_pts AS pts, outcome,
+          (outcome = 'away') AS won, (outcome = 'draw') AS drawn, (outcome = 'home') AS lost
+        FROM fixture_outcomes WHERE outcome IS NOT NULL
+      ),
+      team_stats AS (
+        SELECT team_id,
+          COUNT(*) AS played,
+          COUNT(*) FILTER (WHERE won)   AS won,
+          COUNT(*) FILTER (WHERE drawn) AS drawn,
+          COUNT(*) FILTER (WHERE lost)  AS lost,
+          COALESCE(SUM(gf), 0) AS gf,
+          COALESCE(SUM(ga), 0) AS ga,
+          COALESCE(SUM(CASE WHEN won THEN 3 WHEN drawn THEN 1 ELSE 0 END), 0) AS pts
+        FROM per_team
+        GROUP BY team_id
+      )
       SELECT
         fg.grp,
-        t.id           AS "teamId",
-        t.name         AS "teamName",
-        t.logo_url     AS "logoUrl",
-        COUNT(f.id) FILTER (WHERE f.status = 'completed')::int                                    AS played,
-        COUNT(f.id) FILTER (WHERE f.status = 'completed' AND (
-          (f.home_team_id = t.id AND f.home_score > f.away_score) OR
-          (f.away_team_id = t.id AND f.away_score > f.home_score)
-        ))::int                                                                                    AS won,
-        COUNT(f.id) FILTER (WHERE f.status = 'completed' AND
-          f.home_score = f.away_score)::int                                                        AS drawn,
-        COUNT(f.id) FILTER (WHERE f.status = 'completed' AND (
-          (f.home_team_id = t.id AND f.home_score < f.away_score) OR
-          (f.away_team_id = t.id AND f.away_score < f.home_score)
-        ))::int                                                                                    AS lost,
-        COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.home_score
-                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.away_score
-                          ELSE 0 END), 0)::int                                                    AS gf,
-        COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.away_score
-                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.home_score
-                          ELSE 0 END), 0)::int                                                    AS ga,
-        COALESCE(SUM(
-          CASE
-            WHEN f.status='completed' AND (f.home_team_id=t.id AND f.home_score > f.away_score) THEN 3
-            WHEN f.status='completed' AND (f.away_team_id=t.id AND f.away_score > f.home_score) THEN 3
-            WHEN f.status='completed' AND f.home_score = f.away_score                            THEN 1
-            ELSE 0
-          END
-        ), 0)::int                                                                                 AS pts
+        t.id       AS "teamId",
+        t.name     AS "teamName",
+        t.logo_url AS "logoUrl",
+        COALESCE(ts.played, 0)::int AS played,
+        COALESCE(ts.won,    0)::int AS won,
+        COALESCE(ts.drawn,  0)::int AS drawn,
+        COALESCE(ts.lost,   0)::int AS lost,
+        COALESCE(ts.gf,     0)::int AS gf,
+        COALESCE(ts.ga,     0)::int AS ga,
+        (COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0))::int AS gd,
+        COALESCE(ts.pts,    0)::int AS pts
       FROM fixture_groups fg
       JOIN teams t ON t.id = fg.team_id
-      LEFT JOIN fixtures f
-        ON (f.home_team_id = t.id OR f.away_team_id = t.id)
-        AND f.group_stage = true
-        AND f.status IN ('upcoming', 'completed')
+      LEFT JOIN team_stats ts ON ts.team_id = t.id
       WHERE fg.season_number = $1
-      GROUP BY fg.grp, t.id, t.name, t.logo_url
-      ORDER BY fg.grp ASC, pts DESC,
-        (COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.home_score - f.away_score
-                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.away_score - f.home_score
-                          ELSE 0 END), 0)) DESC,
-        (COALESCE(SUM(CASE WHEN f.status='completed' AND f.home_team_id=t.id THEN f.home_score
-                          WHEN f.status='completed' AND f.away_team_id=t.id THEN f.away_score
-                          ELSE 0 END), 0)) DESC
+      ORDER BY fg.grp ASC, pts DESC, gd DESC, gf DESC
     `, [season])
 
     const groups = { A: [], B: [] }
     for (const row of result.rows) {
       const grp = row.grp?.trim()
-      if (groups[grp]) groups[grp].push({ ...row, gd: row.gf - row.ga })
+      if (groups[grp]) groups[grp].push(row)
     }
     res.json(groups)
   } catch (err) { next(err) }
