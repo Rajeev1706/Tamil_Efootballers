@@ -488,6 +488,8 @@ export const useLogTeamRecord = () => {
       qc.invalidateQueries({ queryKey: ["players"] })
       qc.invalidateQueries({ queryKey: QK.records })
       qc.invalidateQueries({ queryKey: ["fixture-records"] })
+      qc.invalidateQueries({ queryKey: QK.teams })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
     },
   })
 }
@@ -508,6 +510,8 @@ export const useEditTeamRecord = () => {
       qc.invalidateQueries({ queryKey: ["fixture-records"] })
       qc.invalidateQueries({ queryKey: ["players"] })
       qc.invalidateQueries({ queryKey: QK.records })
+      qc.invalidateQueries({ queryKey: QK.teams })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
     },
   })
 }
@@ -520,6 +524,8 @@ export const useDeleteTeamRecord = () => {
       qc.invalidateQueries({ queryKey: ["fixture-records"] })
       qc.invalidateQueries({ queryKey: ["players"] })
       qc.invalidateQueries({ queryKey: QK.records })
+      qc.invalidateQueries({ queryKey: QK.teams })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
     },
   })
 }
