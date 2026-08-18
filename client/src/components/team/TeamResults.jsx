@@ -331,23 +331,23 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
 
   return (
     <div className="space-y-2 border border-surface-border rounded-xl p-3">
-      {/* Row 1: Your player vs Opp player */}
-      <div className="flex items-center gap-2">
+      {/* Row 1: Your player vs Opp player - stacked on mobile */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <select
           value={entry.myPlayerId}
           onChange={e => onChange("myPlayerId", e.target.value)}
-          className="flex-1 min-w-0 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+          className="flex-1 min-w-0 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
         >
           <option value="">— Your player —</option>
           {myPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
 
-        <span className="text-slate-600 text-xs font-bold flex-shrink-0">vs</span>
+        <span className="text-slate-600 text-xs font-bold flex-shrink-0 text-center">vs</span>
 
         <select
           value={entry.oppPlayerId}
           onChange={e => onChange("oppPlayerId", e.target.value)}
-          className="flex-1 min-w-0 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+          className="flex-1 min-w-0 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
         >
           <option value="">— Opp player —</option>
           {oppPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -359,7 +359,7 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
         <select
           value={entry.result}
           onChange={e => onChange("result", e.target.value)}
-          className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+          className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
         >
           <option value="">Result</option>
           <option value="win">Win</option>
@@ -370,26 +370,25 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
         </select>
 
         {!isWalkover ? (
-          <>
-            <span className="text-xs text-slate-600 flex-shrink-0">Score:</span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <input
               type="number" min="0" placeholder="0"
               value={entry.playerScore}
               onChange={e => onChange("playerScore", e.target.value)}
-              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
             />
-            <span className="text-slate-600 text-xs flex-shrink-0">—</span>
+            <span className="text-slate-600 text-xs">—</span>
             <input
               type="number" min="0" placeholder="0"
               value={entry.oppScore}
               onChange={e => onChange("oppScore", e.target.value)}
-              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2 text-sm text-white focus:outline-none focus:border-accent/40"
+              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
             />
-          </>
+          </div>
         ) : (
           <span className={entry.result === "walkover_opp" ? "text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-2 py-1 rounded flex-shrink-0" : "text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-1 rounded flex-shrink-0"}>
-              {entry.result === "walkover_opp" ? "3 – 0 (WO)" : "0 – 3 (WO)"}
-            </span>
+            {entry.result === "walkover_opp" ? "3 – 0 (WO)" : "0 – 3 (WO)"}
+          </span>
         )}
       </div>
 
