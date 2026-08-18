@@ -26,7 +26,7 @@ import teamLeagueTrophyLogo from "../../images/Team League.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
-import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship } from "../lib/queries"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship, useGroupStandings } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 
 // Resolves a player's chosen avatar — custom upload takes priority,
@@ -261,7 +261,9 @@ export default function CommonDashboard() {
   const teamCelebrationSeason = settings.current_season
   const { data: playoffsData }   = useTeamLeaguePlayoffs()
   const { data: leagueFormatData } = useLeagueFormatPublic()
-  const isLeagueOnly = leagueFormatData?.format === "league"
+  const isLeagueOnly    = leagueFormatData?.format === "league"
+  const isGroupKnockout = leagueFormatData?.format === "group_knockout"
+  const { data: groupStandings } = useGroupStandings()
 
   const playoffFinal    = playoffsData?.matches?.find(m => m.matchType === "final")
   const playoffComplete = playoffFinal?.status === "completed"
@@ -669,13 +671,32 @@ export default function CommonDashboard() {
           {isCurrent ? (
             <>
               <p className="text-slate-400 text-sm">{teams.length} teams · {players.length} players</p>
-              {teams[0] && (
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="text-xs text-slate-500">League leader</span>
-                  <span className="text-xs font-semibold text-white bg-accent/15 border border-accent/25 px-2 py-0.5 rounded-full">
-                    {teams[0].name} · {teams[0].points} pts
-                  </span>
-                </div>
+              {isGroupKnockout ? (
+                // Group+Knockout format — show each group's leader separately
+                (groupStandings?.A?.[0] || groupStandings?.B?.[0]) && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-500">Group leaders</span>
+                    {groupStandings?.A?.[0] && (
+                      <span className="text-xs font-semibold text-white bg-accent/15 border border-accent/25 px-2 py-0.5 rounded-full">
+                        A: {groupStandings.A[0].teamName} · {groupStandings.A[0].pts} pts
+                      </span>
+                    )}
+                    {groupStandings?.B?.[0] && (
+                      <span className="text-xs font-semibold text-white bg-accent/15 border border-accent/25 px-2 py-0.5 rounded-full">
+                        B: {groupStandings.B[0].teamName} · {groupStandings.B[0].pts} pts
+                      </span>
+                    )}
+                  </div>
+                )
+              ) : (
+                teams[0] && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="text-xs text-slate-500">League leader</span>
+                    <span className="text-xs font-semibold text-white bg-accent/15 border border-accent/25 px-2 py-0.5 rounded-full">
+                      {teams[0].name} · {teams[0].points} pts
+                    </span>
+                  </div>
+                )
               )}
             </>
           ) : (
