@@ -267,9 +267,22 @@ router.patch("/matches/:matchId/players", authenticate, adminOnly, async (req, r
       UPDATE revolution_matches
       SET player1_id = $1, player2_id = $2,
           status = $3, winner_id = $4,
-          player1_score = NULL, player2_score = NULL
+          player1_score = NULL, player2_score = NULL, match_record_id = NULL
       WHERE id = $5
     `, [newP1, newP2, isBye ? "bye" : "pending", winnerId, req.params.matchId])
+
+    // If this match had a result, delete the old match_record and
+    // recalc MV + form for both old players — their stats must reflect
+    // that the result is now wiped, same as weekly does.
+    if (match.match_record_id) {
+      await query("DELETE FROM match_records WHERE id = $1", [match.match_record_id])
+    }
+    for (const oldId of [match.player1_id, match.player2_id]) {
+      if (oldId) {
+        await recalcMarketValue(oldId)
+        await recalcForm(oldId)
+      }
+    }
 
     // Retract old propagation, propagate new bye
     if (match.round < match.total_rounds) {
@@ -405,11 +418,42 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 // POST /api/revolution/:id/reset
 router.post("/:id/reset", authenticate, adminOnly, async (req, res, next) => {
   try {
+    const tournamentId = parseInt(req.params.id)
+
+    // Collect all match_record_ids and player ids BEFORE deleting matches
+    const matchesRes = await query(`
+      SELECT match_record_id, player1_id, player2_id
+      FROM revolution_matches
+      WHERE tournament_id = $1 AND match_record_id IS NOT NULL
+    `, [tournamentId])
+
+    const affectedPlayerIds = new Set()
+    const matchRecordIds    = []
+    for (const m of matchesRes.rows) {
+      if (m.match_record_id) matchRecordIds.push(m.match_record_id)
+      if (m.player1_id) affectedPlayerIds.add(m.player1_id)
+      if (m.player2_id) affectedPlayerIds.add(m.player2_id)
+    }
+
     await withTransaction(async ({ query: q }) => {
-      await q("DELETE FROM revolution_players WHERE tournament_id = $1", [parseInt(req.params.id)])
-      await q("DELETE FROM revolution_matches WHERE tournament_id = $1", [parseInt(req.params.id)])
-      await q("UPDATE revolution_tournaments SET status = 'setup', total_rounds = NULL, player_count = NULL WHERE id = $1", [parseInt(req.params.id)])
+      // Delete linked match_records first so player stats are wiped
+      if (matchRecordIds.length > 0) {
+        await q(
+          `DELETE FROM match_records WHERE id = ANY($1::int[])`,
+          [matchRecordIds]
+        )
+      }
+      await q("DELETE FROM revolution_players WHERE tournament_id = $1", [tournamentId])
+      await q("DELETE FROM revolution_matches WHERE tournament_id = $1", [tournamentId])
+      await q("UPDATE revolution_tournaments SET status = 'setup', total_rounds = NULL, player_count = NULL WHERE id = $1", [tournamentId])
     })
+
+    // Recalc MV + form for every player whose results were wiped
+    for (const playerId of affectedPlayerIds) {
+      await recalcMarketValue(playerId)
+      await recalcForm(playerId)
+    }
+
     res.json({ reset: true })
   } catch (err) { next(err) }
 })
