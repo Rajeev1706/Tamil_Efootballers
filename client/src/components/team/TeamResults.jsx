@@ -354,43 +354,48 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
         </select>
       </div>
 
-      {/* Row 2: Result + Score */}
-      <div className="flex items-center gap-2">
-        <select
-          value={entry.result}
-          onChange={e => onChange("result", e.target.value)}
-          className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
-        >
-          <option value="">Result</option>
-          <option value="win">Win</option>
-          <option value="draw">Draw</option>
-          <option value="loss">Loss</option>
-          <option value="walkover">Walkover (I gave WO)</option>
-          <option value="walkover_opp">Walkover (Opp gave WO)</option>
-        </select>
+      {/* Row 2: Result */}
+      <select
+        value={entry.result}
+        onChange={e => onChange("result", e.target.value)}
+        className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
+      >
+        <option value="">Result</option>
+        <option value="win">Win</option>
+        <option value="draw">Draw</option>
+        <option value="loss">Loss</option>
+        <option value="walkover">Walkover (I gave WO)</option>
+        <option value="walkover_opp">Walkover (Opp gave WO)</option>
+      </select>
 
-        {!isWalkover ? (
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <input
-              type="number" min="0" placeholder="0"
-              value={entry.playerScore}
-              onChange={e => onChange("playerScore", e.target.value)}
-              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
-            />
-            <span className="text-slate-600 text-xs">—</span>
-            <input
-              type="number" min="0" placeholder="0"
-              value={entry.oppScore}
-              onChange={e => onChange("oppScore", e.target.value)}
-              className="w-12 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
-            />
-          </div>
-        ) : (
-          <span className={entry.result === "walkover_opp" ? "text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-2 py-1 rounded flex-shrink-0" : "text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-1 rounded flex-shrink-0"}>
+      {/* Row 3: Score */}
+      {!isWalkover ? (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 flex-shrink-0">Score:</span>
+          <input
+            type="number" min="0" placeholder="0"
+            value={entry.playerScore}
+            onChange={e => onChange("playerScore", e.target.value)}
+            className="flex-1 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
+          />
+          <span className="text-slate-600 text-xs flex-shrink-0">—</span>
+          <input
+            type="number" min="0" placeholder="0"
+            value={entry.oppScore}
+            onChange={e => onChange("oppScore", e.target.value)}
+            className="flex-1 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
+          />
+        </div>
+      ) : (
+        <div className="text-center">
+          <span className={entry.result === "walkover_opp"
+            ? "text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-3 py-1.5 rounded"
+            : "text-xs text-orange-400 bg-orange-400/10 border border-orange-400/25 px-3 py-1.5 rounded"
+          }>
             {entry.result === "walkover_opp" ? "3 – 0 (WO)" : "0 – 3 (WO)"}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Row 3: Log + Remove buttons */}
       <div className="flex gap-2">

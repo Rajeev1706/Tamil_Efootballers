@@ -180,7 +180,7 @@ function CreateFixtureForm({ teams }) {
   const [round, setRound]           = useState("")
   const [date, setDate]             = useState("")
   const [success, setSuccess]       = useState(false)
-  const [open, setOpen]             = useState(false)
+  const [open, setOpen] = useState(false)
   const createFixture               = useCreateFixture()
 
   const canCreate = homeTeamId && awayTeamId && round && date && homeTeamId !== awayTeamId
@@ -368,33 +368,27 @@ function FixtureCard({ fixture }) {
 
   const [editing, setEditing]     = useState(false)
   const [editRound, setEditRound] = useState(fixture.round)
-  const [editHome, setEditHome] = useState(fixture.homeTeamId)
-  const [editAway, setEditAway] = useState(fixture.awayTeamId)
+  const [editHome, setEditHome]   = useState(fixture.homeTeamId)
+  const [editAway, setEditAway]   = useState(fixture.awayTeamId)
   const [confirmDel, setConfirmDel] = useState(false)
 
   const winner  = saved ? (hs > as_ ? "home" : hs < as_ ? "away" : "draw") : null
-  const canSave = hs !== "" && as_ !== "" && hg !== "" && ag !== "" && !saved
+  const canSave = hs !== "" && as_ !== "" && hg !== "" && ag !== ""
 
   const handleClose = () => {
     closeFixture.mutate(fixture.id, {
-      onSuccess: (fresh) => {
-        setHs(fresh.homeScore ?? "")
-        setAs(fresh.awayScore ?? "")
-        setHg(fresh.homeGoals ?? "")
-        setAg(fresh.awayGoals ?? "")
-        setSaved(true)
-      },
-      onError: (err) => alert(err.response?.data?.error || "Failed to close fixture"),
+      onSuccess: () => setSaved(true),
+      onError:   (err) => alert(err.response?.data?.error || "Failed to close fixture"),
     })
   }
 
   const handleSaveResult = () => {
     saveResult.mutate({
-      id: fixture.id,
-      homeScore: parseInt(hs),
-      awayScore: parseInt(as_),
-      homeGoals: parseInt(hg),
-      awayGoals: parseInt(ag),
+      fixtureId:  fixture.id,
+      homeScore:  parseInt(hs),
+      awayScore:  parseInt(as_),
+      homeGoals:  parseInt(hg),
+      awayGoals:  parseInt(ag),
     }, {
       onSuccess: () => setSaved(true),
       onError:   (err) => alert(err.response?.data?.error || "Failed to save result"),
@@ -502,7 +496,6 @@ function FixtureCard({ fixture }) {
               </select>
             </div>
           </div>
-          <p className="text-xs text-slate-600">Date is set per round now — use "Set date for Round {fixture.round}" above the fixture list.</p>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setEditing(false)}
               className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 hover:text-white transition-colors">
@@ -516,9 +509,7 @@ function FixtureCard({ fixture }) {
         </div>
       )}
 
-      {/* Live tally — reflects player results already logged in the Team
-          Dashboard for this fixture, same numbers already live on the
-          League table. Purely informational, updates as captains log more. */}
+      {/* Live tally */}
       {!saved && (
         fixture.liveResultsLogged > 0 ? (
           <div className="mb-3 flex items-center justify-center gap-4 bg-pitch-800 rounded-lg py-2.5 px-3">
@@ -540,14 +531,10 @@ function FixtureCard({ fixture }) {
         )
       )}
 
-      {/* Close Fixture — primary action: derives points/goals from whatever
-          player results captains have already logged for this fixture live.
-          Manual entry below stays available as an override, same as before. */}
+      {/* Close Fixture */}
       {!saved && (
         <button onClick={handleClose} disabled={closeFixture.isPending}
-          className="w-full mb-3 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold
-                     bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25
-                     transition-colors disabled:opacity-50">
+          className="w-full mb-3 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors disabled:opacity-50">
           <CheckCircle className="w-4 h-4" /> {closeFixture.isPending ? "Closing…" : "Close Fixture"}
         </button>
       )}
@@ -577,7 +564,7 @@ function FixtureCard({ fixture }) {
         </div>
       </div>
 
-      {/* Goals row (for GF/GA/GD in league table) */}
+      {/* Goals row */}
       <div className="flex items-center gap-3">
         <div className="flex-1" />
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -746,11 +733,16 @@ export default function FixtureResults({ fixtures }) {
 
   const format = leagueFormat?.format || "league_knockout"
 
-  // ── Group Knockout format — round-by-round like UCL Results ───────────────
-  if (format === "group_knockout") {
-    const hasGroupFixtures = fixtures.some(f => f.groupStage)
+  // Detect group_knockout from actual fixture data too — this is more
+  // reliable than leagueFormat which can flicker while loading
+  const hasGroupFixtures = fixtures.some(f => f.groupStage)
+  const isGroupKnockout  = format === "group_knockout" || hasGroupFixtures
+
+  // ── Group Knockout format — compact round-by-round like UCL Results ──────────
+  if (isGroupKnockout) {
     const groupFixtures = fixtures.filter(f => f.groupStage)
     const allRounds = [...new Set(groupFixtures.map(f => f.round))].sort((a, b) => a - b)
+    const visibleRounds = activeRound === "all" ? allRounds : allRounds.filter(r => r === Number(activeRound))
 
     return (
       <div className="space-y-4">
@@ -762,15 +754,34 @@ export default function FixtureResults({ fixtures }) {
           </div>
         ) : (
           <>
-            {allRounds.map(round => {
+            {/* Round filter tabs */}
+            {allRounds.length > 0 && (
+              <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
+                <button
+                  onClick={() => setActiveRound("all")}
+                  className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                    activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                  )}>All</button>
+                {allRounds.map(r => (
+                  <button key={r} onClick={() => setActiveRound(r)}
+                    className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                      activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                    )}>Round {r}</button>
+                ))}
+              </div>
+            )}
+
+            {visibleRounds.map(round => {
               const roundFix = groupFixtures.filter(f => f.round === round)
               const completed = roundFix.filter(f => f.status === "completed").length
               return (
                 <div key={round} className="card overflow-hidden">
-                  <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center gap-3">
+                  {/* Round header */}
+                  <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center justify-between">
                     <span className="text-sm font-bold text-white">Round {round}</span>
                     <span className="text-xs text-slate-500">{completed}/{roundFix.length} completed</span>
                   </div>
+                  {/* Fixtures */}
                   {roundFix.map(f => (
                     <FixtureCard key={f.id} fixture={f} />
                   ))}
