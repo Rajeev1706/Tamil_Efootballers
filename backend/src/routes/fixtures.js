@@ -709,7 +709,7 @@ router.get("/group-standings", async (req, res, next) => {
           COUNT(*) FILTER (WHERE lost)  AS lost,
           COALESCE(SUM(gf), 0) AS gf,
           COALESCE(SUM(ga), 0) AS ga,
-          COALESCE(SUM(CASE WHEN won THEN 3 WHEN drawn THEN 1 ELSE 0 END), 0) AS pts
+          COALESCE(SUM(pts), 0) AS pts
         FROM per_team
         GROUP BY team_id
       )
