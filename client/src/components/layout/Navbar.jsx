@@ -34,6 +34,11 @@ export default function Navbar() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [isInstalled, setIsInstalled]     = useState(false)
 
+  // Detect iOS Safari — no beforeinstallprompt support, needs manual hint
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const isInStandaloneMode = window.matchMedia("(display-mode: standalone)").matches
+  const showIosHint = isIos && !isInStandaloneMode
+
   useEffect(() => {
     // Already running as installed PWA — no install button needed
     if (window.matchMedia("(display-mode: standalone)").matches) {
@@ -225,7 +230,7 @@ export default function Navbar() {
                 )
               })}
 
-              {/* Install App — last item, only on mobile, only when installable and not yet installed */}
+              {/* Android — Install App button */}
               {installPrompt && !isInstalled && (
                 <button
                   onClick={handleInstall}
@@ -234,6 +239,19 @@ export default function Navbar() {
                   <Download className="w-4 h-4 flex-shrink-0" />
                   <span>Install App</span>
                 </button>
+              )}
+
+              {/* iOS — manual install hint (Safari doesn't support beforeinstallprompt) */}
+              {showIosHint && (
+                <div className="sm:hidden mt-2 px-4 py-3 rounded-xl border border-accent/30 bg-accent/10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Download className="w-4 h-4 flex-shrink-0 text-accent" />
+                    <span className="text-sm font-medium text-accent">Install App</span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Tap the <span className="text-white font-medium">Share</span> button in Safari, then tap <span className="text-white font-medium">"Add to Home Screen"</span>
+                  </p>
+                </div>
               )}
 
             </nav>
