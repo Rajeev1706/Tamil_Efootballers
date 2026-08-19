@@ -371,19 +371,18 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
       {/* Row 3: Score */}
       {!isWalkover ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 flex-shrink-0">Score:</span>
           <input
-            type="number" min="0" placeholder="0"
+            type="number" min="0" placeholder="My score"
             value={entry.playerScore}
             onChange={e => onChange("playerScore", e.target.value)}
-            className="flex-1 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
+            className="flex-1 min-w-0 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
           />
           <span className="text-slate-600 text-xs flex-shrink-0">—</span>
           <input
-            type="number" min="0" placeholder="0"
+            type="number" min="0" placeholder="Opp score"
             value={entry.oppScore}
             onChange={e => onChange("oppScore", e.target.value)}
-            className="flex-1 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
+            className="flex-1 min-w-0 text-center bg-pitch-800 border border-surface-border rounded-md py-2.5 text-sm text-white focus:outline-none focus:border-accent/40"
           />
         </div>
       ) : (
