@@ -726,21 +726,24 @@ router.get("/group-standings", async (req, res, next) => {
         COALESCE(ts.ga,     0)::int AS ga,
         (COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0))::int AS gd,
         COALESCE(ts.pts,    0)::int AS pts,
-        -- Player matches logged in the most recent group fixture for this team
+        -- Player matches logged in the most recent group fixture that has ANY results
+        -- (picks by round DESC among fixtures with match records, so pre-generated
+        --  empty future rounds don't shadow the active one)
         COALESCE((
           SELECT COUNT(mr.id)
-          FROM fixtures f2
-          JOIN match_records mr ON mr.fixture_id = f2.id AND mr.match_type = 'league' AND mr.season_number = $1
-          JOIN players p2 ON p2.id = mr.player_id
-          WHERE (f2.home_team_id = t.id OR f2.away_team_id = t.id)
-            AND f2.group_stage = true
-            AND f2.id = (
-              SELECT f3.id FROM fixtures f3
-              WHERE (f3.home_team_id = t.id OR f3.away_team_id = t.id)
-                AND f3.group_stage = true
-              ORDER BY f3.round DESC, f3.id DESC
-              LIMIT 1
-            )
+          FROM match_records mr
+          WHERE mr.fixture_id = (
+            SELECT f3.id FROM fixtures f3
+            JOIN match_records mr3 ON mr3.fixture_id = f3.id
+              AND mr3.match_type = 'league'
+              AND mr3.season_number = $1
+            WHERE (f3.home_team_id = t.id OR f3.away_team_id = t.id)
+              AND f3.group_stage = true
+            ORDER BY f3.round DESC, f3.id DESC
+            LIMIT 1
+          )
+          AND mr.match_type = 'league'
+          AND mr.season_number = $1
         ), 0)::int AS "currentMatchesLogged",
         -- Number of players in this team
         (SELECT COUNT(*) FROM players p3 WHERE p3.team_id = t.id)::int AS "teamPlayerCount" 
