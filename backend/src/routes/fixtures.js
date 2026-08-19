@@ -833,7 +833,7 @@ router.post("/:id/reopen", authenticate, adminOnly, async (req, res, next) => {
       // Reset fixture back to pending, clear stored scores
       await q(`
         UPDATE fixtures
-        SET status = 'pending', home_score = NULL, away_score = NULL,
+        SET status = 'upcoming', home_score = NULL, away_score = NULL,
             home_goals = NULL, away_goals = NULL
         WHERE id = $1
       `, [fix.id])
