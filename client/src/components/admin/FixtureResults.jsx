@@ -754,21 +754,40 @@ export default function FixtureResults({ fixtures }) {
           </div>
         ) : (
           <>
-            {/* Round filter tabs */}
+            {/* Round filter tabs + export */}
             {allRounds.length > 0 && (
-              <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
-                <button
-                  onClick={() => setActiveRound("all")}
-                  className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                    activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
-                  )}>All</button>
-                {allRounds.map(r => (
-                  <button key={r} onClick={() => setActiveRound(r)}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
+                  <button
+                    onClick={() => setActiveRound("all")}
                     className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                      activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
-                    )}>Round {r}</button>
-                ))}
+                      activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                    )}>All</button>
+                  {allRounds.map(r => (
+                    <button key={r} onClick={() => setActiveRound(r)}
+                      className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                        activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                      )}>Round {r}</button>
+                  ))}
+                </div>
+                {activeRound !== "all" && (
+                  <button onClick={handleExport} disabled={exporting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+                    <Download className="w-3.5 h-3.5" />
+                    {exporting ? "Exporting…" : "Export PNG"}
+                  </button>
+                )}
               </div>
+            )}
+
+            {/* Hidden export card for group_knockout format */}
+            {activeRound !== "all" && (
+              <FixtureExportCard
+                round={activeRound}
+                fixtures={groupFixtures.filter(f => f.round === Number(activeRound))}
+                exportRef={exportRef}
+                visible={showExportCard}
+              />
             )}
 
             {visibleRounds.map(round => {
