@@ -638,6 +638,18 @@ export const useCloseFixture = () => {
   })
 }
 
+export const useReopenFixture = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => fixturesApi.reopen(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
+      qc.invalidateQueries({ queryKey: QK.teams })
+      qc.invalidateQueries({ queryKey: ["group-standings"] })
+    },
+  })
+}
+
 export const useTrades = (params) =>
   useQuery({ queryKey: QK.trades(params), queryFn: () => tradesApi.list(params) })
 

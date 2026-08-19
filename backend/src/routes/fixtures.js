@@ -726,24 +726,26 @@ router.get("/group-standings", async (req, res, next) => {
         COALESCE(ts.ga,     0)::int AS ga,
         (COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0))::int AS gd,
         COALESCE(ts.pts,    0)::int AS pts,
-        -- Player matches logged in the most recent group fixture that has ANY results
-        -- (picks by round DESC among fixtures with match records, so pre-generated
-        --  empty future rounds don't shadow the active one)
+        -- Player matches logged in the CURRENT round fixture for this team.
+        -- Current round = lowest round where status != 'completed' (same logic as
+        -- TeamResults.jsx). Falls back to MAX(round) when all fixtures are done.
         COALESCE((
           SELECT COUNT(mr.id)
           FROM match_records mr
-          WHERE mr.fixture_id = (
-            SELECT f3.id FROM fixtures f3
-            JOIN match_records mr3 ON mr3.fixture_id = f3.id
-              AND mr3.match_type = 'league'
-              AND mr3.season_number = $1
-            WHERE (f3.home_team_id = t.id OR f3.away_team_id = t.id)
-              AND f3.group_stage = true
-            ORDER BY f3.round DESC, f3.id DESC
-            LIMIT 1
-          )
-          AND mr.match_type = 'league'
-          AND mr.season_number = $1
+          JOIN fixtures f2 ON f2.id = mr.fixture_id
+          WHERE (f2.home_team_id = t.id OR f2.away_team_id = t.id)
+            AND f2.group_stage = true
+            AND f2.round = (
+              SELECT COALESCE(
+                MIN(f3.round) FILTER (WHERE f3.status != 'completed'),
+                MAX(f3.round)
+              )
+              FROM fixtures f3
+              WHERE (f3.home_team_id = t.id OR f3.away_team_id = t.id)
+                AND f3.group_stage = true
+            )
+            AND mr.match_type = 'league'
+            AND mr.season_number = $1
         ), 0)::int AS "currentMatchesLogged",
         -- Number of players in this team
         (SELECT COUNT(*) FROM players p3 WHERE p3.team_id = t.id)::int AS "teamPlayerCount" 
@@ -795,6 +797,53 @@ router.get("/format", authenticate, adminOnly, async (req, res, next) => {
 
 // PATCH /api/fixtures/format — change the team league format mid-season.
 // Allowed any time while at least one fixture is still not completed.
+// POST /api/fixtures/:id/reopen — admin reopens a completed fixture so team owners
+// can continue logging player results. Reverses the played/won/drawn/lost team stats
+// that were applied when the fixture was closed.
+router.post("/:id/reopen", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const fixRes = await query("SELECT * FROM fixtures WHERE id = $1", [parseInt(req.params.id)])
+    if (!fixRes.rows[0]) return res.status(404).json({ error: "Fixture not found" })
+    const fix = fixRes.rows[0]
+    if (fix.status !== "completed") {
+      return res.status(400).json({ error: "Fixture is not completed — nothing to reopen" })
+    }
+
+    const homeScore = fix.home_score ?? 0
+    const awayScore = fix.away_score ?? 0
+    const homeResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
+    const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
+
+    await withTransaction(async ({ query: q }) => {
+      // Reverse the played/won/drawn/lost that were applied on close
+      for (const [teamId, result] of [
+        [fix.home_team_id, homeResult],
+        [fix.away_team_id, awayResult],
+      ]) {
+        await q(`
+          UPDATE teams SET
+            played = GREATEST(played - 1, 0),
+            won    = GREATEST(won    - $1, 0),
+            drawn  = GREATEST(drawn  - $2, 0),
+            lost   = GREATEST(lost   - $3, 0)
+          WHERE id = $4
+        `, [result === "win" ? 1 : 0, result === "draw" ? 1 : 0, result === "loss" ? 1 : 0, teamId])
+      }
+
+      // Reset fixture back to pending, clear stored scores
+      await q(`
+        UPDATE fixtures
+        SET status = 'pending', home_score = NULL, away_score = NULL,
+            home_goals = NULL, away_goals = NULL
+        WHERE id = $1
+      `, [fix.id])
+    })
+
+    const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [fix.id])
+    res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
 // Locked once the last fixture is closed (that's when the format triggers).
 router.patch("/format", authenticate, adminOnly, async (req, res, next) => {
   try {
