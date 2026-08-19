@@ -150,7 +150,7 @@ export default function Navbar() {
 
           {/* Sidebar */}
           <div
-            className="absolute top-0 left-0 h-full w-72 bg-pitch-900 border-r border-surface-border shadow-2xl animate-slide-in"
+            className="absolute top-0 left-0 h-full w-72 bg-pitch-900 border-r border-surface-border shadow-2xl animate-slide-in flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
@@ -165,7 +165,7 @@ export default function Navbar() {
             </div>
 
             {/* Menu items */}
-            <nav className="p-3 space-y-1">
+            <nav className="p-3 space-y-1 overflow-y-auto flex-1">
               {/* Hall of Fame + Calendar — hidden from top navbar on mobile, so surfaced here */}
               {MOBILE_ONLY_NAV.map(item => {
                 const Icon = item.icon

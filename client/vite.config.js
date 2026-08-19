@@ -38,20 +38,23 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache all static assets
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Network-first for API calls — always get fresh data
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/tamil-efootballers\.onrender\.com\/api\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 }, // 5 min
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
               networkTimeoutSeconds: 10,
             },
           },
         ],
+      },
+      // Enable PWA in dev mode so manifest + SW work on localhost too
+      devOptions: {
+        enabled: true,
+        type: 'module',
       },
     }),
   ],
