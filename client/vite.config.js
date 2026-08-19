@@ -39,6 +39,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Raise limit to 5MB to cover large trophy/card PNGs
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/tamil-efootballers\.onrender\.com\/api\/.*/i,
@@ -51,7 +53,6 @@ export default defineConfig({
           },
         ],
       },
-      // Enable PWA in dev mode so manifest + SW work on localhost too
       devOptions: {
         enabled: true,
         type: 'module',
