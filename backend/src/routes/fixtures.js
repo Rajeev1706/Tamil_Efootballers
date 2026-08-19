@@ -725,7 +725,25 @@ router.get("/group-standings", async (req, res, next) => {
         COALESCE(ts.gf,     0)::int AS gf,
         COALESCE(ts.ga,     0)::int AS ga,
         (COALESCE(ts.gf, 0) - COALESCE(ts.ga, 0))::int AS gd,
-        COALESCE(ts.pts,    0)::int AS pts
+        COALESCE(ts.pts,    0)::int AS pts,
+        -- Player matches logged in the most recent group fixture for this team
+        COALESCE((
+          SELECT COUNT(mr.id)
+          FROM fixtures f2
+          JOIN match_records mr ON mr.fixture_id = f2.id AND mr.match_type = 'league' AND mr.season_number = $1
+          JOIN players p2 ON p2.id = mr.player_id
+          WHERE (f2.home_team_id = t.id OR f2.away_team_id = t.id)
+            AND f2.group_stage = true
+            AND f2.id = (
+              SELECT f3.id FROM fixtures f3
+              WHERE (f3.home_team_id = t.id OR f3.away_team_id = t.id)
+                AND f3.group_stage = true
+              ORDER BY f3.round DESC, f3.id DESC
+              LIMIT 1
+            )
+        ), 0)::int AS "currentMatchesLogged",
+        -- Number of players in this team
+        (SELECT COUNT(*) FROM players p3 WHERE p3.team_id = t.id)::int AS "teamPlayerCount" 
       FROM fixture_groups fg
       JOIN teams t ON t.id = fg.team_id
       LEFT JOIN team_stats ts ON ts.team_id = t.id

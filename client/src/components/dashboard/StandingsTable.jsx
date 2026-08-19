@@ -244,7 +244,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-border">
-                  {["#","Team","P","W","D","L","GF","GA","GD","Pts"].map(h => (
+                  {["#","Team","P","M","W","D","L","GF","GA","GD","Pts"].map(h => (
                     <th key={h} className={cn(
                       "py-2 text-xs font-semibold text-slate-500 tracking-wide",
                       h === "Team" ? "text-left px-4" : "text-center px-2",
@@ -277,7 +277,14 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                           </span>
                         </div>
                       </td>
-                      {[team.played, team.won, team.drawn, team.lost, team.gf, team.ga].map((val, i) => (
+                      <td className="py-2.5 px-2 text-center text-slate-400">{team.played}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {team.currentMatchesLogged === 0
+                          ? <span className="text-slate-600">—</span>
+                          : <span>{team.currentMatchesLogged}<span className="text-slate-600">/{team.teamPlayerCount}</span></span>
+                        }
+                      </td>
+                      {[team.won, team.drawn, team.lost, team.gf, team.ga].map((val, i) => (
                         <td key={i} className="py-2.5 px-2 text-center text-slate-400">{val}</td>
                       ))}
                       <td className={cn("py-2.5 px-2 text-center font-medium text-sm",
