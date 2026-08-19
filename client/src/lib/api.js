@@ -176,6 +176,7 @@ export const fixturesApi = {
   saveResult: (id, homeScore, awayScore, homeGoals, awayGoals) =>
     api.patch(`/fixtures/${id}/result`, { homeScore, awayScore, homeGoals, awayGoals }).then(r => r.data),
   close:      (id)                      => api.post(`/fixtures/${id}/close`).then(r => r.data),
+  reopen:     (id)                      => api.post(`/fixtures/${id}/reopen`).then(r => r.data),
 }
 
 export const tradesApi = {

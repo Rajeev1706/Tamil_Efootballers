@@ -2,7 +2,7 @@ import { useState, useRef } from "react"
 import { Check, CheckCircle, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download, RefreshCw } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
-  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture,
+  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture, useReopenFixture,
   useGenerateSeasonFixtures, useChangeLeagueFormat, useLeagueFormat,
   useTlgCurrent,
 } from "../../lib/queries"
@@ -355,6 +355,7 @@ function FixtureCard({ fixture }) {
   const { data: teams = [] } = useTeams()
   const saveResult    = useSaveFixtureResult()
   const closeFixture  = useCloseFixture()
+  const reopenFixture = useReopenFixture()
   const updateFixture = useUpdateFixture()
   const deleteFixture = useDeleteFixture()
 
@@ -383,12 +384,16 @@ function FixtureCard({ fixture }) {
   }
 
   const handleSaveResult = () => {
+    const _hs = parseInt(hs), _as = parseInt(as_), _hg = parseInt(hg), _ag = parseInt(ag)
+    if (!fixture.id || isNaN(_hs) || isNaN(_as) || isNaN(_hg) || isNaN(_ag)) {
+      return alert("Invalid scores — please enter valid numbers")
+    }
     saveResult.mutate({
       fixtureId:  fixture.id,
-      homeScore:  parseInt(hs),
-      awayScore:  parseInt(as_),
-      homeGoals:  parseInt(hg),
-      awayGoals:  parseInt(ag),
+      homeScore:  _hs,
+      awayScore:  _as,
+      homeGoals:  _hg,
+      awayGoals:  _ag,
     }, {
       onSuccess: () => setSaved(true),
       onError:   (err) => alert(err.response?.data?.error || "Failed to save result"),
@@ -430,7 +435,26 @@ function FixtureCard({ fixture }) {
 
         <div className="flex items-center gap-1.5">
           {saved
-            ? <span className="flex items-center gap-1 text-xs font-semibold text-accent"><Check className="w-3 h-3" /> Saved</span>
+            ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (window.confirm("Reopen this fixture? Team owners will be able to log results again.")) {
+                      reopenFixture.mutate(fixture.id, {
+                        onSuccess: () => setSaved(false),
+                        onError: (err) => alert(err.response?.data?.error || "Failed to reopen fixture"),
+                      })
+                    }
+                  }}
+                  disabled={reopenFixture.isPending}
+                  className="text-xs font-medium text-slate-500 hover:text-amber-400 transition-colors flex items-center gap-1 disabled:opacity-50"
+                  title="Reopen fixture"
+                >
+                  <RefreshCw className="w-3 h-3" /> Reopen
+                </button>
+                <span className="flex items-center gap-1 text-xs font-semibold text-accent"><Check className="w-3 h-3" /> Saved</span>
+              </div>
+            )
             : <span className="text-xs text-amber-400 font-medium">Pending</span>
           }
 
