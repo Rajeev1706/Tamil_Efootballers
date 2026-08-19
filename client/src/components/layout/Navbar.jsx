@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, TrendingUp, Award, CircleDollarSign, Home, Calendar } from "lucide-react"
+import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, TrendingUp, Award, CircleDollarSign, Home, Calendar, Download } from "lucide-react"
 import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
@@ -30,7 +30,43 @@ export default function Navbar() {
   const [searchParams] = useSearchParams()
   const user         = useAuthStore(s => s.user)
   const logout       = useAuthStore(s => s.logout)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen]           = useState(false)
+  const [installPrompt, setInstallPrompt] = useState(null)
+  const [isInstalled, setIsInstalled]     = useState(false)
+
+  useEffect(() => {
+    // Already running as installed PWA — no install button needed
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true)
+      return
+    }
+    // Capture the browser install prompt and suppress the auto banner
+    const onBeforeInstall = (e) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+    }
+    const onInstalled = () => {
+      setIsInstalled(true)
+      setInstallPrompt(null)
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstall)
+    window.addEventListener("appinstalled", onInstalled)
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall)
+      window.removeEventListener("appinstalled", onInstalled)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === "accepted") {
+      setInstallPrompt(null)
+      setIsInstalled(true)
+    }
+    setMenuOpen(false)
+  }
 
   const handleLogout = () => {
     logout()
@@ -188,6 +224,17 @@ export default function Navbar() {
                   </button>
                 )
               })}
+
+              {/* Install App — last item, only on mobile, only when installable and not yet installed */}
+              {installPrompt && !isInstalled && (
+                <button
+                  onClick={handleInstall}
+                  className="sm:hidden w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all mt-2 border border-accent/30 text-accent bg-accent/10 hover:bg-accent/20"
+                >
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span>Install App</span>
+                </button>
+              )}
 
             </nav>
           </div>
