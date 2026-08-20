@@ -80,6 +80,24 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
       setEntries(buildInitialEntries())
     }
   }, [lineup.length])
+
+  // When existing records arrive, remove entry rows for players already logged
+  useEffect(() => {
+    if (existingRecords.length === 0) return
+    const loggedMyIds = existingRecords.flatMap(r => [
+      myPlayers.find(p => p.id === r.playerId)?.id,
+      myPlayers.find(p => p.id === r.opponentId)?.id,
+    ]).filter(Boolean)
+    setEntries(prev => {
+      const filtered = prev.filter(e =>
+        !e.myPlayerId || !loggedMyIds.includes(Number(e.myPlayerId))
+      )
+      // Always keep at least one empty row
+      return filtered.length > 0
+        ? filtered
+        : [{ id: Date.now(), myPlayerId: "", oppPlayerId: "", result: "", playerScore: "", oppScore: "" }]
+    })
+  }, [existingRecords.length])
   const usedMyIds  = existingRecords.flatMap(r => [
     myPlayers.find(p => p.id === r.playerId)?.id,
     myPlayers.find(p => p.id === r.opponentId)?.id,
