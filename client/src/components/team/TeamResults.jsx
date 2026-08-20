@@ -11,12 +11,25 @@ const RESULTS = [
   { value: "walkover_opp", label: "Walkover (Opp gave WO)", color: "bg-emerald-400/15 text-emerald-400 border-emerald-400/30" },
 ]
 
+const KO_LABELS = {
+  champions_sf1: "Champions SF 1", champions_sf2: "Champions SF 2",
+  champions_final: "Champions Final", champions_3rd: "3rd / 4th Place",
+  europa_sf1: "Europa SF 1", europa_sf2: "Europa SF 2",
+  europa_final: "Europa Final", europa_7th: "7th / 8th Place",
+}
+
 export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId }) {
   const upcomingFixtures = fixtures.filter(f => f.status === "upcoming")
   const currentRound = upcomingFixtures.length > 0
     ? Math.min(...upcomingFixtures.map(f => f.round))
     : null
   const currentFixtures = upcomingFixtures.filter(f => f.round === currentRound)
+
+  // Build matchday label — knockout legs get a descriptive label
+  const firstFix = currentFixtures[0]
+  const matchdayLabel = firstFix?.isKnockoutLeg && firstFix?.knockoutMatchType
+    ? `${KO_LABELS[firstFix.knockoutMatchType] ?? "Knockout"} · Leg ${firstFix.knockoutLeg}`
+    : `Round ${currentRound} · Current matchday`
 
   if (currentFixtures.length === 0) {
     return (
@@ -30,7 +43,7 @@ export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId 
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Round {currentRound} · Current matchday</p>
+      <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{matchdayLabel}</p>
       {currentFixtures.map(fixture => (
         <FixtureResultCard
           key={fixture.id}

@@ -10,11 +10,14 @@ import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 
-// ── Auto-add group_stage column to fixtures if not present ───────────────────
+// ── Auto-add columns to fixtures if not present ──────────────────────────────
 ;(async () => {
   try {
-    await query(`ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS group_stage BOOLEAN DEFAULT FALSE`)
-    await query(`ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS grp CHAR(1)`)
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS group_stage BOOLEAN DEFAULT FALSE")
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS grp CHAR(1)")
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS is_knockout_leg BOOLEAN DEFAULT FALSE")
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS knockout_match_id INT")
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS knockout_leg INT")
   } catch (e) { console.error("[fixtures] migration:", e.message) }
 })()
 
@@ -131,11 +134,16 @@ const FIXTURE_SELECT = `
     ), 0) AS "liveResultsLogged",
 
     f.group_stage AS "groupStage",
-    f.grp
+    f.grp,
+    f.is_knockout_leg AS "isKnockoutLeg",
+    f.knockout_match_id AS "knockoutMatchId",
+    f.knockout_leg AS "knockoutLeg",
+    tkm.match_type AS "knockoutMatchType"
 
   FROM fixtures f
   JOIN teams ht ON f.home_team_id = ht.id
   JOIN teams at ON f.away_team_id = at.id
+  LEFT JOIN team_knockout_matches tkm ON f.knockout_match_id = tkm.id
 `
 
 // GET /api/fixtures  — all fixtures; optional ?teamId= or ?status=
@@ -448,20 +456,54 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
         WHERE id = $5
       `, [homePts, awayPts, homeGoals, awayGoals, req.params.id])
 
-      for (const [teamId, r] of [[fix.home_team_id, homeResult], [fix.away_team_id, awayResult]]) {
-        await q(`
-          UPDATE teams SET
-            played = played + 1,
-            won    = won   + $1,
-            drawn  = drawn + $2,
-            lost   = lost  + $3
-          WHERE id = $4
-        `, [r === "win" ? 1 : 0, r === "draw" ? 1 : 0, r === "loss" ? 1 : 0, teamId])
+      // Only update played/won/drawn/lost for GROUP STAGE fixtures.
+      // Knockout leg fixtures don't count toward league standings.
+      if (!fix.is_knockout_leg) {
+        for (const [teamId, r] of [[fix.home_team_id, homeResult], [fix.away_team_id, awayResult]]) {
+          await q(`
+            UPDATE teams SET
+              played = played + 1,
+              won    = won   + $1,
+              drawn  = drawn + $2,
+              lost   = lost  + $3
+            WHERE id = $4
+          `, [r === "win" ? 1 : 0, r === "draw" ? 1 : 0, r === "loss" ? 1 : 0, teamId])
+        }
       }
     })
 
-    // When all fixtures are complete, check the format and act accordingly
-    const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
+    // ── Auto-update knockout match when a leg fixture is closed ─────────────
+    if (fix.is_knockout_leg && fix.knockout_match_id) {
+      const { determineKnockoutWinner, advanceKnockoutWinner } = await import("../services/knockoutLogic.js")
+      const km = (await query("SELECT * FROM team_knockout_matches WHERE id = $1", [fix.knockout_match_id])).rows[0]
+      if (km) {
+        // Store actual GOALS in leg columns for GD calculation
+        const t1IsHome  = fix.home_team_id === km.team1_id
+        const t1Goals   = t1IsHome ? homeGoals : awayGoals
+        const t2Goals   = t1IsHome ? awayGoals : homeGoals
+        const legCol    = fix.knockout_leg === 1
+          ? "team1_leg1 = $1, team2_leg1 = $2"
+          : "team1_leg2 = $1, team2_leg2 = $2"
+        await query(`UPDATE team_knockout_matches SET ${legCol} WHERE id = $3`, [t1Goals, t2Goals, km.id])
+
+        // Check if both legs are now complete
+        const fresh = (await query("SELECT * FROM team_knockout_matches WHERE id = $1", [km.id])).rows[0]
+        if (fresh.team1_leg1 !== null && fresh.team1_leg2 !== null) {
+          const winnerId = determineKnockoutWinner(fresh)
+          if (winnerId) {
+            await query("UPDATE team_knockout_matches SET winner_id = $1, status = 'completed' WHERE id = $2", [winnerId, km.id])
+            await advanceKnockoutWinner(fresh, winnerId)
+          } else {
+            // Tied on GD — admin must pick manually
+            await query("UPDATE team_knockout_matches SET status = 'needs_decision' WHERE id = $1", [km.id])
+          }
+        }
+      }
+    }
+
+    // When all GROUP STAGE fixtures are complete, check format and act accordingly
+    // Knockout leg fixtures (is_knockout_leg=true) are handled separately
+    const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed' AND group_stage = true`)
     if (parseInt(remainingRes.rows[0].count) === 0) {
       const seasonRes  = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
       const formatRes  = await query("SELECT value FROM app_settings WHERE key = 'team_league_format'")
@@ -830,13 +872,21 @@ router.post("/:id/reopen", authenticate, adminOnly, async (req, res, next) => {
         `, [result === "win" ? 1 : 0, result === "draw" ? 1 : 0, result === "loss" ? 1 : 0, teamId])
       }
 
-      // Reset fixture back to pending, clear stored scores
+      // Reset fixture back to upcoming, clear stored scores
       await q(`
         UPDATE fixtures
         SET status = 'upcoming', home_score = NULL, away_score = NULL,
             home_goals = NULL, away_goals = NULL
         WHERE id = $1
       `, [fix.id])
+
+      // If this was a knockout leg, also clear the leg score on the knockout match
+      if (fix.is_knockout_leg && fix.knockout_match_id) {
+        const legCol = fix.knockout_leg === 1
+          ? "team1_leg1 = NULL, team2_leg1 = NULL"
+          : "team1_leg2 = NULL, team2_leg2 = NULL"
+        await q(`UPDATE team_knockout_matches SET ${legCol}, status = 'pending', winner_id = NULL WHERE id = $1`, [fix.knockout_match_id])
+      }
     })
 
     const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [fix.id])

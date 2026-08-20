@@ -313,8 +313,11 @@ export const tlgApi = {
 }
 
 export const teamKnockoutApi = {
-  current:     ()                                       => api.get("/team-knockout/current").then(r => r.data),
-  generate:    ()                                       => api.post("/team-knockout/generate").then(r => r.data),
+  current:       ()                          => api.get("/team-knockout/current").then(r => r.data),
+  generate:      ()                          => api.post("/team-knockout/generate").then(r => r.data),
+  toss:          (matchId)                   => api.post(`/team-knockout/matches/${matchId}/toss`).then(r => r.data),
+  tossChoice:    (matchId, homeChoice)       => api.post(`/team-knockout/matches/${matchId}/toss/choice`, { homeChoice }).then(r => r.data),
+  forceWinner:   (matchId, winnerId)         => api.post(`/team-knockout/matches/${matchId}/force-winner`, { winnerId }).then(r => r.data),
   saveLeg:     (matchId, leg, team1Score, team2Score)  => api.patch(`/team-knockout/matches/${matchId}/leg`, { leg, team1Score, team2Score }).then(r => r.data),
   deleteCurrent: ()                                     => api.delete("/team-knockout/current").then(r => r.data),
 }
