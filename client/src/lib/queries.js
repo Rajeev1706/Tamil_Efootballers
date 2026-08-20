@@ -1089,6 +1089,39 @@ export const useDeleteTeamKnockout = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => teamKnockoutApi.deleteCurrent(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-knockout-current"] })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
+    },
+  })
+}
+
+export const useTossKnockoutMatch = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (matchId) => teamKnockoutApi.toss(matchId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["team-knockout-current"] }),
+  })
+}
+
+export const useTossChoiceKnockoutMatch = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, homeChoice }) => teamKnockoutApi.tossChoice(matchId, homeChoice),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-knockout-current"] })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
+    },
+  })
+}
+
+export const useForceKnockoutWinner = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, winnerId }) => teamKnockoutApi.forceWinner(matchId, winnerId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-knockout-current"] })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
+    },
   })
 }
