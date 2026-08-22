@@ -25,6 +25,7 @@ export default function CreatePlayer({ onSuccess }) {
   const { data: teams = [] } = useTeams()
   const createPlayer         = useCreatePlayer()
   const updatePlayer         = useUpdatePlayer()
+  const [submitError, setSubmitError] = useState(null)
 
   const canSubmit = name && grade && (isCaptain || auctionPrice)
 
@@ -37,6 +38,7 @@ export default function CreatePlayer({ onSuccess }) {
 
   const handleSubmit = async () => {
     if (!canSubmit) return
+    setSubmitError(null)
 
     createPlayer.mutate(
       {
@@ -69,7 +71,7 @@ export default function CreatePlayer({ onSuccess }) {
           setImageFile(null); setImagePreview(null)
           onSuccess?.()
         },
-        onError: (err) => alert(err.response?.data?.error || "Failed to create player"),
+        onError: (err) => setSubmitError(err.response?.data?.error || "Failed to create player"),
       }
     )
   }
@@ -246,6 +248,12 @@ export default function CreatePlayer({ onSuccess }) {
           </div>
         </div>
       </div>
+
+      {submitError && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
+          <span>⚠</span> {submitError}
+        </div>
+      )}
 
       <button
         onClick={handleSubmit}
