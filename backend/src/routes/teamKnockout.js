@@ -74,9 +74,8 @@ async function getGroupStandings(season) {
       t.logo_url AS "logoUrl",
       COALESCE(SUM(
         CASE
-          WHEN f.home_team_id = t.id AND f.home_score > f.away_score  THEN 3
-          WHEN f.away_team_id = t.id AND f.away_score > f.home_score  THEN 3
-          WHEN f.home_score = f.away_score                             THEN 1
+          WHEN f.home_team_id = t.id THEN f.home_score
+          WHEN f.away_team_id = t.id THEN f.away_score
           ELSE 0
         END
       ), 0) AS pts,
