@@ -153,6 +153,14 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
     const finalAuctionPrice = isCaptain ? 0 : auctionPrice
     const finalMarketValue  = 0
 
+    // Duplicate name check (case-insensitive)
+    const dupCheck = await query(
+      "SELECT id FROM players WHERE LOWER(name) = LOWER($1)", [name]
+    )
+    if (dupCheck.rows.length > 0) {
+      return res.status(409).json({ error: `Player "${name}" already exists` })
+    }
+
     const result = await query(`
       INSERT INTO players (
         name, alias, team_id, grade, is_captain, auction_price, market_value,
