@@ -113,6 +113,10 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H,
   const oppP = allOppPlayers.find(p => p.id === matchup?.oppPlayerId) || null
   const bothSelected = myP && oppP
 
+  // Fetch H2H silently to colour the button green when history exists
+  const { data: h2hHistory = [] } = useH2H(myP?.id, oppP?.id)
+  const hasH2H = h2hHistory.length > 0
+
   return (
     <div>
       {/* Row with dropdowns */}
@@ -162,17 +166,19 @@ function MatchupRow({ slot, myPlayers, oppPlayers, matchup, onChange, onViewH2H,
             <ImageIcon className="w-3 h-3" />
           </button>
 
-          {/* H2H button */}
+          {/* H2H button — green when match history exists, violet otherwise */}
           <button
             onClick={() => myP && oppP && onViewH2H(myP, oppP)}
             disabled={!myP || !oppP}
             className={cn(
               "flex items-center justify-center gap-1 text-xs font-semibold px-2.5 py-2 rounded-xl border transition-all",
               myP && oppP
-                ? "text-violet-400 bg-violet-400/10 border-violet-400/25 hover:bg-violet-400/20"
+                ? hasH2H
+                  ? "text-emerald-400 bg-emerald-400/15 border-emerald-400/35 hover:bg-emerald-400/25"
+                  : "text-violet-400 bg-violet-400/10 border-violet-400/25 hover:bg-violet-400/20"
                 : "text-slate-600 bg-surface-border border-surface-border cursor-not-allowed"
             )}
-            title="View head-to-head history"
+            title={hasH2H ? `${h2hHistory.length} H2H matches found` : "No H2H history yet"}
           >
             <History className="w-3 h-3" /> H2H
           </button>
