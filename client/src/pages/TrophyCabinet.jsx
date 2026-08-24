@@ -5,7 +5,6 @@ import { cn } from "../lib/utils"
 import { useTrophyHistory, useTrophyHistoryYear } from "../lib/queries"
 import { getAvatarById } from "../lib/avatars"
 import Layout from "../components/layout/Layout"
-import GradeBadge from "../components/common/GradeBadge"
 
 import ballondorTrophy    from "../../images/ballondor.png"
 import teamLeagueTrophy   from "../../images/Team League.png"
@@ -120,7 +119,6 @@ export default function TrophyCabinet() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-semibold text-white truncate">{player.name}</span>
-                        <GradeBadge grade={player.grade} size="sm" />
                       </div>
                       <span className="text-[10px] text-slate-500 truncate">{player.team || "—"}</span>
                     </div>
