@@ -71,7 +71,8 @@ function MatchCard({ match }) {
   const toss        = useTossKnockoutMatch()
   const tossChoice  = useTossChoiceKnockoutMatch()
   const forceWinner = useForceKnockoutWinner()
-  const [showToss, setShowToss] = useState(false)
+  const [showToss, setShowToss]   = useState(false)
+  const [isRedoing, setIsRedoing] = useState(false)
 
   const noTeams       = !match.team1_id || !match.team2_id
   const completed     = match.status === "completed"
@@ -80,7 +81,11 @@ function MatchCard({ match }) {
   const choiceDone    = !!match.home_choice
   const isChampions   = match.match_type.startsWith("champions_")
 
-  const handleToss = async () => { await toss.mutateAsync(match.id); setShowToss(false) }
+  const handleToss = async () => {
+    await toss.mutateAsync(match.id)
+    setShowToss(false)
+    setIsRedoing(false)
+  }
 
   return (
     <div className={cn("rounded-xl border p-4 space-y-3", MATCH_COLORS[match.match_type])}>
@@ -147,14 +152,14 @@ function MatchCard({ match }) {
             <div className="border border-surface-border/40 rounded-xl p-3 bg-pitch-900/40 space-y-3">
               <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide text-center">🪙 Coin Toss</p>
 
-              {!tossDone ? (
-                showToss
+              {(!tossDone || isRedoing) && !choiceDone ? (
+                (showToss || isRedoing)
                   ? <CoinFlip onDone={handleToss} />
                   : <button onClick={() => setShowToss(true)}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-pitch-900 font-bold text-sm hover:bg-accent/90">
                       <Coins className="w-4 h-4" /> Start Toss
                     </button>
-              ) : (
+              ) : choiceDone ? null : (
                 <div className="space-y-3">
                   <div className="flex items-center justify-center gap-2 py-2 rounded-lg bg-gold/10 border border-gold/20">
                     <span className="text-lg">🥇</span>
@@ -170,6 +175,14 @@ function MatchCard({ match }) {
                       </button>
                     ))}
                   </div>
+                  {/* Redo toss — only before home choice is locked */}
+                  <button
+                    onClick={() => { if (confirm("Redo the coin toss? The current result will be replaced.")) setIsRedoing(true) }}
+                    disabled={toss.isPending}
+                    className="w-full text-[10px] text-slate-600 hover:text-slate-400 transition-colors pt-1 underline underline-offset-2"
+                  >
+                    Redo toss
+                  </button>
                 </div>
               )}
             </div>

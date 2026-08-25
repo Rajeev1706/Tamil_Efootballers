@@ -1,24 +1,41 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { Users } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
+import { Users, Play } from "lucide-react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import api from "../lib/api"
 import { cn } from "../lib/utils"
 
 export default function DuoDraw() {
   const { season } = useParams()
-  const navigate = useNavigate()
-  const [phase, setPhase]           = useState("intro")
+  const navigate   = useNavigate()
+  const qc         = useQueryClient()
+  const [phase, setPhase]           = useState("idle") // idle | intro | revealing | done
   const [pairIdx, setPairIdx]       = useState(0)
   const [revealStep, setRevealStep] = useState(0)   // 0=blank 1=set1 2=connector 3=set2 4=pause
   const [fadingOut, setFadingOut]   = useState(false)
   const [transitioning, setTransitioning] = useState(false) // true while between pairs
 
-  const { data: pairs = [] } = useQuery({
+  const generateMut = useMutation({
+    mutationFn: () => api.post("/duo/generate", { seasonNumber: Number(season) }).then(r => r.data),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ["duo-pairs", season] })
+      qc.invalidateQueries({ queryKey: ["duo"] })
+      setPhase("intro")
+    },
+  })
+
+  const { data: pairs = [], isLoading: pairsLoading } = useQuery({
     queryKey: ["duo-pairs", season],
     queryFn:  () => api.get(`/duo/pairs?season=${season}`).then(r => r.data),
     enabled:  !!season,
   })
+
+  // If pairs already exist (re-visit), go to intro directly
+  useEffect(() => {
+    if (!pairsLoading && pairs.length > 0 && phase === "idle") {
+      setPhase("intro")
+    }
+  }, [pairs.length, pairsLoading, phase])
 
   const currentPair = pairs[pairIdx]
 
@@ -35,10 +52,10 @@ export default function DuoDraw() {
         setFadingOut(true)
         setTimeout(() => {
           // Mark as transitioning so new pair renders fully hidden
+          setRevealStep(0)
           setTransitioning(true)
           setFadingOut(false)
           setPairIdx(i => i + 1)
-          setRevealStep(0)
           // Small delay before starting new reveal so DOM updates first
           setTimeout(() => setTransitioning(false), 80)
         }, 500)
@@ -53,9 +70,9 @@ export default function DuoDraw() {
     if (phase === "revealing") setRevealStep(0)
   }, [pairIdx])
 
-  if (pairs.length === 0) return (
+  if (pairsLoading && phase === "idle") return (
     <div className="min-h-screen bg-pitch-900 flex items-center justify-center">
-      <p className="text-slate-500">Loading pairs...</p>
+      <p className="text-slate-500">Loading...</p>
     </div>
   )
 
@@ -72,11 +89,29 @@ export default function DuoDraw() {
         </div>
       </div>
 
+      {/* Idle — Start button triggers generate */}
+      {phase === "idle" && (
+        <div className="text-center">
+          <p className="text-slate-400 mb-2 text-sm">Sets confirmed — ready to draw pairs</p>
+          <p className="text-slate-500 text-sm mb-10">Admin-selected Set 1 paired randomly with Set 2</p>
+          <button
+            onClick={() => generateMut.mutate()}
+            disabled={generateMut.isPending}
+            className="bg-accent text-white px-10 py-4 rounded-2xl text-lg font-extrabold hover:bg-accent/90 transition-all hover:scale-105 shadow-lg shadow-accent/20 disabled:opacity-50 flex items-center gap-3 mx-auto">
+            <Play className="w-6 h-6" />
+            {generateMut.isPending ? "Generating…" : "Start Draw"}
+          </button>
+          {generateMut.isError && (
+            <p className="text-rose-400 text-sm mt-4">{generateMut.error?.response?.data?.error || "Failed to generate"}</p>
+          )}
+        </div>
+      )}
+
       {/* Intro screen */}
       {phase === "intro" && (
         <div className="text-center">
           <p className="text-slate-400 mb-2 text-sm">{pairs.length} duo pairs drawn</p>
-          <p className="text-slate-500 text-sm mb-10">S/A+/A players paired with B/C players · Random draw</p>
+          <p className="text-slate-500 text-sm mb-10">Set 1 paired randomly with Set 2 · {pairs.length} duo pairs</p>
           <button onClick={() => setPhase("revealing")}
             className="bg-accent text-white px-10 py-4 rounded-2xl text-lg font-extrabold hover:bg-accent/90 transition-all hover:scale-105 shadow-lg shadow-accent/20">
             Reveal Pairs
@@ -98,7 +133,7 @@ export default function DuoDraw() {
             {/* Set 1 player */}
             <div className={cn(
               "flex-1 text-center transition-all duration-500",
-              revealStep >= 1 ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-8"
+              revealStep >= 1 ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-8 invisible"
             )}>
               <div className="bg-pitch-800 border border-surface-border rounded-2xl px-6 py-5 mx-1"
                 style={{ boxShadow: revealStep >= 1 ? "0 0 30px rgba(99,102,241,0.15)" : "none" }}>
@@ -110,7 +145,7 @@ export default function DuoDraw() {
             {/* Connector */}
             <div className={cn(
               "flex flex-col items-center flex-shrink-0 px-3 transition-all duration-300",
-              revealStep >= 2 ? "opacity-100 scale-100" : "opacity-0 scale-75"
+              revealStep >= 2 ? "opacity-100 scale-100" : "opacity-0 scale-75 invisible"
             )}>
               <div className="w-px h-8 bg-slate-700" />
               <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center">
@@ -122,7 +157,7 @@ export default function DuoDraw() {
             {/* Set 2 player */}
             <div className={cn(
               "flex-1 text-center transition-all duration-500",
-              revealStep >= 3 ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
+              revealStep >= 3 ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8 invisible"
             )}>
               <div className="bg-pitch-800 border border-surface-border rounded-2xl px-6 py-5 mx-1"
                 style={{ boxShadow: revealStep >= 3 ? "0 0 30px rgba(16,185,129,0.15)" : "none" }}>

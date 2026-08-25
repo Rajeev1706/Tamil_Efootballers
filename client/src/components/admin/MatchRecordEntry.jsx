@@ -5,15 +5,19 @@ import { useLogRecord, useDeleteRecord, useEditRecord } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 
 const MATCH_TYPES = [
-  { value: "league", label: "Dshann League" },
-  { value: "ucl",    label: "UCL"         },
-  { value: "weekly", label: "Weekly"      },
+  { value: "league",     label: "Dshann League" },
+  { value: "ucl",        label: "UCL"           },
+  { value: "weekly",     label: "Weekly"        },
+  { value: "revolution", label: "Revolution"    },
+  { value: "duo",        label: "Duo"           },
 ]
 
 const MATCH_TYPE_COLORS = {
-  league: "text-accent bg-accent/10 border-accent/25",
-  ucl:    "text-violet-400 bg-violet-400/10 border-violet-400/25",
-  weekly: "text-amber-400 bg-amber-400/10 border-amber-400/25",
+  league:     "text-accent bg-accent/10 border-accent/25",
+  ucl:        "text-violet-400 bg-violet-400/10 border-violet-400/25",
+  weekly:     "text-amber-400 bg-amber-400/10 border-amber-400/25",
+  revolution: "text-rose-400 bg-rose-400/10 border-rose-400/25",
+  duo:        "text-emerald-400 bg-emerald-400/10 border-emerald-400/25",
 }
 
 function ToggleBtn({ value, selected, onChange, label, color }) {

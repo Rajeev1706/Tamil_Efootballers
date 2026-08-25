@@ -17,6 +17,7 @@ import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import RevolutionAdmin from "../components/admin/RevolutionTournament"
 import TlgAdmin from "../components/admin/TlgAdmin"
 import TeamKnockoutAdmin from "../components/admin/TeamKnockoutAdmin"
+import DuoTournamentAdmin from "../components/admin/DuoTournamentAdmin"
 import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
@@ -401,6 +402,7 @@ const TABS = [
   { id: "revolution", label: "Revolution",  icon: Trophy          },
   { id: "tlg",        label: "TLG",         icon: Trophy          },
   { id: "teamknockout",  label: "Team Knockout",  icon: Trophy },
+  { id: "duo",           label: "Duo",            icon: Users  },
   { id: "replacement",label: "Replacement", icon: RefreshCw       },
   { id: "fixtures",   label: "Fixtures",     icon: Calendar        },
   { id: "teamresults",label: "Team Results", icon: Users           },
@@ -563,6 +565,7 @@ export default function AdminPage() {
         )}
         {activeTab === "tlg" && <TlgAdmin />}
         {activeTab === "teamknockout" && <TeamKnockoutAdmin />}
+        {activeTab === "duo" && <DuoTournamentAdmin />}
         {activeTab === "replacement" && (
           <ReplacementModule players={players} />
         )}

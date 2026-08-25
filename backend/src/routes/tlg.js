@@ -175,6 +175,7 @@ router.post("/:id/draw", authenticate, adminOnly, async (req, res, next) => {
     const gATeams  = shuffled.slice(0, 4)
     const gBTeams  = shuffled.slice(4, 8)
 
+    await query("DELETE FROM tlg_fixtures WHERE season_id = $1", [tlgId])
     await query("DELETE FROM tlg_groups WHERE season_id = $1", [tlgId])
 
     const gA = (await query("INSERT INTO tlg_groups (season_id, name) VALUES ($1,'A') RETURNING *", [tlgId])).rows[0]
