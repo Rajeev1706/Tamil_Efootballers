@@ -19,10 +19,12 @@ function legStats(legData, matchTeam1Id) {
   if (!legData) return null
   const closed = legData.leg_status === "completed"
 
-  // For closed fixtures: use stored scores (set on admin close)
-  // For live/upcoming: always use live match_records totals (same as group standings)
-  const homePts   = closed && legData.stored_home_pts   != null ? legData.stored_home_pts   : legData.live_home_pts
-  const awayPts   = closed && legData.stored_away_pts   != null ? legData.stored_away_pts   : legData.live_away_pts
+  // ALWAYS use live match_records for Pts — same as group standings.
+  // Stored values (f.home_score) can be stale or wrong; live_home_pts
+  // is always recomputed from match_records so it's the ground truth.
+  const homePts   = legData.live_home_pts
+  const awayPts   = legData.live_away_pts
+  // Goals: stored when closed (more reliable after admin confirms), else live
   const homeGoals = closed && legData.stored_home_goals != null ? legData.stored_home_goals : legData.live_home_goals
   const awayGoals = closed && legData.stored_away_goals != null ? legData.stored_away_goals : legData.live_away_goals
   const isLive    = !closed && Number(legData.matches_logged) > 0
