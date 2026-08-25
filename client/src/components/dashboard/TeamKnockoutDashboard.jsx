@@ -19,10 +19,12 @@ function legStats(legData, matchTeam1Id) {
   if (!legData) return null
   const closed = legData.leg_status === "completed"
 
-  const homePts   = closed ? (legData.stored_home_pts   ?? legData.live_home_pts)   : legData.live_home_pts
-  const awayPts   = closed ? (legData.stored_away_pts   ?? legData.live_away_pts)   : legData.live_away_pts
-  const homeGoals = closed ? (legData.stored_home_goals ?? legData.live_home_goals) : legData.live_home_goals
-  const awayGoals = closed ? (legData.stored_away_goals ?? legData.live_away_goals) : legData.live_away_goals
+  // For closed fixtures: use stored scores (set on admin close)
+  // For live/upcoming: always use live match_records totals (same as group standings)
+  const homePts   = closed && legData.stored_home_pts   != null ? legData.stored_home_pts   : legData.live_home_pts
+  const awayPts   = closed && legData.stored_away_pts   != null ? legData.stored_away_pts   : legData.live_away_pts
+  const homeGoals = closed && legData.stored_home_goals != null ? legData.stored_home_goals : legData.live_home_goals
+  const awayGoals = closed && legData.stored_away_goals != null ? legData.stored_away_goals : legData.live_away_goals
   const isLive    = !closed && Number(legData.matches_logged) > 0
 
   const t1IsHome = legData.home_team_id === matchTeam1Id
@@ -37,15 +39,12 @@ function legStats(legData, matchTeam1Id) {
   }
 }
 
-function StatLabel({ label }) {
-  return <span className="text-[9px] font-bold uppercase tracking-widest text-slate-600">{label}</span>
-}
-
-function StatVal({ val, highlight, dim }) {
+function StatCell({ val, highlight, dim, header }) {
+  if (header) return <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">{val}</span>
   return (
     <span className={cn(
-      "text-xs font-bold font-mono w-8 text-center",
-      highlight ? "text-emerald-400" : dim ? "text-slate-600" : "text-slate-300"
+      "text-xs font-bold font-mono text-center",
+      highlight ? "text-emerald-400" : dim ? "text-slate-500" : "text-slate-300"
     )}>
       {val ?? "—"}
     </span>
@@ -121,45 +120,48 @@ function MiniMatchRow({ match }) {
         </div>
       ) : (
         <>
-          {/* Stats header row */}
-          {hasAnyData && (
-            <div className="flex items-center justify-between mb-1 pb-1 border-b border-surface-border/30">
-              <span className="text-[9px] text-slate-700 flex-1">Team</span>
-              <div className="flex gap-1">
-                <StatLabel label="Pts" />
-                <StatLabel label="GF" />
-                <StatLabel label="GA" />
-                <StatLabel label="GD" />
+          {/* Stats table — grid for perfect alignment */}
+          {hasAnyData ? (
+            <div className="space-y-0.5">
+              {/* Header */}
+              <div className="grid grid-cols-[1fr_40px_36px_36px_44px] gap-1 pb-1 border-b border-surface-border/30">
+                <span className="text-[10px] text-slate-600">Team</span>
+                <StatCell val="Pts" header />
+                <StatCell val="GF"  header />
+                <StatCell val="GA"  header />
+                <StatCell val="GD"  header />
               </div>
-            </div>
-          )}
-
-          {/* Team rows */}
-          {teams.map(t => (
-            <div key={t.id} className="flex items-center justify-between gap-2 py-1">
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <TeamAvatar logoUrl={t.logo} name={t.name} size="w-5 h-5" />
-                <span className={cn("text-xs font-medium truncate", t.wins ? "text-emerald-400" : "text-white")}>
-                  {t.name}
-                </span>
-                {t.wins && <span className="text-[9px] text-emerald-400 font-bold flex-shrink-0">✓</span>}
-              </div>
-              {hasAnyData ? (
-                <div className="flex gap-1 flex-shrink-0">
-                  <StatVal val={t.pts} highlight={t.wins} />
-                  <StatVal val={t.gf} />
-                  <StatVal val={t.ga} />
-                  <StatVal
+              {/* Team rows */}
+              {teams.map(t => (
+                <div key={t.id} className="grid grid-cols-[1fr_40px_36px_36px_44px] gap-1 items-center py-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <TeamAvatar logoUrl={t.logo} name={t.name} size="w-5 h-5" />
+                    <span className={cn("text-xs font-medium truncate", t.wins ? "text-emerald-400" : "text-white")}>
+                      {t.name}
+                    </span>
+                    {t.wins && <span className="text-[9px] text-emerald-400 font-bold ml-0.5">✓</span>}
+                  </div>
+                  <StatCell val={t.pts} highlight={t.wins} />
+                  <StatCell val={t.gf} />
+                  <StatCell val={t.ga} />
+                  <StatCell
                     val={t.gd >= 0 ? `+${t.gd}` : t.gd}
                     highlight={t.gd > 0}
                     dim={t.gd < 0}
                   />
                 </div>
-              ) : (
-                <span className="text-[10px] text-slate-700">vs</span>
-              )}
+              ))}
             </div>
-          ))}
+          ) : (
+            <div className="space-y-1">
+              {teams.map(t => (
+                <div key={t.id} className="flex items-center gap-2">
+                  <TeamAvatar logoUrl={t.logo} name={t.name} size="w-5 h-5" />
+                  <span className="text-xs text-slate-400">{t.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Leg breakdown */}
           {(l1?.hasData || l2?.hasData) && (
