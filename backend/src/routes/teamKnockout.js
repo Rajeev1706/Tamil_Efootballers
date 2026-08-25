@@ -130,11 +130,63 @@ router.get("/current", async (req, res, next) => {
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
     const season = parseInt(seasonRes.rows[0]?.value || "1")
 
-    const matches = await query(
+    const matchesRes = await query(
       MATCH_SELECT + " WHERE tkm.season_number = $1 ORDER BY tkm.id ASC", [season]
     )
     const groups = await getGroupStandings(season).catch(() => ({ A: [], B: [] }))
-    res.json({ season, matches: matches.rows, groups })
+
+    // Enrich each match with LIVE leg scores from match_records
+    // (team1_leg1/leg2 are only set after admin closes the fixture;
+    //  live scores update in real-time as team owners log player results)
+    const matchIds = matchesRes.rows.map(m => m.id)
+    let liveLegs = {}
+    if (matchIds.length > 0) {
+      const liveRes = await query(`
+        SELECT
+          f.knockout_match_id AS match_id,
+          f.knockout_leg      AS leg,
+          f.home_team_id,
+          f.away_team_id,
+          f.status            AS leg_status,
+          -- Stored scores (set when admin closes the fixture)
+          f.home_score        AS stored_home_pts,
+          f.away_score        AS stored_away_pts,
+          f.home_goals        AS stored_home_goals,
+          f.away_goals        AS stored_away_goals,
+          -- Live scores from match_records (updates in real-time)
+          COALESCE(SUM(CASE
+            WHEN p.team_id = f.home_team_id AND mr.result = 'win'  THEN 3
+            WHEN p.team_id = f.home_team_id AND mr.result = 'draw' THEN 1
+            ELSE 0 END), 0) AS live_home_pts,
+          COALESCE(SUM(CASE
+            WHEN p.team_id = f.away_team_id AND mr.result = 'win'  THEN 3
+            WHEN p.team_id = f.away_team_id AND mr.result = 'draw' THEN 1
+            ELSE 0 END), 0) AS live_away_pts,
+          COALESCE(SUM(CASE WHEN p.team_id = f.home_team_id THEN mr.player_score ELSE 0 END), 0) AS live_home_goals,
+          COALESCE(SUM(CASE WHEN p.team_id = f.away_team_id THEN mr.player_score ELSE 0 END), 0) AS live_away_goals,
+          COUNT(mr.id) AS matches_logged
+        FROM fixtures f
+        LEFT JOIN match_records mr ON mr.fixture_id = f.id
+        LEFT JOIN players p ON p.id = mr.player_id
+        WHERE f.is_knockout_leg = true
+          AND f.knockout_match_id = ANY($1::int[])
+        GROUP BY f.id, f.knockout_match_id, f.knockout_leg,
+                 f.home_team_id, f.away_team_id, f.status,
+                 f.home_score, f.away_score, f.home_goals, f.away_goals
+      `, [matchIds])
+
+      for (const row of liveRes.rows) {
+        if (!liveLegs[row.match_id]) liveLegs[row.match_id] = {}
+        liveLegs[row.match_id][`leg${row.leg}`] = row
+      }
+    }
+
+    const matches = matchesRes.rows.map(m => ({
+      ...m,
+      liveLegs: liveLegs[m.id] || {},
+    }))
+
+    res.json({ season, matches, groups })
   } catch (err) { next(err) }
 })
 
@@ -203,8 +255,10 @@ router.post("/matches/:matchId/toss", authenticate, adminOnly, async (req, res, 
     if (!match.team1_id || !match.team2_id) {
       return res.status(400).json({ error: "Both teams must be set before tossing" })
     }
-    if (match.toss_done) {
-      return res.status(400).json({ error: "Toss already done for this match" })
+    // Allow redo only if toss is done but home_choice not yet picked
+    // (fixtures not created yet — no permanent commitment made)
+    if (match.toss_done && match.home_choice) {
+      return res.status(400).json({ error: "Toss is locked — home leg already chosen and fixtures created" })
     }
 
     // Random winner — server-side so it can't be manipulated

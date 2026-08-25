@@ -3,10 +3,12 @@ import { Trophy, ChevronDown } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 const MATCH_TYPE_OPTIONS = [
-  { value: "all",    label: "Total matches" },
-  { value: "league", label: "Dshann League"   },
-  { value: "ucl",    label: "UCL"           },
-  { value: "weekly", label: "Weekly"        },
+  { value: "all",        label: "Total matches"  },
+  { value: "league",     label: "Dshann League"  },
+  { value: "ucl",        label: "UCL"            },
+  { value: "weekly",     label: "Weekly"         },
+  { value: "revolution", label: "Revolution"     },
+  { value: "duo",        label: "Duo Tournament" },
 ]
 
 function SummaryRow({ label, value }) {

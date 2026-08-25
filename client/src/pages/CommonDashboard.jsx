@@ -761,7 +761,13 @@ export default function CommonDashboard() {
 
               <div key={activePanel} className="animate-panel-in">
                 {activePanel === "players"   && <PlayersDirectory players={players} onPlayerClick={handlePlayer} />}
-                {activePanel === "standings" && <StandingsTable teams={teams} players={players} onPlayerClick={handlePlayer} view={standingsView} onViewChange={setStandingsView} />}
+                {activePanel === "standings" && (
+                  <StandingsTable
+                    teams={teams} players={players}
+                    onPlayerClick={handlePlayer}
+                    view={standingsView} onViewChange={setStandingsView}
+                  />
+                )}
                 {activePanel === "ucl"       && <UclStandings onPlayerClick={handlePlayer} />}
                 {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "revolution" && <RevolutionDashboard onPlayerClick={handlePlayer} />}

@@ -764,7 +764,8 @@ export default function FixtureResults({ fixtures }) {
 
   // ── Group Knockout format — compact round-by-round like UCL Results ──────────
   if (isGroupKnockout) {
-    const groupFixtures = fixtures.filter(f => f.groupStage)
+    // Include knockout leg fixtures (is_knockout_leg=true) alongside group stage
+    const groupFixtures = fixtures.filter(f => f.groupStage || f.isKnockoutLeg)
     const allRounds = [...new Set(groupFixtures.map(f => f.round))].sort((a, b) => a - b)
     const visibleRounds = activeRound === "all" ? allRounds : allRounds.filter(r => r === Number(activeRound))
 
@@ -787,12 +788,18 @@ export default function FixtureResults({ fixtures }) {
                     className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
                       activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
                     )}>All</button>
-                  {allRounds.map(r => (
-                    <button key={r} onClick={() => setActiveRound(r)}
-                      className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                        activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
-                      )}>Round {r}</button>
-                  ))}
+                  {allRounds.map(r => {
+                    const koFix = groupFixtures.find(f => f.round === r && f.isKnockoutLeg)
+                    const label = koFix
+                      ? `KO Leg ${koFix.knockoutLeg}`
+                      : `Round ${r}`
+                    return (
+                      <button key={r} onClick={() => setActiveRound(r)}
+                        className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
+                          activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+                        )}>{label}</button>
+                    )
+                  })}
                 </div>
                 {activeRound !== "all" && (
                   <button onClick={handleExport} disabled={exporting}
@@ -821,7 +828,11 @@ export default function FixtureResults({ fixtures }) {
                 <div key={round} className="card overflow-hidden">
                   {/* Round header */}
                   <div className="px-5 py-3 border-b border-surface-border bg-pitch-800/40 flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">Round {round}</span>
+                    <span className="text-sm font-bold text-white">
+                      {roundFix[0]?.isKnockoutLeg
+                        ? `${roundFix[0].knockoutMatchType?.replace(/_/g," ").replace(/\w/g,c=>c.toUpperCase()) ?? "Knockout"} · Leg ${roundFix[0].knockoutLeg}`
+                        : `Round ${round}`}
+                    </span>
                     <span className="text-xs text-slate-500">{completed}/{roundFix.length} completed</span>
                   </div>
                   {/* Fixtures */}

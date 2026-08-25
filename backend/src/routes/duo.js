@@ -13,6 +13,16 @@ const router = Router()
 // ── Inline column migration — add trophy10/11 if not already present ──────────
 ;(async () => {
   try {
+    // duo_selections: admin-chosen Set 1 / Set 2 players per season
+    await query(`
+      CREATE TABLE IF NOT EXISTS duo_selections (
+        id            SERIAL PRIMARY KEY,
+        season_number INT NOT NULL,
+        set_number    INT NOT NULL CHECK (set_number IN (1,2)),
+        player_id     INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        UNIQUE(season_number, player_id)
+      )
+    `)
     // Ensure all extended trophy columns exist (trophy8/9 may not be in base migrate.js)
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy8_count  INT DEFAULT 0`)
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy9_count  INT DEFAULT 0`)
@@ -187,15 +197,25 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { seasonNumber } = z.object({ seasonNumber: z.number().int().positive() }).parse(req.body)
 
-    // Get all players split by grade
+    // Use admin-selected sets from duo_selections table
     const set1Res = await query(
-      `SELECT id, name, grade::text AS grade FROM players WHERE grade::text = ANY($1::text[]) ORDER BY RANDOM()`,
-      [SET1_GRADES]
+      `SELECT p.id, p.name, p.grade::text AS grade
+       FROM duo_selections ds JOIN players p ON p.id = ds.player_id
+       WHERE ds.season_number = $1 AND ds.set_number = 1
+       ORDER BY RANDOM()`,
+      [seasonNumber]
     )
     const set2Res = await query(
-      `SELECT id, name, grade::text AS grade FROM players WHERE grade::text = ANY($1::text[]) ORDER BY RANDOM()`,
-      [SET2_GRADES]
+      `SELECT p.id, p.name, p.grade::text AS grade
+       FROM duo_selections ds JOIN players p ON p.id = ds.player_id
+       WHERE ds.season_number = $1 AND ds.set_number = 2
+       ORDER BY RANDOM()`,
+      [seasonNumber]
     )
+
+    if (set1Res.rows.length === 0 || set2Res.rows.length === 0) {
+      return res.status(400).json({ error: "Please confirm Set 1 and Set 2 selections first" })
+    }
 
     const set1 = shuffle(set1Res.rows)
     const set2 = shuffle(set2Res.rows)
@@ -586,6 +606,64 @@ router.delete("/season/:seasonNumber", authenticate, adminOnly, async (req, res,
     })
 
     res.json({ success: true, message: `Season ${sn} duo data deleted` })
+  } catch (err) { next(err) }
+})
+
+// ── POST /api/duo/sets — admin saves Set 1 and Set 2 player selections ────────
+router.post("/sets", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { seasonNumber, set1PlayerIds, set2PlayerIds } = z.object({
+      seasonNumber:  z.number().int().positive(),
+      set1PlayerIds: z.array(z.number().int().positive()).min(1).max(32),
+      set2PlayerIds: z.array(z.number().int().positive()).min(1).max(32),
+    }).parse(req.body)
+
+    if (set1PlayerIds.length !== set2PlayerIds.length) {
+      return res.status(400).json({ error: "Set 1 and Set 2 must have the same number of players" })
+    }
+    const overlap = set1PlayerIds.filter(id => set2PlayerIds.includes(id))
+    if (overlap.length > 0) {
+      return res.status(400).json({ error: "A player cannot be in both sets" })
+    }
+
+    await withTransaction(async ({ query: q }) => {
+      await q("DELETE FROM duo_selections WHERE season_number = $1", [seasonNumber])
+      for (const pid of set1PlayerIds) {
+        await q("INSERT INTO duo_selections (season_number, set_number, player_id) VALUES ($1,1,$2)", [seasonNumber, pid])
+      }
+      for (const pid of set2PlayerIds) {
+        await q("INSERT INTO duo_selections (season_number, set_number, player_id) VALUES ($1,2,$2)", [seasonNumber, pid])
+      }
+    })
+    res.json({ saved: true, set1Count: set1PlayerIds.length, set2Count: set2PlayerIds.length })
+  } catch (err) { next(err) }
+})
+
+// ── GET /api/duo/sets — get saved selections ──────────────────────────────────
+router.get("/sets", async (req, res, next) => {
+  try {
+    const seasonNumber = parseInt(req.query.season)
+    const rows = await query(`
+      SELECT ds.set_number, p.id, p.name, p.grade::text AS grade, p.team_id,
+             t.name AS team_name
+      FROM duo_selections ds
+      JOIN players p ON p.id = ds.player_id
+      LEFT JOIN teams t ON t.id = p.team_id
+      WHERE ds.season_number = $1
+      ORDER BY ds.set_number, p.name
+    `, [seasonNumber])
+    const set1 = rows.rows.filter(r => r.set_number === 1)
+    const set2 = rows.rows.filter(r => r.set_number === 2)
+    res.json({ set1, set2, confirmed: set1.length > 0 && set2.length > 0 })
+  } catch (err) { next(err) }
+})
+
+// ── DELETE /api/duo/sets — clear selections ───────────────────────────────────
+router.delete("/sets", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const seasonNumber = parseInt(req.query.season)
+    await query("DELETE FROM duo_selections WHERE season_number = $1", [seasonNumber])
+    res.json({ cleared: true })
   } catch (err) { next(err) }
 })
 

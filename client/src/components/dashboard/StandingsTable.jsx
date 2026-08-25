@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { Target, Trophy, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic, useGroupStandings } from "../../lib/queries"
+import TeamKnockoutDashboard from "./TeamKnockoutDashboard"
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
@@ -53,13 +54,15 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
   const [searchParams] = useSearchParams()
   const leagueRankChanges  = useRankChanges("league-table", teams.map(t => t.id))
   const [internalView, setInternalView] = useState("table")
-  const view    = controlledView || internalView
-  const setView = onViewChange || setInternalView
   const { data: scorers = [] } = useTopScorers()
   const { data: formatData }  = useLeagueFormatPublic()
-  const leagueFormat   = formatData?.format || "league_knockout"
-  const isLeagueOnly   = leagueFormat === "league"
+  const leagueFormat    = formatData?.format || "league_knockout"
+  const isLeagueOnly    = leagueFormat === "league"
   const isGroupKnockout = leagueFormat === "group_knockout"
+  // For group_knockout format, Playoffs view doesn't apply — fall back to table
+  const rawView = controlledView || internalView
+  const view    = (rawView === "playoffs" && isGroupKnockout) ? "table" : rawView
+  const setView = onViewChange || setInternalView
   const { data: groupStandings } = useGroupStandings()
   const scorerRankChanges = useRankChanges("league-golden-boot", scorers.map(s => s.id))
   const { data: playoffsData } = useTeamLeaguePlayoffs()
@@ -95,7 +98,7 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
           <div>
             <p className="section-label mb-0.5">Dshann League</p>
             <h2 className="text-base font-semibold text-white">
-              {view === "table" ? "Season standings" : view === "fixtures" ? "Fixtures" : view === "playoffs" ? "Playoffs" : "Golden Boot"}
+              {view === "table" ? "Season standings" : view === "fixtures" ? "Fixtures" : view === "playoffs" ? "Playoffs" : view === "teamknockout" ? "Team Knockout" : "Golden Boot"}
             </h2>
           </div>
         </div>
@@ -106,8 +109,9 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
         >
           <option value="table">League table</option>
           <option value="fixtures">Fixtures</option>
-          <option value="playoffs">Playoffs</option>
+          {!isGroupKnockout && <option value="playoffs">Playoffs</option>}
           <option value="scorers">Golden Boot</option>
+          {isGroupKnockout && <option value="teamknockout">Team Knockout</option>}
         </select>
       </div>
 
@@ -482,6 +486,11 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
             </table>
           </div>
         )
+      )}
+      {view === "teamknockout" && (
+        <div className="px-5 py-4">
+          <TeamKnockoutDashboard />
+        </div>
       )}
     </div>
   )
