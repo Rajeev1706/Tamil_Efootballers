@@ -153,18 +153,42 @@ router.get("/current", async (req, res, next) => {
           f.away_score        AS stored_away_pts,
           f.home_goals        AS stored_home_goals,
           f.away_goals        AS stored_away_goals,
-          -- Live scores from match_records — same formula as group standings
-          -- Uses COALESCE(mr.team_id, p.team_id) to handle player transfers correctly
-          COALESCE(SUM(CASE
-            WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id AND mr.result = 'win'  THEN 3
-            WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id AND mr.result = 'draw' THEN 1
-            ELSE 0 END), 0) AS live_home_pts,
-          COALESCE(SUM(CASE
-            WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id AND mr.result = 'win'  THEN 3
-            WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id AND mr.result = 'draw' THEN 1
-            ELSE 0 END), 0) AS live_away_pts,
-          COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score ELSE 0 END), 0) AS live_home_goals,
-          COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score ELSE 0 END), 0) AS live_away_goals,
+          -- Live scores: if a team has logged, use their direct records.
+          -- If only the other team has logged, compute via inverse
+          -- (home loss = away win, home draw = away draw) to avoid requiring
+          -- both teams to log the same fixture independently.
+          CASE
+            WHEN COUNT(mr.id) FILTER (WHERE COALESCE(mr.team_id, p.team_id) = f.home_team_id) > 0
+            THEN COALESCE(SUM(CASE
+              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id AND mr.result = 'win'  THEN 3
+              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id AND mr.result = 'draw' THEN 1
+              ELSE 0 END), 0)
+            ELSE COALESCE(SUM(CASE
+              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id AND mr.result = 'loss' THEN 3
+              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id AND mr.result = 'draw' THEN 1
+              ELSE 0 END), 0)
+          END AS live_home_pts,
+          CASE
+            WHEN COUNT(mr.id) FILTER (WHERE COALESCE(mr.team_id, p.team_id) = f.away_team_id) > 0
+            THEN COALESCE(SUM(CASE
+              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id AND mr.result = 'win'  THEN 3
+              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id AND mr.result = 'draw' THEN 1
+              ELSE 0 END), 0)
+            ELSE COALESCE(SUM(CASE
+              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id AND mr.result = 'loss' THEN 3
+              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id AND mr.result = 'draw' THEN 1
+              ELSE 0 END), 0)
+          END AS live_away_pts,
+          CASE
+            WHEN COUNT(mr.id) FILTER (WHERE COALESCE(mr.team_id, p.team_id) = f.home_team_id) > 0
+            THEN COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score ELSE 0 END), 0)
+            ELSE COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0)
+          END AS live_home_goals,
+          CASE
+            WHEN COUNT(mr.id) FILTER (WHERE COALESCE(mr.team_id, p.team_id) = f.away_team_id) > 0
+            THEN COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score ELSE 0 END), 0)
+            ELSE COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0)
+          END AS live_away_goals,
           COUNT(mr.id) AS matches_logged
         FROM fixtures f
         LEFT JOIN match_records mr ON mr.fixture_id = f.id
