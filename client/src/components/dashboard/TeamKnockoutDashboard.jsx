@@ -20,13 +20,11 @@ function legStats(legData, matchTeam1Id) {
   const closed = legData.leg_status === "completed"
 
   // ALWAYS use live match_records for Pts — same as group standings.
-  // Stored values (f.home_score) can be stale or wrong; live_home_pts
-  // is always recomputed from match_records so it's the ground truth.
-  const homePts   = legData.live_home_pts
-  const awayPts   = legData.live_away_pts
-  // Goals: stored when closed (more reliable after admin confirms), else live
-  const homeGoals = closed && legData.stored_home_goals != null ? legData.stored_home_goals : legData.live_home_goals
-  const awayGoals = closed && legData.stored_away_goals != null ? legData.stored_away_goals : legData.live_away_goals
+  // PostgreSQL SUM() returns strings — Number() prevents "8"+"0"="80" bug.
+  const homePts   = Number(legData.live_home_pts   || 0)
+  const awayPts   = Number(legData.live_away_pts   || 0)
+  const homeGoals = Number((closed && legData.stored_home_goals != null ? legData.stored_home_goals : legData.live_home_goals) || 0)
+  const awayGoals = Number((closed && legData.stored_away_goals != null ? legData.stored_away_goals : legData.live_away_goals) || 0)
   const isLive    = !closed && Number(legData.matches_logged) > 0
 
   const t1IsHome = legData.home_team_id === matchTeam1Id

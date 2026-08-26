@@ -406,12 +406,19 @@ router.delete("/current", authenticate, adminOnly, async (req, res, next) => {
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
     const season = parseInt(seasonRes.rows[0]?.value || "1")
 
-    // Also delete the fixture rows created for knockout legs
+    // Delete ALL knockout leg fixtures for this season — including orphaned ones
+    // from previous resets where the match IDs changed but fixtures remained.
+    // We wipe everything with is_knockout_leg = true linked to this season's matches
+    // AND any dangling is_knockout_leg fixtures (round 7-10, no active match link).
     await query(`
       DELETE FROM fixtures
       WHERE is_knockout_leg = true
-        AND knockout_match_id IN (
-          SELECT id FROM team_knockout_matches WHERE season_number = $1
+        AND (
+          knockout_match_id IN (
+            SELECT id FROM team_knockout_matches WHERE season_number = $1
+          )
+          OR knockout_match_id IS NULL
+          OR knockout_match_id NOT IN (SELECT id FROM team_knockout_matches)
         )
     `, [season])
 
