@@ -17,6 +17,10 @@ import goldenBootTrophy   from "../../images/Golden Boot.png"
 import teamLeagueGBTrophy from "../../images/team league_gb.png"
 import uclGBTrophy        from "../../images/ucl_gb.png"
 import revolutionTrophy   from "../../images/revolution.png"
+import europaTrophy       from "../../images/europa.png"
+import duoTrophy          from "../../images/duo.png"
+import duoBootTrophy      from "../../images/duoboot.png"
+import championshipTrophy  from "../../images/championship.png" 
 
 const FormDot = ({ result }) => {
   const cls = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
@@ -90,10 +94,14 @@ function TrophyCase({ player }) {
     { image: teamLeagueTrophy,   label: "Dshann League",             count: player.trophy2Count ?? 0 },
     { image: uclTrophy,          label: "UCL",                     count: player.trophy4Count ?? 0 },
     { image: weeklyTrophy,       label: "Weekly",                  count: player.trophy3Count ?? 0 },
-    { image: revolutionTrophy,   label: "Revolution",              count: player.trophy8Count ?? 0 },
-    { image: goldenBootTrophy,   label: "Weekly Golden Boot",      count: player.trophy5Count ?? 0 },
-    { image: teamLeagueGBTrophy, label: "League Golden Boot",      count: player.trophy6Count ?? 0 },
-    { image: uclGBTrophy,        label: "UCL Golden Boot",         count: player.trophy7Count ?? 0 },
+    { image: revolutionTrophy,   label: "Revolution",              count: player.trophy8Count  ?? 0 },
+    { image: europaTrophy,        label: "Europa",                  count: player.trophy9Count  ?? 0 },
+    { image: duoTrophy,           label: "Duo Tournament",          count: player.trophy10Count ?? 0 },
+    { image: goldenBootTrophy,    label: "Weekly Golden Boot",      count: player.trophy5Count  ?? 0 },
+    { image: teamLeagueGBTrophy,  label: "League Golden Boot",      count: player.trophy6Count  ?? 0 },
+    { image: uclGBTrophy,         label: "UCL Golden Boot",         count: player.trophy7Count  ?? 0 },
+    { image: duoBootTrophy,        label: "Duo Golden Boot",         count: player.trophy11Count ?? 0 },
+    { image: championshipTrophy,   label: "Championship",            count: player.trophy12Count ?? 0 },
   ]
   const total = trophies.reduce((a, t) => a + t.count, 0)
   return (
