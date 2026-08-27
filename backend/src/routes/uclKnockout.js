@@ -472,6 +472,21 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
           teamId:       uclWinnerTeamId,
           seasonNumber: season,
         })
+        // Award championship trophy (trophy12) to all players in the winning team
+        if (uclWinnerTeamId) {
+          const { awardOrReassignTrophy: awardTrophy } = await import("../services/trophyAwards.js")
+          const teamPlayers = await query(
+            "SELECT id FROM players WHERE team_id = $1", [uclWinnerTeamId]
+          )
+          for (const p of teamPlayers.rows) {
+            await awardOrReassignTrophy({
+              sourceKey:    `championship_season_${season}_player_${p.id}`,
+              trophyColumn: "trophy12_count",
+              playerId:     p.id,
+              seasonNumber: season,
+            })
+          }
+        }
       } else {
         await reconcileTeamTrophy({ tournament: "championship", teamId: null, seasonNumber: season })
       }

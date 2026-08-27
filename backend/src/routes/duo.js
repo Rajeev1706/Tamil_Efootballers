@@ -28,6 +28,7 @@ const router = Router()
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy9_count  INT DEFAULT 0`)
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy10_count INT DEFAULT 0`)
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy11_count INT DEFAULT 0`)
+    await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy12_count INT DEFAULT 0`)
     await query(`
       CREATE OR REPLACE VIEW players_full AS
       SELECT
@@ -47,6 +48,7 @@ const router = Router()
         p.trophy9_count  AS "trophy9Count",
         p.trophy10_count AS "trophy10Count",
         p.trophy11_count AS "trophy11Count",
+        p.trophy12_count AS "trophy12Count",
         p.is_captain     AS "isCaptain",
         p.grade_floor    AS "gradeFloor",
         p.grade_ceiling  AS "gradeCeiling",
