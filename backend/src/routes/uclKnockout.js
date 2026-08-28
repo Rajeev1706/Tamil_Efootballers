@@ -384,7 +384,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       WHERE tournament_id=$1 AND status='pending' AND player1_id IS NOT NULL AND player2_id IS NOT NULL
     `, [match.tournament_id])
     if (parseInt(remaining.rows[0].count) === 0) {
-      await query("UPDATE ucl_knockout_tournaments SET status='completed' WHERE id=$1", [match.tournament_id])
+      await query("UPDATE ucl_knockout_tournaments SET status='completed', completed_at=NOW() WHERE id=$1", [match.tournament_id])
 
       // Golden Boot BDR — awarded at tournament end since top scorer can
       // change until the last match. Uses claimAward to fire only once.

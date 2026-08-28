@@ -375,7 +375,7 @@ router.post("/matches/:matchId/force-winner", authenticate, adminOnly, async (re
     }
 
     await query(
-      "UPDATE team_knockout_matches SET winner_id = $1, status = 'completed' WHERE id = $2",
+      "UPDATE team_knockout_matches SET winner_id = $1, status = 'completed', completed_at = NOW() WHERE id = $2",
       [winnerId, match.id]
     )
     await advanceKnockoutWinner(match, winnerId)
@@ -413,7 +413,7 @@ router.patch("/matches/:matchId/leg", authenticate, adminOnly, async (req, res, 
     if (bothLegsPlayed) {
       winnerId = determineKnockoutWinner(fresh)
       if (winnerId) {
-        await query("UPDATE team_knockout_matches SET winner_id = $1, status = 'completed' WHERE id = $2", [winnerId, match.id])
+        await query("UPDATE team_knockout_matches SET winner_id = $1, status = 'completed', completed_at = NOW() WHERE id = $2", [winnerId, match.id])
         await advanceKnockoutWinner(fresh, winnerId)
       } else {
         await query("UPDATE team_knockout_matches SET status = 'needs_decision' WHERE id = $1", [match.id])
