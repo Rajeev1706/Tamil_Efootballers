@@ -42,13 +42,13 @@ export default function App() {
         <Route path="/trophy-cabinet"        element={<TrophyCabinet />} />
         <Route path="/championship"           element={<ChampionshipPage />} />
         <Route path="/trophy-cabinet/:id"    element={<PlayerTrophyCabinet />} />
-        <Route path="/weekly/draw/:id"    element={<WeeklyDraw />} />
+        <Route path="/weekly/draw/:id"    element={<ProtectedRoute role="admin"><WeeklyDraw /></ProtectedRoute>} />
         <Route path="/weekly/bracket/:id" element={<WeeklyBracket />} />
-        <Route path="/revolution/draw/:id"    element={<RevolutionDraw />} />
-        <Route path="/tlg-draw/:id" element={<TlgDraw />} />
-        <Route path="/revolution/bracket/:id" element={<RevolutionBracket />} />
-        <Route path="/ucl/draw"                element={<UclDraw />} />
-        <Route path="/ucl-knockout/draw/:id"    element={<UclKODraw />} />
+        <Route path="/revolution/draw/:id"    element={<ProtectedRoute role="admin"><RevolutionDraw /></ProtectedRoute>} />
+        <Route path="/tlg-draw/:id" element={<ProtectedRoute role="admin"><TlgDraw /></ProtectedRoute>} />
+        <Route path="/revolution/bracket/:id" element={<ProtectedRoute role="admin"><RevolutionBracket /></ProtectedRoute>} />
+        <Route path="/ucl/draw"                element={<ProtectedRoute role="admin"><UclDraw /></ProtectedRoute>} />
+        <Route path="/ucl-knockout/draw/:id"    element={<ProtectedRoute role="admin"><UclKODraw /></ProtectedRoute>} />
         <Route path="/ucl-knockout/bracket/:id" element={<UclKOBracket />} />
         <Route path="/team-knockout" element={<TeamKnockoutBracket />} />
         <Route path="/admin/auction"            element={<ProtectedRoute role="admin"><AuctionAdmin /></ProtectedRoute>} />
@@ -57,7 +57,7 @@ export default function App() {
         <Route path="/team-trophies"               element={<TeamTrophyCabinet />} />
         <Route path="/team-trophies/:id"           element={<TeamTrophyDetail />} />
         <Route path="/duo-tournament"              element={<DuoTournament />} />
-        <Route path="/duo/draw/:season"             element={<DuoDraw />} />
+        <Route path="/duo/draw/:season"             element={<ProtectedRoute role="admin"><DuoDraw /></ProtectedRoute>} />
         <Route path="/team"         element={
           <ProtectedRoute><TeamDashboard /></ProtectedRoute>
         } />
