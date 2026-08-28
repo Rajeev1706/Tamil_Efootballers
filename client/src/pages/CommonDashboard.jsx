@@ -20,13 +20,17 @@ import TeamsDirectory from "../components/dashboard/TeamsDirectory"
 import Loading from "../components/common/Loading"
 import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
+import DuoCelebration from "../components/common/DuoCelebration" 
 import BallonDorCelebration from "../components/common/BallonDorCelebration"
 import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
+import europaTrophyLogo      from "../../images/europa.png"
+import duoTrophyLogo          from "../../images/duo.png"
+import revolutionTrophyLogo   from "../../images/revolution.png" 
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
-import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship, useGroupStandings } from "../lib/queries"
+import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship, useGroupStandings, useTeamKnockoutCurrent, useRevolutionCurrent } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 
 // Resolves a player's chosen avatar — custom upload takes priority,
@@ -161,6 +165,13 @@ const PANEL_OPTIONS = [
 ]
 
 
+// Check if a tournament completion timestamp is within the celebration window
+function isWithinCelebrationWindow(completedAt, hours) {
+  if (!completedAt) return false
+  const ms = hours * 60 * 60 * 1000
+  return Date.now() - new Date(completedAt).getTime() < ms
+}
+
 // Check if a timestamp is within 48 hours of now
 function isWithin48Hours(isoTimestamp) {
   if (!isoTimestamp) return false
@@ -240,7 +251,7 @@ export default function CommonDashboard() {
     if (testWeeklyActive) return
     if (!weeklyChampion || !weeklyTournament?.id) return
     const completedAt = settings[`weekly_champion_completed_at_${weeklyTournament.id}`]
-    if (!isWithin48Hours(completedAt)) return
+    if (!isWithinCelebrationWindow(completedAt, 24)) return
     const key = `weekly_champion_seen_${weeklyTournament.id}`
     if (!localStorage.getItem(key)) {
       setShowWeeklyCelebration(true)
@@ -259,21 +270,68 @@ export default function CommonDashboard() {
   // actual champion isn't decided until the Final itself is played).
   const [showTeamCelebration, setShowTeamCelebration] = useState(false)
   const teamCelebrationSeason = settings.current_season
+  const [showEuropaCelebration, setShowEuropaCelebration] = useState(false)
   const { data: playoffsData }   = useTeamLeaguePlayoffs()
   const { data: leagueFormatData } = useLeagueFormatPublic()
   const isLeagueOnly    = leagueFormatData?.format === "league"
   const isGroupKnockout = leagueFormatData?.format === "group_knockout"
-  const { data: groupStandings } = useGroupStandings()
+  const { data: groupStandings }   = useGroupStandings()
+  const { data: revolutionData }   = useRevolutionCurrent()
+  const [showRevCelebration, setShowRevCelebration]   = useState(false)
+  const [showDuoCelebration, setShowDuoCelebration]   = useState(false)
+
+  // Revolution — find final winner
+  const revTotalRounds = revolutionData?.total_rounds
+  const revFinalMatch  = revTotalRounds
+    ? revolutionData?.matches?.find(m => m.round === revTotalRounds && m.status === "completed")
+    : null
+  const revChampion = revFinalMatch
+    ? players.find(p => p.id === revFinalMatch.winnerId)
+    : null
+  const revChampionAvatar = revChampion ? resolveAvatar(revChampion) : { thumb: null, bg: null }
+
+  // Duo — fetch current and find champion pair
+  const [duoData, setDuoData] = useState(null)
+  useEffect(() => {
+    import("../lib/api").then(({ default: apiClient }) => {
+      apiClient.get("/duo/current").then(r => setDuoData(r.data)).catch(() => {})
+    })
+  }, [])
+  const duoChampion = duoData?.champion ?? null
+  const duoPlayer1 = duoChampion ? {
+    name:    duoChampion.set1Name,
+    avatar:  duoChampion.set1AvatarUrl,
+    bgImage: duoChampion.set1AvatarBg,
+  } : null
+  const duoPlayer2 = duoChampion ? {
+    name:    duoChampion.set2Name,
+    avatar:  duoChampion.set2AvatarUrl,
+    bgImage: duoChampion.set2AvatarBg,
+  } : null
 
   const playoffFinal    = playoffsData?.matches?.find(m => m.matchType === "final")
   const playoffComplete = playoffFinal?.status === "completed"
 
-  // Champion detection — works for both formats:
+  // For group_knockout format — read champion from team knockout Champions Final
+  const { data: teamKOData } = useTeamKnockoutCurrent()
+  const knockoutChampsFinal  = teamKOData?.matches?.find(m => m.match_type === "champions_final")
+  const knockoutChampion     = knockoutChampsFinal?.status === "completed" ? knockoutChampsFinal?.winner_id : null
+
+  // Europa Final winner (group_knockout format)
+  const knockoutEuropaFinal   = teamKOData?.matches?.find(m => m.match_type === "europa_final")
+  const knockoutEuropaWinnerId = knockoutEuropaFinal?.status === "completed" ? knockoutEuropaFinal?.winner_id : null
+  const europaChampion        = knockoutEuropaWinnerId ? teams.find(t => t.id === knockoutEuropaWinnerId) : null
+  const europaChampionPlayers = europaChampion ? sortCaptainFirst(players.filter(p => p.teamId === europaChampion.id)) : []
+
+  // Champion detection — works for all formats:
+  // Group+Knockout: read from team_knockout_matches Champions Final
   // League+Knockout: read from the playoff Final winner
   // League Only: read the stored champion team ID from app_settings
-  const championTeamId = isLeagueOnly
-    ? (leagueFormatData?.leagueOnlyChampionTeamId || null)
-    : (playoffComplete ? playoffFinal.winnerTeamId : null)
+  const championTeamId = isGroupKnockout
+    ? knockoutChampion
+    : isLeagueOnly
+      ? (leagueFormatData?.leagueOnlyChampionTeamId || null)
+      : (playoffComplete ? playoffFinal.winnerTeamId : null)
   const teamChampion = championTeamId ? teams.find(t => t.id === championTeamId) : null
 
   // Captain always shown first in the roster list, wherever it's used.
@@ -321,7 +379,10 @@ export default function CommonDashboard() {
     if (testTeamActive) return
     if (teamsLoading || playersLoading) return
     if (!teamChampion || !teamCelebrationSeason) return
-    if (!isWithin48Hours(settings['league_champion_completed_at'])) return
+    const champCompletedAt = isGroupKnockout
+      ? knockoutChampsFinal?.completed_at
+      : settings['league_champion_completed_at']
+    if (!isWithinCelebrationWindow(champCompletedAt, 48)) return
     const key = `team_league_champion_seen_${teamCelebrationSeason}_${teamChampion.id}`
     if (!localStorage.getItem(key)) {
       setShowTeamCelebration(true)
@@ -334,7 +395,53 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamChampion?.id, teamCelebrationSeason, teamsLoading, playersLoading])
 
-  // ── UCL Knockout champion celebration ───────────────────────────────────
+  // Europa champion celebration — fires once per season after team celebration
+  useEffect(() => {
+    if (!europaChampion || !teamCelebrationSeason) return
+    const key = `europa_champion_seen_${teamCelebrationSeason}_${europaChampion.id}`
+    if (!localStorage.getItem(key)) {
+      if (!isWithinCelebrationWindow(knockoutEuropaFinal?.completed_at, 48)) return
+      setShowEuropaCelebration(true)
+      const dismiss = () => { localStorage.setItem(key, "1"); setShowEuropaCelebration(false) }
+      const timer = setTimeout(dismiss, 10000)
+      document.addEventListener("click", dismiss)
+      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    }
+  }, [europaChampion?.id, teamCelebrationSeason])
+
+  // ── Revolution champion celebration ────────────────────────────────────────
+  useEffect(() => {
+    if (!revChampion || !revolutionData?.id) return
+    const completedAt = settings[`revolution_champion_completed_at_${revolutionData.id}`]
+    if (!isWithinCelebrationWindow(completedAt, 6)) return
+    const key = `revolution_champion_seen_${revolutionData.id}`
+    if (!localStorage.getItem(key)) {
+      setShowRevCelebration(true)
+      localStorage.setItem(key, "1")
+      const dismiss = () => setShowRevCelebration(false)
+      const timer = setTimeout(dismiss, 10000)
+      document.addEventListener("click", dismiss)
+      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    }
+  }, [revChampion?.id, revolutionData?.id, settings])
+
+  // ── Duo champion celebration ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!duoChampion || !duoData?.seasonNumber) return
+    const completedAt = settings[`duo_champion_completed_at_${duoData.seasonNumber}`]
+    if (!isWithinCelebrationWindow(completedAt, 24)) return
+    const key = `duo_champion_seen_${duoData.seasonNumber}`
+    if (!localStorage.getItem(key)) {
+      setShowDuoCelebration(true)
+      localStorage.setItem(key, "1")
+      const dismiss = () => setShowDuoCelebration(false)
+      const timer = setTimeout(dismiss, 12000)
+      document.addEventListener("click", dismiss)
+      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
+    }
+  }, [duoChampion?.set1Name, duoData?.seasonNumber, settings])
+
+  // ── UCL Knockout champion celebration ───────────────────────────────────────
   // Fires once the UCL Knockout Final is completed — mirrors the Weekly
   // Tournament celebration exactly, just reading from ucl-knockout instead.
   const [showUclCelebration, setShowUclCelebration] = useState(false)
@@ -380,7 +487,7 @@ export default function CommonDashboard() {
     if (testUclActive) return
     if (!uclChampion || !uclKnockout?.id) return
     const uclCompletedAt = settings[`ucl_champion_completed_at_${uclKnockout.id}`]
-    if (!isWithin48Hours(uclCompletedAt)) return
+    if (!isWithinCelebrationWindow(uclCompletedAt, 24)) return
     const key = `ucl_champion_seen_${uclKnockout.id}`
     if (!localStorage.getItem(key)) {
       setShowUclCelebration(true)
@@ -559,9 +666,9 @@ export default function CommonDashboard() {
       ) : showTeamCelebration && displayTeamChampion ? (
         <ChampionCelebration
           trophyImage={teamLeagueTrophyLogo}
-          eyebrow="Dshann League"
+          eyebrow={isGroupKnockout ? "Champions" : "Dshann League"}
           title={displayTeamChampion}
-          subtitle="are the Dshann League Champions! 🏆"
+          subtitle={isGroupKnockout ? "are the Champions! 🏆" : "are the Dshann League Champions! 🏆"}
           badgeImage={displayTeamLogo}
           anthemUrl={displayTeamAnthem}
         >
@@ -569,6 +676,19 @@ export default function CommonDashboard() {
             <TeamRosterChips players={displayTeamPlayers} bestPerformerId={displayBestPerformer?.id} />
           )}
           {teamGoldenBoot && <GoldenBootBadge scorer={teamGoldenBoot} />}
+        </ChampionCelebration>
+      ) : showEuropaCelebration && europaChampion ? (
+        <ChampionCelebration
+          trophyImage={europaTrophyLogo}
+          eyebrow="Europa Championship"
+          title={europaChampion.name}
+          subtitle="are the Europa Champions! 🥈"
+          badgeImage={europaChampion.logoUrl}
+          onClick={() => { localStorage.setItem(`europa_champion_seen_${teamCelebrationSeason}_${europaChampion.id}`, "1"); setShowEuropaCelebration(false) }}
+        >
+          {europaChampionPlayers.length > 0 && (
+            <TeamRosterChips players={europaChampionPlayers} />
+          )}
         </ChampionCelebration>
       ) : showUclCelebration && displayUclChampion ? (
         <ChampionCelebration
@@ -581,6 +701,21 @@ export default function CommonDashboard() {
         >
           {uclGoldenBoot && <GoldenBootBadge scorer={uclGoldenBoot} />}
         </ChampionCelebration>
+      ) : showRevCelebration && revChampion ? (
+        <ChampionCelebration
+          trophyImage={revolutionTrophyLogo}
+          eyebrow="Revolution Trophy"
+          title={revChampion.name}
+          subtitle="is the Revolution Champion! ⚡"
+          badgeImage={revChampionAvatar.thumb}
+          bgImage={revChampionAvatar.bg}
+        />
+      ) : showDuoCelebration && duoChampion ? (
+        <DuoCelebration
+          trophyImage={duoTrophyLogo}
+          player1={duoPlayer1}
+          player2={duoPlayer2}
+        />
       ) : showBallonDorCelebration && displayBallonDorWinner ? (
         <BallonDorCelebration
           trophyImage={ballonDorTrophy}

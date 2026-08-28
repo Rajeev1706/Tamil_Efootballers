@@ -403,6 +403,11 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     `, [match.tournament_id])
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE revolution_tournaments SET status = 'completed' WHERE id = $1", [match.tournament_id])
+      // Store completion timestamp in app_settings for celebration window
+      await query(`
+        INSERT INTO app_settings (key, value) VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET value = $2
+      `, [`revolution_champion_completed_at_${match.tournament_id}`, new Date().toISOString()])
     }
 
     // ── Recalc MV + form for both players ──────────────────────────────────
@@ -461,7 +466,35 @@ router.post("/:id/reset", authenticate, adminOnly, async (req, res, next) => {
 // DELETE /api/revolution/:id
 router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
-    await query("DELETE FROM revolution_tournaments WHERE id = $1", [parseInt(req.params.id)])
+    const tournamentId = parseInt(req.params.id)
+
+    // Collect linked match_records and affected players BEFORE cascade-delete
+    const matchesRes = await query(`
+      SELECT match_record_id, player1_id, player2_id
+      FROM revolution_matches
+      WHERE tournament_id = $1 AND match_record_id IS NOT NULL
+    `, [tournamentId])
+
+    const affectedPlayerIds = new Set()
+    const matchRecordIds    = []
+    for (const m of matchesRes.rows) {
+      if (m.match_record_id) matchRecordIds.push(m.match_record_id)
+      if (m.player1_id) affectedPlayerIds.add(m.player1_id)
+      if (m.player2_id) affectedPlayerIds.add(m.player2_id)
+    }
+
+    // Delete linked match_records first, then the tournament (cascades matches)
+    if (matchRecordIds.length > 0) {
+      await query(`DELETE FROM match_records WHERE id = ANY($1::int[])`, [matchRecordIds])
+    }
+    await query("DELETE FROM revolution_tournaments WHERE id = $1", [tournamentId])
+
+    // Recalc MV + form for every player whose results were wiped
+    for (const playerId of affectedPlayerIds) {
+      await recalcMarketValue(playerId)
+      await recalcForm(playerId)
+    }
+
     res.json({ deleted: true })
   } catch (err) { next(err) }
 })

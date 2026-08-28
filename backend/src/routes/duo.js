@@ -154,9 +154,15 @@ router.get("/current", async (req, res, next) => {
       SELECT
         df.*,
         dp1.duo_name AS "homeDuoName", dp2.duo_name AS "awayDuoName",
-        p1s1.name AS "homeSet1Name", p1s2.name AS "homeSet2Name",
-        p2s1.name AS "awaySet1Name", p2s2.name AS "awaySet2Name",
-        g.name AS "groupName"
+        p1s1.id AS "homeSet1Id", p1s1.name AS "homeSet1Name",
+        p1s1.avatar_id AS "homeSet1AvatarId", p1s1.avatar_url AS "homeSet1AvatarUrl", p1s1.avatar_bg_url AS "homeSet1AvatarBg",
+        p1s2.id AS "homeSet2Id", p1s2.name AS "homeSet2Name",
+        p1s2.avatar_id AS "homeSet2AvatarId", p1s2.avatar_url AS "homeSet2AvatarUrl", p1s2.avatar_bg_url AS "homeSet2AvatarBg",
+        p2s1.id AS "awaySet1Id", p2s1.name AS "awaySet1Name",
+        p2s1.avatar_id AS "awaySet1AvatarId", p2s1.avatar_url AS "awaySet1AvatarUrl", p2s1.avatar_bg_url AS "awaySet1AvatarBg",
+        p2s2.id AS "awaySet2Id", p2s2.name AS "awaySet2Name",
+        p2s2.avatar_id AS "awaySet2AvatarId", p2s2.avatar_url AS "awaySet2AvatarUrl", p2s2.avatar_bg_url AS "awaySet2AvatarBg",
+        g.name AS "groupName" 
       FROM duo_fixtures df
       JOIN duo_pairs dp1 ON dp1.id = df.home_pair_id
       JOIN duo_pairs dp2 ON dp2.id = df.away_pair_id
@@ -185,11 +191,32 @@ router.get("/current", async (req, res, next) => {
       LIMIT 10
     `, [seasonNum]).catch(() => ({ rows: [] }))
 
+    // Find champion pair from completed final
+    const finalFixture = fixtures.rows.find(f => f.knockout_round === 'final' && f.status === 'completed' && f.winner_pair_id)
+    let champion = null
+    if (finalFixture) {
+      const isHomeWinner = finalFixture.winner_pair_id === finalFixture.home_pair_id
+      champion = {
+        set1Name:       isHomeWinner ? finalFixture.homeSet1Name : finalFixture.awaySet1Name,
+        set2Name:       isHomeWinner ? finalFixture.homeSet2Name : finalFixture.awaySet2Name,
+        set1Id:         isHomeWinner ? finalFixture.homeSet1Id   : finalFixture.awaySet1Id,
+        set2Id:         isHomeWinner ? finalFixture.homeSet2Id   : finalFixture.awaySet2Id,
+        set1AvatarId:   isHomeWinner ? finalFixture.homeSet1AvatarId  : finalFixture.awaySet1AvatarId,
+        set1AvatarUrl:  isHomeWinner ? finalFixture.homeSet1AvatarUrl : finalFixture.awaySet1AvatarUrl,
+        set1AvatarBg:   isHomeWinner ? finalFixture.homeSet1AvatarBg  : finalFixture.awaySet1AvatarBg,
+        set2AvatarId:   isHomeWinner ? finalFixture.homeSet2AvatarId  : finalFixture.awaySet2AvatarId,
+        set2AvatarUrl:  isHomeWinner ? finalFixture.homeSet2AvatarUrl : finalFixture.awaySet2AvatarUrl,
+        set2AvatarBg:   isHomeWinner ? finalFixture.homeSet2AvatarBg  : finalFixture.awaySet2AvatarBg,
+        duoName:        isHomeWinner ? finalFixture.homeDuoName        : finalFixture.awayDuoName,
+      }
+    }
+
     res.json({
       seasonNumber: seasonNum,
       groups: groups.rows,
       fixtures: fixtures.rows,
       topScorers: topScorers.rows,
+      champion,
     })
   } catch (err) { next(err) }
 })
@@ -442,6 +469,12 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           const duoWinnerLabel = duoWinnerNamesRes.rows.map(r => r.name).join(" & ")
           await updateSeasonRecord(seasonNum, { duo_winner: duoWinnerLabel })
 
+          // Store completion timestamp in app_settings for celebration window
+          await query(`
+            INSERT INTO app_settings (key, value) VALUES ($1, $2)
+            ON CONFLICT (key) DO UPDATE SET value = $2
+          `, [`duo_champion_completed_at_${seasonNum}`, new Date().toISOString()])
+
           const gbRes = await q(`
             SELECT mr.player_id,
               SUM(mr.player_score) AS goals
@@ -453,7 +486,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           `, [seasonNum])
           const topScorer = gbRes.rows[0]
           if (topScorer?.goals > 0) {
-            await addBdr(topScorer.player_id, 4)
+            await addBdr(topScorer.player_id, 3)
             // ── Duo Golden Boot trophy (trophy11) ─────────────────────────────
             await awardOrReassignTrophy({
               sourceKey:    `duo_golden_boot_s${seasonNum}`,
