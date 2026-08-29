@@ -61,7 +61,7 @@ const LOSS_MATRIX = {
 }
 
 const BDR_SWING_RATE      = 18 / 120 // halved from the previous 36/120 rate, still uncapped
-const MATCH_VALUE_CEILING = 450      // ceiling on match-performance only, not the final total
+// MATCH_VALUE_CEILING removed — match-performance is now uncapped
 
 // One-time bonus per trophy a player has won IN THE CURRENT SEASON ONLY,
 // added after everything else. Reads from player_trophies (season-scoped),
@@ -135,7 +135,7 @@ export async function calculateMarketValue(playerId) {
   const pp             = ew * 3
   const winPct         = Math.max(ew / 14, 0)
   const matchValueRaw  = pp * 5 + winPct * 85
-  const matchValue     = Math.min(matchValueRaw, MATCH_VALUE_CEILING) // ceiling here only
+  const matchValue     = matchValueRaw // uncapped — no ceiling
 
   const bdrPoints = player.bdr ?? 0
   const bdrSwing  = ewRaw > 0 ? bdrPoints * BDR_SWING_RATE : 0 // uncapped, added after the ceiling
