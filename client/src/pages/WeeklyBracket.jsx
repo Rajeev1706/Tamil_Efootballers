@@ -19,6 +19,25 @@ function getRoundLabel(round, totalRounds) {
   return `Round ${round}`
 }
 
+// Short label for the source round (one level before current)
+function getPrevRoundShort(round, totalRounds) {
+  const fromEnd = totalRounds - round
+  if (fromEnd === 1) return "Final"
+  if (fromEnd === 2) return "SF"
+  if (fromEnd === 3) return "QF"
+  if (fromEnd === 4) return "R16"
+  if (fromEnd === 5) return "R32"
+  if (fromEnd === 6) return "R64"
+  if (fromEnd === 7) return "R128"
+  return `R${round - 1}`
+}
+
+// Compute the two source match numbers from the previous round
+// that feed into this match's two player slots
+function getSourceMatches(matchNumber) {
+  return [(matchNumber * 2) - 1, matchNumber * 2]
+}
+
 function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
   const saveResult    = useSaveWeeklyResult()
   const updatePlayers = useUpdateMatchPlayers()
@@ -78,41 +97,50 @@ function MatchRow({ match, totalRounds, tournamentId, allPlayers, onSaved }) {
     <div className={cn("border-b border-surface-border/50", justSaved && "animate-result-flash")}>
       <div className="flex items-center px-5 py-3.5">
         <span className="text-xs text-slate-600 font-mono w-9 flex-shrink-0">#{match.match_number}</span>
-        <span className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
-          !match.player1_id ? "text-slate-600 italic" :
-          isCompleted && p1IsWinner ? "text-emerald-400" : "text-white"
-        )}>
-          {!isBye && match.player1_id && (
-            <PlayerAvatarIcon player={{ avatarId: match.player1AvatarId, avatarUrl: match.player1AvatarUrl, name: match.player1Name }} />
-          )}
-          <span className="truncate">{isBye && !match.player1_id ? "BYE" : (match.player1Name ?? "TBD")}</span>
-        </span>
+        {/* When both players are TBD and not a bye — show source match info */}
+        {!match.player1_id && !match.player2_id && !isBye ? (
+          <span className="flex-1 text-center text-xs text-slate-500 italic">
+            Winner of {getPrevRoundShort(match.round, totalRounds)} #{getSourceMatches(match.match_number)[0]} vs #{getSourceMatches(match.match_number)[1]}
+          </span>
+        ) : (
+          <>
+            <span className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
+              !match.player1_id ? "text-slate-600 italic" :
+              isCompleted && p1IsWinner ? "text-emerald-400" : "text-white"
+            )}>
+              {!isBye && match.player1_id && (
+                <PlayerAvatarIcon player={{ avatarId: match.player1AvatarId, avatarUrl: match.player1AvatarUrl, name: match.player1Name }} />
+              )}
+              <span className="truncate">{isBye && !match.player1_id ? "BYE" : (match.player1Name ?? `W: ${getPrevRoundShort(match.round, totalRounds)} #${getSourceMatches(match.match_number)[0]}`)}</span>
+            </span>
 
-        <div className="px-4 flex-shrink-0">
-          {isBye ? (
-            <span className="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full">BYE</span>
-          ) : isCompleted ? (
-            match.isWalkover ? (
-              <span className="text-xs font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2.5 py-1 rounded-full">WO</span>
-            ) : (
-              <span className="text-sm font-mono font-bold text-white bg-pitch-800 px-3 py-1 rounded-lg">
-                {match.player1_score} - {match.player2_score}
-              </span>
-            )
-          ) : (
-            <span className="text-xs text-slate-600">vs</span>
-          )}
-        </div>
+            <div className="px-4 flex-shrink-0">
+              {isBye ? (
+                <span className="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full">BYE</span>
+              ) : isCompleted ? (
+                match.isWalkover ? (
+                  <span className="text-xs font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2.5 py-1 rounded-full">WO</span>
+                ) : (
+                  <span className="text-sm font-mono font-bold text-white bg-pitch-800 px-3 py-1 rounded-lg">
+                    {match.player1_score} - {match.player2_score}
+                  </span>
+                )
+              ) : (
+                <span className="text-xs text-slate-600">vs</span>
+              )}
+            </div>
 
-        <span className={cn("font-medium text-right flex-1 min-w-0 flex items-center justify-end gap-2",
-          !match.player2_id ? "text-slate-600 italic" :
-          isCompleted && p2IsWinner ? "text-emerald-400" : "text-white"
-        )}>
-          <span className="truncate">{match.player2Name ?? "TBD"}</span>
-          {match.player2_id && (
-            <PlayerAvatarIcon player={{ avatarId: match.player2AvatarId, avatarUrl: match.player2AvatarUrl, name: match.player2Name }} />
-          )}
-        </span>
+            <span className={cn("font-medium text-right flex-1 min-w-0 flex items-center justify-end gap-2",
+              !match.player2_id ? "text-slate-600 italic" :
+              isCompleted && p2IsWinner ? "text-emerald-400" : "text-white"
+            )}>
+              <span className="truncate">{match.player2Name ?? `W: ${getPrevRoundShort(match.round, totalRounds)} #${getSourceMatches(match.match_number)[1]}`}</span>
+              {match.player2_id && (
+                <PlayerAvatarIcon player={{ avatarId: match.player2AvatarId, avatarUrl: match.player2AvatarUrl, name: match.player2Name }} />
+              )}
+            </span>
+          </>
+        )}
       </div>
 
       {!editing && !editingPlayers && (
