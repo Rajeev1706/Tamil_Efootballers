@@ -24,6 +24,23 @@ function getRoundLabel(round, totalRounds) {
   return `Round ${round}`
 }
 
+function getPrevRoundShort(round, totalRounds) {
+  const fromEnd = totalRounds - round
+  if (fromEnd === 1) return "Final"
+  if (fromEnd === 2) return "SF"
+  if (fromEnd === 3) return "QF"
+  if (fromEnd === 4) return "R16"
+  if (fromEnd === 5) return "R32"
+  if (fromEnd === 6) return "R64"
+  if (fromEnd === 7) return "R128"
+  return `R${round - 1}`
+}
+
+function getSourceMatches(matchNumber) {
+  return [(matchNumber * 2) - 1, matchNumber * 2]
+}
+
+
 export default function WeeklyDashboard({ onPlayerClick }) {
   const { data: tournament, isLoading } = useWeeklyCurrent()
   const { data: scorers = [] } = useWeeklyTopScorers()
@@ -118,43 +135,52 @@ export default function WeeklyDashboard({ onPlayerClick }) {
               return (
                 <div key={i} className="flex items-center px-5 py-3.5">
                   <span className="text-xs text-slate-600 font-mono w-9 flex-shrink-0">#{m.matchNumber ?? i + 1}</span>
-                  <button
-                    onClick={() => m.player1Id && onPlayerClick?.({ id: m.player1Id, name: m.player1Name })}
-                    className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
-                      m.winnerId === m.player1Id ? "text-white" : "text-slate-400",
-                      !m.player1Id && "text-slate-600 italic"
-                    )}
-                  >
-                    {m.player1Id && (
-                      <PlayerAvatarIcon player={{ avatarId: m.player1AvatarId, avatarUrl: m.player1AvatarUrl, name: m.player1Name }} />
-                    )}
-                    <span className="truncate">{m.player1Name ?? "TBD"}</span>
-                  </button>
+                  {/* Both TBD and not a bye — show source match info */}
+                  {!m.player1Id && !m.player2Id && !isBye ? (
+                    <span className="flex-1 text-center text-xs text-slate-500 italic">
+                      Winner of {getPrevRoundShort(m.round, totalRounds)} #{getSourceMatches(m.matchNumber ?? (i+1))[0]} vs #{getSourceMatches(m.matchNumber ?? (i+1))[1]}
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => m.player1Id && onPlayerClick?.({ id: m.player1Id, name: m.player1Name })}
+                        className={cn("font-medium text-left flex-1 min-w-0 flex items-center gap-2",
+                          m.winnerId === m.player1Id ? "text-white" : "text-slate-400",
+                          !m.player1Id && "text-slate-600 italic"
+                        )}
+                      >
+                        {m.player1Id && (
+                          <PlayerAvatarIcon player={{ avatarId: m.player1AvatarId, avatarUrl: m.player1AvatarUrl, name: m.player1Name }} />
+                        )}
+                        <span className="truncate">{m.player1Name ?? `W: ${getPrevRoundShort(m.round, totalRounds)} #${getSourceMatches(m.matchNumber ?? (i+1))[0]}`}</span>
+                      </button>
 
-                  <div className="px-4 flex-shrink-0">
-                    {isBye ? (
-                      <span className="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full">BYE</span>
-                    ) : isCompleted ? (
-                      <span className="text-sm font-mono font-bold text-white bg-pitch-800 px-3 py-1 rounded-lg">
-                        {m.player1Score} - {m.player2Score}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-600">vs</span>
-                    )}
-                  </div>
+                      <div className="px-4 flex-shrink-0">
+                        {isBye ? (
+                          <span className="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full">BYE</span>
+                        ) : isCompleted ? (
+                          <span className="text-sm font-mono font-bold text-white bg-pitch-800 px-3 py-1 rounded-lg">
+                            {m.player1Score} - {m.player2Score}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-600">vs</span>
+                        )}
+                      </div>
 
-                  <button
-                    onClick={() => m.player2Id && onPlayerClick?.({ id: m.player2Id, name: m.player2Name })}
-                    className={cn("font-medium text-right flex-1 min-w-0 flex items-center justify-end gap-2",
-                      m.winnerId === m.player2Id ? "text-white" : "text-slate-400",
-                      !m.player2Id && "text-slate-600 italic"
-                    )}
-                  >
-                    <span className="truncate">{m.player2Name ?? "TBD"}</span>
-                    {m.player2Id && (
-                      <PlayerAvatarIcon player={{ avatarId: m.player2AvatarId, avatarUrl: m.player2AvatarUrl, name: m.player2Name }} />
-                    )}
-                  </button>
+                      <button
+                        onClick={() => m.player2Id && onPlayerClick?.({ id: m.player2Id, name: m.player2Name })}
+                        className={cn("font-medium text-right flex-1 min-w-0 flex items-center justify-end gap-2",
+                          m.winnerId === m.player2Id ? "text-white" : "text-slate-400",
+                          !m.player2Id && "text-slate-600 italic"
+                        )}
+                      >
+                        <span className="truncate">{m.player2Name ?? `W: ${getPrevRoundShort(m.round, totalRounds)} #${getSourceMatches(m.matchNumber ?? (i+1))[1]}`}</span>
+                        {m.player2Id && (
+                          <PlayerAvatarIcon player={{ avatarId: m.player2AvatarId, avatarUrl: m.player2AvatarUrl, name: m.player2Name }} />
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               )
             })}
