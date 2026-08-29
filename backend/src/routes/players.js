@@ -849,15 +849,16 @@ router.get("/:id/mv-debug", authenticate, adminOnly, async (req, res, next) => {
 })
 
 // POST /api/players/recalc-all-mv — admin: recalculate MV for all players in current season
+// Runs in parallel batches of 10 to avoid request timeout on large rosters
 router.post("/recalc-all-mv", authenticate, adminOnly, async (req, res, next) => {
   try {
     const allPlayers = await query("SELECT id FROM players ORDER BY id")
-    let count = 0
-    for (const p of allPlayers.rows) {
-      await recalcMarketValue(p.id)
-      count++
+    const ids = allPlayers.rows.map(p => p.id)
+    const BATCH = 10
+    for (let i = 0; i < ids.length; i += BATCH) {
+      await Promise.all(ids.slice(i, i + BATCH).map(id => recalcMarketValue(id)))
     }
-    res.json({ success: true, updated: count })
+    res.json({ success: true, updated: ids.length })
   } catch (err) { next(err) }
 })
 
