@@ -7,6 +7,7 @@ import { addBdr } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
+import { recalcForm }          from "../services/form.js" 
 
 const router = Router()
 
@@ -471,6 +472,17 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
         }
       }
     })
+
+    // Recalculate form for all players in the fixture after close
+    try {
+      const fixPlayerRes = await query(`
+        SELECT DISTINCT mr.player_id, mr.opponent_id
+        FROM match_records mr WHERE mr.fixture_id = $1
+      `, [fix.id])
+      const playerIds = new Set()
+      fixPlayerRes.rows.forEach(r => { playerIds.add(r.player_id); playerIds.add(r.opponent_id) })
+      for (const pid of playerIds) await recalcForm(pid)
+    } catch (e) { console.error("[fixtures] form recalc after close:", e.message) }
 
     // ── Auto-update knockout match when a leg fixture is closed ─────────────
     if (fix.is_knockout_leg && fix.knockout_match_id) {

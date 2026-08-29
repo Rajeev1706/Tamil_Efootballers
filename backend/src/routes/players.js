@@ -3,6 +3,7 @@ import { z } from "zod"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
+import { recalcForm }        from "../services/form.js" 
 
 const router = Router()
 
@@ -857,6 +858,7 @@ router.post("/recalc-all-mv", authenticate, adminOnly, async (req, res, next) =>
     const BATCH = 10
     for (let i = 0; i < ids.length; i += BATCH) {
       await Promise.all(ids.slice(i, i + BATCH).map(id => recalcMarketValue(id)))
+      await Promise.all(ids.slice(i, i + BATCH).map(id => recalcForm(id)))
     }
     res.json({ success: true, updated: ids.length })
   } catch (err) { next(err) }
