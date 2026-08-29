@@ -11,11 +11,11 @@ const MATCH_TYPE_OPTIONS = [
   { value: "duo",        label: "Duo Tournament" },
 ]
 
-function SummaryRow({ label, value }) {
+function SummaryRow({ label, value, valueClass }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-slate-500">{label}</span>
-      <span className="text-white font-semibold font-mono">{value}</span>
+      <span className={`font-semibold font-mono ${valueClass ?? "text-white"}`}>{value}</span>
     </div>
   )
 }
@@ -72,6 +72,7 @@ export default function SeasonSummary({ player }) {
   const losses = filtered.filter(m => m.result === "loss").length
   const total  = wins + draws + losses
   const goals  = filtered.reduce((s, m) => s + (m.playerScore ?? 0), 0)
+  const wosGiven = filtered.filter(m => m.isWalkoverGiven).length
 
   return (
     <div className="card overflow-hidden">
@@ -105,6 +106,9 @@ export default function SeasonSummary({ player }) {
         <SummaryRow label="Goals scored"   value={goals} />
         <SummaryRow label="Goals per match" value={total ? (goals / total).toFixed(1) : "—"} />
         <SummaryRow label="BDR points"     value={player?.bdrPoints?.toLocaleString() ?? "—"} />
+        {wosGiven > 0 && (
+          <SummaryRow label="WOs given" value={wosGiven} valueClass="text-orange-400" />
+        )}
       </div>
     </div>
   )
