@@ -246,22 +246,7 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testWeeklyActive])
 
-  useEffect(() => {
-    if (testWeeklyActive) return
-    if (!weeklyChampion || !weeklyTournament?.id) return
-    const completedAt = settings[`weekly_champion_completed_at_${weeklyTournament.id}`]
-    if (!isWithinCelebrationWindow(completedAt, 24)) return
-    const key = `weekly_champion_seen_${weeklyTournament.id}`
-    if (!localStorage.getItem(key)) {
-      setShowWeeklyCelebration(true)
-      localStorage.setItem(key, "1")
-      const dismiss = () => setShowWeeklyCelebration(false)
-      const timer = setTimeout(dismiss, 10000)
-      document.addEventListener("click", dismiss)
-      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weeklyChampion, weeklyTournament?.id])
+  // Weekly real trigger → handled by queue below
 
   // ── Team League champion celebration ────────────────────────────────────
   // Fires once the PLAYOFF FINAL is completed — NOT when regular-season
@@ -374,71 +359,13 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testTeamActive, teamsLoading, playersLoading])
 
-  useEffect(() => {
-    if (testTeamActive) return
-    if (teamsLoading || playersLoading) return
-    if (!teamChampion || !teamCelebrationSeason) return
-    const champCompletedAt = isGroupKnockout
-      ? knockoutChampsFinal?.completed_at
-      : settings['league_champion_completed_at']
-    if (!isWithinCelebrationWindow(champCompletedAt, 48)) return
-    const key = `team_league_champion_seen_${teamCelebrationSeason}_${teamChampion.id}`
-    if (!localStorage.getItem(key)) {
-      setShowTeamCelebration(true)
-      localStorage.setItem(key, "1")
-      const dismiss = () => setShowTeamCelebration(false)
-      const timer = setTimeout(dismiss, 10000)
-      document.addEventListener("click", dismiss)
-      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamChampion?.id, teamCelebrationSeason, teamsLoading, playersLoading])
+  // Team real trigger → handled by queue below
 
-  // Europa champion celebration — fires once per season after team celebration
-  useEffect(() => {
-    if (!europaChampion || !teamCelebrationSeason) return
-    const key = `europa_champion_seen_${teamCelebrationSeason}_${europaChampion.id}`
-    if (!localStorage.getItem(key)) {
-      if (!isWithinCelebrationWindow(knockoutEuropaFinal?.completed_at, 48)) return
-      setShowEuropaCelebration(true)
-      const dismiss = () => { localStorage.setItem(key, "1"); setShowEuropaCelebration(false) }
-      const timer = setTimeout(dismiss, 10000)
-      document.addEventListener("click", dismiss)
-      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-    }
-  }, [europaChampion?.id, teamCelebrationSeason])
+  // Europa real trigger → handled by queue below
 
-  // ── Revolution champion celebration ────────────────────────────────────────
-  useEffect(() => {
-    if (!revChampion || !revolutionData?.id) return
-    const completedAt = settings[`revolution_champion_completed_at_${revolutionData.id}`]
-    if (!isWithinCelebrationWindow(completedAt, 6)) return
-    const key = `revolution_champion_seen_${revolutionData.id}`
-    if (!localStorage.getItem(key)) {
-      setShowRevCelebration(true)
-      localStorage.setItem(key, "1")
-      const dismiss = () => setShowRevCelebration(false)
-      const timer = setTimeout(dismiss, 10000)
-      document.addEventListener("click", dismiss)
-      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-    }
-  }, [revChampion?.id, revolutionData?.id, settings])
+  // Revolution real trigger → handled by queue below
 
-  // ── Duo champion celebration ─────────────────────────────────────────────
-  useEffect(() => {
-    if (!duoChampion || !duoData?.seasonNumber) return
-    const completedAt = settings[`duo_champion_completed_at_${duoData.seasonNumber}`]
-    if (!isWithinCelebrationWindow(completedAt, 24)) return
-    const key = `duo_champion_seen_${duoData.seasonNumber}`
-    if (!localStorage.getItem(key)) {
-      setShowDuoCelebration(true)
-      localStorage.setItem(key, "1")
-      const dismiss = () => setShowDuoCelebration(false)
-      const timer = setTimeout(dismiss, 12000)
-      document.addEventListener("click", dismiss)
-      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-    }
-  }, [duoChampion?.set1Name, duoData?.seasonNumber, settings])
+  // Duo real trigger → handled by queue below
 
   // ── UCL Knockout champion celebration ───────────────────────────────────────
   // Fires once the UCL Knockout Final is completed — mirrors the Weekly
@@ -482,22 +409,7 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testUclActive])
 
-  useEffect(() => {
-    if (testUclActive) return
-    if (!uclChampion || !uclKnockout?.id) return
-    const uclCompletedAt = settings[`ucl_champion_completed_at_${uclKnockout.id}`]
-    if (!isWithinCelebrationWindow(uclCompletedAt, 24)) return
-    const key = `ucl_champion_seen_${uclKnockout.id}`
-    if (!localStorage.getItem(key)) {
-      setShowUclCelebration(true)
-      localStorage.setItem(key, "1")
-      const dismiss = () => setShowUclCelebration(false)
-      const timer = setTimeout(dismiss, 10000)
-      document.addEventListener("click", dismiss)
-      return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uclChampion, uclKnockout?.id])
+  // UCL real trigger → handled by queue below
 
   // ── Ballon d'Or celebration ──────────────────────────────────────────────
   // Fires immediately after the UCL Champion celebration finishes (whether
@@ -533,33 +445,95 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testBallonDorActive])
 
-  // Detect the exact moment the UCL celebration transitions from shown to
-  // dismissed (catches both the timeout path and the click-to-dismiss path,
-  // since both correctly flip showUclCelebration to false either way).
-  const prevShowUcl = useRef(false)
-  useEffect(() => {
-    if (testBallonDorActive) { prevShowUcl.current = showUclCelebration; return }
-    const dedupKey = uclKnockout?.id ?? (testUclActive ? "test" : null)
-    if (prevShowUcl.current && !showUclCelebration && ballonDorWinner && dedupKey != null) {
-      const key = `ballon_dor_seen_${dedupKey}`
-      if (testUclActive || !localStorage.getItem(key)) {
-        setShowBallonDorCelebration(true)
-        localStorage.setItem(key, "1")
-      }
-    }
-    prevShowUcl.current = showUclCelebration
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showUclCelebration])
+  // BallonDor real trigger → handled by queue below
 
-  // Ballon d'Or's own dismiss cycle, once shown for real (non-test path)
+  // ── Celebration Queue ────────────────────────────────────────────────────
+  // Builds once when data is ready. Collects all unseen eligible celebrations.
+  // Plays them one by one — marks as seen only when each actually dismisses.
+  const [celebQueue, setCelebQueue] = useState(null)
+  const [celebIndex, setCelebIndex] = useState(0)
+  const queueReady = !teamsLoading && !playersLoading
+
+  const dismissCelebration = () => {
+    if (!celebQueue || celebIndex >= celebQueue.length) return
+    const current = celebQueue[celebIndex]
+    localStorage.setItem(current.key, "1")
+    current.setter(false)
+    const next = celebIndex + 1
+    setCelebIndex(next)
+    if (next < celebQueue.length) {
+      setTimeout(() => celebQueue[next].setter(true), 500)
+    }
+  }
+
+  // Build the queue once when all relevant data has loaded
   useEffect(() => {
-    if (testBallonDorActive) return
-    if (!showBallonDorCelebration) return
-    const dismiss = () => setShowBallonDorCelebration(false)
-    const timer = setTimeout(dismiss, 10000)
-    document.addEventListener("click", dismiss)
-    return () => { clearTimeout(timer); document.removeEventListener("click", dismiss) }
-  }, [showBallonDorCelebration, testBallonDorActive])
+    if (!queueReady || celebQueue !== null) return
+    const entries = []
+
+    // 1. Weekly (24h)
+    if (weeklyChampion && weeklyTournament?.id) {
+      const k = `weekly_champion_seen_${weeklyTournament.id}`
+      const at = settings[`weekly_champion_completed_at_${weeklyTournament.id}`]
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(at, 24))
+        entries.push({ key: k, setter: setShowWeeklyCelebration })
+    }
+    // 2. Team Champion (48h)
+    if (teamChampion && teamCelebrationSeason) {
+      const k = `team_league_champion_seen_${teamCelebrationSeason}_${teamChampion.id}`
+      const at = isGroupKnockout ? knockoutChampsFinal?.completed_at : settings["league_champion_completed_at"]
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(at, 48))
+        entries.push({ key: k, setter: setShowTeamCelebration })
+    }
+    // 3. Europa Champion (48h)
+    if (europaChampion && teamCelebrationSeason) {
+      const k = `europa_champion_seen_${teamCelebrationSeason}_${europaChampion.id}`
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(knockoutEuropaFinal?.completed_at, 48))
+        entries.push({ key: k, setter: setShowEuropaCelebration })
+    }
+    // 4. UCL (24h)
+    if (uclChampion && uclKnockout?.id) {
+      const k = `ucl_champion_seen_${uclKnockout.id}`
+      const at = settings[`ucl_champion_completed_at_${uclKnockout.id}`]
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(at, 24))
+        entries.push({ key: k, setter: setShowUclCelebration })
+    }
+    // 5. Revolution (6h)
+    if (revChampion && revolutionData?.id) {
+      const k = `revolution_champion_seen_${revolutionData.id}`
+      const at = settings[`revolution_champion_completed_at_${revolutionData.id}`]
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(at, 6))
+        entries.push({ key: k, setter: setShowRevCelebration })
+    }
+    // 6. Duo (24h)
+    if (duoChampion && duoData?.seasonNumber) {
+      const k = `duo_champion_seen_${duoData.seasonNumber}`
+      const at = settings[`duo_champion_completed_at_${duoData.seasonNumber}`]
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(at, 24))
+        entries.push({ key: k, setter: setShowDuoCelebration })
+    }
+    // 7. Ballon d'Or (follows UCL, 24h)
+    if (ballonDorWinner && uclKnockout?.id) {
+      const k = `ballon_dor_seen_${uclKnockout.id}`
+      const at = settings[`ucl_champion_completed_at_${uclKnockout.id}`]
+      if (!localStorage.getItem(k) && isWithinCelebrationWindow(at, 24))
+        entries.push({ key: k, setter: setShowBallonDorCelebration })
+    }
+
+    setCelebQueue(entries)
+    if (entries.length > 0) entries[0].setter(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueReady, teamChampion?.id, europaChampion?.id, revChampion?.id,
+      duoChampion?.set1Name, uclChampion, weeklyChampion, settings])
+
+  // Auto-dismiss timer for current celebration
+  useEffect(() => {
+    if (!celebQueue || celebIndex >= celebQueue.length) return
+    const timer = setTimeout(dismissCelebration, 10000)
+    document.addEventListener("click", dismissCelebration)
+    return () => { clearTimeout(timer); document.removeEventListener("click", dismissCelebration) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebIndex, celebQueue?.length])
 
   const activePanel    = searchParams.get("view") || "standings"
 
@@ -683,7 +657,7 @@ export default function CommonDashboard() {
           title={europaChampion.name}
           subtitle="are the Europa Champions! 🥈"
           badgeImage={europaChampion.logoUrl}
-          onClick={() => { localStorage.setItem(`europa_champion_seen_${teamCelebrationSeason}_${europaChampion.id}`, "1"); setShowEuropaCelebration(false) }}
+          onClick={dismissCelebration}
         >
           {europaChampionPlayers.length > 0 && (
             <TeamRosterChips players={europaChampionPlayers} />
