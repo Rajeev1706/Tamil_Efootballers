@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw, Zap } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -29,6 +29,51 @@ import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
 import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 import AdminTeamsTab from "../components/admin/AdminTeamsTab"
+
+function RecalcMVCard() {
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(false)
+  const [count, setCount]     = useState(0)
+
+  async function handleRecalc() {
+    setLoading(true)
+    try {
+      const res = await api.post("/players/recalc-all-mv")
+      setCount(res.data.updated)
+      setDone(true)
+    } catch (err) {
+      alert("Recalculate failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+        <p className="text-emerald-400 font-semibold text-lg mb-1">✅ MV recalculated!</p>
+        <p className="text-sm text-slate-400">Market values updated for {count} players using current season records.</p>
+        <button onClick={() => setDone(false)} className="mt-3 text-xs text-slate-500 hover:text-white transition-colors">Dismiss</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <Zap className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Recalculate Market Values</p>
+          <p className="text-sm text-slate-500 mt-0.5">Recompute MV for all players based on current season match records. Use after formula changes.</p>
+        </div>
+      </div>
+      <button onClick={handleRecalc} disabled={loading}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 text-sm font-semibold transition-colors disabled:opacity-40">
+        {loading ? "Recalculating…" : "Recalculate MV"}
+      </button>
+    </div>
+  )
+}
 
 function ResetMVCard() {
   const [confirm, setConfirm] = useState(false)
@@ -524,6 +569,7 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Market Value</p>
       <ResetMVCard />
+      <RecalcMVCard />
     </div>
 
     {/* Season Reset */}

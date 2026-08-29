@@ -848,4 +848,17 @@ router.get("/:id/mv-debug", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// POST /api/players/recalc-all-mv — admin: recalculate MV for all players in current season
+router.post("/recalc-all-mv", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const allPlayers = await query("SELECT id FROM players ORDER BY id")
+    let count = 0
+    for (const p of allPlayers.rows) {
+      await recalcMarketValue(p.id)
+      count++
+    }
+    res.json({ success: true, updated: count })
+  } catch (err) { next(err) }
+})
+
 export default router
