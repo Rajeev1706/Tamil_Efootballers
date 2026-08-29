@@ -161,7 +161,6 @@ const PANEL_OPTIONS = [
   { value: "weekly",        label: "Weekly"            },
   { value: "revolution",    label: "Revolution Trophy" },
   { value: "duo",           label: "Duo Tournament"    },
-  { value: "teamknockout",  label: "Team Knockout"     },
 ]
 
 
