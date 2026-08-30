@@ -3,13 +3,14 @@ import { Target, Trophy, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic, useGroupStandings } from "../../lib/queries"
 import { useState, lazy, Suspense } from "react"
-const TeamKnockoutDashboard = lazy(() => import("./TeamKnockoutDashboard"))
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
 import { useRankChanges } from "../../hooks/useRankChanges"
 import teamLeagueTrophy from "../../../images/Team League.png"
 import goldenBoot from "../../../images/Golden Boot.png"
+
+const TeamKnockoutDashboard = lazy(() => import("./TeamKnockoutDashboard"))
 
 // One playoff match card — shows both teams, the score once played, and
 // highlights the winner in green. `label` is the match name shown above it.
