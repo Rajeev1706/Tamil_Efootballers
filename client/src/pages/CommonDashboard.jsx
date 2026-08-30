@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, lazy, Suspense } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star, Gavel } from "lucide-react"
 import { cn } from "../lib/utils"
@@ -21,7 +21,7 @@ import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
 import BallonDorCelebration from "../components/common/BallonDorCelebration"
 import DuoCelebration from "../components/common/DuoCelebration"
-import TeamKnockoutDashboard from "../components/dashboard/TeamKnockoutDashboard" 
+const TeamKnockoutDashboard = lazy(() => import("../components/dashboard/TeamKnockoutDashboard"))
 import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
 import europaTrophyLogo      from "../../images/europa.png"
@@ -880,7 +880,11 @@ export default function CommonDashboard() {
                 {activePanel === "weekly"    && <WeeklyDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "revolution" && <RevolutionDashboard onPlayerClick={handlePlayer} />}
                 {activePanel === "duo"        && <DuoDashboard />}
-                {activePanel === "teamknockout" && <TeamKnockoutDashboard />}
+                {activePanel === "teamknockout" && (
+                  <Suspense fallback={<div className="text-slate-500 text-sm py-4 text-center">Loading…</div>}>
+                    <TeamKnockoutDashboard />
+                  </Suspense>
+                )}
                 {activePanel === "bdr"       && <BDRRanking players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "market"    && <MarketValues players={players} onPlayerClick={handlePlayer} />}
                 {activePanel === "trophies"  && <TrophyRanking players={players} onPlayerClick={handlePlayer} trophyKey={trophyKey} onTrophyChange={setTrophyKey} />}
