@@ -33,6 +33,18 @@ export async function claimAward(awardType, referenceId) {
 }
 
 // Adds (or subtracts) BDR points for a single player, floored at 0.
+// Track BDR from team league formats separately (used in championship calculation)
+export async function addLeagueBdr(playerId, amount) {
+  if (!playerId || !amount) return
+  await query("UPDATE players SET league_bdr = league_bdr + $1 WHERE id = $2", [amount, playerId])
+}
+
+// Award flat championship points to a team (once per team, not per player)
+export async function addTeamChampionshipPts(teamId, pts) {
+  if (!teamId || !pts) return
+  await query("UPDATE teams SET championship_pts = championship_pts + $1 WHERE id = $2", [pts, teamId])
+}
+
 export async function addBdr(playerId, delta) {
   if (!playerId || !delta) return
   await query(

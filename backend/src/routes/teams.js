@@ -3,7 +3,7 @@ import { z } from "zod"
 import bcrypt from "bcryptjs"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
-import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { claimAward, addBdr, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { recalcMarketValue } from "../services/marketValue.js"
@@ -654,7 +654,9 @@ router.get("/championship", async (_req, res, next) => {
         t.id,
         t.name,
         t.logo_url       AS "logoUrl",
-        COALESCE(SUM(p.bdr_points), 0)::int AS "totalBdr",
+        -- championship_pts = flat team league points (not × squad size)
+        -- SUM(bdr_points - league_bdr) = all non-league-format BDR (UCL, weekly, etc.)
+        (t.championship_pts + COALESCE(SUM(p.bdr_points - p.league_bdr), 0))::int AS "totalBdr",
         COUNT(p.id)::int AS "playerCount",
         JSON_AGG(
           JSON_BUILD_OBJECT(
@@ -668,7 +670,7 @@ router.get("/championship", async (_req, res, next) => {
         ) FILTER (WHERE p.id IS NOT NULL) AS players
       FROM teams t
       LEFT JOIN players p ON p.team_id = t.id
-      GROUP BY t.id, t.name, t.logo_url
+      GROUP BY t.id, t.name, t.logo_url, t.championship_pts
       ORDER BY "totalBdr" DESC
     `)
     res.json(result.rows)
@@ -1492,14 +1494,18 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
         const thirdPlaceId = q2.winner_team_id === q2.team1_id ? q2.team2_id : q2.team1_id
 
         const placements = [
-          { teamId: winnerId, bdr: 12 },   // Champion
-          { teamId: loserId, bdr: 9 },     // Runner-up
-          { teamId: thirdPlaceId, bdr: 7 },
-          { teamId: fourthPlaceId, bdr: 5 },
+          { teamId: winnerId,      bdr: 12, flatPts: 12 },
+          { teamId: loserId,       bdr: 9,  flatPts: 9  },
+          { teamId: thirdPlaceId,  bdr: 7,  flatPts: 7  },
+          { teamId: fourthPlaceId, bdr: 5,  flatPts: 5  },
         ]
-        for (const { teamId, bdr } of placements) {
+        for (const { teamId, bdr, flatPts } of placements) {
           const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
-          for (const p of playersRes.rows) await addBdr(p.id, bdr)
+          for (const p of playersRes.rows) {
+            await addBdr(p.id, bdr)
+            await addLeagueBdr(p.id, bdr) // track league BDR separately
+          }
+          await addTeamChampionshipPts(teamId, flatPts) // flat team pts
         }
       }
 
