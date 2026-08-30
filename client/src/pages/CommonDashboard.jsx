@@ -299,6 +299,11 @@ export default function CommonDashboard() {
   const playoffFinal    = playoffsData?.matches?.find(m => m.matchType === "final")
   const playoffComplete = playoffFinal?.status === "completed"
 
+  // Captain always shown first in the roster list, wherever it's used.
+  // Defined here BEFORE first use to avoid TDZ crash in production bundles.
+  const sortCaptainFirst = (list) =>
+    [...list].sort((a, b) => (b.isCaptain ? 1 : 0) - (a.isCaptain ? 1 : 0))
+
   // For group_knockout format — read champion from team knockout Champions Final
   const { data: teamKOData } = useTeamKnockoutCurrent()
   const knockoutChampsFinal  = teamKOData?.matches?.find(m => m.match_type === "champions_final")
@@ -320,10 +325,6 @@ export default function CommonDashboard() {
       ? (leagueFormatData?.leagueOnlyChampionTeamId || null)
       : (playoffComplete ? playoffFinal.winnerTeamId : null)
   const teamChampion = championTeamId ? teams.find(t => t.id === championTeamId) : null
-
-  // Captain always shown first in the roster list, wherever it's used.
-  const sortCaptainFirst = (list) =>
-    [...list].sort((a, b) => (b.isCaptain ? 1 : 0) - (a.isCaptain ? 1 : 0))
 
   const teamChampionPlayers = teamChampion
     ? sortCaptainFirst(players.filter(p => p.teamId === teamChampion.id))
