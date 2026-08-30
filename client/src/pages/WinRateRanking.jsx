@@ -191,14 +191,14 @@ export default function WinRateRanking() {
                     </div>
 
                     {/* Desktop: W/D/L full */}
-                    <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0">
+                    <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0 w-24 justify-end">
                       <span className="text-emerald-400 font-mono">{player.wins}W</span>
                       <span className="text-amber-400 font-mono">{player.draws}D</span>
                       <span className="text-rose-400 font-mono">{player.losses}L</span>
                     </div>
 
                     {/* Win rate */}
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-right flex-shrink-0 w-14 sm:w-16">
                       <span className={cn("font-bold text-xs sm:text-sm font-mono",
                         wr>=70?"text-emerald-400":wr>=50?"text-accent":wr>=35?"text-amber-400":"text-rose-400"
                       )}>{wr}%</span>
