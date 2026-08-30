@@ -21,17 +21,20 @@ import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
 import BallonDorCelebration from "../components/common/BallonDorCelebration"
 import DuoCelebration from "../components/common/DuoCelebration"
-const TeamKnockoutDashboard = lazy(() => import("../components/dashboard/TeamKnockoutDashboard"))
 import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
 import europaTrophyLogo      from "../../images/europa.png"
 import duoTrophyLogo          from "../../images/duo.png"
-import revolutionTrophyLogo   from "../../images/revolution.png" 
+import revolutionTrophyLogo   from "../../images/revolution.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
 import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship, useGroupStandings, useTeamKnockoutCurrent, useRevolutionCurrent } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
+
+// Lazy-loaded after all imports — keeps it out of the TDZ that causes
+// "Cannot access before initialization" in production bundles
+const TeamKnockoutDashboard = lazy(() => import("../components/dashboard/TeamKnockoutDashboard"))
 
 // Resolves a player's chosen avatar — custom upload takes priority,
 // falls back to their picked preset character, then to nothing at all.
