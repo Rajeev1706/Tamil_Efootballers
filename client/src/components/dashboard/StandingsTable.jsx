@@ -1,9 +1,9 @@
-import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Target, Trophy, Crown } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useTopScorers, useTeamLeaguePlayoffs, useFixtures, useLeagueFormatPublic, useGroupStandings } from "../../lib/queries"
-import TeamKnockoutDashboard from "./TeamKnockoutDashboard"
+import { useState, lazy, Suspense } from "react"
+const TeamKnockoutDashboard = lazy(() => import("./TeamKnockoutDashboard"))
 import { TeamAvatar, TeamLogoIcon } from "../common/TeamLogo"
 import PlayerAvatarIcon from "../common/PlayerAvatarIcon"
 import RankBadge from "../common/RankBadge"
@@ -489,7 +489,9 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
       )}
       {view === "teamknockout" && (
         <div className="px-5 py-4">
-          <TeamKnockoutDashboard />
+          <Suspense fallback={<div className="text-slate-500 text-sm py-4 text-center">Loading…</div>}>
+            <TeamKnockoutDashboard />
+          </Suspense>
         </div>
       )}
     </div>
