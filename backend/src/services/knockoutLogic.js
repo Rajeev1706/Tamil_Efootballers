@@ -5,7 +5,7 @@
 import { query } from "../db/pool.js"
 import { reconcileTeamTrophy } from "./teamTrophyAwards.js"
 import { updateSeasonRecord } from "./seasonRecord.js"
-import { claimAward, addBdr } from "./bdrAwards.js"
+import { claimAward, addBdr, addLeagueBdr, addTeamChampionshipPts } from "./bdrAwards.js"
 
 // Determine winner of a two-leg tie using aggregate GD (actual goals).
 // Returns team1_id or team2_id, or null if tied (needs manual decision).
@@ -82,14 +82,18 @@ export async function advanceKnockoutWinner(match, winnerId) {
       const thirdId  = third.winner_id
       const fourthId = third.winner_id === third.team1_id ? third.team2_id : third.team1_id
       const placements = [
-        { teamId: winnerId, bdr: 12 },
-        { teamId: loserId,  bdr: 9  },
-        { teamId: thirdId,  bdr: 7  },
-        { teamId: fourthId, bdr: 5  },
+        { teamId: winnerId, bdr: 12, flatPts: 12 },
+        { teamId: loserId,  bdr: 9,  flatPts: 9  },
+        { teamId: thirdId,  bdr: 7,  flatPts: 7  },
+        { teamId: fourthId, bdr: 5,  flatPts: 5  },
       ]
-      for (const { teamId, bdr } of placements) {
+      for (const { teamId, bdr, flatPts } of placements) {
         const players = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
-        for (const p of players.rows) await addBdr(p.id, bdr)
+        for (const p of players.rows) {
+          await addBdr(p.id, bdr)
+          await addLeagueBdr(p.id, bdr) // track league BDR separately
+        }
+        await addTeamChampionshipPts(teamId, flatPts) // flat team pts (not × squad size)
       }
     }
 
@@ -102,14 +106,18 @@ export async function advanceKnockoutWinner(match, winnerId) {
       const champWinnerId = cf.winner_id
       const champLoserId  = cf.winner_id === cf.team1_id ? cf.team2_id : cf.team1_id
       const placements = [
-        { teamId: champWinnerId, bdr: 12 },
-        { teamId: champLoserId,  bdr: 9  },
-        { teamId: winnerId,      bdr: 7  },
-        { teamId: loserId,       bdr: 5  },
+        { teamId: champWinnerId, bdr: 12, flatPts: 12 },
+        { teamId: champLoserId,  bdr: 9,  flatPts: 9  },
+        { teamId: winnerId,      bdr: 7,  flatPts: 7  },
+        { teamId: loserId,       bdr: 5,  flatPts: 5  },
       ]
-      for (const { teamId, bdr } of placements) {
+      for (const { teamId, bdr, flatPts } of placements) {
         const players = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
-        for (const p of players.rows) await addBdr(p.id, bdr)
+        for (const p of players.rows) {
+          await addBdr(p.id, bdr)
+          await addLeagueBdr(p.id, bdr)
+        }
+        await addTeamChampionshipPts(teamId, flatPts)
       }
     }
 
@@ -117,7 +125,11 @@ export async function advanceKnockoutWinner(match, winnerId) {
     await reconcileTeamTrophy({ tournament: "europa", teamId: winnerId, seasonNumber: season })
     if (await claimAward("team_knockout_europa_bdr", season)) {
       const players = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
-      for (const p of players.rows) await addBdr(p.id, 4)
+      for (const p of players.rows) {
+        await addBdr(p.id, 4)
+        await addLeagueBdr(p.id, 4)
+      }
+      await addTeamChampionshipPts(winnerId, 4) // flat +4 for europa winner
     }
   }
 }

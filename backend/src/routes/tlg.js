@@ -11,7 +11,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
-import { addBdr } from "../services/bdrAwards.js"
+import { addBdr, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 // BDR for final standings — same as regular Team League playoffs
@@ -21,11 +21,26 @@ const TLG_BDR = {
   europa_final:    { winner: 0,  loser: 0  }, // No extra BDR for Europa
   seventh_place:   { winner: 0,  loser: 0  }, // No extra BDR for 7th/8th
 }
+// Flat championship points per team (not per player)
+const TLG_CHAMP_PTS = {
+  champions_final: { winner: 12, loser: 9 },
+  third_place:     { winner: 7,  loser: 5 },
+  europa_final:    { winner: 4,  loser: 0 }, // Europa winner gets +4
+  seventh_place:   { winner: 0,  loser: 0 },
+}
 
 async function awardBdrToTeam(teamId, bdr) {
   if (!bdr || !teamId) return
   const players = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
-  for (const p of players.rows) await addBdr(p.id, bdr)
+  for (const p of players.rows) {
+    await addBdr(p.id, bdr)
+    await addLeagueBdr(p.id, bdr) // track league BDR separately
+  }
+}
+
+async function awardChampPtsToTeam(teamId, pts) {
+  if (!pts || !teamId) return
+  await addTeamChampionshipPts(teamId, pts)
 }
 
 const router = Router()
@@ -317,6 +332,8 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
       // BDR: Champion +12, Runner-up +9
       await awardBdrToTeam(winnerId, TLG_BDR.champions_final.winner)
       await awardBdrToTeam(loserId,  TLG_BDR.champions_final.loser)
+      await awardChampPtsToTeam(winnerId, TLG_CHAMP_PTS.champions_final.winner)
+      await awardChampPtsToTeam(loserId,  TLG_CHAMP_PTS.champions_final.loser)
 
       const playersRes = await query("SELECT id FROM players WHERE team_id=$1", [winnerId])
       await reconcileTrophyRoster({
@@ -363,6 +380,8 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
       // BDR: 3rd place +7, 4th place +5
       await awardBdrToTeam(winnerId, TLG_BDR.third_place.winner)
       await awardBdrToTeam(loserId,  TLG_BDR.third_place.loser)
+      await awardChampPtsToTeam(winnerId, TLG_CHAMP_PTS.third_place.winner)
+      await awardChampPtsToTeam(loserId,  TLG_CHAMP_PTS.third_place.loser)
     }
 
     if (phase === "europa_final") {
