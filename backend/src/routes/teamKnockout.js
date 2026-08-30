@@ -116,12 +116,23 @@ const MATCH_SELECT = `
     t1.name AS "team1Name", t1.logo_url AS "team1Logo",
     t2.name AS "team2Name", t2.logo_url AS "team2Logo",
     tw.name AS "tossWinnerName",
-    w.name  AS "winnerName",  w.logo_url AS "winnerLogo"
+    w.name  AS "winnerName",  w.logo_url AS "winnerLogo",
+    -- Direct stored scores from leg fixtures (most reliable for closed legs)
+    lf1.status     AS "leg1Status",
+    lf1.home_score AS "leg1HomeScore", lf1.away_score AS "leg1AwayScore",
+    lf1.home_goals AS "leg1HomeGoals", lf1.away_goals AS "leg1AwayGoals",
+    lf1.home_team_id AS "leg1HomeTeamId",
+    lf2.status     AS "leg2Status",
+    lf2.home_score AS "leg2HomeScore", lf2.away_score AS "leg2AwayScore",
+    lf2.home_goals AS "leg2HomeGoals", lf2.away_goals AS "leg2AwayGoals",
+    lf2.home_team_id AS "leg2HomeTeamId"
   FROM team_knockout_matches tkm
   LEFT JOIN teams t1 ON t1.id = tkm.team1_id
   LEFT JOIN teams t2 ON t2.id = tkm.team2_id
   LEFT JOIN teams tw ON tw.id = tkm.toss_winner_id
   LEFT JOIN teams w  ON w.id  = tkm.winner_id
+  LEFT JOIN fixtures lf1 ON lf1.id = tkm.leg1_fixture_id
+  LEFT JOIN fixtures lf2 ON lf2.id = tkm.leg2_fixture_id
 `
 
 // ── GET /api/team-knockout/current ───────────────────────────────────────────

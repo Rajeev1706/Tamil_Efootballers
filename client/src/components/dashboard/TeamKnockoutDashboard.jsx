@@ -15,26 +15,40 @@ const MATCH_LABELS = {
 }
 
 // Resolve effective scores for a leg — stored (after close) takes priority over live
-function legStats(legData, matchTeam1Id) {
-  if (!legData) return null
-  const closed = legData.leg_status === "completed"
+function legStats(legData, matchTeam1Id, directLeg) {
+  // directLeg: direct join from MATCH_SELECT on leg fixture — most reliable for closed legs
+  const directClosed = directLeg?.status === "completed"
 
-  // ALWAYS use live match_records for Pts — same as group standings.
-  // PostgreSQL SUM() returns strings — Number() prevents "8"+"0"="80" bug.
-  const homePts   = Number(legData.live_home_pts   || 0)
-  const awayPts   = Number(legData.live_away_pts   || 0)
+  if (directClosed && directLeg.homeScore != null) {
+    const homePts   = Number(directLeg.homeScore  || 0)
+    const awayPts   = Number(directLeg.awayScore  || 0)
+    const homeGoals = Number(directLeg.homeGoals  || 0)
+    const awayGoals = Number(directLeg.awayGoals  || 0)
+    const t1IsHome  = Number(directLeg.homeTeamId) === Number(matchTeam1Id)
+    return {
+      t1Pts:   t1IsHome ? homePts   : awayPts,
+      t2Pts:   t1IsHome ? awayPts   : homePts,
+      t1Goals: t1IsHome ? homeGoals : awayGoals,
+      t2Goals: t1IsHome ? awayGoals : homeGoals,
+      isLive:  false, closed: true, hasData: true,
+    }
+  }
+
+  // Fallback: live match_records data for upcoming/live fixtures
+  if (!legData) return null
+  const closed  = legData.leg_status === "completed"
+  const homePts   = Number((closed && legData.stored_home_pts   != null ? legData.stored_home_pts   : legData.live_home_pts)   || 0)
+  const awayPts   = Number((closed && legData.stored_away_pts   != null ? legData.stored_away_pts   : legData.live_away_pts)   || 0)
   const homeGoals = Number((closed && legData.stored_home_goals != null ? legData.stored_home_goals : legData.live_home_goals) || 0)
   const awayGoals = Number((closed && legData.stored_away_goals != null ? legData.stored_away_goals : legData.live_away_goals) || 0)
   const isLive    = !closed && Number(legData.matches_logged) > 0
-
-  const t1IsHome = legData.home_team_id === matchTeam1Id
+  const t1IsHome  = Number(legData.home_team_id) === Number(matchTeam1Id)
   return {
     t1Pts:   t1IsHome ? homePts   : awayPts,
     t2Pts:   t1IsHome ? awayPts   : homePts,
     t1Goals: t1IsHome ? homeGoals : awayGoals,
     t2Goals: t1IsHome ? awayGoals : homeGoals,
-    isLive,
-    closed,
+    isLive, closed,
     hasData: closed || Number(legData.matches_logged) > 0,
   }
 }
@@ -58,8 +72,26 @@ function MiniMatchRow({ match }) {
   const isChamp    = match.match_type?.startsWith("champions_")
   const isFinal    = match.match_type?.endsWith("_final") || match.match_type?.endsWith("_3rd") || match.match_type?.endsWith("_7th")
 
-  const l1 = legStats(match.liveLegs?.leg1, match.team1_id)
-  const l2 = legStats(match.liveLegs?.leg2, match.team1_id)
+  // Direct fixture stored scores (from MATCH_SELECT join — most reliable for closed legs)
+  const direct1 = match.leg1_fixture_id ? {
+    status:      match.leg1Status,
+    homeScore:   match.leg1HomeScore,
+    awayScore:   match.leg1AwayScore,
+    homeGoals:   match.leg1HomeGoals,
+    awayGoals:   match.leg1AwayGoals,
+    homeTeamId:  match.leg1HomeTeamId,
+  } : null
+  const direct2 = match.leg2_fixture_id ? {
+    status:      match.leg2Status,
+    homeScore:   match.leg2HomeScore,
+    awayScore:   match.leg2AwayScore,
+    homeGoals:   match.leg2HomeGoals,
+    awayGoals:   match.leg2AwayGoals,
+    homeTeamId:  match.leg2HomeTeamId,
+  } : null
+
+  const l1 = legStats(match.liveLegs?.leg1, match.team1_id, direct1)
+  const l2 = legStats(match.liveLegs?.leg2, match.team1_id, direct2)
 
   const anyLive   = l1?.isLive || l2?.isLive
   const hasAnyData = l1?.hasData || l2?.hasData
