@@ -271,15 +271,7 @@ export default function PlayerProfile() {
             ))}
           </div>
 
-          {/* Walkovers given — only shown if the player has given at least one */}
-          {(player.record?.walkoversGiven > 0) && (
-            <div className="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-400/5 border border-orange-400/20">
-              <span className="text-xs font-bold text-orange-400 bg-orange-400/10 border border-orange-400/25 px-2 py-0.5 rounded">WO</span>
-              <span className="text-sm text-slate-400">
-                Walkover given <span className="text-orange-400 font-bold">{player.record.walkoversGiven}</span> time{player.record.walkoversGiven > 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
+
 
           {showAuctionDelta && !player.isCaptain && (
             <div className="flex items-center gap-3 mt-4">
