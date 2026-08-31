@@ -405,9 +405,10 @@ function ScoreEntry({ fixture, onSave }) {
         let resultColor = "text-amber-400"
         if (homeSets > awaySets) { resultLabel = `${fixture.homeDuoName} wins 2-0`; resultColor = "text-emerald-400" }
         else if (awaySets > homeSets) { resultLabel = `${fixture.awayDuoName} wins 2-0`; resultColor = "text-emerald-400" }
-        else if (homeAggPrev > awayAggPrev) { resultLabel = `1-1 → ${fixture.homeDuoName} wins on agg`; resultColor = "text-blue-400" }
-        else if (awayAggPrev > homeAggPrev) { resultLabel = `1-1 → ${fixture.awayDuoName} wins on agg`; resultColor = "text-blue-400" }
-        else if (homeSets + awaySets > 0) { resultLabel = "1-1 — Decider needed"; resultColor = "text-orange-400" }
+        else if (fixture.knockout_round && homeAggPrev > awayAggPrev) { resultLabel = `1-1 → ${fixture.homeDuoName} wins on agg`; resultColor = "text-blue-400" }
+        else if (fixture.knockout_round && awayAggPrev > homeAggPrev) { resultLabel = `1-1 → ${fixture.awayDuoName} wins on agg`; resultColor = "text-blue-400" }
+        else if (fixture.knockout_round && homeSets + awaySets > 0) { resultLabel = "1-1 — Decider needed"; resultColor = "text-orange-400" }
+        else if (!fixture.knockout_round && homeSets + awaySets > 0) { resultLabel = "1-1 — Draw (1 pt each)"; resultColor = "text-amber-400" }
         return (
           <div className="flex items-center justify-between px-3 py-2 bg-pitch-800 rounded-lg">
             <span className="text-xs text-slate-400">Sets: {homeSets} – {awaySets}</span>
@@ -556,7 +557,7 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult }) {
       {open && (
         <div className="px-4 pb-4 space-y-3">
           <ScoreEntry fixture={fixture} onSave={onSave} />
-          {needsDecider && (
+          {needsDecider && fixture.knockout_round && (
             <DeciderEntry
               fixture={fixture}
               onSetup={onDeciderSetup}
