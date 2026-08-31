@@ -568,7 +568,13 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebIndex, celebQueue?.length])
 
-  const featuredPanel  = settings?.featured_panel || "standings"
+  // Read featured panel: localStorage first (instant, no API wait), then sync from settings
+  const storedPanel    = typeof window !== "undefined" ? localStorage.getItem("featured_panel") : null
+  const featuredPanel  = settings?.featured_panel || storedPanel || "standings"
+  // Sync localStorage whenever settings API returns a value
+  if (settings?.featured_panel && settings.featured_panel !== storedPanel) {
+    localStorage.setItem("featured_panel", settings.featured_panel)
+  }
   const activePanel    = searchParams.get("view") || featuredPanel
 
   // Re-declare top scorer queries here so they can use activePanel + celebration states
