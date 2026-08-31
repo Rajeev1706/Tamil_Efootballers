@@ -75,12 +75,15 @@ export async function advanceKnockoutWinner(match, winnerId) {
     await updateSeasonRecord(season, { team_league_winner: nameRes.rows[0]?.name ?? null })
 
     // Award trophy2_count (Team League champion) to every player on the winning team
-    const champPlayersRes = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
+    const champPlayersRes = await query("SELECT id, name FROM players WHERE team_id = $1", [winnerId])
     await reconcileTrophyRoster({
       sourceKey:    `group-knockout-champions-final-s${season}`,
       trophyColumn: "trophy2_count",
       playerIds:    champPlayersRes.rows.map(p => p.id),
       seasonNumber: season,
+    })
+    await updateSeasonRecord(season, {
+      team_league_players: champPlayersRes.rows.map(p => p.name),
     })
 
     const thirdMatch = await query(
