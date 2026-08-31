@@ -632,6 +632,104 @@ router.get("/pairs", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ── PATCH /api/duo/pairs/:id — replace set1 or set2 player in a pair ──────────
+// When a player is swapped, any existing fixture scores involving this pair are
+// reset to pending (match records deleted) so results reflect the new player.
+router.patch("/pairs/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { set1PlayerId, set2PlayerId } = z.object({
+      set1PlayerId: z.number().int().positive().optional(),
+      set2PlayerId: z.number().int().positive().optional(),
+    }).parse(req.body)
+
+    if (!set1PlayerId && !set2PlayerId) {
+      return res.status(400).json({ error: "Provide set1PlayerId or set2PlayerId to update" })
+    }
+
+    const pairRes = await query("SELECT * FROM duo_pairs WHERE id = $1", [req.params.id])
+    const pair = pairRes.rows[0]
+    if (!pair) return res.status(404).json({ error: "Pair not found" })
+
+    const newSet1Id = set1PlayerId ?? pair.set1_player_id
+    const newSet2Id = set2PlayerId ?? pair.set2_player_id
+
+    if (newSet1Id === newSet2Id) {
+      return res.status(400).json({ error: "Set 1 and Set 2 players must be different" })
+    }
+
+    // Build new duo_name from first names
+    const namesRes = await query(
+      "SELECT id, name FROM players WHERE id = ANY($1::int[])",
+      [[newSet1Id, newSet2Id]]
+    )
+    const nameMap = Object.fromEntries(namesRes.rows.map(p => [p.id, p.name]))
+    const duoName = `${nameMap[newSet1Id]?.split(" ")[0]} & ${nameMap[newSet2Id]?.split(" ")[0]}`
+
+    await withTransaction(async ({ query: q }) => {
+      // Update the pair
+      await q(`
+        UPDATE duo_pairs SET set1_player_id = $1, set2_player_id = $2, duo_name = $3 WHERE id = $4
+      `, [newSet1Id, newSet2Id, duoName, req.params.id])
+
+      // Find all fixtures involving this pair and reset any that have scores
+      const fixtures = await q(`
+        SELECT id, set1_match_record_id, set2_match_record_id
+        FROM duo_fixtures
+        WHERE (home_pair_id = $1 OR away_pair_id = $1)
+          AND status IN ('completed', 'needs_decider')
+      `, [pair.id])
+
+      for (const fix of fixtures.rows) {
+        // Delete match records so MV/form are recalculated without the old result
+        if (fix.set1_match_record_id) {
+          await q("DELETE FROM match_records WHERE id = $1", [fix.set1_match_record_id])
+        }
+        if (fix.set2_match_record_id) {
+          await q("DELETE FROM match_records WHERE id = $1", [fix.set2_match_record_id])
+        }
+
+        // Reset fixture back to pending, clear scores
+        await q(`
+          UPDATE duo_fixtures SET
+            set1_home_score = NULL, set1_away_score = NULL,
+            set2_home_score = NULL, set2_away_score = NULL,
+            set1_match_record_id = NULL, set2_match_record_id = NULL,
+            winner_pair_id = NULL, status = 'pending'
+          WHERE id = $1
+        `, [fix.id])
+      }
+
+      // Also reverse group standings for this pair (reset to 0) if any fixtures were cleared
+      if (fixtures.rows.length > 0) {
+        await q(`
+          UPDATE duo_group_members SET
+            played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, points = 0
+          WHERE duo_pair_id = $1
+        `, [pair.id])
+      }
+    })
+
+    // Recalc MV/form for all 4 affected players
+    const allPlayerIds = [pair.set1_player_id, pair.set2_player_id, newSet1Id, newSet2Id]
+    for (const pid of [...new Set(allPlayerIds)]) {
+      await recalcMarketValue(pid)
+      await recalcForm(pid)
+    }
+
+    const fresh = await query(`
+      SELECT dp.id, dp.duo_name AS "duoName",
+        p1.id AS "set1Id", p1.name AS "set1Name", p1.grade AS "set1Grade",
+        p2.id AS "set2Id", p2.name AS "set2Name", p2.grade AS "set2Grade"
+      FROM duo_pairs dp
+      JOIN players p1 ON p1.id = dp.set1_player_id
+      JOIN players p2 ON p2.id = dp.set2_player_id
+      WHERE dp.id = $1
+    `, [req.params.id])
+
+    res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
 // ── DELETE /api/duo/season/:seasonNumber — admin: wipe all duo data ──────────
 router.delete("/season/:seasonNumber", authenticate, adminOnly, async (req, res, next) => {
   try {

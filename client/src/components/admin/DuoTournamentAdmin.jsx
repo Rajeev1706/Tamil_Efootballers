@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X } from "lucide-react"
+import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X, Pencil } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
 import { cn } from "../../lib/utils"
@@ -233,10 +233,33 @@ function SetSelection({ season, onConfirmed }) {
 
 // ── Pairs View ────────────────────────────────────────────────────────────────
 function PairsView({ season, groupMap }) {
+  const qc = useQueryClient()
   const { data: pairs = [] } = useQuery({
     queryKey: ["duo-pairs", season],
     queryFn:  () => api.get(`/duo/pairs?season=${season}`).then(r => r.data),
   })
+  const { data: allPlayers = [] } = useQuery({
+    queryKey: ["players"],
+    queryFn:  () => api.get("/players").then(r => r.data),
+  })
+
+  const [editingPairId, setEditingPairId] = useState(null)
+  const [editSet1, setEditSet1] = useState("")
+  const [editSet2, setEditSet2] = useState("")
+
+  const editMut = useMutation({
+    mutationFn: ({ id, set1PlayerId, set2PlayerId }) =>
+      api.patch(`/duo/pairs/${id}`, { set1PlayerId, set2PlayerId }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["duo-pairs"] })
+      qc.invalidateQueries({ queryKey: ["duo", season] })
+      setEditingPairId(null)
+    },
+    onError: (err) => alert(err?.response?.data?.error || "Failed to update pair"),
+  })
+
+  const set1Players = allPlayers.filter(p => ["S","A+","A"].includes(p.grade))
+  const set2Players = allPlayers.filter(p => ["B","C"].includes(p.grade))
 
   const pairGroupMap = {}
   Object.entries(groupMap).forEach(([groupName, members]) => {
@@ -253,26 +276,85 @@ function PairsView({ season, groupMap }) {
         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Group</p>
       </div>
       {pairs.map((pair, idx) => (
-        <div key={pair.id} className="flex items-center gap-3 px-4 py-3 bg-pitch-800 rounded-xl border border-surface-border hover:border-accent/30 transition-colors">
-          <span className="text-xs text-slate-600 w-5 flex-shrink-0">{idx + 1}</span>
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[pair.set1Grade] || GRADE_COLORS.C)}>{pair.set1Grade}</span>
-            <span className="text-sm font-semibold text-white truncate">{pair.set1Name}</span>
+        <div key={pair.id} className="bg-pitch-800 rounded-xl border border-surface-border hover:border-accent/30 transition-colors overflow-hidden">
+          {/* Pair row */}
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span className="text-xs text-slate-600 w-5 flex-shrink-0">{idx + 1}</span>
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[pair.set1Grade] || GRADE_COLORS.C)}>{pair.set1Grade}</span>
+              <span className="text-sm font-semibold text-white truncate">{pair.set1Name}</span>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="w-6 h-px bg-slate-600" />
+              <span className="text-xs text-slate-500 font-bold">DUO</span>
+              <div className="w-6 h-px bg-slate-600" />
+            </div>
+            <div className="flex-1 flex items-center gap-2 min-w-0 justify-end">
+              <span className="text-sm font-semibold text-white truncate">{pair.set2Name}</span>
+              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[pair.set2Grade] || GRADE_COLORS.C)}>{pair.set2Grade}</span>
+            </div>
+            <div className="w-20 flex-shrink-0 flex items-center justify-end gap-2">
+              {pairGroupMap[pair.id]
+                ? <span className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-lg">{pairGroupMap[pair.id]}</span>
+                : <span className="text-xs text-slate-600">—</span>}
+              <button
+                onClick={() => {
+                  if (editingPairId === pair.id) { setEditingPairId(null); return }
+                  setEditingPairId(pair.id)
+                  setEditSet1(pair.set1Id)
+                  setEditSet2(pair.set2Id)
+                }}
+                className="text-slate-500 hover:text-accent transition-colors p-1"
+                title="Edit pair"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <div className="w-6 h-px bg-slate-600" />
-            <span className="text-xs text-slate-500 font-bold">DUO</span>
-            <div className="w-6 h-px bg-slate-600" />
-          </div>
-          <div className="flex-1 flex items-center gap-2 min-w-0 justify-end">
-            <span className="text-sm font-semibold text-white truncate">{pair.set2Name}</span>
-            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[pair.set2Grade] || GRADE_COLORS.C)}>{pair.set2Grade}</span>
-          </div>
-          <div className="w-16 flex-shrink-0 text-right">
-            {pairGroupMap[pair.id]
-              ? <span className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-lg">{pairGroupMap[pair.id]}</span>
-              : <span className="text-xs text-slate-600">—</span>}
-          </div>
+
+          {/* Edit panel */}
+          {editingPairId === pair.id && (
+            <div className="border-t border-surface-border px-4 pb-4 pt-3 bg-pitch-900/50 space-y-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Replace players</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] text-slate-500 mb-1">Set 1 (S/A+/A)</p>
+                  <select value={editSet1} onChange={e => setEditSet1(Number(e.target.value))}
+                    className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
+                    {set1Players.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 mb-1">Set 2 (B/C)</p>
+                  <select value={editSet2} onChange={e => setEditSet2(Number(e.target.value))}
+                    className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
+                    {set2Players.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {editSet1 === editSet2 && (
+                <p className="text-xs text-rose-400">Set 1 and Set 2 must be different players</p>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setEditingPairId(null)}
+                  className="px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 text-xs hover:text-white transition-colors">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => editMut.mutate({ id: pair.id, set1PlayerId: editSet1, set2PlayerId: editSet2 })}
+                  disabled={editMut.isPending || editSet1 === editSet2}
+                  className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {editMut.isPending ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-600">⚠ Any played fixtures for this pair will be reset to pending</p>
+            </div>
+          )}
         </div>
       ))}
     </div>
