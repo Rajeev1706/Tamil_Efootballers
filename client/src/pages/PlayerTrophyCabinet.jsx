@@ -194,7 +194,7 @@ export default function PlayerTrophyCabinet() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-xl sm:text-2xl font-extrabold text-white">{player.name}</h1>
-            <GradeBadge grade={player.grade} size="sm" />
+            
           </div>
           {player.team && <p className="text-slate-400 text-sm">{player.team}</p>}
           <div className="flex items-center gap-2 mt-1">
