@@ -35,6 +35,7 @@ function SetSelection({ season, onConfirmed }) {
   const { data: savedSets } = useQuery({
     queryKey: ["duo-sets", season],
     queryFn:  () => api.get(`/duo/sets?season=${season}`).then(r => r.data),
+    enabled:  !!season,
   })
 
   const saveMut = useMutation({
@@ -765,11 +766,13 @@ export default function DuoTournamentAdmin() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["duo", season],
     queryFn:  () => api.get(`/duo/current?season=${season}`).then(r => r.data),
+    enabled:  !!season,
   })
 
   const { data: savedSets } = useQuery({
     queryKey: ["duo-sets", season],
     queryFn:  () => api.get(`/duo/sets?season=${season}`).then(r => r.data),
+    enabled:  !!season,
   })
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["duo"] }); refetch() }

@@ -409,9 +409,19 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
     }
 
     await withTransaction(async ({ query: q }) => {
-      // Get pair players
+      // Get pair players + their grades
       const homePair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.home_pair_id])).rows[0]
       const awayPair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.away_pair_id])).rows[0]
+
+      const allPlayerIds = [
+        homePair.set1_player_id, homePair.set2_player_id,
+        awayPair.set1_player_id, awayPair.set2_player_id
+      ].filter(Boolean)
+      const gradesRes = await q(
+        "SELECT id, grade FROM players WHERE id = ANY($1::int[])",
+        [allPlayerIds]
+      )
+      const gradeMap = Object.fromEntries(gradesRes.rows.map(p => [p.id, p.grade]))
 
       // Create/update match records for Set1 players
       let set1RecordId = fix.set1_match_record_id
@@ -420,10 +430,10 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       }
       const result1 = set1HomeScore > set1AwayScore ? "win" : set1HomeScore < set1AwayScore ? "loss" : "draw"
       const s1r = await q(`
-        INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number)
-        VALUES ($1,$2,$3,$4,$5,'duo',$6) RETURNING id`,
+        INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
+        VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
         [homePair.set1_player_id, awayPair.set1_player_id, result1, set1HomeScore, set1AwayScore,
-         homePair.season_number]
+         homePair.season_number, gradeMap[awayPair.set1_player_id] || "C"]
       )
       set1RecordId = s1r.rows[0].id
 
@@ -434,10 +444,10 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       }
       const result2 = set2HomeScore > set2AwayScore ? "win" : set2HomeScore < set2AwayScore ? "loss" : "draw"
       const s2r = await q(`
-        INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number)
-        VALUES ($1,$2,$3,$4,$5,'duo',$6) RETURNING id`,
+        INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
+        VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
         [homePair.set2_player_id, awayPair.set2_player_id, result2, set2HomeScore, set2AwayScore,
-         homePair.season_number]
+         homePair.season_number, gradeMap[awayPair.set2_player_id] || "C"]
       )
       set2RecordId = s2r.rows[0].id
 
@@ -992,12 +1002,14 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
 
       // Create match record for the decider players
       const deciderResult = homeScore > awayScore ? "win" : "loss"
+      const deciderHomeGrade = (await q("SELECT grade FROM players WHERE id = $1", [fix.decider_home_player_id])).rows[0]?.grade || "C"
+      const deciderAwayGrade = (await q("SELECT grade FROM players WHERE id = $1", [fix.decider_away_player_id])).rows[0]?.grade || "C"
       const mrRes = await q(`
         INSERT INTO match_records
-          (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number)
-        VALUES ($1, $2, $3, $4, $5, 'duo', $6) RETURNING id
+          (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
+        VALUES ($1, $2, $3, $4, $5, 'duo', $6, $7) RETURNING id
       `, [fix.decider_home_player_id, fix.decider_away_player_id,
-          deciderResult, homeScore, awayScore, homePair.season_number])
+          deciderResult, homeScore, awayScore, homePair.season_number, deciderAwayGrade])
 
       // Mark fixture completed with winner
       await q(`
