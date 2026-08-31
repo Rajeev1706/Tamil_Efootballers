@@ -4,6 +4,7 @@
 
 import { query } from "../db/pool.js"
 import { reconcileTeamTrophy } from "./teamTrophyAwards.js"
+import { reconcileTrophyRoster } from "./trophyAwards.js"
 import { updateSeasonRecord } from "./seasonRecord.js"
 import { claimAward, addBdr, addLeagueBdr, addTeamChampionshipPts } from "./bdrAwards.js"
 
@@ -73,6 +74,15 @@ export async function advanceKnockoutWinner(match, winnerId) {
     const nameRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
     await updateSeasonRecord(season, { team_league_winner: nameRes.rows[0]?.name ?? null })
 
+    // Award trophy2_count (Team League champion) to every player on the winning team
+    const champPlayersRes = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
+    await reconcileTrophyRoster({
+      sourceKey:    `group-knockout-champions-final-s${season}`,
+      trophyColumn: "trophy2_count",
+      playerIds:    champPlayersRes.rows.map(p => p.id),
+      seasonNumber: season,
+    })
+
     const thirdMatch = await query(
       "SELECT winner_id, team1_id, team2_id FROM team_knockout_matches WHERE season_number=$1 AND match_type='champions_3rd'",
       [season]
@@ -91,9 +101,9 @@ export async function advanceKnockoutWinner(match, winnerId) {
         const players = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
         for (const p of players.rows) {
           await addBdr(p.id, bdr)
-          await addLeagueBdr(p.id, bdr) // track league BDR separately
+          await addLeagueBdr(p.id, bdr)
         }
-        await addTeamChampionshipPts(teamId, flatPts) // flat team pts (not × squad size)
+        await addTeamChampionshipPts(teamId, flatPts)
       }
     }
 
@@ -123,13 +133,23 @@ export async function advanceKnockoutWinner(match, winnerId) {
 
   } else if (match.match_type === "europa_final") {
     await reconcileTeamTrophy({ tournament: "europa", teamId: winnerId, seasonNumber: season })
+
+    // Award trophy9_count (Europa champion) to every player on the winning team
+    const europaPlayersRes = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
+    await reconcileTrophyRoster({
+      sourceKey:    `group-knockout-europa-final-s${season}`,
+      trophyColumn: "trophy9_count",
+      playerIds:    europaPlayersRes.rows.map(p => p.id),
+      seasonNumber: season,
+    })
+
     if (await claimAward("team_knockout_europa_bdr", season)) {
       const players = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
       for (const p of players.rows) {
         await addBdr(p.id, 4)
         await addLeagueBdr(p.id, 4)
       }
-      await addTeamChampionshipPts(winnerId, 4) // flat +4 for europa winner
+      await addTeamChampionshipPts(winnerId, 4)
     }
   }
 }
