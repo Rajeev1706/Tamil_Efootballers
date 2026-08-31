@@ -29,6 +29,7 @@ import revolutionTrophyLogo   from "../../images/revolution.png"
 import uclTrophyLogo from "../../images/ucl.png"
 import goldenBootLogo from "../../images/Golden Boot.png"
 import ballonDorTrophy from "../../images/ballondor.png"
+import championshipTrophy from "../../images/championship.png"
 import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship, useGroupStandings, useTeamKnockoutCurrent, useRevolutionCurrent } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
 
@@ -874,7 +875,7 @@ export default function CommonDashboard() {
                 <StatCard label="Teams"         value={teams.length}                                   sub="in the league"   icon={Users}      accent="bg-violet-400/15 text-violet-400"
                   onClick={() => navigate("/team-trophies")} />
                 <StatCard label="Team of Champions"  value={championship[0]?.totalBdr ?? "—"}               sub={championship[0]?.name} icon={Trophy} accent="bg-amber-400/15 text-amber-400"
-                  image={teamLeagueTrophyLogo} trophyStyle
+                  image={championshipTrophy} trophyStyle
                   onClick={() => navigate("/championship")} />
               </div>
 
