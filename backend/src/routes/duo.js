@@ -10,9 +10,58 @@ import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 const router = Router()
 
-// ── Inline column migration — add trophy10/11 if not already present ──────────
+// ── Inline column migration ───────────────────────────────────────────────────
 ;(async () => {
   try {
+    // ── Core duo tables (safe to run on every startup) ─────────────────────
+    await query(`
+      CREATE TABLE IF NOT EXISTS duo_pairs (
+        id              SERIAL PRIMARY KEY,
+        season_number   INT NOT NULL,
+        set1_player_id  INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        set2_player_id  INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        duo_name        TEXT NOT NULL,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)
+    await query(`
+      CREATE TABLE IF NOT EXISTS duo_groups (
+        id            SERIAL PRIMARY KEY,
+        season_number INT NOT NULL,
+        name          TEXT NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'active',
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)
+    await query(`
+      CREATE TABLE IF NOT EXISTS duo_group_members (
+        id           SERIAL PRIMARY KEY,
+        group_id     INT NOT NULL REFERENCES duo_groups(id) ON DELETE CASCADE,
+        duo_pair_id  INT NOT NULL REFERENCES duo_pairs(id) ON DELETE CASCADE,
+        played INT DEFAULT 0, won INT DEFAULT 0, drawn INT DEFAULT 0,
+        lost INT DEFAULT 0, gf INT DEFAULT 0, ga INT DEFAULT 0, points INT DEFAULT 0
+      )
+    `)
+    await query(`
+      CREATE TABLE IF NOT EXISTS duo_fixtures (
+        id                    SERIAL PRIMARY KEY,
+        group_id              INT REFERENCES duo_groups(id) ON DELETE CASCADE,
+        home_pair_id          INT NOT NULL REFERENCES duo_pairs(id) ON DELETE CASCADE,
+        away_pair_id          INT NOT NULL REFERENCES duo_pairs(id) ON DELETE CASCADE,
+        round_number          INT,
+        match_number          INT,
+        knockout_round        TEXT,
+        status                TEXT NOT NULL DEFAULT 'pending',
+        set1_home_score       INT,
+        set1_away_score       INT,
+        set2_home_score       INT,
+        set2_away_score       INT,
+        set1_match_record_id  INT REFERENCES match_records(id) ON DELETE SET NULL,
+        set2_match_record_id  INT REFERENCES match_records(id) ON DELETE SET NULL,
+        winner_pair_id        INT REFERENCES duo_pairs(id) ON DELETE SET NULL,
+        created_at            TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)
     // duo_selections: admin-chosen Set 1 / Set 2 players per season
     await query(`
       CREATE TABLE IF NOT EXISTS duo_selections (

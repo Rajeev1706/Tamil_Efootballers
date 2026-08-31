@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useDraftState } from "../../hooks/useDraftState"
 import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X, Pencil } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
@@ -19,8 +20,8 @@ const GRADE_COLORS = {
 function SetSelection({ season, onConfirmed }) {
   const qc = useQueryClient()
   const [step, setStep]       = useState(1) // 1 = pick Set 1, 2 = pick Set 2
-  const [set1, setSet1]       = useState([]) // array of player objects
-  const [set2, setSet2]       = useState([]) // array of player objects
+  const [set1, setSet1, clearSet1Draft] = useDraftState(`draft_duo_set1_${season}`, [])
+  const [set2, setSet2, clearSet2Draft] = useDraftState(`draft_duo_set2_${season}`, [])
   const [search, setSearch]   = useState("")
 
   const { data: allPlayers = [] } = useQuery({

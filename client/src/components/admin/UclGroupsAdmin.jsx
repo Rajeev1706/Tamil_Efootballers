@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useDraftState } from "../../hooks/useDraftState"
 import { useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { Plus, Trash2, Pencil, Check, X, Users, ChevronDown, ChevronUp, Zap, Settings } from "lucide-react"
@@ -18,8 +19,8 @@ function GenerateForm({ onClose }) {
   const navigate = useNavigate()
   const { data: allPlayers = [] } = usePlayers()
   const generateGroups = useGenerateUclGroups()
-  const [selected, setSelected] = useState([])
-  const [search, setSearch]     = useState("")
+  const [selected, setSelected, clearDraftSel] = useDraftState("draft_ucl_selected", [])
+  const [search, setSearch]                       = useState("")
 
   const filtered = allPlayers.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) && !selected.includes(p.id)
@@ -39,6 +40,7 @@ function GenerateForm({ onClose }) {
   async function handleGenerate() {
     if (selected.length < 1) return
     await generateGroups.mutateAsync(selected)
+    clearDraftSel()
     onClose() // return to admin list — View Draw button will appear
   }
 
