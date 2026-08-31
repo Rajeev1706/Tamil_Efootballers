@@ -5,6 +5,7 @@ import duoTrophy  from "../../../images/duo.png"
 import duoBoot    from "../../../images/duoboot.png"
 import api from "../../lib/api"
 import { cn } from "../../lib/utils"
+import PlayerAvatar from "../common/PlayerAvatar"
 
 const ROUND_LABELS = { r16: "Round of 16", qf: "Quarter Finals", sf: "Semi Finals", final: "Final" }
 
@@ -314,12 +315,14 @@ export default function DuoDashboard() {
                 <span className={cn("text-sm font-bold font-mono w-6 text-center flex-shrink-0",
                   i === 0 ? "text-gold" : "text-slate-500"
                 )}>{i + 1}</span>
+                <div className="w-9 h-9 flex-shrink-0">
+                  <PlayerAvatar player={p} size="sm" />
+                </div>
                 {i === 0 && (
                   <img src={duoBoot} alt="Golden Boot" className="w-7 h-7 object-contain flex-shrink-0" />
                 )}
                 <div className={cn("flex-1 min-w-0", i !== 0 && "ml-9")}>
                   <p className={cn("font-semibold text-sm", i === 0 ? "text-gold" : "text-white")}>{p.name}</p>
-                  <p className="text-xs text-slate-500">{p.grade} grade</p>
                 </div>
                 <span className={cn("font-extrabold font-mono text-lg flex-shrink-0",
                   i === 0 ? "text-gold" : "text-slate-300"
