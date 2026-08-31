@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useDraftState } from "../../hooks/useDraftState"
-import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X, Pencil } from "lucide-react"
+import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X, Pencil, Download } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
 import { useSettings } from "../../lib/queries"
+import { toPng } from "html-to-image"
+import logoUrl from "../../../images/logo.png"
 import { cn } from "../../lib/utils"
 
 const ROUND_LABELS = { r16: "Round of 16", qf: "Quarter Finals", sf: "Semi Finals", final: "Final" }
@@ -570,23 +572,128 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult }) {
   )
 }
 
-function FixturesByRound({ fixtures, onSave }) {
+// ── Duo Export Card (hidden off-screen, rendered to PNG) ─────────────────────
+function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
+  const roundFixtures = fixtures.filter(f => f.round_number === round)
+  const byGroup = roundFixtures.reduce((acc, f) => {
+    (acc[f.groupName] = acc[f.groupName] || []).push(f); return acc
+  }, {})
+  return (
+    <div ref={exportRef} style={{
+      position: "fixed", left: visible ? 0 : "-9999px", top: 0,
+      width: 800, background: "#050810", padding: 36,
+      fontFamily: "system-ui, sans-serif", overflow: "visible",
+      zIndex: visible ? 9999 : -1, opacity: visible ? 1 : 0, pointerEvents: "none",
+    }}>
+      {/* Watermark */}
+      <img src={logoUrl} alt="" style={{
+        position: "absolute", top: "50%", left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: 280, height: 280, objectFit: "contain", opacity: 0.04, pointerEvents: "none",
+      }} />
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, position: "relative" }}>
+        <img src={logoUrl} alt="TEC" style={{ width: 44, height: 44, objectFit: "contain" }} />
+        <div>
+          <p style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>
+            Tamil Efootballers · Duo Tournament S{season}
+          </p>
+          <p style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
+        </div>
+      </div>
+      {/* Groups */}
+      {Object.entries(byGroup).map(([groupName, gFixtures]) => (
+        <div key={groupName} style={{ marginBottom: 20, position: "relative" }}>
+          <p style={{ color: "#22d3ee", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }}>
+            {groupName}
+          </p>
+          {gFixtures.map(f => {
+            const homeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
+            const awaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
+            const done = f.status === "completed"
+            return (
+              <div key={f.id} style={{
+                display: "flex", alignItems: "center",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12, padding: "12px 20px", marginBottom: 8,
+              }}>
+                <div style={{ flex: 1, textAlign: "right" }}>
+                  <p style={{ color: "#f1f5f9", fontSize: 14, fontWeight: 700, margin: 0 }}>{f.homeDuoName}</p>
+                  <p style={{ color: "#64748b", fontSize: 11, margin: "2px 0 0 0" }}>{f.homeSet1Name} & {f.homeSet2Name}</p>
+                </div>
+                <div style={{ padding: "0 20px", textAlign: "center", flexShrink: 0 }}>
+                  {done
+                    ? <span style={{ color: "#94a3b8", fontSize: 18, fontWeight: 800, fontFamily: "monospace" }}>{homeSets} – {awaySets}</span>
+                    : <span style={{ color: "#475569", fontSize: 12, fontWeight: 700 }}>vs</span>
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ color: "#f1f5f9", fontSize: 14, fontWeight: 700, margin: 0 }}>{f.awayDuoName}</p>
+                  <p style={{ color: "#64748b", fontSize: 11, margin: "2px 0 0 0" }}>{f.awaySet1Name} & {f.awaySet2Name}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FixturesByRound({ fixtures, onSave, season }) {
   const rounds = [...new Set(fixtures.map(f => f.round_number).filter(Boolean))].sort((a,b) => a-b)
   const [activeRound, setActiveRound] = useState(rounds[0] || 1)
+  const [exporting, setExporting] = useState(false)
+  const [showExportCard, setShowExportCard] = useState(false)
+  const exportRef = useRef(null)
+
   if (rounds.length === 0) return <p className="text-slate-500 text-sm text-center py-8">No fixtures yet — generate a draw first.</p>
   const byGroup = fixtures.filter(f => f.round_number === activeRound).reduce((acc, f) => {
     (acc[f.groupName] = acc[f.groupName]||[]).push(f); return acc
   }, {})
+
+  async function handleExport() {
+    if (!exportRef.current) return
+    setShowExportCard(true)
+    setExporting(true)
+    await new Promise(r => setTimeout(r, 400))
+    try {
+      const el = exportRef.current
+      const dataUrl = await toPng(el, {
+        cacheBust: true, pixelRatio: 2, backgroundColor: "#050810",
+        width: el.scrollWidth, height: el.scrollHeight,
+      })
+      const link = document.createElement("a")
+      link.download = `Duo-Round-${activeRound}-Fixtures.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      alert("Export failed: " + (err?.message || "Could not generate image"))
+    } finally {
+      setExporting(false)
+      setShowExportCard(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
-        {rounds.map(r => (
-          <button key={r} onClick={() => setActiveRound(r)}
-            className={cn("px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
-              activeRound === r ? "bg-accent text-white border-accent" : "bg-pitch-800 text-slate-400 border-surface-border hover:text-white")}>
-            Round {r}
-          </button>
-        ))}
+      <DuoExportCard round={activeRound} fixtures={fixtures} exportRef={exportRef} visible={showExportCard} season={season} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {rounds.map(r => (
+            <button key={r} onClick={() => setActiveRound(r)}
+              className={cn("px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
+                activeRound === r ? "bg-accent text-white border-accent" : "bg-pitch-800 text-slate-400 border-surface-border hover:text-white")}>
+              Round {r}
+            </button>
+          ))}
+        </div>
+        <button onClick={handleExport} disabled={exporting}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+          <Download className="w-3.5 h-3.5" />
+          {exporting ? "Exporting…" : "Export PNG"}
+        </button>
       </div>
       <div className="space-y-6">
         {Object.entries(byGroup).map(([groupName, gFixtures]) => (
@@ -793,7 +900,7 @@ export default function DuoTournamentAdmin() {
                   ))}
                 </div>
               )}
-              {activeTab === "fixtures" && <FixturesByRound fixtures={groupFixtures} onSave={(id, scores) => scoreMut.mutate({ id, scores })} />}
+              {activeTab === "fixtures" && <FixturesByRound fixtures={groupFixtures} onSave={(id, scores) => scoreMut.mutate({ id, scores })} season={season} />}
               {activeTab === "knockout" && (
                 <div className="space-y-6">
                   {knockoutRounds.length === 0
