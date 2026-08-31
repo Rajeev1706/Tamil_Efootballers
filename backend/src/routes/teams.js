@@ -1576,7 +1576,6 @@ router.post("/playoffs/reset", authenticate, adminOnly, async (req, res, next) =
 
 // GET /api/teams/championship — team BDR standings (sum of all player BDR)
 
-export default router
 // POST /api/teams/increment-year — admin only
 // Increments the current year:
 //  1. Saves current trophy counts to player_trophy_history (for trophy cabinet)
@@ -1660,3 +1659,119 @@ router.post("/increment-year", authenticate, adminOnly, async (req, res, next) =
     })
   } catch (err) { next(err) }
 })
+// GET /api/teams/season-autofill — compute current season stats for admin season record auto-fill
+router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const season = await getCurrentSeason()
+    const safe = async (fn) => { try { return await fn() } catch { return null } }
+
+    // Top scorer (all match types, current season)
+    const topScorerRes = await safe(() => query(`
+      SELECT p.name,
+        COALESCE(SUM(
+          CASE WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
+               WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
+               ELSE 0 END
+        ), 0) AS goals
+      FROM players p
+      LEFT JOIN match_records mr
+        ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.season_number = $1
+      GROUP BY p.id, p.name ORDER BY goals DESC LIMIT 1
+    `, [season]))
+
+    // Highest MV player
+    const highestMvRes = await safe(() => query(
+      `SELECT name, market_value FROM players ORDER BY market_value DESC LIMIT 1`
+    ))
+
+    // Longest win streak this season
+    const streakRes = await safe(() => query(`
+      SELECT p.name, MAX(streak) AS longest
+      FROM (
+        SELECT player_id, COUNT(*) AS streak
+        FROM (
+          SELECT player_id, result,
+            ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY recorded_at, id) -
+            ROW_NUMBER() OVER (PARTITION BY player_id, result ORDER BY recorded_at, id) AS grp
+          FROM match_records WHERE result = 'win' AND season_number = $1
+        ) g GROUP BY player_id, grp
+      ) s JOIN players p ON p.id = s.player_id
+      GROUP BY p.id, p.name ORDER BY longest DESC LIMIT 1
+    `, [season]))
+
+    // Ballon d'Or — highest BDR
+    const ballondorRes = await safe(() => query(
+      `SELECT name FROM players ORDER BY bdr_points DESC LIMIT 1`
+    ))
+
+    // Team League winner (group_knockout format: champions_final)
+    const champFinalRes = await safe(() => query(`
+      SELECT t.name AS team_name, tkm.winner_id
+      FROM team_knockout_matches tkm
+      JOIN teams t ON t.id = tkm.winner_id
+      WHERE tkm.match_type = 'champions_final' AND tkm.status = 'completed' AND tkm.season_number = $1
+    `, [season]))
+
+    let teamLeagueWinner = champFinalRes?.rows[0]?.team_name ?? null
+    let teamLeaguePlayers = []
+    if (champFinalRes?.rows[0]?.winner_id) {
+      const pl = await safe(() => query(
+        "SELECT name FROM players WHERE team_id = $1 ORDER BY name",
+        [champFinalRes.rows[0].winner_id]
+      ))
+      teamLeaguePlayers = pl?.rows?.map(p => p.name) ?? []
+    }
+
+    // UCL knockout winner
+    const uclRes = await safe(() => query(`
+      SELECT p.name AS player_name
+      FROM ucl_knockout_tournaments ukt
+      JOIN ucl_knockout_matches ukm
+        ON ukm.tournament_id = ukt.id AND ukm.round = ukt.total_rounds
+        AND ukm.status = 'completed' AND ukm.winner_id IS NOT NULL
+      JOIN players p ON p.id = ukm.winner_id
+      WHERE ukt.status != 'setup' ORDER BY ukt.created_at DESC LIMIT 1
+    `))
+
+    // Duo winner (most recent final for this season)
+    const duoRes = await safe(() => query(`
+      SELECT dp.duo_name
+      FROM duo_fixtures df
+      JOIN duo_pairs dp ON dp.id = df.winner_pair_id
+      WHERE df.knockout_round = 'final' AND df.status = 'completed' AND dp.season_number = $1
+      LIMIT 1
+    `, [season]))
+
+    // Championship winner — team with highest championship_pts
+    const champshipRes = await safe(() => query(
+      `SELECT name FROM teams WHERE championship_pts > 0 ORDER BY championship_pts DESC LIMIT 1`
+    ))
+
+    // Weekly winners from existing season record, padded to 4 slots
+    const existingRes = await safe(() => query(
+      `SELECT weekly_winners FROM season_records WHERE season_number = $1 ORDER BY id DESC LIMIT 1`,
+      [season]
+    ))
+    const existingWeekly = existingRes?.rows[0]?.weekly_winners?.filter(Boolean) ?? []
+    const weeklyWinners = [...existingWeekly, "", "", "", ""].slice(0, 4)
+
+    res.json({
+      topScorer:           topScorerRes?.rows[0]?.name ?? null,
+      topScorerGoals:      topScorerRes?.rows[0]?.goals ? parseInt(topScorerRes.rows[0].goals) : null,
+      highestMvPlayer:     highestMvRes?.rows[0]?.name ?? null,
+      highestMv:           highestMvRes?.rows[0]?.market_value ?? null,
+      longestStreakPlayer:  streakRes?.rows[0]?.name ?? null,
+      longestStreak:       streakRes?.rows[0]?.longest ? parseInt(streakRes.rows[0].longest) : null,
+      ballondorWinner:     ballondorRes?.rows[0]?.name ?? null,
+      teamLeagueWinner,
+      teamLeaguePlayers,
+      uclWinner:           uclRes?.rows[0]?.player_name ?? null,
+      duoWinner:           duoRes?.rows[0]?.duo_name ?? null,
+      championshipWinner:  champshipRes?.rows[0]?.name ?? null,
+      weeklyWinners,
+      season,
+    })
+  } catch (err) { next(err) }
+})
+
+export default router
