@@ -720,7 +720,11 @@ router.patch("/pairs/:id", authenticate, adminOnly, async (req, res, next) => {
 
       // Find all fixtures involving this pair and reset any that have scores
       const fixtures = await q(`
-        SELECT id, set1_match_record_id, set2_match_record_id
+        SELECT id, group_id, home_pair_id, away_pair_id,
+               set1_match_record_id, set2_match_record_id,
+               set1_home_score, set1_away_score,
+               set2_home_score, set2_away_score,
+               winner_pair_id
         FROM duo_fixtures
         WHERE (home_pair_id = $1 OR away_pair_id = $1)
           AND status IN ('completed', 'needs_decider')
@@ -735,6 +739,46 @@ router.patch("/pairs/:id", authenticate, adminOnly, async (req, res, next) => {
           await q("DELETE FROM match_records WHERE id = $1", [fix.set2_match_record_id])
         }
 
+        // Reverse the OPPONENT pair's group standings for this specific fixture
+        // so both sides of the match are consistent after the reset
+        if (fix.group_id) {
+          const oppPairId = fix.home_pair_id === pair.id ? fix.away_pair_id : fix.home_pair_id
+          const isHome    = fix.home_pair_id === pair.id
+
+          const homeAgg = (fix.set1_home_score ?? 0) + (fix.set2_home_score ?? 0)
+          const awayAgg = (fix.set1_away_score ?? 0) + (fix.set2_away_score ?? 0)
+          const homeSets = ((fix.set1_home_score > fix.set1_away_score ? 1 : 0) +
+                            (fix.set2_home_score > fix.set2_away_score ? 1 : 0))
+          const awaySets = ((fix.set1_away_score > fix.set1_home_score ? 1 : 0) +
+                            (fix.set2_away_score > fix.set2_home_score ? 1 : 0))
+
+          // Determine opponent's result from their perspective
+          const oppResult = isHome
+            ? (awaySets > homeSets ? "win" : awaySets < homeSets ? "loss" : "draw")
+            : (homeSets > awaySets ? "win" : homeSets < awaySets ? "loss" : "draw")
+          const oppGf = isHome ? awayAgg : homeAgg
+          const oppGa = isHome ? homeAgg : awayAgg
+
+          await q(`
+            UPDATE duo_group_members SET
+              played = GREATEST(played - 1, 0),
+              won    = GREATEST(won    - $1, 0),
+              drawn  = GREATEST(drawn  - $2, 0),
+              lost   = GREATEST(lost   - $3, 0),
+              gf     = GREATEST(gf     - $4, 0),
+              ga     = GREATEST(ga     - $5, 0),
+              points = GREATEST(points - $6, 0)
+            WHERE group_id = $7 AND duo_pair_id = $8
+          `, [
+            oppResult === "win"  ? 1 : 0,
+            oppResult === "draw" ? 1 : 0,
+            oppResult === "loss" ? 1 : 0,
+            oppGf, oppGa,
+            oppResult === "win" ? 3 : oppResult === "draw" ? 1 : 0,
+            fix.group_id, oppPairId
+          ])
+        }
+
         // Reset fixture back to pending, clear scores
         await q(`
           UPDATE duo_fixtures SET
@@ -746,7 +790,7 @@ router.patch("/pairs/:id", authenticate, adminOnly, async (req, res, next) => {
         `, [fix.id])
       }
 
-      // Also reverse group standings for this pair (reset to 0) if any fixtures were cleared
+      // Reset the edited pair's own standings to 0
       if (fixtures.rows.length > 0) {
         await q(`
           UPDATE duo_group_members SET

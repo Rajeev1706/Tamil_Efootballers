@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useDraftState } from "../../hooks/useDraftState"
 import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X, Pencil } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
+import { useSettings } from "../../lib/queries"
 import { cn } from "../../lib/utils"
 
 const ROUND_LABELS = { r16: "Round of 16", qf: "Quarter Finals", sf: "Semi Finals", final: "Final" }
@@ -604,9 +605,16 @@ function FixturesByRound({ fixtures, onSave }) {
 export default function DuoTournamentAdmin() {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const [season, setSeason]   = useState(7)
+  const { data: settings = {} } = useSettings()
+  const currentSeason = settings.current_season ? parseInt(settings.current_season) : null
+  const [season, setSeason] = useState(null)
   const [activeTab, setActiveTab] = useState("groups")
   const [setsConfirmed, setSetsConfirmed] = useState(false)
+
+  // Set season to current season once settings load (only on first load)
+  useEffect(() => {
+    if (currentSeason && season === null) setSeason(currentSeason)
+  }, [currentSeason])
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["duo", season],
