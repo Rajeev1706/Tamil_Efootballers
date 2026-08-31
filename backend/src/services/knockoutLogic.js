@@ -69,7 +69,23 @@ export async function advanceKnockoutWinner(match, winnerId) {
   const finalMatches = ["champions_final", "champions_3rd", "europa_final", "europa_7th"]
   if (!finalMatches.includes(match.match_type)) return
 
+  // Helper: upsert a team's final championship position into team_season_history
+  async function upsertPos(teamId, pos, extra = {}) {
+    const setCols = [`championship_pos = ${pos}`]
+    if (extra.relegated !== undefined) setCols.push(`relegated = ${extra.relegated}`)
+    await query(`
+      INSERT INTO team_season_history (team_id, season_number, championship_pos${extra.relegated !== undefined ? ", relegated" : ""})
+      VALUES ($1, $2, $3${extra.relegated !== undefined ? ", $4" : ""})
+      ON CONFLICT (team_id, season_number)
+      DO UPDATE SET ${setCols.join(", ")}
+    `, extra.relegated !== undefined ? [teamId, season, pos, extra.relegated] : [teamId, season, pos])
+  }
+
   if (match.match_type === "champions_final") {
+    // 1st and 2nd place
+    await upsertPos(winnerId, 1)
+    await upsertPos(loserId,  2)
+
     await reconcileTeamTrophy({ tournament: "team_league", teamId: winnerId, seasonNumber: season })
     const nameRes = await query("SELECT name FROM teams WHERE id = $1", [winnerId])
     await updateSeasonRecord(season, { team_league_winner: nameRes.rows[0]?.name ?? null })
@@ -111,6 +127,10 @@ export async function advanceKnockoutWinner(match, winnerId) {
     }
 
   } else if (match.match_type === "champions_3rd") {
+    // 3rd and 4th place
+    await upsertPos(winnerId, 3)
+    await upsertPos(loserId,  4)
+
     const cf = (await query(
       "SELECT winner_id, team1_id, team2_id FROM team_knockout_matches WHERE season_number=$1 AND match_type='champions_final'",
       [season]
@@ -135,6 +155,10 @@ export async function advanceKnockoutWinner(match, winnerId) {
     }
 
   } else if (match.match_type === "europa_final") {
+    // 5th and 6th place
+    await upsertPos(winnerId, 5)
+    await upsertPos(loserId,  6)
+
     await reconcileTeamTrophy({ tournament: "europa", teamId: winnerId, seasonNumber: season })
 
     // Award trophy9_count (Europa champion) to every player on the winning team
@@ -156,12 +180,8 @@ export async function advanceKnockoutWinner(match, winnerId) {
     }
 
   } else if (match.match_type === "europa_7th") {
-    // Loser of the 7th/8th place match finishes last — mark as relegated
-    await query(`
-      INSERT INTO team_season_history (team_id, season_number, relegated)
-      VALUES ($1, $2, true)
-      ON CONFLICT (team_id, season_number)
-      DO UPDATE SET relegated = true
-    `, [loserId, season])
+    // 7th and 8th place — loser finishes last and is relegated
+    await upsertPos(winnerId, 7)
+    await upsertPos(loserId,  8, { relegated: true })
   }
 }
