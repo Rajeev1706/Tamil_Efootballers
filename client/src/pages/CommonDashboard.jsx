@@ -47,19 +47,46 @@ function resolveAvatar(obj) {
   }
 }
 
-const StatCard = ({ label, value, sub, icon: Icon, accent, onClick }) => (
+const StatCard = ({ label, value, sub, icon: Icon, accent, image, avatarStyle, trophyStyle, onClick }) => (
   <div
-    className={cn("card p-4 flex items-start gap-3", onClick && "cursor-pointer hover:border-accent/30 transition-colors")}
+    className={cn("card p-4 flex items-center", trophyStyle ? "gap-1" : "gap-3", onClick && "cursor-pointer hover:border-accent/30 transition-colors")}
     onClick={onClick}
   >
-    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${accent}`}>
-      <Icon className="w-4 h-4" />
-    </div>
-    <div>
-      <p className="text-xs text-slate-500 font-medium mb-0.5">{label}</p>
-      <p className="text-xl font-bold text-white font-mono"><CountUp value={value} /></p>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
-    </div>
+    {trophyStyle && image ? (
+      <>
+        <img src={image} alt="" className="w-14 h-14 object-contain flex-shrink-0" />
+        <div>
+          <p className="text-xs text-slate-500 font-medium mb-0.5">{label}</p>
+          <p className="text-xl font-bold text-white font-mono"><CountUp value={value} /></p>
+          {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+        </div>
+      </>
+    ) : avatarStyle && image ? (
+      <>
+        <div className="w-16 h-16 rounded-2xl flex-shrink-0 overflow-hidden border border-surface-border bg-pitch-800">
+          <img src={image} alt="" className="w-full h-full object-cover" />
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 font-medium mb-0.5">{label}</p>
+          <p className="text-xl font-bold text-white font-mono"><CountUp value={value} /></p>
+          {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+        </div>
+      </>
+    ) : (
+      <>
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden ${image ? "" : accent}`}>
+          {image
+            ? <img src={image} alt="" className="w-full h-full object-contain" />
+            : <Icon className="w-4 h-4" />
+          }
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 font-medium mb-0.5">{label}</p>
+          <p className="text-xl font-bold text-white font-mono"><CountUp value={value} /></p>
+          {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+        </div>
+      </>
+    )}
   </div>
 )
 
@@ -161,9 +188,9 @@ function TeamRosterChips({ players, bestPerformerId, delay = 3000 }) {
 const PANEL_OPTIONS = [
   { value: "standings",     label: "League table"      },
   { value: "ucl",           label: "UCL"               },
+  { value: "duo",           label: "Duo Tournament"    },
   { value: "weekly",        label: "Weekly"            },
   { value: "revolution",    label: "Revolution Trophy" },
-  { value: "duo",           label: "Duo Tournament"    },
 ]
 
 
@@ -838,10 +865,16 @@ export default function CommonDashboard() {
             <>
               {/* Stat cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                <StatCard label="BDR Leader"    value={leader?.bdrPoints ?? "—"} sub={leader?.name}    icon={Trophy}    accent="bg-gold/15 text-gold"              />
-                <StatCard label="Highest MV"    value={topMV?.marketValue ?? "—"}                      sub={topMV?.name}     icon={TrendingUp} accent="bg-accent/15 text-accent"        />
-                <StatCard label="Teams"         value={teams.length}                                   sub="in the league"   icon={Users}      accent="bg-violet-400/15 text-violet-400" />
+                <StatCard label="BDR Leader"    value={leader?.bdrPoints ?? "—"} sub={leader?.name}    icon={Trophy}    accent="bg-gold/15 text-gold"
+                  image={ballonDorTrophy} trophyStyle
+                  onClick={() => setActivePanel("bdr")} />
+                <StatCard label="Highest MV"    value={topMV?.marketValue ?? "—"} sub={topMV?.name} icon={TrendingUp} accent="bg-accent/15 text-accent"
+                  image={topMV ? (resolveAvatar(topMV).thumb || null) : null} avatarStyle
+                  onClick={() => setActivePanel("market")} />
+                <StatCard label="Teams"         value={teams.length}                                   sub="in the league"   icon={Users}      accent="bg-violet-400/15 text-violet-400"
+                  onClick={() => navigate("/team-trophies")} />
                 <StatCard label="Team of Champions"  value={championship[0]?.totalBdr ?? "—"}               sub={championship[0]?.name} icon={Trophy} accent="bg-amber-400/15 text-amber-400"
+                  image={teamLeagueTrophyLogo} trophyStyle
                   onClick={() => navigate("/championship")} />
               </div>
 
