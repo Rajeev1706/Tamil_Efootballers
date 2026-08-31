@@ -578,10 +578,12 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
   const byGroup = roundFixtures.reduce((acc, f) => {
     (acc[f.groupName] = acc[f.groupName] || []).push(f); return acc
   }, {})
+  const groupEntries = Object.entries(byGroup)
+
   return (
     <div ref={exportRef} style={{
       position: "fixed", left: visible ? 0 : "-9999px", top: 0,
-      width: 800, background: "#050810", padding: 36,
+      width: 1400, background: "#050810", padding: "36px 40px",
       fontFamily: "system-ui, sans-serif", overflow: "visible",
       zIndex: visible ? 9999 : -1, opacity: visible ? 1 : 0, pointerEvents: "none",
     }}>
@@ -589,54 +591,56 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
       <img src={logoUrl} alt="" style={{
         position: "absolute", top: "50%", left: "50%",
         transform: "translate(-50%, -50%)",
-        width: 280, height: 280, objectFit: "contain", opacity: 0.04, pointerEvents: "none",
+        width: 320, height: 320, objectFit: "contain", opacity: 0.04, pointerEvents: "none",
       }} />
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, position: "relative" }}>
-        <img src={logoUrl} alt="TEC" style={{ width: 44, height: 44, objectFit: "contain" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32, position: "relative" }}>
+        <img src={logoUrl} alt="TEC" style={{ width: 48, height: 48, objectFit: "contain" }} />
         <div>
-          <p style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>
+          <p style={{ color: "#64748b", fontSize: 12, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>
             Tamil Efootballers · Duo Tournament S{season}
           </p>
-          <p style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
+          <p style={{ color: "#ffffff", fontSize: 26, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
         </div>
       </div>
-      {/* Groups */}
-      {Object.entries(byGroup).map(([groupName, gFixtures]) => (
-        <div key={groupName} style={{ marginBottom: 20, position: "relative" }}>
-          <p style={{ color: "#22d3ee", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }}>
-            {groupName}
-          </p>
-          {gFixtures.map(f => {
-            const homeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
-            const awaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
-            const done = f.status === "completed"
-            return (
-              <div key={f.id} style={{
-                display: "flex", alignItems: "center",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 12, padding: "12px 20px", marginBottom: 8,
-              }}>
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <p style={{ color: "#f1f5f9", fontSize: 14, fontWeight: 700, margin: 0 }}>{f.homeDuoName}</p>
-                  <p style={{ color: "#64748b", fontSize: 11, margin: "2px 0 0 0" }}>{f.homeSet1Name} & {f.homeSet2Name}</p>
+      {/* Groups — 2 columns */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px", position: "relative" }}>
+        {groupEntries.map(([groupName, gFixtures]) => (
+          <div key={groupName}>
+            <p style={{ color: "#22d3ee", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, margin: "0 0 8px 0" }}>
+              {groupName}
+            </p>
+            {gFixtures.map(f => {
+              const homeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
+              const awaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
+              const done = f.status === "completed"
+              return (
+                <div key={f.id} style={{
+                  display: "flex", alignItems: "center",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 10, padding: "10px 16px", marginBottom: 7,
+                }}>
+                  <div style={{ flex: 1, textAlign: "right" }}>
+                    <p style={{ color: "#f1f5f9", fontSize: 13, fontWeight: 700, margin: 0 }}>{f.homeDuoName}</p>
+                    <p style={{ color: "#64748b", fontSize: 10, margin: "2px 0 0 0" }}>{f.homeSet1Name} & {f.homeSet2Name}</p>
+                  </div>
+                  <div style={{ padding: "0 14px", textAlign: "center", flexShrink: 0 }}>
+                    {done
+                      ? <span style={{ color: "#94a3b8", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{homeSets} – {awaySets}</span>
+                      : <span style={{ color: "#475569", fontSize: 11, fontWeight: 700 }}>vs</span>
+                    }
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ color: "#f1f5f9", fontSize: 13, fontWeight: 700, margin: 0 }}>{f.awayDuoName}</p>
+                    <p style={{ color: "#64748b", fontSize: 10, margin: "2px 0 0 0" }}>{f.awaySet1Name} & {f.awaySet2Name}</p>
+                  </div>
                 </div>
-                <div style={{ padding: "0 20px", textAlign: "center", flexShrink: 0 }}>
-                  {done
-                    ? <span style={{ color: "#94a3b8", fontSize: 18, fontWeight: 800, fontFamily: "monospace" }}>{homeSets} – {awaySets}</span>
-                    : <span style={{ color: "#475569", fontSize: 12, fontWeight: 700 }}>vs</span>
-                  }
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ color: "#f1f5f9", fontSize: 14, fontWeight: 700, margin: 0 }}>{f.awayDuoName}</p>
-                  <p style={{ color: "#64748b", fontSize: 11, margin: "2px 0 0 0" }}>{f.awaySet1Name} & {f.awaySet2Name}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      ))}
+              )
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
