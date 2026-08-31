@@ -60,6 +60,7 @@ const router = Router()
       `ALTER TABLE team_knockout_matches ADD COLUMN IF NOT EXISTS home_choice TEXT`,
       `ALTER TABLE team_knockout_matches ADD COLUMN IF NOT EXISTS leg1_fixture_id INT`,
       `ALTER TABLE team_knockout_matches ADD COLUMN IF NOT EXISTS leg2_fixture_id INT`,
+      `ALTER TABLE team_knockout_matches ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`,
     ]) { await query(sql).catch(() => {}) }
   } catch (e) { console.error("[teamKnockout] migration:", e.message) }
 })()

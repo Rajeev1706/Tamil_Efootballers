@@ -259,7 +259,7 @@ export default function CommonDashboard() {
   const teamCelebrationSeason = settings.current_season
   const [showEuropaCelebration, setShowEuropaCelebration] = useState(false)
   const { data: playoffsData }   = useTeamLeaguePlayoffs()
-  const { data: leagueFormatData } = useLeagueFormatPublic()
+  const { data: leagueFormatData, isLoading: leagueFormatLoading } = useLeagueFormatPublic()
   const isLeagueOnly    = leagueFormatData?.format === "league"
   const isGroupKnockout = leagueFormatData?.format === "group_knockout"
   const { data: groupStandings }   = useGroupStandings()
@@ -305,7 +305,7 @@ export default function CommonDashboard() {
     [...list].sort((a, b) => (b.isCaptain ? 1 : 0) - (a.isCaptain ? 1 : 0))
 
   // For group_knockout format — read champion from team knockout Champions Final
-  const { data: teamKOData } = useTeamKnockoutCurrent()
+  const { data: teamKOData, isLoading: teamKOLoading } = useTeamKnockoutCurrent()
   const knockoutChampsFinal  = teamKOData?.matches?.find(m => m.match_type === "champions_final")
   const knockoutChampion     = knockoutChampsFinal?.status === "completed" ? knockoutChampsFinal?.winner_id : null
 
@@ -456,7 +456,7 @@ export default function CommonDashboard() {
   // Plays them one by one — marks as seen only when each actually dismisses.
   const [celebQueue, setCelebQueue] = useState(null)
   const [celebIndex, setCelebIndex] = useState(0)
-  const queueReady = !teamsLoading && !playersLoading
+  const queueReady = !teamsLoading && !playersLoading && !leagueFormatLoading && !teamKOLoading
 
   const dismissCelebration = () => {
     if (!celebQueue || celebIndex >= celebQueue.length) return

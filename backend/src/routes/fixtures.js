@@ -503,7 +503,7 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
         if (fresh.team1_leg1 !== null && fresh.team1_leg2 !== null) {
           const winnerId = determineKnockoutWinner(fresh)
           if (winnerId) {
-            await query("UPDATE team_knockout_matches SET winner_id = $1, status = 'completed' WHERE id = $2", [winnerId, km.id])
+            await query("UPDATE team_knockout_matches SET winner_id = $1, status = 'completed', completed_at = NOW() WHERE id = $2", [winnerId, km.id])
             await advanceKnockoutWinner(fresh, winnerId)
           } else {
             // Tied on GD — admin must pick manually
