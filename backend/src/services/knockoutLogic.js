@@ -154,5 +154,14 @@ export async function advanceKnockoutWinner(match, winnerId) {
       }
       await addTeamChampionshipPts(winnerId, 4)
     }
+
+  } else if (match.match_type === "europa_7th") {
+    // Loser of the 7th/8th place match finishes last — mark as relegated
+    await query(`
+      INSERT INTO team_season_history (team_id, season_number, relegated)
+      VALUES ($1, $2, true)
+      ON CONFLICT (team_id, season_number)
+      DO UPDATE SET relegated = true
+    `, [loserId, season])
   }
 }
