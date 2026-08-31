@@ -480,6 +480,8 @@ function FeaturedPanelCard() {
     setSaved(false)
     try {
       await settingsApi.update("featured_panel", val)
+      // Persist to localStorage so dashboard reads it instantly on next load
+      localStorage.setItem("featured_panel", val)
       // Invalidate settings cache so rest of app picks up the change
       qc.invalidateQueries({ queryKey: ["settings"] })
       setSaved(true)
