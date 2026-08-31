@@ -62,6 +62,14 @@ const router = Router()
       LEFT JOIN teams t ON p.team_id = t.id
     `)
   } catch (e) { console.error("[duo] trophy10/11 migration:", e.message) }
+  // Decider match columns for 1-1 knockout ties
+  try {
+    await query(`ALTER TABLE duo_fixtures ADD COLUMN IF NOT EXISTS decider_home_player_id INT REFERENCES players(id)`)
+    await query(`ALTER TABLE duo_fixtures ADD COLUMN IF NOT EXISTS decider_away_player_id INT REFERENCES players(id)`)
+    await query(`ALTER TABLE duo_fixtures ADD COLUMN IF NOT EXISTS decider_home_score INT`)
+    await query(`ALTER TABLE duo_fixtures ADD COLUMN IF NOT EXISTS decider_away_score INT`)
+    await query(`ALTER TABLE duo_fixtures ADD COLUMN IF NOT EXISTS decider_match_record_id INT REFERENCES match_records(id)`)
+  } catch (e) { console.error('[duo] decider migration:', e.message) }
 })()
 
 const GROUP_NAMES  = ["Group A","Group B","Group C","Group D","Group E","Group F","Group G","Group H"]
@@ -333,9 +341,25 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
     const homeAgg = set1HomeScore + set2HomeScore
     const awayAgg = set1AwayScore + set2AwayScore
 
+    // Set wins: who won each set individually
+    const homeSets = (set1HomeScore > set1AwayScore ? 1 : 0) + (set2HomeScore > set2AwayScore ? 1 : 0)
+    const awaySets = (set1AwayScore > set1HomeScore ? 1 : 0) + (set2AwayScore > set2HomeScore ? 1 : 0)
+
     let winnerPairId = null
-    if (homeAgg > awayAgg) winnerPairId = fix.home_pair_id
-    else if (awayAgg > homeAgg) winnerPairId = fix.away_pair_id
+    let needsDecider = false
+
+    if (fix.knockout_round) {
+      // Knockout tiebreaker chain: sets → aggregate → decider
+      if (homeSets > awaySets)       winnerPairId = fix.home_pair_id
+      else if (awaySets > homeSets)  winnerPairId = fix.away_pair_id
+      else if (homeAgg > awayAgg)    winnerPairId = fix.home_pair_id
+      else if (awayAgg > homeAgg)    winnerPairId = fix.away_pair_id
+      else                           needsDecider = true
+    } else {
+      // Group stage: set wins determine result; draw (1-1) is allowed
+      if (homeSets > awaySets)      winnerPairId = fix.home_pair_id
+      else if (awaySets > homeSets) winnerPairId = fix.away_pair_id
+    }
 
     await withTransaction(async ({ query: q }) => {
       // Get pair players
@@ -376,16 +400,18 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           set1_home_score = $1, set1_away_score = $2,
           set2_home_score = $3, set2_away_score = $4,
           set1_match_record_id = $5, set2_match_record_id = $6,
-          winner_pair_id = $7, status = 'completed'
-        WHERE id = $8`,
+          winner_pair_id = $7, status = $8
+        WHERE id = $9`,
         [set1HomeScore, set1AwayScore, set2HomeScore, set2AwayScore,
-         set1RecordId, set2RecordId, winnerPairId, fix.id]
+         set1RecordId, set2RecordId, winnerPairId,
+         needsDecider ? 'needs_decider' : 'completed',
+         fix.id]
       )
 
-      // Update group standings if group fixture
+      // Update group standings if group fixture (result based on set wins)
       if (fix.group_id) {
-        const homeResult = homeAgg > awayAgg ? "win" : homeAgg < awayAgg ? "loss" : "draw"
-        const awayResult = homeAgg < awayAgg ? "win" : homeAgg > awayAgg ? "loss" : "draw"
+        const homeResult = homeSets > awaySets ? "win" : homeSets < awaySets ? "loss" : "draw"
+        const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
         const updateStandings = async (pairId, result, gf, ga) => {
           await q(`
@@ -420,8 +446,8 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       }
 
       // ── BDR for knockout rounds ───────────────────────────────────────────
-      // Only award when this is a knockout match (has knockout_round)
-      if (fix.knockout_round && winnerPairId) {
+      // Only award when this is a knockout match and a winner is known (not needs_decider)
+      if (fix.knockout_round && winnerPairId && !needsDecider) {
         const loserPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
         const loserPair   = winnerPairId === fix.home_pair_id ? awayPair : homePair
         const winnerPair  = winnerPairId === fix.home_pair_id ? homePair : awayPair
@@ -701,5 +727,176 @@ router.delete("/sets", authenticate, adminOnly, async (req, res, next) => {
     res.json({ cleared: true })
   } catch (err) { next(err) }
 })
+
+// ── POST /api/duo/fixtures/:id/decider/setup ─────────────────────────────────
+// Admin picks one player from each pair to play the decider 1v1.
+// Only allowed when fixture status = 'needs_decider'.
+router.post("/fixtures/:id/decider/setup", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { homePlayerId, awayPlayerId } = z.object({
+      homePlayerId: z.number().int().positive(),
+      awayPlayerId: z.number().int().positive(),
+    }).parse(req.body)
+
+    const fixRes = await query("SELECT * FROM duo_fixtures WHERE id = $1", [req.params.id])
+    const fix = fixRes.rows[0]
+    if (!fix) return res.status(404).json({ error: "Fixture not found" })
+    if (fix.status !== "needs_decider") {
+      return res.status(400).json({ error: "Fixture does not need a decider — only allowed when 1-1 with equal aggregate" })
+    }
+
+    // Validate players belong to their respective pairs
+    const homePair = (await query("SELECT * FROM duo_pairs WHERE id = $1", [fix.home_pair_id])).rows[0]
+    const awayPair = (await query("SELECT * FROM duo_pairs WHERE id = $1", [fix.away_pair_id])).rows[0]
+
+    const homeValid = homePlayerId === homePair.set1_player_id || homePlayerId === homePair.set2_player_id
+    const awayValid = awayPlayerId === awayPair.set1_player_id || awayPlayerId === awayPair.set2_player_id
+
+    if (!homeValid) return res.status(400).json({ error: "Home player must be from the home pair" })
+    if (!awayValid) return res.status(400).json({ error: "Away player must be from the away pair" })
+
+    await query(`
+      UPDATE duo_fixtures
+      SET decider_home_player_id = $1, decider_away_player_id = $2
+      WHERE id = $3
+    `, [homePlayerId, awayPlayerId, req.params.id])
+
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// ── POST /api/duo/fixtures/:id/decider/result ─────────────────────────────────
+// Admin enters the decider 1v1 score. Must have a winner (no draw).
+// Determines the pair winner, advances them in the bracket, awards BDR/trophies.
+router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { homeScore, awayScore } = z.object({
+      homeScore: z.number().int().min(0),
+      awayScore: z.number().int().min(0),
+    }).parse(req.body)
+
+    if (homeScore === awayScore) {
+      return res.status(400).json({ error: "Decider must have a winner — scores cannot be equal" })
+    }
+
+    const fixRes = await query("SELECT * FROM duo_fixtures WHERE id = $1", [req.params.id])
+    const fix = fixRes.rows[0]
+    if (!fix) return res.status(404).json({ error: "Fixture not found" })
+    if (fix.status !== "needs_decider") {
+      return res.status(400).json({ error: "Fixture is not awaiting a decider" })
+    }
+    if (!fix.decider_home_player_id || !fix.decider_away_player_id) {
+      return res.status(400).json({ error: "Set up decider players first via /decider/setup" })
+    }
+
+    const winnerPairId = homeScore > awayScore ? fix.home_pair_id : fix.away_pair_id
+    const loserPairId  = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
+
+    await withTransaction(async ({ query: q }) => {
+      const homePair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.home_pair_id])).rows[0]
+      const awayPair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.away_pair_id])).rows[0]
+
+      // Delete old decider match record if re-entering
+      if (fix.decider_match_record_id) {
+        await q("DELETE FROM match_records WHERE id = $1", [fix.decider_match_record_id])
+      }
+
+      // Create match record for the decider players
+      const deciderResult = homeScore > awayScore ? "win" : "loss"
+      const mrRes = await q(`
+        INSERT INTO match_records
+          (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number)
+        VALUES ($1, $2, $3, $4, $5, 'duo', $6) RETURNING id
+      `, [fix.decider_home_player_id, fix.decider_away_player_id,
+          deciderResult, homeScore, awayScore, homePair.season_number])
+
+      // Mark fixture completed with winner
+      await q(`
+        UPDATE duo_fixtures SET
+          decider_home_score = $1, decider_away_score = $2,
+          decider_match_record_id = $3,
+          winner_pair_id = $4, status = 'completed'
+        WHERE id = $5
+      `, [homeScore, awayScore, mrRes.rows[0].id, winnerPairId, fix.id])
+
+      // Recalc MV + form for decider players
+      await recalcMarketValue(fix.decider_home_player_id)
+      await recalcMarketValue(fix.decider_away_player_id)
+      await recalcForm(fix.decider_home_player_id)
+      await recalcForm(fix.decider_away_player_id)
+
+      // BDR awards
+      const winnerPair = winnerPairId === fix.home_pair_id ? homePair : awayPair
+      const loserPair  = loserPairId  === fix.home_pair_id ? homePair : awayPair
+      const LOSER_BDR  = { qf: 4, sf: 6, final: 8 }
+      const WINNER_BDR = { final: 10 }
+      const loserBdr   = LOSER_BDR[fix.knockout_round]
+      const winnerBdr  = WINNER_BDR[fix.knockout_round]
+      if (loserBdr) {
+        await addBdr(loserPair.set1_player_id, loserBdr)
+        await addBdr(loserPair.set2_player_id, loserBdr)
+      }
+      if (winnerBdr) {
+        await addBdr(winnerPair.set1_player_id, winnerBdr)
+        await addBdr(winnerPair.set2_player_id, winnerBdr)
+      }
+
+      // Advance winner in bracket
+      if (fix.knockout_round && fix.knockout_round !== "final") {
+        const NEXT_ROUND = { r16: "qf", qf: "sf", sf: "final" }
+        const nextRound  = NEXT_ROUND[fix.knockout_round]
+        if (nextRound) {
+          const col = fix.match_number % 2 !== 0 ? "home_pair_id" : "away_pair_id"
+          await q(`
+            UPDATE duo_fixtures SET ${col} = $1
+            WHERE knockout_round = $2
+            AND home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $3)
+            AND match_number = $4
+          `, [winnerPairId, nextRound, homePair.season_number, Math.ceil(fix.match_number / 2)])
+        }
+      }
+
+      // Final: trophies + golden boot
+      if (fix.knockout_round === "final") {
+        const seasonNum = homePair.season_number
+        await reconcileTrophyRoster({
+          sourceKey:    `duo_champion_s${seasonNum}`,
+          trophyColumn: "trophy10_count",
+          playerIds:    [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean),
+          seasonNumber: seasonNum,
+        })
+        const duoWinnerNamesRes = await query(
+          "SELECT name FROM players WHERE id = ANY($1::int[])",
+          [[winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)]
+        )
+        await updateSeasonRecord(seasonNum, { duo_winner: duoWinnerNamesRes.rows.map(r => r.name).join(" & ") })
+        await query(`
+          INSERT INTO app_settings (key, value) VALUES ($1, $2)
+          ON CONFLICT (key) DO UPDATE SET value = $2
+        `, [`duo_champion_completed_at_${seasonNum}`, new Date().toISOString()])
+
+        const gbRes = await q(`
+          SELECT mr.player_id, SUM(mr.player_score) AS goals
+          FROM match_records mr
+          WHERE mr.match_type = 'duo' AND mr.season_number = $1
+          GROUP BY mr.player_id ORDER BY goals DESC LIMIT 1
+        `, [seasonNum])
+        const topScorer = gbRes.rows[0]
+        if (topScorer?.goals > 0) {
+          await addBdr(topScorer.player_id, 3)
+          await awardOrReassignTrophy({
+            sourceKey:    `duo_golden_boot_s${seasonNum}`,
+            trophyColumn: "trophy11_count",
+            playerId:     topScorer.player_id,
+            seasonNumber: seasonNum,
+          })
+        }
+      }
+    })
+
+    res.json({ success: true, winnerPairId })
+  } catch (err) { next(err) }
+})
+
 
 export default router
