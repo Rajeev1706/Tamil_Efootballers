@@ -20,8 +20,9 @@ import TeamKnockoutAdmin from "../components/admin/TeamKnockoutAdmin"
 import DuoTournamentAdmin from "../components/admin/DuoTournamentAdmin"
 import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
-import { usePlayers, useRecords, useFixtures, useTrades } from "../lib/queries"
-import api, { teamsApi } from "../lib/api"
+import { usePlayers, useRecords, useFixtures, useTrades, useSettings } from "../lib/queries"
+import { useQueryClient } from "@tanstack/react-query"
+import api, { teamsApi, settingsApi } from "../lib/api"
 import { adminActivity } from "../data/mockData"
 import { cn } from "../lib/utils"
 import ManageTeams from "../components/admin/ManageTeams"
@@ -455,6 +456,67 @@ const TABS = [
   { id: "auction",    label: "Auction",      icon: Gavel, href: "/admin/auction" },
 ]
 
+// ── FeaturedPanelCard ─────────────────────────────────────────────────────────
+const PANEL_OPTIONS = [
+  { value: "standings",  label: "Dshann League (Default)" },
+  { value: "ucl",        label: "UCL" },
+  { value: "duo",        label: "Duo Tournament" },
+  { value: "weekly",     label: "Weekly" },
+  { value: "revolution", label: "Revolution Trophy" },
+]
+
+function FeaturedPanelCard() {
+  const { data: settings = {} } = useSettings()
+  const qc = useQueryClient()
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  // Use local state for immediate UI response — initialise from settings once loaded
+  const [selected, setSelected] = useState(null)
+  const current = selected ?? settings.featured_panel ?? "standings"
+
+  async function handleChange(val) {
+    setSelected(val)   // optimistic update immediately
+    setSaving(true)
+    setSaved(false)
+    try {
+      await settingsApi.update("featured_panel", val)
+      // Invalidate settings cache so rest of app picks up the change
+      qc.invalidateQueries({ queryKey: ["settings"] })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      setSelected(null) // revert on error
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="card p-5 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-white mb-1">Homepage Featured View</p>
+        <p className="text-xs text-slate-500">When someone opens the site, this tournament/view is shown first.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {PANEL_OPTIONS.map(opt => (
+          <button key={opt.value} onClick={() => handleChange(opt.value)} disabled={saving}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
+              current === opt.value
+                ? "bg-accent text-white border-accent"
+                : "bg-pitch-800 text-slate-400 border-surface-border hover:text-white hover:border-accent/40"
+            }`}>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${current === opt.value ? "bg-white" : "bg-slate-600"}`} />
+            {opt.label}
+            {current === opt.value && <span className="ml-auto text-[10px] opacity-70">ACTIVE</span>}
+          </button>
+        ))}
+      </div>
+      {saved && <p className="text-xs text-emerald-400">✓ Saved — dashboard will now open on {PANEL_OPTIONS.find(o => o.value === current)?.label}</p>}
+    </div>
+  )
+}
+
+
 export default function AdminPage() {
   const navigate      = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -531,6 +593,12 @@ export default function AdminPage() {
     <p className="text-sm text-slate-400">
       Create teams first, then add players. You can rename or delete at any time.
     </p>
+
+    {/* Featured Panel */}
+    <div>
+      <p className="section-label mb-3">Dashboard Featured View</p>
+      <FeaturedPanelCard />
+    </div>
 
     {/* Teams */}
     <div>
