@@ -310,13 +310,29 @@ function ScoreEntry({ fixture, onSave }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-between px-3 py-2 bg-pitch-800 rounded-lg">
-        <span className="text-xs text-slate-400">Aggregate</span>
-        <span className={cn("text-sm font-bold", homeAgg > awayAgg ? "text-emerald-400" : homeAgg < awayAgg ? "text-rose-400" : "text-amber-400")}>
-          {homeAgg} – {awayAgg}
-          {homeAgg > awayAgg ? ` → ${fixture.homeDuoName} wins` : homeAgg < awayAgg ? ` → ${fixture.awayDuoName} wins` : " → Draw"}
-        </span>
-      </div>
+      {(() => {
+        const s1HomeScore = Number(scores.set1HomeScore) || 0
+        const s1AwayScore = Number(scores.set1AwayScore) || 0
+        const s2HomeScore = Number(scores.set2HomeScore) || 0
+        const s2AwayScore = Number(scores.set2AwayScore) || 0
+        const homeSets = (s1HomeScore > s1AwayScore ? 1 : 0) + (s2HomeScore > s2AwayScore ? 1 : 0)
+        const awaySets = (s1AwayScore > s1HomeScore ? 1 : 0) + (s2AwayScore > s2HomeScore ? 1 : 0)
+        const homeAggPrev = s1HomeScore + s2HomeScore
+        const awayAggPrev = s1AwayScore + s2AwayScore
+        let resultLabel = ""
+        let resultColor = "text-amber-400"
+        if (homeSets > awaySets) { resultLabel = `${fixture.homeDuoName} wins 2-0`; resultColor = "text-emerald-400" }
+        else if (awaySets > homeSets) { resultLabel = `${fixture.awayDuoName} wins 2-0`; resultColor = "text-emerald-400" }
+        else if (homeAggPrev > awayAggPrev) { resultLabel = `1-1 → ${fixture.homeDuoName} wins on agg`; resultColor = "text-blue-400" }
+        else if (awayAggPrev > homeAggPrev) { resultLabel = `1-1 → ${fixture.awayDuoName} wins on agg`; resultColor = "text-blue-400" }
+        else if (homeSets + awaySets > 0) { resultLabel = "1-1 — Decider needed"; resultColor = "text-orange-400" }
+        return (
+          <div className="flex items-center justify-between px-3 py-2 bg-pitch-800 rounded-lg">
+            <span className="text-xs text-slate-400">Sets: {homeSets} – {awaySets}</span>
+            <span className={`text-sm font-bold ${resultColor}`}>{resultLabel}</span>
+          </div>
+        )
+      })()}
       <button onClick={() => onSave(fixture.id, scores)}
         className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold w-full justify-center hover:bg-accent/90">
         <Save className="w-4 h-4" /> Save Result
@@ -325,11 +341,111 @@ function ScoreEntry({ fixture, onSave }) {
   )
 }
 
-function FixtureRow({ fixture, onSave }) {
-  const [open, setOpen] = useState(false)
-  const isCompleted = fixture.status === "completed"
+// ── Decider Entry — shown when knockout fixture is 1-1 with equal aggregate ──
+function DeciderEntry({ fixture, onSetup, onResult }) {
+  const hasPlayers = fixture.decider_home_player_id && fixture.decider_away_player_id
+  const [homeScore, setHomeScore] = useState("")
+  const [awayScore, setAwayScore] = useState("")
+
+  // Build player options for each pair
+  const homePlayers = [
+    { id: fixture.homeSet1Id, name: fixture.homeSet1Name },
+    { id: fixture.homeSet2Id, name: fixture.homeSet2Name },
+  ].filter(p => p.id)
+  const awayPlayers = [
+    { id: fixture.awaySet1Id, name: fixture.awaySet1Name },
+    { id: fixture.awaySet2Id, name: fixture.awaySet2Name },
+  ].filter(p => p.id)
+
+  const [selHome, setSelHome] = useState(fixture.decider_home_player_id || "")
+  const [selAway, setSelAway] = useState(fixture.decider_away_player_id || "")
+
+  const homeName = homePlayers.find(p => p.id === (fixture.decider_home_player_id || selHome))?.name
+  const awayName = awayPlayers.find(p => p.id === (fixture.decider_away_player_id || selAway))?.name
+
   return (
-    <div className="border border-surface-border rounded-xl overflow-hidden">
+    <div className="mt-2 p-3 bg-orange-400/5 border border-orange-400/30 rounded-xl space-y-3">
+      <p className="text-xs font-bold text-orange-400 uppercase tracking-widest">⚡ Decider Match — Pick one player from each pair</p>
+
+      {/* Player selection */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1">{fixture.homeDuoName}</p>
+          <select
+            value={selHome}
+            onChange={e => setSelHome(Number(e.target.value))}
+            disabled={hasPlayers}
+            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white disabled:opacity-60"
+          >
+            <option value="">Pick player…</option>
+            {homePlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1">{fixture.awayDuoName}</p>
+          <select
+            value={selAway}
+            onChange={e => setSelAway(Number(e.target.value))}
+            disabled={hasPlayers}
+            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white disabled:opacity-60"
+          >
+            <option value="">Pick player…</option>
+            {awayPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {!hasPlayers && (
+        <button
+          onClick={() => onSetup(fixture.id, selHome, selAway)}
+          disabled={!selHome || !selAway}
+          className="w-full bg-orange-500/20 border border-orange-400/40 text-orange-300 text-sm font-semibold py-2 rounded-lg disabled:opacity-40 hover:bg-orange-500/30 transition-colors"
+        >
+          Confirm Decider Players
+        </button>
+      )}
+
+      {/* Score entry — only after players are set */}
+      {hasPlayers && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-400 text-center">{homeName} vs {awayName}</p>
+          <div className="flex items-center gap-3 justify-center">
+            <input type="number" min="0" value={homeScore} onChange={e => setHomeScore(e.target.value)}
+              className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1.5 text-sm text-white" />
+            <span className="text-slate-500 font-bold">–</span>
+            <input type="number" min="0" value={awayScore} onChange={e => setAwayScore(e.target.value)}
+              className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1.5 text-sm text-white" />
+          </div>
+          {homeScore !== "" && awayScore !== "" && homeScore === awayScore && (
+            <p className="text-xs text-rose-400 text-center">Decider must have a winner — scores cannot be equal</p>
+          )}
+          <button
+            onClick={() => onResult(fixture.id, Number(homeScore), Number(awayScore))}
+            disabled={homeScore === "" || awayScore === "" || homeScore === awayScore}
+            className="w-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-sm font-semibold py-2 rounded-lg disabled:opacity-40 hover:bg-emerald-500/30 transition-colors"
+          >
+            Save Decider Result
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult }) {
+  const [open, setOpen] = useState(false)
+  const isCompleted    = fixture.status === "completed"
+  const needsDecider   = fixture.status === "needs_decider"
+
+  // Set wins from stored scores
+  const homeSets = ((fixture.set1_home_score > fixture.set1_away_score ? 1 : 0) +
+                    (fixture.set2_home_score > fixture.set2_away_score ? 1 : 0))
+  const awaySets = ((fixture.set1_away_score > fixture.set1_home_score ? 1 : 0) +
+                    (fixture.set2_away_score > fixture.set2_home_score ? 1 : 0))
+
+  return (
+    <div className={cn("border rounded-xl overflow-hidden",
+      needsDecider ? "border-orange-400/40" : "border-surface-border")}>
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover transition-colors">
         <div className="flex-1 flex items-center justify-between min-w-0">
@@ -339,11 +455,15 @@ function FixtureRow({ fixture, onSave }) {
           </div>
           {isCompleted ? (
             <div className="flex items-center gap-2 mx-4">
-              <span className={cn("text-lg font-bold font-mono", fixture.home_agg > fixture.away_agg ? "text-emerald-400" : "text-slate-400")}>{fixture.home_agg}</span>
+              <span className={cn("text-lg font-bold font-mono", homeSets > awaySets ? "text-emerald-400" : "text-slate-400")}>{homeSets}</span>
               <span className="text-slate-600">–</span>
-              <span className={cn("text-lg font-bold font-mono", fixture.away_agg > fixture.home_agg ? "text-emerald-400" : "text-slate-400")}>{fixture.away_agg}</span>
+              <span className={cn("text-lg font-bold font-mono", awaySets > homeSets ? "text-emerald-400" : "text-slate-400")}>{awaySets}</span>
             </div>
-          ) : <span className="text-xs text-slate-500 mx-4">vs</span>}
+          ) : needsDecider ? (
+            <span className="text-xs text-orange-400 font-bold mx-4">1-1 DECIDER</span>
+          ) : (
+            <span className="text-xs text-slate-500 mx-4">vs</span>
+          )}
           <div className="text-right min-w-0">
             <p className="text-sm font-semibold text-white truncate">{fixture.awayDuoName}</p>
             <p className="text-xs text-slate-500 truncate">{fixture.awaySet1Name} & {fixture.awaySet2Name}</p>
@@ -351,7 +471,18 @@ function FixtureRow({ fixture, onSave }) {
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
       </button>
-      {open && <div className="px-4 pb-4"><ScoreEntry fixture={fixture} onSave={onSave} /></div>}
+      {open && (
+        <div className="px-4 pb-4 space-y-3">
+          <ScoreEntry fixture={fixture} onSave={onSave} />
+          {needsDecider && (
+            <DeciderEntry
+              fixture={fixture}
+              onSetup={onDeciderSetup}
+              onResult={onDeciderResult}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -421,6 +552,20 @@ export default function DuoTournamentAdmin() {
   const deleteMut = useMutation({
     mutationFn: (sn) => api.delete(`/duo/season/${sn}`).then(r => r.data),
     onSuccess:  () => { invalidate(); setActiveTab("groups") },
+  })
+
+  const deciderSetupMut = useMutation({
+    mutationFn: ({ id, homePlayerId, awayPlayerId }) =>
+      api.post(`/duo/fixtures/${id}/decider/setup`, { homePlayerId, awayPlayerId }).then(r => r.data),
+    onSuccess: () => invalidate(),
+    onError: (err) => alert(err?.response?.data?.error || "Failed to set decider players"),
+  })
+
+  const deciderResultMut = useMutation({
+    mutationFn: ({ id, homeScore, awayScore }) =>
+      api.post(`/duo/fixtures/${id}/decider/result`, { homeScore, awayScore }).then(r => r.data),
+    onSuccess: () => invalidate(),
+    onError: (err) => alert(err?.response?.data?.error || "Failed to save decider result"),
   })
 
   const scoreMut = useMutation({
@@ -568,7 +713,11 @@ export default function DuoTournamentAdmin() {
                           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{ROUND_LABELS[round] || round}</h3>
                           <div className="space-y-2">
                             {knockoutFixtures.filter(f => f.knockout_round === round).map(f => (
-                              <FixtureRow key={f.id} fixture={f} onSave={(id, scores) => scoreMut.mutate({ id, scores })} />
+                              <FixtureRow key={f.id} fixture={f}
+                                onSave={(id, scores) => scoreMut.mutate({ id, scores })}
+                                onDeciderSetup={(id, homePlayerId, awayPlayerId) => deciderSetupMut.mutate({ id, homePlayerId, awayPlayerId })}
+                                onDeciderResult={(id, homeScore, awayScore) => deciderResultMut.mutate({ id, homeScore, awayScore })}
+                              />
                             ))}
                           </div>
                         </div>
