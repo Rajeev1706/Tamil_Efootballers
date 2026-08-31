@@ -122,8 +122,6 @@ const router = Router()
 })()
 
 const GROUP_NAMES  = ["Group A","Group B","Group C","Group D","Group E","Group F","Group G","Group H"]
-const SET1_GRADES  = ["S","A+","A"]
-const SET2_GRADES  = ["B","C"]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

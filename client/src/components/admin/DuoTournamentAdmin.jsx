@@ -130,9 +130,7 @@ function SetSelection({ season, onConfirmed }) {
             <span className="text-xs opacity-70">({s === 1 ? set1.length : set2.length}/32)</span>
           </button>
         ))}
-        <span className="text-xs text-slate-600 ml-auto">
-          {step === 1 ? "Pick high-grade players" : "Pick low-grade players (from remaining)"}
-        </span>
+
       </div>
 
       {/* Validation hint */}
@@ -259,8 +257,8 @@ function PairsView({ season, groupMap }) {
     onError: (err) => alert(err?.response?.data?.error || "Failed to update pair"),
   })
 
-  const set1Players = allPlayers.filter(p => ["S","A+","A"].includes(p.grade))
-  const set2Players = allPlayers.filter(p => ["B","C"].includes(p.grade))
+  const set1Players = allPlayers
+  const set2Players  = allPlayers
 
   const pairGroupMap = {}
   Object.entries(groupMap).forEach(([groupName, members]) => {
@@ -319,7 +317,7 @@ function PairsView({ season, groupMap }) {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Replace players</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-[10px] text-slate-500 mb-1">Set 1 (S/A+/A)</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Set 1</p>
                   <select value={editSet1} onChange={e => setEditSet1(Number(e.target.value))}
                     className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                     {set1Players.map(p => (
@@ -328,7 +326,7 @@ function PairsView({ season, groupMap }) {
                   </select>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 mb-1">Set 2 (B/C)</p>
+                  <p className="text-[10px] text-slate-500 mb-1">Set 2</p>
                   <select value={editSet2} onChange={e => setEditSet2(Number(e.target.value))}
                     className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                     {set2Players.map(p => (
