@@ -365,7 +365,7 @@ function PairsView({ season, groupMap }) {
 }
 
 // ── Score Entry + Fixture Row (unchanged) ─────────────────────────────────────
-function ScoreEntry({ fixture, onSave }) {
+function ScoreEntry({ fixture, onSave, saving }) {
   const [scores, setScores] = useState({
     set1HomeScore: fixture.set1_home_score ?? "",
     set1AwayScore: fixture.set1_away_score ?? "",
@@ -419,9 +419,9 @@ function ScoreEntry({ fixture, onSave }) {
           </div>
         )
       })()}
-      <button onClick={() => onSave(fixture.id, scores)}
-        className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold w-full justify-center hover:bg-accent/90">
-        <Save className="w-4 h-4" /> Save Result
+      <button onClick={() => onSave(fixture.id, scores)} disabled={saving}
+        className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold w-full justify-center hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95">
+        <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Result"}
       </button>
     </div>
   )
@@ -518,7 +518,7 @@ function DeciderEntry({ fixture, onSetup, onResult }) {
   )
 }
 
-function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult }) {
+function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }) {
   const [open, setOpen] = useState(false)
   const isCompleted    = fixture.status === "completed"
   const needsDecider   = fixture.status === "needs_decider"
@@ -559,7 +559,7 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult }) {
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3">
-          <ScoreEntry fixture={fixture} onSave={onSave} />
+          <ScoreEntry fixture={fixture} onSave={onSave} saving={saving} />
           {needsDecider && fixture.knockout_round && (
             <DeciderEntry
               fixture={fixture}
@@ -680,7 +680,7 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
   )
 }
 
-function FixturesByRound({ fixtures, onSave, season }) {
+function FixturesByRound({ fixtures, onSave, saving, season }) {
   const rounds = [...new Set(fixtures.map(f => f.round_number).filter(Boolean))].sort((a,b) => a-b)
   const [activeRound, setActiveRound] = useState(rounds[0] || 1)
   const [exporting, setExporting] = useState(false)
@@ -739,7 +739,7 @@ function FixturesByRound({ fixtures, onSave, season }) {
           <div key={groupName}>
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{groupName}</h3>
             <div className="space-y-2">
-              {gFixtures.map(f => <FixtureRow key={f.id} fixture={f} onSave={onSave} />)}
+              {gFixtures.map(f => <FixtureRow key={f.id} fixture={f} onSave={onSave} saving={saving} />)}
             </div>
           </div>
         ))}
@@ -941,7 +941,7 @@ export default function DuoTournamentAdmin() {
                   ))}
                 </div>
               )}
-              {activeTab === "fixtures" && <FixturesByRound fixtures={groupFixtures} onSave={(id, scores) => scoreMut.mutate({ id, scores })} season={season} />}
+              {activeTab === "fixtures" && <FixturesByRound fixtures={groupFixtures} onSave={(id, scores) => scoreMut.mutate({ id, scores })} saving={scoreMut.isPending} season={season} />}
               {activeTab === "knockout" && (
                 <div className="space-y-6">
                   {knockoutRounds.length === 0
@@ -953,6 +953,7 @@ export default function DuoTournamentAdmin() {
                             {knockoutFixtures.filter(f => f.knockout_round === round).map(f => (
                               <FixtureRow key={f.id} fixture={f}
                                 onSave={(id, scores) => scoreMut.mutate({ id, scores })}
+                                saving={scoreMut.isPending}
                                 onDeciderSetup={(id, homePlayerId, awayPlayerId) => deciderSetupMut.mutate({ id, homePlayerId, awayPlayerId })}
                                 onDeciderResult={(id, homeScore, awayScore) => deciderResultMut.mutate({ id, homeScore, awayScore })}
                               />

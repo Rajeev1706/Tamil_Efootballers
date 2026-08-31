@@ -568,7 +568,8 @@ export default function CommonDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebIndex, celebQueue?.length])
 
-  const activePanel    = searchParams.get("view") || "standings"
+  const featuredPanel  = settings?.featured_panel || "standings"
+  const activePanel    = searchParams.get("view") || featuredPanel
 
   // Re-declare top scorer queries here so they can use activePanel + celebration states
   // as enabled guards — defers these requests until they're actually needed, cutting
