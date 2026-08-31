@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useDraftState } from "../../hooks/useDraftState"
 import { useNavigate } from "react-router-dom"
 import { Plus, Trophy, Trash2, ChevronRight, Calendar, CheckCircle, Clock } from "lucide-react"
 import { useWeeklyTournaments, useCreateWeeklyTournament, useSetWeeklyPlayers, useDeleteWeeklyTournament } from "../../lib/queries"
@@ -17,10 +18,10 @@ function CreateForm({ onClose }) {
   const createTournament = useCreateWeeklyTournament()
   const setPlayers      = useSetWeeklyPlayers()
 
-  const [name, setName]                 = useState("")
-  const [selected, setSelected]         = useState([])
-  const [search, setSearch]             = useState("")
-  const [step, setStep]                 = useState("name") // name | players
+  const [name, setName, clearDraftName]         = useDraftState("draft_weekly_name", "")
+  const [selected, setSelected, clearDraftSel]  = useDraftState("draft_weekly_selected", [])
+  const [search, setSearch]                     = useState("")
+  const [step, setStep]                         = useState("name") // name | players
 
   const filtered = players.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) && !selected.includes(p.id)
@@ -38,6 +39,8 @@ function CreateForm({ onClose }) {
     if (!name.trim() || selected.length < 2) return
     const t = await createTournament.mutateAsync(name.trim())
     await setPlayers.mutateAsync({ id: t.id, playerIds: selected })
+    clearDraftName()
+    clearDraftSel()
     onClose() // return to admin list — View Draw button appears there
   }
 
