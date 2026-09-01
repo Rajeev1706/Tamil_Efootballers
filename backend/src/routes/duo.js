@@ -472,6 +472,43 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
         const homeResult = homeSets > awaySets ? "win" : homeSets < awaySets ? "loss" : "draw"
         const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
+        // If fixture was already completed, REVERSE the old standings first to prevent double-counting
+        if (fix.status === 'completed' || fix.status === 'needs_decider') {
+          const oldHomeSets = ((fix.set1_home_score > fix.set1_away_score ? 1 : 0) +
+                               (fix.set2_home_score > fix.set2_away_score ? 1 : 0))
+          const oldAwaySets = ((fix.set1_away_score > fix.set1_home_score ? 1 : 0) +
+                               (fix.set2_away_score > fix.set2_home_score ? 1 : 0))
+          const oldHomeAgg  = (fix.set1_home_score || 0) + (fix.set2_home_score || 0)
+          const oldAwayAgg  = (fix.set1_away_score || 0) + (fix.set2_away_score || 0)
+          const oldHomeResult = oldHomeSets > oldAwaySets ? "win" : oldHomeSets < oldAwaySets ? "loss" : "draw"
+          const oldAwayResult = oldHomeResult === "win" ? "loss" : oldHomeResult === "loss" ? "win" : "draw"
+
+          const reverseStandings = async (pairId, result, gf, ga) => {
+            await q(`
+              UPDATE duo_group_members SET
+                played = GREATEST(played - 1, 0),
+                won    = GREATEST(won    - $2::int, 0),
+                drawn  = GREATEST(drawn  - $3::int, 0),
+                lost   = GREATEST(lost   - $4::int, 0),
+                gf     = GREATEST(gf     - $5, 0),
+                ga     = GREATEST(ga     - $6, 0),
+                points = GREATEST(points - $7, 0)
+              WHERE group_id = $8 AND duo_pair_id = $1`,
+              [pairId,
+               result === "win"  ? 1 : 0,
+               result === "draw" ? 1 : 0,
+               result === "loss" ? 1 : 0,
+               gf, ga,
+               result === "win" ? 3 : result === "draw" ? 1 : 0,
+               fix.group_id
+              ]
+            )
+          }
+
+          await reverseStandings(fix.home_pair_id, oldHomeResult, oldHomeAgg, oldAwayAgg)
+          await reverseStandings(fix.away_pair_id, oldAwayResult, oldAwayAgg, oldHomeAgg)
+        }
+
         const updateStandings = async (pairId, result, gf, ga) => {
           await q(`
             UPDATE duo_group_members SET
