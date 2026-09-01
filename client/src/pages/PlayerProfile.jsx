@@ -85,6 +85,7 @@ function PlayerSquadCard({ player }) {
 
 import HeadToHead from "../components/player/HeadToHead"
 import SeasonSummary from "../components/player/SeasonSummary"
+import TournamentHistory from "../components/player/TournamentHistory"
 import PerformanceZones from "../components/dashboard/PerformanceZones"
 import PercentileDashboard from "../components/player/PercentileDashboard"
 
@@ -367,6 +368,9 @@ export default function PlayerProfile() {
 
           {/* Season summary */}
           <SeasonSummary player={player} />
+
+          {/* Tournament history */}
+          <TournamentHistory playerId={player.id} />
 
         </div>
       </div>

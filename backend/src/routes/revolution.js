@@ -5,6 +5,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
+import { incrementHistory, roundLabel } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -415,6 +416,16 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     await recalcMarketValue(match.player2_id)
     await recalcForm(match.player1_id)
     await recalcForm(match.player2_id)
+
+    // ── Tournament history tracking ──────────────────────────────────────────
+    if (winnerId && match.total_rounds) {
+      const loserId = winnerId === match.player1_id ? match.player2_id : match.player1_id
+      const label   = roundLabel(match.round, match.total_rounds)
+      if (loserId) await incrementHistory(loserId, "revolution", "knockout", label).catch(() => {})
+      if (match.round === match.total_rounds) {
+        await incrementHistory(winnerId, "revolution", "knockout", "winner").catch(() => {})
+      }
+    }
 
     res.json({ updated: true, winnerId, nextRound: match.round + 1 })
   } catch (err) { next(err) }

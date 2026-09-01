@@ -142,6 +142,27 @@ app.post("/admin/recalc-mv", authenticate, adminOnly, async (req, res) => {
       )
     `)
   } catch (e) { console.error("[league_info] migration:", e.message) }
+
+// ── player_tournament_history ─────────────────────────────────────────────────
+try {
+  await query(`
+    CREATE TABLE IF NOT EXISTS player_tournament_history (
+      id              SERIAL PRIMARY KEY,
+      player_id       INT  NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      tournament_type TEXT NOT NULL,
+      category        TEXT NOT NULL,
+      key             TEXT NOT NULL,
+      count           INT  NOT NULL DEFAULT 0,
+      UNIQUE(player_id, tournament_type, category, key)
+    )
+  `)
+} catch (e) { console.error("[tournament_history] migration:", e.message) }
+
+// ── Missing column migrations ─────────────────────────────────────────────────
+try {
+  await query(`ALTER TABLE revolution_matches ADD COLUMN IF NOT EXISTS is_walkover BOOLEAN DEFAULT FALSE`)
+  await query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS championship_pts INT DEFAULT 0`)
+} catch (e) { console.error("[missing columns] migration:", e.message) }
 })()
 
 app.get("/api/league-info", async (_req, res) => {

@@ -3,7 +3,8 @@ import { z } from "zod"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
-import { recalcForm }        from "../services/form.js" 
+import { recalcForm }        from "../services/form.js"
+import { incrementHistory, roundLabel, buildHistoryResponse } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -18,8 +19,7 @@ router.post("/reset-mv", authenticate, adminOnly, async (req, res, next) => {
 // Ensure grade_floor column exists
 ;(async () => {
   try {
-    const { query: q } = await import("../db/pool.js")
-    await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS grade_floor VARCHAR(2) DEFAULT NULL`)
+    await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS grade_floor VARCHAR(2) DEFAULT NULL`)
   } catch (e) { console.error("[players] grade_floor migration:", e.message) }
 })()
 router.get("/", async (req, res, next) => {
@@ -864,4 +864,339 @@ router.post("/recalc-all-mv", authenticate, adminOnly, async (req, res, next) =>
   } catch (err) { next(err) }
 })
 
+// ── GET /api/players/:id/tournament-history — fast read from DB ───────────────
+router.get("/:id/tournament-history", async (req, res, next) => {
+  try {
+    const playerId = parseInt(req.params.id)
+    const { rows } = await query(
+      "SELECT tournament_type, category, key, count FROM player_tournament_history WHERE player_id = $1",
+      [playerId]
+    )
+    res.json(buildHistoryResponse(rows))
+  } catch (err) { next(err) }
+})
+
+// ── POST /api/players/recalc-tournament-history — admin backfill ──────────────
+// Scans all existing tournament data and (re-)builds player_tournament_history.
+// Safe to run multiple times — clears all rows for the player first.
+router.post("/recalc-tournament-history", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    let total = 0
+
+    // Clear existing history
+    await query("TRUNCATE player_tournament_history RESTART IDENTITY")
+
+    // ── Weekly ──────────────────────────────────────────────────────────────
+    const weeklyMatches = await query(`
+      SELECT wtm.round, wt.total_rounds, wtm.winner_id,
+             wtm.player1_id, wtm.player2_id
+      FROM weekly_tournament_matches wtm
+      JOIN weekly_tournaments wt ON wt.id = wtm.tournament_id
+      WHERE wtm.status = 'completed' AND wtm.winner_id IS NOT NULL
+    `)
+    for (const m of weeklyMatches.rows) {
+      if (!m.total_rounds) continue
+      const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+      const label   = roundLabel(m.round, m.total_rounds)
+      if (loserId) { await incrementHistory(loserId, "weekly", "knockout", label); total++ }
+      if (m.round === m.total_rounds && m.winner_id) {
+        await incrementHistory(m.winner_id, "weekly", "knockout", "winner"); total++
+      }
+    }
+
+    // ── Revolution ──────────────────────────────────────────────────────────
+    const revMatches = await query(`
+      SELECT rm.round, rt.total_rounds, rm.winner_id, rm.player1_id, rm.player2_id
+      FROM revolution_matches rm
+      JOIN revolution_tournaments rt ON rt.id = rm.tournament_id
+      WHERE rm.status = 'completed' AND rm.winner_id IS NOT NULL
+    `)
+    for (const m of revMatches.rows) {
+      if (!m.total_rounds) continue
+      const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+      const label   = roundLabel(m.round, m.total_rounds)
+      if (loserId) { await incrementHistory(loserId, "revolution", "knockout", label); total++ }
+      if (m.round === m.total_rounds && m.winner_id) {
+        await incrementHistory(m.winner_id, "revolution", "knockout", "winner"); total++
+      }
+    }
+
+    // ── UCL Knockout ────────────────────────────────────────────────────────
+    const uclKoMatches = await query(`
+      SELECT ukm.round, ukt.total_rounds, ukm.winner_id, ukm.player1_id, ukm.player2_id
+      FROM ucl_knockout_matches ukm
+      JOIN ucl_knockout_tournaments ukt ON ukt.id = ukm.tournament_id
+      WHERE ukm.status = 'completed' AND ukm.winner_id IS NOT NULL
+    `)
+    for (const m of uclKoMatches.rows) {
+      if (!m.total_rounds) continue
+      const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+      const label   = roundLabel(m.round, m.total_rounds)
+      if (loserId) { await incrementHistory(loserId, "ucl", "knockout", label); total++ }
+      if (m.round === m.total_rounds && m.winner_id) {
+        await incrementHistory(m.winner_id, "ucl", "knockout", "winner"); total++
+      }
+    }
+
+    // ── Duo Knockout ────────────────────────────────────────────────────────
+    const duoKoFix = await query(`
+      SELECT df.knockout_round, df.winner_pair_id, df.home_pair_id, df.away_pair_id
+      FROM duo_fixtures df
+      WHERE df.knockout_round IS NOT NULL AND df.status = 'completed' AND df.winner_pair_id IS NOT NULL
+    `)
+    for (const f of duoKoFix.rows) {
+      const loserPairId  = f.winner_pair_id === f.home_pair_id ? f.away_pair_id : f.home_pair_id
+      const [loserPair, winnerPair] = await Promise.all([
+        query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [loserPairId]),
+        f.knockout_round === "final"
+          ? query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [f.winner_pair_id])
+          : Promise.resolve({ rows: [] }),
+      ])
+      for (const pid of [loserPair.rows[0]?.set1_player_id, loserPair.rows[0]?.set2_player_id].filter(Boolean)) {
+        await incrementHistory(pid, "duo", "knockout", f.knockout_round); total++
+      }
+      if (f.knockout_round === "final") {
+        for (const pid of [winnerPair.rows[0]?.set1_player_id, winnerPair.rows[0]?.set2_player_id].filter(Boolean)) {
+          await incrementHistory(pid, "duo", "knockout", "winner"); total++
+        }
+      }
+    }
+
+    // ── Duo Group Stage ─────────────────────────────────────────────────────
+    const duoGroupStandings = await query(`
+      SELECT dgm.duo_pair_id AS "duoPairId",
+        RANK() OVER (PARTITION BY dgm.group_id ORDER BY dgm.points DESC, dgm.gf - dgm.ga DESC, dgm.gf DESC) AS rnk
+      FROM duo_group_members dgm
+    `)
+    for (const row of duoGroupStandings.rows) {
+      const pairRes = await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [row.duoPairId])
+      const pair = pairRes.rows[0]
+      if (pair) {
+        for (const pid of [pair.set1_player_id, pair.set2_player_id].filter(Boolean)) {
+          await incrementHistory(pid, "duo", "group", String(parseInt(row.rnk))); total++
+        }
+      }
+    }
+
+    res.json({ success: true, total })
+  } catch (err) { next(err) }
+})
+
+
 export default router
+// ── GET /api/players/:id/tournament-history ───────────────────────────────────
+// Returns per-player tournament history across Weekly, Revolution, UCL, Duo.
+// Aggregates counts of how many times they reached/were eliminated at each round.
+router.get("/:id/tournament-history", async (req, res, next) => {
+  try {
+    const playerId = parseInt(req.params.id)
+    const safe = async (fn) => { try { return await fn() } catch { return [] } }
+
+    // ── Helper: convert numeric round → label based on total_rounds ──────────
+    function roundLabel(round, totalRounds) {
+      const diff = totalRounds - round
+      if (diff === 0) return "final"
+      if (diff === 1) return "sf"
+      if (diff === 2) return "qf"
+      if (diff === 3) return "r16"
+      if (diff === 4) return "r32"
+      return "r64"
+    }
+
+    function aggregateRounds(entries) {
+      const counts = { winner: 0, final: 0, sf: 0, qf: 0, r16: 0, r32: 0, r64: 0 }
+      for (const e of entries) counts[e] = (counts[e] || 0) + 1
+      return counts
+    }
+
+    // ── Weekly ────────────────────────────────────────────────────────────────
+    const weeklyRows = await safe(() => query(`
+      SELECT wt.total_rounds,
+             wtm.round,
+             CASE WHEN wtm.winner_id = $1 THEN true ELSE false END AS won
+      FROM weekly_tournament_matches wtm
+      JOIN weekly_tournaments wt ON wt.id = wtm.tournament_id
+      WHERE (wtm.player1_id = $1 OR wtm.player2_id = $1)
+        AND wtm.status = 'completed'
+        AND (wtm.winner_id IS NOT NULL)
+    `, [playerId]))
+
+    // For each tournament the player entered, find their best round
+    const weeklyByTournament = {}
+    for (const r of weeklyRows) {
+      const key = `${r.total_rounds}-${r.round}`
+      if (!weeklyByTournament[r.total_rounds]) weeklyByTournament[r.total_rounds] = {}
+      if (r.won) {
+        if (r.round === r.total_rounds) weeklyByTournament[`winner-${r.round}`] = "winner"
+      } else {
+        weeklyByTournament[key] = roundLabel(r.round, r.total_rounds)
+      }
+    }
+    const weeklyEntries = []
+    for (const r of weeklyRows) {
+      if (r.won && r.round === r.total_rounds) weeklyEntries.push("winner")
+      else if (!r.won) weeklyEntries.push(roundLabel(r.round, r.total_rounds))
+    }
+    const weekly = aggregateRounds(weeklyEntries)
+
+    // ── Revolution ────────────────────────────────────────────────────────────
+    const revRows = await safe(() => query(`
+      SELECT rt.total_rounds,
+             rtm.round,
+             CASE WHEN rtm.winner_id = $1 THEN true ELSE false END AS won
+      FROM revolution_tournament_matches rtm
+      JOIN revolution_tournaments rt ON rt.id = rtm.tournament_id
+      WHERE (rtm.player1_id = $1 OR rtm.player2_id = $1)
+        AND rtm.status = 'completed'
+        AND rtm.winner_id IS NOT NULL
+    `, [playerId]))
+
+    const revEntries = []
+    for (const r of revRows) {
+      if (r.won && r.round === r.total_rounds) revEntries.push("winner")
+      else if (!r.won) revEntries.push(roundLabel(r.round, r.total_rounds))
+    }
+    const revolution = aggregateRounds(revEntries)
+
+    // ── UCL Knockout ──────────────────────────────────────────────────────────
+    const uclKoRows = await safe(() => query(`
+      SELECT ukt.total_rounds,
+             ukm.round,
+             CASE WHEN ukm.winner_id = $1 THEN true ELSE false END AS won
+      FROM ucl_knockout_matches ukm
+      JOIN ucl_knockout_tournaments ukt ON ukt.id = ukm.tournament_id
+      WHERE (ukm.player1_id = $1 OR ukm.player2_id = $1)
+        AND ukm.status = 'completed'
+        AND ukm.winner_id IS NOT NULL
+    `, [playerId]))
+
+    const uclKoEntries = []
+    for (const r of uclKoRows) {
+      if (r.won && r.round === r.total_rounds) uclKoEntries.push("winner")
+      else if (!r.won) uclKoEntries.push(roundLabel(r.round, r.total_rounds))
+    }
+    const uclKnockout = aggregateRounds(uclKoEntries)
+
+    // ── UCL Group Stage ───────────────────────────────────────────────────────
+    // Rank each player within their group by points → gd → gf
+    const uclGroupRows = await safe(() => query(`
+      SELECT
+        ugp.grp,
+        ugp.season_number,
+        p2.id AS player_id,
+        COALESCE(SUM(CASE
+          WHEN um.player1_id = p2.id AND um.winner_id = p2.id THEN 3
+          WHEN um.player2_id = p2.id AND um.winner_id = p2.id THEN 3
+          WHEN um.winner_id IS NULL AND um.status = 'completed' THEN 1
+          ELSE 0
+        END), 0) AS pts,
+        COALESCE(SUM(CASE WHEN um.player1_id = p2.id THEN um.player1_score
+                         WHEN um.player2_id = p2.id THEN um.player2_score ELSE 0 END), 0) AS gf,
+        COALESCE(SUM(CASE WHEN um.player1_id = p2.id THEN um.player2_score
+                         WHEN um.player2_id = p2.id THEN um.player1_score ELSE 0 END), 0) AS ga
+      FROM ucl_group_players ugp
+      JOIN players p2 ON p2.id = ugp.player_id
+      LEFT JOIN ucl_matches um
+        ON um.season_number = ugp.season_number
+        AND um.grp = ugp.grp
+        AND (um.player1_id = p2.id OR um.player2_id = p2.id)
+        AND um.status = 'completed'
+      GROUP BY ugp.grp, ugp.season_number, p2.id
+    `))
+
+    // Group by season+group, rank within each group, find target player's positions
+    const uclGroupMap = {}
+    for (const r of uclGroupRows) {
+      const key = `${r.season_number}-${r.grp}`
+      if (!uclGroupMap[key]) uclGroupMap[key] = []
+      uclGroupMap[key].push(r)
+    }
+    const uclGroupPositions = []
+    for (const [, members] of Object.entries(uclGroupMap)) {
+      members.sort((a, b) => (b.pts - a.pts) || ((b.gf - b.ga) - (a.gf - a.ga)) || (b.gf - a.gf))
+      const idx = members.findIndex(m => m.player_id === playerId)
+      if (idx !== -1) uclGroupPositions.push(idx + 1)
+    }
+    const uclGroup = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 }
+    for (const pos of uclGroupPositions) {
+      if (uclGroup[pos] !== undefined) uclGroup[pos]++
+    }
+
+    // ── Duo Group Stage ───────────────────────────────────────────────────────
+    // Find all duo pairs this player was in, then rank within their group
+    const duoGroupRows = await safe(() => query(`
+      SELECT
+        dgm.group_id,
+        dp.season_number,
+        dp2.id AS pair_id,
+        dp2.set1_player_id,
+        dp2.set2_player_id,
+        dgm.points,
+        dgm.gf - dgm.ga AS gd,
+        dgm.gf
+      FROM duo_pairs dp
+      JOIN duo_group_members dgm2 ON dgm2.duo_pair_id = dp.id
+      JOIN duo_group_members dgm  ON dgm.group_id = dgm2.group_id
+      JOIN duo_pairs dp2          ON dp2.id = dgm.duo_pair_id
+      WHERE (dp.set1_player_id = $1 OR dp.set2_player_id = $1)
+        AND dp.season_number = dp2.season_number
+      ORDER BY dgm.group_id, dgm.points DESC, (dgm.gf - dgm.ga) DESC, dgm.gf DESC
+    `, [playerId]))
+
+    // Group by group_id, find target player's pair's rank
+    const duoGroupByGid = {}
+    for (const r of duoGroupRows) {
+      if (!duoGroupByGid[r.group_id]) duoGroupByGid[r.group_id] = []
+      duoGroupByGid[r.group_id].push(r)
+    }
+    const duoGroupPositions = []
+    for (const [, members] of Object.entries(duoGroupByGid)) {
+      const idx = members.findIndex(m =>
+        m.set1_player_id === playerId || m.set2_player_id === playerId
+      )
+      if (idx !== -1) duoGroupPositions.push(idx + 1)
+    }
+    const duoGroup = { 1: 0, 2: 0, 3: 0, 4: 0 }
+    for (const pos of duoGroupPositions) {
+      if (duoGroup[pos] !== undefined) duoGroup[pos]++
+    }
+
+    // ── Duo Knockout ──────────────────────────────────────────────────────────
+    const ROUND_ORDER = ["r16", "qf", "sf", "final"]
+    const duoKoRows = await safe(() => query(`
+      SELECT df.knockout_round, df.winner_pair_id,
+             dp.set1_player_id, dp.set2_player_id
+      FROM duo_fixtures df
+      JOIN duo_pairs dp ON dp.id = df.home_pair_id OR dp.id = df.away_pair_id
+      WHERE df.knockout_round IS NOT NULL
+        AND df.status = 'completed'
+        AND df.winner_pair_id IS NOT NULL
+        AND (dp.set1_player_id = $1 OR dp.set2_player_id = $1)
+    `, [playerId]))
+
+    const duoKoEntries = []
+    for (const r of duoKoRows) {
+      const playerPairId = r.set1_player_id === playerId || r.set2_player_id === playerId
+        ? (r.home_pair_id === r.pair_id ? r.home_pair_id : r.away_pair_id)
+        : null
+      const isWinner = r.winner_pair_id && (r.set1_player_id === playerId || r.set2_player_id === playerId)
+        && r.knockout_round === 'final'
+      if (r.knockout_round === 'final' && isWinner) duoKoEntries.push("winner")
+      else if (r.set1_player_id === playerId || r.set2_player_id === playerId) {
+        // Check if player's pair lost this match
+        duoKoEntries.push(r.knockout_round)
+      }
+    }
+    const duoKnockout = { winner: 0, final: 0, sf: 0, qf: 0, r16: 0 }
+    for (const e of duoKoEntries) {
+      if (duoKnockout[e] !== undefined) duoKnockout[e]++
+    }
+
+    res.json({
+      weekly,
+      revolution,
+      ucl:  { group: uclGroup, knockout: uclKnockout },
+      duo:  { group: duoGroup, knockout: duoKnockout },
+    })
+  } catch (err) { next(err) }
+})

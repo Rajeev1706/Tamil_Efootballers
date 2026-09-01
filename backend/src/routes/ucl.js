@@ -5,6 +5,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { incrementHistory } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -653,6 +654,53 @@ router.get("/top-scorers", async (req, res, next) => {
       LIMIT 10
     `, [season])
     res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
+// POST /api/ucl/finalize-groups — admin triggers after UCL group stage ends.
+// Computes each player's final position within their group and stores in
+// player_tournament_history. Safe to run multiple times (uses upsert logic
+// via count incrementing, so only call ONCE per group stage season).
+router.post("/finalize-groups", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    // Get all active UCL groups and their players with standings
+    const groupsRes  = await query("SELECT * FROM ucl_groups WHERE status = 'active' ORDER BY name ASC")
+    const statsRes   = await query(`
+      SELECT
+        p.id, p.ucl_group_id AS "groupId",
+        SUM(CASE
+          WHEN (mr.player_id = p.id AND mr.result = 'win') OR (mr.opponent_id = p.id AND mr.result = 'loss') THEN 3
+          WHEN mr.result = 'draw' THEN 1 ELSE 0
+        END) AS pts,
+        SUM(CASE WHEN mr.player_id = p.id THEN COALESCE(mr.player_score,0) ELSE COALESCE(mr.opponent_score,0) END)
+        - SUM(CASE WHEN mr.player_id = p.id THEN COALESCE(mr.opponent_score,0) ELSE COALESCE(mr.player_score,0) END) AS gd,
+        SUM(CASE WHEN mr.player_id = p.id THEN COALESCE(mr.player_score,0) ELSE COALESCE(mr.opponent_score,0) END) AS gf
+      FROM players p
+      LEFT JOIN match_records mr
+        ON (mr.player_id = p.id OR mr.opponent_id = p.id) AND mr.match_type = 'ucl'
+        AND EXISTS (
+          SELECT 1 FROM ucl_fixtures uf JOIN ucl_groups ug ON uf.group_id = ug.id
+          WHERE uf.match_record_id = mr.id AND ug.status = 'active'
+        )
+        AND NOT EXISTS (SELECT 1 FROM ucl_knockout_matches km WHERE km.match_record_id = mr.id)
+      WHERE p.ucl_group_id IS NOT NULL
+      GROUP BY p.id, p.ucl_group_id
+    `)
+
+    let recorded = 0
+    for (const group of groupsRes.rows) {
+      const players = statsRes.rows
+        .filter(p => p.groupId === group.id)
+        .sort((a, b) => (b.pts - a.pts) || (b.gd - a.gd) || (b.gf - a.gf))
+
+      for (let i = 0; i < players.length; i++) {
+        const position = i + 1
+        await incrementHistory(players[i].id, "ucl", "group", String(position)).catch(() => {})
+        recorded++
+      }
+    }
+
+    res.json({ success: true, recorded, groups: groupsRes.rows.length })
   } catch (err) { next(err) }
 })
 
