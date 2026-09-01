@@ -5,7 +5,7 @@ import duoTrophy  from "../../../images/duo.png"
 import duoBoot    from "../../../images/duoboot.png"
 import api from "../../lib/api"
 import { cn } from "../../lib/utils"
-import PlayerAvatar from "../common/PlayerAvatar"
+import { getAvatarById } from "../../lib/avatars"
 
 const ROUND_LABELS = { r16: "Round of 16", qf: "Quarter Finals", sf: "Semi Finals", final: "Final" }
 
@@ -310,23 +310,35 @@ export default function DuoDashboard() {
           </div>
         ) : (
           <div className="divide-y divide-surface-border/50">
-            {data.topScorers.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-4 px-5 py-3">
-                <span className={cn("text-sm font-bold font-mono w-6 text-center flex-shrink-0",
-                  i === 0 ? "text-gold" : "text-slate-500"
-                )}>{i + 1}</span>
-                <div className="w-9 h-9 flex-shrink-0">
-                  <PlayerAvatar player={p} size="sm" />
+            {data.topScorers.map((p, i) => {
+              const preset    = getAvatarById(p.avatarId)
+              const avatarSrc = p.avatarUrl || preset?.thumb
+              return (
+                <div key={p.id} className="flex items-center gap-4 px-5 py-3">
+                  <span className={cn("text-sm font-bold font-mono w-6 text-center flex-shrink-0",
+                    i === 0 ? "text-gold" : "text-slate-500"
+                  )}>{i + 1}</span>
+                  {avatarSrc ? (
+                    <img src={avatarSrc} alt={p.name}
+                      className="w-[43px] h-[43px] rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className={cn(
+                      "w-[43px] h-[43px] rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0",
+                      i === 0 ? "bg-gold/15 text-gold" : "bg-pitch-800 text-slate-400"
+                    )}>
+                      {p.name?.[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={cn("font-semibold text-sm", i === 0 ? "text-gold" : "text-white")}>{p.name}</p>
+                  </div>
+                  <span className={cn("font-extrabold font-mono text-lg flex-shrink-0",
+                    i === 0 ? "text-gold" : "text-slate-300"
+                  )}>{p.goals}</span>
+                  <span className="text-xs text-slate-500 flex-shrink-0">goals</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className={cn("font-semibold text-sm", i === 0 ? "text-gold" : "text-white")}>{p.name}</p>
-                </div>
-                <span className={cn("font-extrabold font-mono text-lg flex-shrink-0",
-                  i === 0 ? "text-gold" : "text-slate-300"
-                )}>{p.goals}</span>
-                <span className="text-xs text-slate-500 flex-shrink-0">goals</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )
       )}
