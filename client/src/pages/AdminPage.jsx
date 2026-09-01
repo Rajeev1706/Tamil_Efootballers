@@ -31,6 +31,84 @@ import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 import AdminTeamsTab from "../components/admin/AdminTeamsTab"
 
+function RecalcTournamentHistoryCard() {
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(false)
+  const [count, setCount]     = useState(0)
+
+  async function handle() {
+    setLoading(true)
+    try {
+      const res = await api.post("/players/recalc-tournament-history")
+      setCount(res.data.total)
+      setDone(true)
+    } catch { alert("Failed to recalculate tournament history") }
+    finally { setLoading(false) }
+  }
+
+  if (done) return (
+    <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+      <p className="text-emerald-400 font-semibold text-lg mb-1">✅ Done!</p>
+      <p className="text-sm text-slate-400">{count} history rows written from all tournament data.</p>
+      <button onClick={() => setDone(false)} className="mt-3 text-xs text-slate-500 hover:text-white">Dismiss</button>
+    </div>
+  )
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <Trophy className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Backfill Tournament History</p>
+          <p className="text-sm text-slate-500 mt-0.5">Rebuilds player tournament history (Weekly/Revolution/UCL KO/Duo) from all existing data. Run once after deploying this feature.</p>
+        </div>
+      </div>
+      <button onClick={handle} disabled={loading}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-gold/30 text-gold hover:bg-gold/10 text-sm font-semibold transition-colors disabled:opacity-40">
+        {loading ? "Backfilling…" : "Backfill History"}
+      </button>
+    </div>
+  )
+}
+
+function FinalizeUclGroupsCard() {
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(false)
+
+  async function handle() {
+    if (!window.confirm("Record current UCL group stage positions for all players? Only do this once after the UCL group stage ends.")) return
+    setLoading(true)
+    try {
+      await api.post("/ucl/finalize-groups")
+      setDone(true)
+    } catch { alert("Failed to finalize UCL groups") }
+    finally { setLoading(false) }
+  }
+
+  if (done) return (
+    <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+      <p className="text-emerald-400 font-semibold text-lg mb-1">✅ UCL group positions recorded!</p>
+      <button onClick={() => setDone(false)} className="mt-3 text-xs text-slate-500 hover:text-white">Dismiss</button>
+    </div>
+  )
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <Trophy className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Finalize UCL Group Positions</p>
+          <p className="text-sm text-slate-500 mt-0.5">Records each player's final group stage position in their tournament history. Run once when the UCL group stage is complete.</p>
+        </div>
+      </div>
+      <button onClick={handle} disabled={loading}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 text-sm font-semibold transition-colors disabled:opacity-40">
+        {loading ? "Saving…" : "Finalize Groups"}
+      </button>
+    </div>
+  )
+}
+
 function RecalcMVCard() {
   const [loading, setLoading] = useState(false)
   const [done, setDone]       = useState(false)
@@ -640,6 +718,8 @@ export default function AdminPage() {
       <p className="section-label mb-3">Market Value</p>
       <ResetMVCard />
       <RecalcMVCard />
+      <RecalcTournamentHistoryCard />
+      <FinalizeUclGroupsCard />
     </div>
 
     {/* Season Reset */}

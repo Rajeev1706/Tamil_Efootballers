@@ -8,6 +8,7 @@ import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
+import { incrementHistory, roundLabel } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 const TOTAL_ROUNDS = 5   // R32 → R16 → QF → SF → Final
@@ -366,6 +367,16 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     await recalcMarketValue(match.player2_id)
     await recalcForm(match.player1_id)
     await recalcForm(match.player2_id)
+
+    // ── Tournament history tracking ───────────────────────────────────────────
+    if (winnerId) {
+      const loserId = winnerId === match.player1_id ? match.player2_id : match.player1_id
+      const label   = roundLabel(match.round, TOTAL_ROUNDS)
+      if (loserId) await incrementHistory(loserId, "ucl", "knockout", label).catch(() => {})
+      if (match.round === TOTAL_ROUNDS) {
+        await incrementHistory(winnerId, "ucl", "knockout", "winner").catch(() => {})
+      }
+    }
 
     // Advance winner to next round
     if (winnerId && match.round < TOTAL_ROUNDS) {

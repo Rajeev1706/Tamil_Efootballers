@@ -7,6 +7,7 @@ import { recalcForm } from "../services/form.js"
 import { addBdr } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
+import { incrementHistory } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -541,6 +542,29 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
         await recalcForm(pid)
       }
 
+      // ── Duo knockout tournament history ──────────────────────────────────────
+      if (fix.knockout_round && winnerPairId && !needsDecider) {
+        try {
+          const loserKoPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
+          const loserKoPair   = await q("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [loserKoPairId])
+          const lp = loserKoPair.rows[0]
+          if (lp) {
+            for (const pid of [lp.set1_player_id, lp.set2_player_id].filter(Boolean)) {
+              await incrementHistory(pid, "duo", "knockout", fix.knockout_round).catch(() => {})
+            }
+          }
+          if (fix.knockout_round === "final") {
+            const winnerKoPair = await q("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [winnerPairId])
+            const wp = winnerKoPair.rows[0]
+            if (wp) {
+              for (const pid of [wp.set1_player_id, wp.set2_player_id].filter(Boolean)) {
+                await incrementHistory(pid, "duo", "knockout", "winner").catch(() => {})
+              }
+            }
+          }
+        } catch (e) { console.error("[duo] ko history:", e.message) }
+      }
+
       // ── BDR for knockout rounds ───────────────────────────────────────────
       // Only award when this is a knockout match and a winner is known (not needs_decider)
       if (fix.knockout_round && winnerPairId && !needsDecider) {
@@ -663,6 +687,20 @@ router.post("/knockout/generate", authenticate, adminOnly, async (req, res, next
         [shuffled[i*2].duoPairId, shuffled[i*2+1].duoPairId, round, i+1]
       )
     }
+
+    // ── Record group stage positions in tournament history ───────────────────
+    // All pairs and their final group rankings are known at this point
+    try {
+      for (const row of standings.rows) {
+        const pairRes = await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [row.duoPairId])
+        const pair = pairRes.rows[0]
+        if (pair) {
+          for (const pid of [pair.set1_player_id, pair.set2_player_id].filter(Boolean)) {
+            await incrementHistory(pid, "duo", "group", String(parseInt(row.rnk)))
+          }
+        }
+      }
+    } catch (e) { console.error("[duo] group history:", e.message) }
 
     res.json({ success: true, round, matches: matchCount })
   } catch (err) { next(err) }
