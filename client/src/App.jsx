@@ -15,6 +15,8 @@ const WinRateRanking      = lazy(() => import("./pages/WinRateRanking"))
 const TrophyCabinet       = lazy(() => import("./pages/TrophyCabinet"))
 const PlayerTrophyCabinet = lazy(() => import("./pages/PlayerTrophyCabinet"))
 const ChampionshipPage    = lazy(() => import("./pages/ChampionshipPage"))
+const TrendingProfiles    = lazy(() => import("./pages/TrendingProfiles"))
+const WeeklyPowerRankings = lazy(() => import("./pages/WeeklyPowerRankings"))
 const WeeklyDraw          = lazy(() => import("./pages/WeeklyDraw"))
 const WeeklyBracket       = lazy(() => import("./pages/WeeklyBracket"))
 const RevolutionDraw      = lazy(() => import("./pages/RevolutionDraw"))
@@ -55,6 +57,8 @@ export default function App() {
           <Route path="/team-roster/:id"         element={<TeamRosterPage />} />
           <Route path="/hall-of-fame"            element={<HallOfFame />} />
           <Route path="/win-rate-ranking"        element={<WinRateRanking />} />
+          <Route path="/trending"                 element={<TrendingProfiles />} />
+          <Route path="/power-rankings"          element={<WeeklyPowerRankings />} />
           <Route path="/trophy-cabinet"          element={<TrophyCabinet />} />
           <Route path="/championship"            element={<ChampionshipPage />} />
           <Route path="/trophy-cabinet/:id"      element={<PlayerTrophyCabinet />} />

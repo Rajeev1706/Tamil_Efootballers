@@ -19,8 +19,11 @@ import TeamsDirectory from "../components/dashboard/TeamsDirectory"
 import Loading from "../components/common/Loading"
 import CountUp from "../components/common/CountUp"
 import ChampionCelebration from "../components/common/ChampionCelebration"
+import WeeklyTournamentCelebration from "../components/common/WeeklyTournamentCelebration"
+import DshannLeagueCelebration     from "../components/common/DshannLeagueCelebration"
+import RevolutionCelebration       from "../components/common/RevolutionCelebration"
 import BallonDorCelebration from "../components/common/BallonDorCelebration"
-import DuoCelebration from "../components/common/DuoCelebration"
+import DuoWinnerCelebration from "../components/common/DuoWinnerCelebration"
 import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
 import europaTrophyLogo      from "../../images/europa.png"
@@ -33,6 +36,7 @@ import championshipTrophy from "../../images/championship.png"
 import teamsImg from "../../images/teams.jpg"
 import { useTeams, usePlayers, useSeasonRecords, useSettings, useWeeklyCurrent, useFixtures, useUclKnockoutCurrent, useTopScorers, useUclTopScorers, useWeeklyTopScorers, useBestLeaguePerformer, useTeamLeaguePlayoffs, useAuctionCurrent, useLeagueFormatPublic, useChampionship, useGroupStandings, useTeamKnockoutCurrent, useRevolutionCurrent } from "../lib/queries"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
+import WeeklyCelebrationOverlay from "../components/dashboard/WeeklyCelebrationOverlay"
 
 // Lazy-loaded after all imports — keeps it out of the TDZ that causes
 // "Cannot access before initialization" in production bundles
@@ -258,10 +262,16 @@ export default function CommonDashboard() {
   const testWeeklyActive = urlParams.has("testCelebration")
   const testWeeklyParam  = urlParams.get("testCelebration")
   const testWeeklyMatchedPlayer = testWeeklyParam
-    ? players.find(p => p.name.toLowerCase() === testWeeklyParam.toLowerCase())
+    ? (players.filter(p => p.name.toLowerCase() === testWeeklyParam.toLowerCase())
+        .sort((a, b) => (b.avatarUrl || b.avatarId ? 1 : 0) - (a.avatarUrl || a.avatarId ? 1 : 0))[0])
     : null
   const testWeeklyName   = testWeeklyActive
     ? (testWeeklyMatchedPlayer?.name || (testWeeklyParam && !["1", "true"].includes(testWeeklyParam) ? testWeeklyParam : "Test Player"))
+    : null
+  // TEST: ?testGoldenBoot=PlayerName shows golden boot on the card
+  const testGoldenBootParam = urlParams.get("testGoldenBoot")
+  const testGoldenBoot = testWeeklyActive
+    ? { name: testGoldenBootParam || "Top Scorer", goals: 5 }
     : null
   const displayWeeklyChampion = testWeeklyName || weeklyChampion
   const displayWeeklyChampionAvatar = testWeeklyActive
@@ -294,7 +304,9 @@ export default function CommonDashboard() {
   const { data: groupStandings }   = useGroupStandings()
   const { data: revolutionData }   = useRevolutionCurrent()
   const [showRevCelebration, setShowRevCelebration]   = useState(false)
+  const [testRevDismissed, setTestRevDismissed]        = useState(false)
   const [showDuoCelebration, setShowDuoCelebration]   = useState(false)
+  const [testDuoDismissed, setTestDuoDismissed]         = useState(false)
 
   // Revolution — find final winner
   const revTotalRounds = revolutionData?.total_rounds
@@ -314,16 +326,27 @@ export default function CommonDashboard() {
     })
   }, [])
   const duoChampion = duoData?.champion ?? null
-  const duoPlayer1 = duoChampion ? {
+
+  // TEST-ONLY: ?testDuoCelebration=Player1Name:Player2Name
+  const testDuoParam  = urlParams.get("testDuoCelebration")
+  const testDuoActive = !!testDuoParam
+  const testDuoP1Name = testDuoParam?.split(":")?.[0] || "Player 1"
+  const testDuoP2Name = testDuoParam?.split(":")?.[1] || "Player 2"
+  const testDuoP1Match = (testDuoActive && players.length > 0) ? players.find(p => p.name.toLowerCase() === testDuoP1Name.toLowerCase()) : null
+  const testDuoP2Match = (testDuoActive && players.length > 0) ? players.find(p => p.name.toLowerCase() === testDuoP2Name.toLowerCase()) : null
+  const testDuoP1     = testDuoActive ? { name: testDuoP1Name, avatar: testDuoP1Match ? resolveAvatar(testDuoP1Match).thumb : null } : null
+  const testDuoP2     = testDuoActive ? { name: testDuoP2Name, avatar: testDuoP2Match ? resolveAvatar(testDuoP2Match).thumb : null } : null
+
+  const duoPlayer1 = testDuoP1 || (duoChampion ? {
     name:    duoChampion.set1Name,
     avatar:  duoChampion.set1AvatarUrl,
     bgImage: duoChampion.set1AvatarBg,
-  } : null
-  const duoPlayer2 = duoChampion ? {
+  } : null)
+  const duoPlayer2 = testDuoP2 || (duoChampion ? {
     name:    duoChampion.set2Name,
     avatar:  duoChampion.set2AvatarUrl,
     bgImage: duoChampion.set2AvatarBg,
-  } : null
+  } : null)
 
   const playoffFinal    = playoffsData?.matches?.find(m => m.matchType === "final")
   const playoffComplete = playoffFinal?.status === "completed"
@@ -363,6 +386,14 @@ export default function CommonDashboard() {
   const testTeamActive = urlParams.has("testTeamCelebration")
   const testTeamParam  = urlParams.get("testTeamCelebration")
   const testTeamName   = testTeamActive
+
+  // TEST-ONLY: ?testRevolution=PlayerName
+  const testRevParam  = urlParams.get("testRevolution")
+  const testRevActive = !!testRevParam
+  const testRevPlayer = (testRevActive && players.length > 0)
+    ? players.find(p => p.name.toLowerCase() === testRevParam.toLowerCase())
+    : null
+  const testRevAvatar = testRevPlayer ? resolveAvatar(testRevPlayer).thumb : null
     ? (testTeamParam && !["1", "true"].includes(testTeamParam) ? testTeamParam : "Test FC")
     : null
   const displayTeamChampion = testTeamName || teamChampion?.name
@@ -452,6 +483,7 @@ export default function CommonDashboard() {
   // which already includes the UCL awards since those apply server-side
   // before this data is ever fetched.
   const [showBallonDorCelebration, setShowBallonDorCelebration] = useState(false)
+  const [showWeeklyHonours, setShowWeeklyHonours] = useState(false)
   const ballonDorWinner = players.length > 0
     ? [...players].sort((a, b) => b.bdrPoints - a.bdrPoints)[0]
     : null
@@ -570,6 +602,17 @@ export default function CommonDashboard() {
 
   // Read featured panel: localStorage first (instant, no API wait), then sync from settings
   const storedPanel    = typeof window !== "undefined" ? localStorage.getItem("featured_panel") : null
+  // ── Weekly Honours celebration trigger ─────────────────────────────────────
+  const weeklyHonoursTriggeredAt = settings?.weekly_celebration_triggered_at
+  const weeklyHonoursKey = `weekly_honours_seen_${weeklyHonoursTriggeredAt}`
+  if (weeklyHonoursTriggeredAt && !showWeeklyHonours) {
+    const seenKey = localStorage.getItem(weeklyHonoursKey)
+    const age     = Date.now() - new Date(weeklyHonoursTriggeredAt).getTime()
+    if (!seenKey && age < 8 * 60 * 60 * 1000) {
+      setTimeout(() => setShowWeeklyHonours(true), 300)
+    }
+  }
+
   const featuredPanel  = settings?.featured_panel || storedPanel || "standings"
   // Sync localStorage whenever settings API returns a value
   if (settings?.featured_panel && settings.featured_panel !== storedPanel) {
@@ -666,30 +709,21 @@ export default function CommonDashboard() {
   return (
     <Layout>
       {showWeeklyCelebration && displayWeeklyChampion ? (
-        <ChampionCelebration
-          trophyImage={weeklyTrophyLogo}
-          eyebrow="Weekly Tournament"
-          title={displayWeeklyChampion}
-          subtitle="is the Weekly Champion! 🎉"
-          badgeImage={displayWeeklyChampionAvatar.thumb}
-          bgImage={displayWeeklyChampionAvatar.bg}
-        >
-          {weeklyGoldenBoot && <GoldenBootBadge scorer={weeklyGoldenBoot} />}
-        </ChampionCelebration>
+        <WeeklyTournamentCelebration
+          name={displayWeeklyChampion}
+          avatarThumb={displayWeeklyChampionAvatar?.thumb}
+          scorer={testGoldenBoot || weeklyGoldenBoot || null}
+          onDismiss={() => setShowWeeklyCelebration(false)}
+        />
       ) : showTeamCelebration && displayTeamChampion ? (
-        <ChampionCelebration
-          trophyImage={teamLeagueTrophyLogo}
-          eyebrow={isGroupKnockout ? "Champions" : "Dshann League"}
-          title={displayTeamChampion}
-          subtitle={isGroupKnockout ? "are the Champions! 🏆" : "are the Dshann League Champions! 🏆"}
-          badgeImage={displayTeamLogo}
+        <DshannLeagueCelebration
+          teamName={displayTeamChampion}
+          teamLogo={displayTeamLogo}
+          players={displayTeamPlayers}
+          scorer={teamGoldenBoot || null}
           anthemUrl={displayTeamAnthem}
-        >
-          {displayTeamPlayers.length > 0 && (
-            <TeamRosterChips players={displayTeamPlayers} bestPerformerId={displayBestPerformer?.id} />
-          )}
-          {teamGoldenBoot && <GoldenBootBadge scorer={teamGoldenBoot} />}
-        </ChampionCelebration>
+          onDismiss={() => setShowTeamCelebration(false)}
+        />
       ) : showEuropaCelebration && europaChampion ? (
         <ChampionCelebration
           trophyImage={europaTrophyLogo}
@@ -714,20 +748,19 @@ export default function CommonDashboard() {
         >
           {uclGoldenBoot && <GoldenBootBadge scorer={uclGoldenBoot} />}
         </ChampionCelebration>
-      ) : showRevCelebration && revChampion ? (
-        <ChampionCelebration
-          trophyImage={revolutionTrophyLogo}
-          eyebrow="Revolution Trophy"
-          title={revChampion.name}
-          subtitle="is the Revolution Champion! ⚡"
-          badgeImage={revChampionAvatar.thumb}
-          bgImage={revChampionAvatar.bg}
+      ) : (showRevCelebration && revChampion) || (testRevActive && !testRevDismissed) ? (
+        <RevolutionCelebration
+          name={testRevActive ? (testRevParam || "Test Player") : revChampion.name}
+          avatarThumb={testRevActive ? testRevAvatar : revChampionAvatar.thumb}
+          anthemUrl={null}
+          onDismiss={() => { setShowRevCelebration(false); setTestRevDismissed(true) }}
         />
-      ) : showDuoCelebration && duoChampion ? (
-        <DuoCelebration
-          trophyImage={duoTrophyLogo}
+      ) : (showDuoCelebration || (testDuoActive && !testDuoDismissed)) && (duoChampion || testDuoActive) ? (
+        <DuoWinnerCelebration
           player1={duoPlayer1}
           player2={duoPlayer2}
+          scorer={null}
+          onDismiss={() => { setShowDuoCelebration(false); setTestDuoDismissed(true) }}
         />
       ) : showBallonDorCelebration && displayBallonDorWinner ? (
         <BallonDorCelebration
@@ -941,6 +974,17 @@ export default function CommonDashboard() {
             </>
           )}
         </>
+      )}
+
+      {/* Weekly Honours Celebration — side by side overlay */}
+      {showWeeklyHonours && (
+        <WeeklyCelebrationOverlay
+          settings={settings || {}}
+          onDismiss={() => {
+            setShowWeeklyHonours(false)
+            if (weeklyHonoursKey) localStorage.setItem(weeklyHonoursKey, "1")
+          }}
+        />
       )}
     </Layout>
   )

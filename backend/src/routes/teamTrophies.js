@@ -164,6 +164,44 @@ router.get("/:teamId", async (req, res, next) => {
       ORDER BY tsh.season_number ASC
     `, [req.params.teamId])
 
+    // For each season in history, fetch players who actually played for this team
+    const historyWithSquad = await Promise.all(historyRes.rows.map(async (h) => {
+      const squadRes = await query(`
+        SELECT DISTINCT p.id, p.name, p.grade,
+          p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+          COUNT(mr.id)::int AS matches,
+          COUNT(mr.id) FILTER (WHERE mr.result = 'win')::int  AS wins,
+          COALESCE(SUM(mr.player_score), 0)::int               AS goals
+        FROM match_records mr
+        JOIN players p ON p.id = mr.player_id
+        WHERE mr.season_number = $1
+          AND EXISTS (
+            SELECT 1 FROM match_records mr2
+            JOIN players p2 ON p2.id = mr2.opponent_id
+            WHERE mr2.player_id = mr.player_id
+              AND mr2.season_number = $1
+          )
+          AND p.team_id = $2
+        GROUP BY p.id, p.name, p.grade, p.avatar_id, p.avatar_url
+        ORDER BY matches DESC
+      `, [h.season_number, req.params.teamId])
+
+      // Season summary stats
+      const statsRes = await query(`
+        SELECT
+          COUNT(mr.id)::int AS matches,
+          COUNT(mr.id) FILTER (WHERE mr.result = 'win')::int  AS wins,
+          COUNT(mr.id) FILTER (WHERE mr.result = 'draw')::int AS draws,
+          COUNT(mr.id) FILTER (WHERE mr.result = 'loss')::int AS losses,
+          COALESCE(SUM(mr.player_score), 0)::int              AS goals
+        FROM match_records mr
+        JOIN players p ON p.id = mr.player_id
+        WHERE p.team_id = $1 AND mr.season_number = $2
+      `, [req.params.teamId, h.season_number])
+
+      return { ...h, squad: squadRes.rows, seasonStats: statsRes.rows[0] || {} }
+    }))
+
     // Win rate from all completed fixtures (all-time)
     const winRateRes = await query(`
       SELECT
@@ -201,7 +239,7 @@ router.get("/:teamId", async (req, res, next) => {
     res.json({
       team:    teamRes.rows[0],
       trophies: trophyRes.rows,
-      history:  historyRes.rows,
+      history:  historyWithSquad,
       stats:    statsRes.rows[0] || {},
       winRate: {
         played: wr.played || 0,

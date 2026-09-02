@@ -94,16 +94,59 @@ function CabinetShelf({ items }) {
 const TROPHIES_PER_SHELF = 5
 
 // ── Season History Row ─────────────────────────────────────────────────────────
-function SeasonRow({ season, trophySeasons }) {
+function generateSummary(season, teamName, isChampion) {
+  const { squad = [], seasonStats = {} } = season
+  const totalPlayers = squad.length
+  const winRate = seasonStats.matches > 0
+    ? Math.round((seasonStats.wins / seasonStats.matches) * 100) : 0
+  const topScorer = squad.sort((a, b) => b.goals - a.goals)[0]
+  const topPerformer = squad.sort((a, b) => b.wins - a.wins)[0]
+
+  const openers = [
+    `Season ${season.season_number} was a defining chapter for ${teamName}.`,
+    `${teamName} made their mark in Season ${season.season_number}.`,
+    `It was a memorable season for ${teamName} in Season ${season.season_number}.`,
+    `Season ${season.season_number} saw ${teamName} put in a determined campaign.`,
+  ]
+  const opener = openers[season.season_number % openers.length]
+
+  const squadLine = totalPlayers > 0 ? ` The squad had ${totalPlayers} players.` : ""
+
+  const resultLines = isChampion
+    ? [` They lifted the Dshann League title`, ` They were crowned Dshann League champions`, ` A historic triumph — the Dshann League title was theirs`]
+    : season.relegated
+    ? [` It ended in relegation`, ` The season ended in heartbreak with relegation`]
+    : winRate >= 60
+    ? [` A strong campaign with ${winRate}% win rate`, ` Solid performances saw them win ${winRate}% of their games`]
+    : winRate >= 40
+    ? [` A balanced season — winning ${winRate}% of games`, ` Mixed results saw a ${winRate}% win rate`]
+    : [` A tough season with only ${winRate}% wins`, ` They struggled, managing just ${winRate}% wins`]
+  const resultLine = (resultLines[season.season_number % resultLines.length] || resultLines[0])
+    + (seasonStats.matches ? ` across ${seasonStats.matches} matches.` : ".")
+
+  const performerLine = topPerformer
+    ? ` ${topPerformer.name} stood out with ${topPerformer.wins} wins.` : ""
+  const goalLine = seasonStats.goals > 0
+    ? ` The team scored ${seasonStats.goals} goals in total.` : ""
+
+  return opener + squadLine + resultLine + performerLine + goalLine
+}
+
+function SeasonRow({ season, trophySeasons, teamName }) {
+  const [expanded, setExpanded]  = useState(false)
   const isChampion    = trophySeasons.includes(season.season_number)
   const leagueStyle   = positionStyle(season.team_league_pos)
   const champStyle    = positionStyle(season.championship_pos)
+  const squad         = season.squad || []
+  const summary       = generateSummary(season, teamName, isChampion)
 
   return (
     <div className={cn(
-      "grid grid-cols-[auto_1fr_1fr_auto] gap-3 items-center px-4 py-3 border-b border-surface-border/40 last:border-0 transition-colors",
+      "border-b border-surface-border/40 last:border-0 transition-colors",
       season.relegated ? "bg-rose-950/10" : isChampion ? "bg-gold/5" : ""
     )}>
+    <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-3 items-center px-4 py-3 cursor-pointer hover:bg-white/3"
+      onClick={() => setExpanded(e => !e)}>
       {/* Season label */}
       <div className="flex flex-col items-center min-w-[52px]">
         <span className="text-xs font-bold text-slate-300">S{season.season_number}</span>
@@ -113,12 +156,16 @@ function SeasonRow({ season, trophySeasons }) {
       {/* Team League position */}
       <div className="flex flex-col items-center gap-1">
         <span className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold">League</span>
-        <span className={cn(
-          "text-sm font-extrabold font-mono px-2 py-0.5 rounded-lg border",
-          leagueStyle.bg, leagueStyle.text, leagueStyle.border
-        )}>
-          {season.team_league_pos ? ordinal(season.team_league_pos) : "—"}
-        </span>
+        {season.team_league_pos ? (
+          <span className={cn(
+            "text-sm font-extrabold font-mono px-2 py-0.5 rounded-lg border",
+            leagueStyle.bg, leagueStyle.text, leagueStyle.border
+          )}>
+            {ordinal(season.team_league_pos)}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-600">—</span>
+        )}
         {isChampion && season.team_league_pos === 1 && (
           <span className="text-[9px] text-gold flex items-center gap-0.5">
             <Trophy className="w-2.5 h-2.5" /> Champions
@@ -149,6 +196,38 @@ function SeasonRow({ season, trophySeasons }) {
           </span>
         ) : null}
       </div>
+    </div>
+
+    {/* Expanded squad + summary */}
+    {expanded && (
+      <div className="px-4 pb-4 space-y-3">
+        {/* Auto-generated summary */}
+        <p className="text-xs text-slate-400 italic leading-relaxed border-l-2 border-accent/40 pl-3">
+          {summary}
+        </p>
+        {/* Squad chips */}
+        {squad.length > 0 && (
+          <div>
+            <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold mb-2">
+              Squad ({squad.length} players)
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {squad.map(p => (
+                <span key={p.id}
+                  className="text-xs bg-pitch-800 border border-surface-border rounded-full px-2.5 py-1 text-slate-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent/60 flex-shrink-0" />
+                  {p.name}
+                  <span className="text-slate-600 text-[10px]">{p.wins}W</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {squad.length === 0 && (
+          <p className="text-xs text-slate-600">No match records found for this season.</p>
+        )}
+      </div>
+    )}
     </div>
   )
 }
@@ -372,7 +451,7 @@ export default function TeamTrophyDetail() {
             </div>
 
             {visibleHistory.map(season => (
-              <SeasonRow key={season.id} season={season} trophySeasons={trophySeasonNumbers} />
+              <SeasonRow key={season.id} season={season} trophySeasons={trophySeasonNumbers} teamName={team.name} />
             ))}
 
             {history.length > VISIBLE_ROWS && (

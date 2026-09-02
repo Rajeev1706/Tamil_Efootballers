@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw, Zap } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw, Zap, Flame } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -104,6 +104,86 @@ function FinalizeUclGroupsCard() {
       <button onClick={handle} disabled={loading}
         className="flex-shrink-0 px-4 py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 text-sm font-semibold transition-colors disabled:opacity-40">
         {loading ? "Saving…" : "Finalize Groups"}
+      </button>
+    </div>
+  )
+}
+
+function TriggerWeeklyHonoursCard() {
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(null)
+
+  async function handle() {
+    if (!window.confirm("This will snapshot the #1 trending player and #1 power ranking player, show celebration cards on the dashboard, then reset both tables. Continue?")) return
+    setLoading(true)
+    try {
+      const res = await api.post("/trending/trigger-celebration")
+      setDone(res.data)
+    } catch (err) {
+      alert(err?.response?.data?.error || "Failed to trigger celebration")
+    } finally { setLoading(false) }
+  }
+
+  if (done) return (
+    <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 space-y-2">
+      <p className="text-emerald-400 font-semibold text-lg">✅ Weekly Honours Triggered!</p>
+      {done.trending && <p className="text-sm text-slate-400">🔥 Trending: <span className="text-white font-semibold">{done.trending.name}</span> — {done.trending.views} views</p>}
+      {done.powerRank && <p className="text-sm text-slate-400">⚡ Power Ranking: <span className="text-white font-semibold">{done.powerRank.name}</span> — {done.powerRank.points}pts</p>}
+      <p className="text-xs text-slate-500 mt-1">Celebration cards will appear on the dashboard for 48 hours. Both tables have been reset.</p>
+      <button onClick={() => setDone(null)} className="text-xs text-slate-500 hover:text-white">Dismiss</button>
+    </div>
+  )
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <Flame className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Trigger Weekly Honours</p>
+          <p className="text-sm text-slate-500 mt-0.5">Snapshots the #1 trending player and #1 power ranking player, shows celebration cards side by side on the dashboard, then resets both tables.</p>
+        </div>
+      </div>
+      <button onClick={handle} disabled={loading}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-orange-400/30 text-orange-400 hover:bg-orange-400/10 text-sm font-semibold transition-colors disabled:opacity-40 whitespace-nowrap">
+        {loading ? "Triggering…" : "🏅 Trigger Now"}
+      </button>
+    </div>
+  )
+}
+
+function GeneratePowerRankingsCard() {
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState(null)
+
+  async function handle() {
+    setLoading(true)
+    try {
+      const res = await api.post("/power-rankings/generate")
+      setDone(res.data)
+    } catch { alert("Failed to generate rankings") }
+    finally { setLoading(false) }
+  }
+
+  if (done) return (
+    <div className="card p-6 border-emerald-500/30 bg-emerald-500/5 text-center">
+      <p className="text-emerald-400 font-semibold text-lg mb-1">✅ Rankings generated!</p>
+      <p className="text-sm text-slate-400">{done.count} players ranked for week {done.weekStart}</p>
+      <button onClick={() => setDone(null)} className="mt-3 text-xs text-slate-500 hover:text-white">Dismiss</button>
+    </div>
+  )
+
+  return (
+    <div className="card p-6 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <Zap className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-white font-semibold">Generate Weekly Power Rankings</p>
+          <p className="text-sm text-slate-500 mt-0.5">Manually snapshot this week's rankings. Auto-runs every Sunday 7am IST.</p>
+        </div>
+      </div>
+      <button onClick={handle} disabled={loading}
+        className="flex-shrink-0 px-4 py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 text-sm font-semibold transition-colors disabled:opacity-40">
+        {loading ? "Generating…" : "Generate Now"}
       </button>
     </div>
   )
@@ -718,6 +798,8 @@ export default function AdminPage() {
       <p className="section-label mb-3">Market Value</p>
       <ResetMVCard />
       <RecalcMVCard />
+      <GeneratePowerRankingsCard />
+      <TriggerWeeklyHonoursCard />
       <RecalcTournamentHistoryCard />
       <FinalizeUclGroupsCard />
     </div>
