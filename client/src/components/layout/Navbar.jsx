@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, TrendingUp, Award, CircleDollarSign, Home, Calendar, Download } from "lucide-react"
+import { BarChart2, Shield, LogIn, LogOut, Users, Trophy, Menu, X, GitCompare, TrendingUp, Award, CircleDollarSign, Home, Calendar, Download, Flame, Zap } from "lucide-react"
 import { useAuthStore } from "../../store/authStore"
 import { cn } from "../../lib/utils"
 
@@ -17,6 +17,8 @@ const MENU_ITEMS = [
   { value: "bdr",       label: "BDR Rankings",          icon: Award },
   { value: "championship", label: "Championship",       icon: Trophy,  link: "/championship" },
   { value: "winrate",   label: "Win Rate",              icon: TrendingUp, link: "/win-rate-ranking" },
+  { value: "trending",  label: "Trending Players",      icon: Flame,   link: "/trending" },
+  { value: "powerrank", label: "Weekly Player",         icon: Zap,     link: "/power-rankings" },
   { value: "market",    label: "Market Value",          icon: TrendingUp },
   { value: "compare",   label: "Compare Players",       icon: GitCompare },
   { value: "trophies",  label: "Trophy (Current Year)", icon: Trophy },

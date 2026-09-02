@@ -30,6 +30,8 @@ import duoRoutes            from "./routes/duo.js"
 import specialEditionRoutes from "./routes/specialEditions.js"
 import uploadRoutes         from "./routes/upload.js"
 import tlgRoutes            from "./routes/tlg.js"
+import trendingRoutes      from "./routes/trending.js"
+import powerRankingRoutes  from "./routes/powerRankings.js"
 import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
@@ -81,6 +83,8 @@ app.use("/api/duo",              duoRoutes)
 app.use("/api/special-editions", specialEditionRoutes)
 app.use("/api/upload", uploadRoutes)
 app.use("/api/tlg",    tlgRoutes)
+app.use("/api/trending",       trendingRoutes)
+app.use("/api/power-rankings", powerRankingRoutes)
 
 // GET /api/settings
 app.get("/api/settings", async (_req, res) => {
@@ -161,8 +165,35 @@ try {
 // ── Missing column migrations ─────────────────────────────────────────────────
 try {
   await query(`ALTER TABLE revolution_matches ADD COLUMN IF NOT EXISTS is_walkover BOOLEAN DEFAULT FALSE`)
+  await query(`ALTER TABLE match_records ADD COLUMN IF NOT EXISTS is_walkover BOOLEAN DEFAULT FALSE`)
   await query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS championship_pts INT DEFAULT 0`)
 } catch (e) { console.error("[missing columns] migration:", e.message) }
+
+// ── New feature tables ────────────────────────────────────────────────────────
+try {
+  await query(`CREATE TABLE IF NOT EXISTS player_profile_views (
+    id         SERIAL PRIMARY KEY,
+    player_id  INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    viewed_at  TIMESTAMPTZ DEFAULT NOW()
+  )`)
+  await query(`CREATE INDEX IF NOT EXISTS idx_profile_views_player ON player_profile_views(player_id)`)
+  await query(`CREATE INDEX IF NOT EXISTS idx_profile_views_time   ON player_profile_views(viewed_at)`)
+  await query(`CREATE TABLE IF NOT EXISTS weekly_power_rankings (
+    id           SERIAL PRIMARY KEY,
+    week_start   DATE NOT NULL,
+    week_end     DATE NOT NULL,
+    player_id    INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    rank         INT NOT NULL,
+    prev_rank    INT,
+    points       INT NOT NULL DEFAULT 0,
+    wins         INT NOT NULL DEFAULT 0,
+    draws        INT NOT NULL DEFAULT 0,
+    losses       INT NOT NULL DEFAULT 0,
+    matches      INT NOT NULL DEFAULT 0,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+  )`)
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_wpr_unique ON weekly_power_rankings(week_start, player_id)`)
+} catch (e) { console.error("[new features] migration:", e.message) }
 })()
 
 app.get("/api/league-info", async (_req, res) => {

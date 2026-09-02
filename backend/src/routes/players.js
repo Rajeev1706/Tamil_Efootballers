@@ -1200,3 +1200,24 @@ router.get("/:id/tournament-history", async (req, res, next) => {
     })
   } catch (err) { next(err) }
 })
+
+
+// ── GET /api/players/:id/form-heatmap — match results grouped by date ─────────
+router.get("/:id/form-heatmap", async (req, res, next) => {
+  try {
+    const playerId = parseInt(req.params.id)
+    const season   = req.query.season ? parseInt(req.query.season) : null
+
+    const { rows } = await query(`
+      SELECT
+        DATE(mr.recorded_at AT TIME ZONE 'Asia/Kolkata') AS date,
+        mr.result
+      FROM match_records mr
+      WHERE mr.player_id = $1
+        ${season ? "AND mr.season_number = $2" : ""}
+      ORDER BY date ASC
+    `, season ? [playerId, season] : [playerId])
+
+    res.json(rows)
+  } catch (err) { next(err) }
+})

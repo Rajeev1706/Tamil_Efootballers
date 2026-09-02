@@ -86,6 +86,22 @@ function PlayerSquadCard({ player }) {
 import HeadToHead from "../components/player/HeadToHead"
 import SeasonSummary from "../components/player/SeasonSummary"
 import TournamentHistory from "../components/player/TournamentHistory"
+import FormHeatmap from "../components/player/FormHeatmap"
+
+// Record a profile view once per browser per player per 7 days
+function recordProfileView(playerId) {
+  try {
+    const key      = `pv_${playerId}`
+    const stored   = localStorage.getItem(key)
+    const sevenDays = 7 * 24 * 60 * 60 * 1000
+    if (stored && Date.now() - parseInt(stored) < sevenDays) return
+    // Not viewed recently — record it
+    import("../lib/api").then(({ default: api }) => {
+      api.post(`/trending/view/${playerId}`).catch(() => {})
+    })
+    localStorage.setItem(key, String(Date.now()))
+  } catch {}
+}
 import PerformanceZones from "../components/dashboard/PerformanceZones"
 import PercentileDashboard from "../components/player/PercentileDashboard"
 
@@ -149,6 +165,10 @@ export default function PlayerProfile() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   if (isLoading) return <Layout><Loading /></Layout>
+  if (isError || !player) return <Layout><div className="text-center py-20 text-slate-400">Player not found.</div></Layout>
+
+  // Record view — once per browser per 7 days
+  recordProfileView(player.id)
   if (isError || !player) return (
     <Layout>
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -368,6 +388,9 @@ export default function PlayerProfile() {
 
           {/* Season summary */}
           <SeasonSummary player={player} />
+
+          {/* Form heatmap */}
+          <FormHeatmap playerId={player.id} seasonNumber={player.seasonNumber} />
 
           {/* Tournament history */}
           <TournamentHistory playerId={player.id} />
