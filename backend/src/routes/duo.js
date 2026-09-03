@@ -239,9 +239,13 @@ router.get("/current", async (req, res, next) => {
         p.id, p.name, p.grade,
         p.avatar_id  AS "avatarId",
         p.avatar_url AS "avatarUrl",
-        COALESCE(SUM(mr.player_score), 0)::int AS goals
+        COALESCE(SUM(
+          CASE WHEN mr.player_id   = p.id THEN COALESCE(mr.player_score, 0)
+               WHEN mr.opponent_id = p.id THEN COALESCE(mr.opponent_score, 0)
+               ELSE 0 END
+        ), 0)::int AS goals
       FROM players p
-      JOIN match_records mr ON mr.player_id = p.id
+      JOIN match_records mr ON (mr.player_id = p.id OR mr.opponent_id = p.id)
       WHERE mr.match_type = 'duo'
         AND mr.season_number = $1
       GROUP BY p.id, p.name, p.grade, p.avatar_id, p.avatar_url
