@@ -917,11 +917,16 @@ export default function AdminPage() {
       <SeasonRecordsAdmin />
     </div>
 
+    {/* Download Celebration Cards */}
+    <div>
+      <p className="section-label mb-3">Celebration Cards</p>
+      <DownloadCelebrationCard />
+    </div>
+
     {/* Market Value Reset */}
     <div>
       <p className="section-label mb-3">Market Value</p>
       <ResetMVCard />
-      <DownloadCelebrationCard />
       <RecalcMVCard />
       <GeneratePowerRankingsCard />
       <TriggerWeeklyHonoursCard />
