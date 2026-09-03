@@ -3,6 +3,7 @@
 // Used by both teamKnockout.js (manual leg entry) and fixtures.js (auto on close).
 
 import { query } from "../db/pool.js"
+import { saveActiveCelebration } from "./tournamentHistoryService.js"
 import { reconcileTeamTrophy } from "./teamTrophyAwards.js"
 import { reconcileTrophyRoster } from "./trophyAwards.js"
 import { updateSeasonRecord } from "./seasonRecord.js"
@@ -100,6 +101,15 @@ export async function advanceKnockoutWinner(match, winnerId) {
     })
     await updateSeasonRecord(season, {
       team_league_players: champPlayersRes.rows.map(p => p.name),
+    })
+
+    // Save for admin card download
+    const teamLogoRes = await query("SELECT name, logo_url FROM teams WHERE id=$1", [winnerId])
+    const tl = teamLogoRes.rows[0]
+    await saveActiveCelebration("dshann", {
+      teamName: tl?.name,
+      teamLogo: tl?.logo_url,
+      players:  champPlayersRes.rows.map(p => p.name),
     })
 
     const thirdMatch = await query(

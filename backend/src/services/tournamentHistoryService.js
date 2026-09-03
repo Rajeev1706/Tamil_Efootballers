@@ -70,3 +70,17 @@ export function buildHistoryResponse(rows) {
 
   return result
 }
+
+/**
+ * Save celebration data per tournament type.
+ * Stored permanently — always downloadable as the latest card for that tournament.
+ * key: celebration_<type>_data  e.g. celebration_weekly_data
+ */
+export async function saveActiveCelebration(type, data) {
+  try {
+    await query(
+      "INSERT INTO app_settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2",
+      [`celebration_${type}_data`, JSON.stringify({ ...data, triggeredAt: new Date().toISOString() })]
+    )
+  } catch (e) { console.error("[celebration] save error:", e.message) }
+}

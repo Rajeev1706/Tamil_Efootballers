@@ -5,7 +5,7 @@ import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
-import { incrementHistory, roundLabel } from "../services/tournamentHistoryService.js"
+import { incrementHistory, roundLabel, saveActiveCelebration } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -424,6 +424,8 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       if (loserId) await incrementHistory(loserId, "revolution", "knockout", label).catch(() => {})
       if (match.round === match.total_rounds) {
         await incrementHistory(winnerId, "revolution", "knockout", "winner").catch(() => {})
+        const rPlayer = (await query(`SELECT name, avatar_url AS "avatarUrl", avatar_id AS "avatarId" FROM players WHERE id=$1`,[winnerId])).rows[0]
+        if (rPlayer) await saveActiveCelebration("revolution", { name: rPlayer.name, avatarUrl: rPlayer.avatarUrl, avatarId: rPlayer.avatarId })
       }
     }
 

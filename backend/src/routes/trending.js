@@ -84,6 +84,13 @@ router.post("/trigger-celebration", async (req, res, next) => {
     )
 
     await upsert("weekly_celebration_triggered_at", new Date().toISOString())
+    await upsert("active_celebration_type", "week_best_player")
+    await upsert("active_celebration_triggered_at", new Date().toISOString())
+    await upsert("active_celebration_data", JSON.stringify({
+      name:   powerRank?.name,
+      points: powerRank?.points,
+      wins:   powerRank?.wins,
+    }))
     // Trending data no longer used in celebration — only power ranking shown
     if (powerRank) {
       await upsert("weekly_celebration_power_id",      powerRank.id)
