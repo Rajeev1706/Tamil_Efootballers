@@ -9,17 +9,13 @@ const router = Router()
 export async function computeAndSnapshotRankings() {
   const now = new Date()
 
-  // Use last reset date as start — accumulate since last trigger
-  const lastResetRes = await query(
-    "SELECT value FROM app_settings WHERE key = 'power_ranking_last_reset_at'"
-  )
-  const lastReset = lastResetRes.rows[0]?.value
-    ? new Date(lastResetRes.rows[0].value)
-    : new Date(0)  // epoch = all time if never triggered
+  // Rolling window: today + last 3 days = 4 days total
+  const weekStart = new Date(now)
+  weekStart.setDate(weekStart.getDate() - 3)
+  weekStart.setHours(0, 0, 0, 0)
 
-  const weekStartDate = lastReset.toISOString().slice(0, 10)
+  const weekStartDate = weekStart.toISOString().slice(0, 10)
   const weekEndDate   = now.toISOString().slice(0, 10)
-  const weekStart     = lastReset
   const weekEnd       = now
 
   // Get all match_records from this week
