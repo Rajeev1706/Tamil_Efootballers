@@ -7,7 +7,7 @@ import { recalcForm } from "../services/form.js"
 import { addBdr } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
-import { incrementHistory } from "../services/tournamentHistoryService.js"
+import { incrementHistory, saveActiveCelebration } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -564,6 +564,13 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
               for (const pid of [wp.set1_player_id, wp.set2_player_id].filter(Boolean)) {
                 await incrementHistory(pid, "duo", "knockout", "winner").catch(() => {})
               }
+              // Save for admin card download
+              const p1 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`,[wp.set1_player_id])).rows[0]
+              const p2 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`,[wp.set2_player_id])).rows[0]
+              await saveActiveCelebration("duo", {
+                p1Name: p1?.name, p1Avatar: p1?.avatarUrl,
+                p2Name: p2?.name, p2Avatar: p2?.avatarUrl,
+              })
             }
           }
         } catch (e) { console.error("[duo] ko history:", e.message) }

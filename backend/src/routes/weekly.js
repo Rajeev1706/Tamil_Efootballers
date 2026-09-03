@@ -7,7 +7,7 @@ import { recalcForm } from "../services/form.js"
 import { claimAward, addBdr } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
-import { incrementHistory, roundLabel } from "../services/tournamentHistoryService.js"
+import { incrementHistory, roundLabel, saveActiveCelebration } from "../services/tournamentHistoryService.js"
 
 const router = Router()
 
@@ -472,6 +472,9 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       // Winner of the final gets "winner"
       if (match.round === totalRounds) {
         await incrementHistory(winnerId, "weekly", "knockout", "winner").catch(() => {})
+        // Save for admin card download
+        const wPlayer = (await query(`SELECT name, avatar_url AS "avatarUrl", avatar_id AS "avatarId" FROM players WHERE id=$1`,[winnerId])).rows[0]
+        if (wPlayer) await saveActiveCelebration("weekly", { name: wPlayer.name, avatarUrl: wPlayer.avatarUrl, avatarId: wPlayer.avatarId })
       }
     }
 

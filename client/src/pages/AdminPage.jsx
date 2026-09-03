@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw, Zap, Flame } from "lucide-react"
+import { LayoutDashboard, Users, Activity, Calendar, CalendarDays, ArrowLeftRight, Shield, Settings, AlertTriangle, RotateCcw, Trophy, Gavel, RefreshCw, Zap, Flame, Download } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import AdminOverview from "../components/admin/AdminOverview"
 import PlayerManagement from "../components/admin/PlayerManagement"
@@ -22,6 +22,16 @@ import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
 import { usePlayers, useRecords, useFixtures, useTrades, useSettings } from "../lib/queries"
 import { useQueryClient } from "@tanstack/react-query"
+import weeklyCardImg   from "../../images/weeklycard.png"
+import weekCardImg     from "../../images/weekcard.png"
+import revCardImg      from "../../images/revcard.png"
+import dshannCardImg   from "../../images/dshanncard.png"
+import duoCardImg      from "../../images/duocard.png"
+import weeklyTrophy    from "../../images/Weekly.png"
+import weekTrophy      from "../../images/weektrophy.png"
+import revTrophy       from "../../images/revolution.png"
+import dshannTrophy    from "../../images/Team League.png"
+import duoTrophy       from "../../images/duo.png"
 import api, { teamsApi, settingsApi } from "../lib/api"
 import { adminActivity } from "../data/mockData"
 import { cn } from "../lib/utils"
@@ -614,6 +624,120 @@ const TABS = [
   { id: "auction",    label: "Auction",      icon: Gavel, href: "/admin/auction" },
 ]
 
+
+// ── DownloadCelebrationCard ────────────────────────────────────────────────────────
+const CARD_CONFIG = [
+  { type: "weekly",           card: weeklyCardImg,  trophy: weeklyTrophy,  label: "Weekly Tournament"      },
+  { type: "revolution",       card: revCardImg,     trophy: revTrophy,     label: "Revolution Trophy"      },
+  { type: "dshann",           card: dshannCardImg,  trophy: dshannTrophy,  label: "Dshann League"          },
+  { type: "duo",              card: duoCardImg,     trophy: duoTrophy,     label: "Duo Tournament"         },
+  { type: "week_best_player", card: weekCardImg,    trophy: weekTrophy,    label: "Best Player of Week"    },
+]
+
+async function loadImg(src) {
+  return new Promise((res, rej) => {
+    const img = new Image(); img.crossOrigin = "anonymous"
+    img.onload = () => res(img)
+    img.onerror = () => { const i2 = new Image(); i2.onload = () => res(i2); i2.onerror = rej; i2.src = src }
+    img.src = src
+  })
+}
+
+async function downloadCard(cfg, data) {
+  const W = 440, H = 616
+  const canvas = document.createElement("canvas")
+  canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext("2d")
+
+  const cardImg = await loadImg(cfg.card)
+  ctx.drawImage(cardImg, 0, 0, W, H)
+
+  const trophyImg = await loadImg(cfg.trophy)
+  const tw = W * 0.28, tx = (W - tw) / 2
+  ctx.drawImage(trophyImg, tx, H * 0.10, tw, tw)
+
+  if (cfg.type === "duo") {
+    const aw = W * 0.28, ay = H * 0.40
+    for (let i = 0; i < 2; i++) {
+      const ax = i === 0 ? W * 0.08 : W * 0.64
+      ctx.fillStyle = "#1e293b"; ctx.beginPath()
+      ctx.roundRect(ax, ay, aw, aw, 10); ctx.fill()
+      const src = i === 0 ? data.p1Avatar : data.p2Avatar
+      if (src) try {
+        const av = await loadImg(src)
+        ctx.save(); ctx.beginPath(); ctx.roundRect(ax, ay, aw, aw, 10); ctx.clip()
+        ctx.drawImage(av, ax, ay, aw, aw); ctx.restore()
+      } catch {}
+      ctx.fillStyle = "white"; ctx.font = "bold 20px sans-serif"; ctx.textAlign = "center"
+      ctx.shadowColor = "black"; ctx.shadowBlur = 6
+      ctx.fillText(i === 0 ? (data.p1Name||"") : (data.p2Name||""), ax + aw/2, ay + aw + 26)
+      ctx.shadowBlur = 0
+    }
+  } else {
+    const aw = W * 0.28, ax = (W - aw) / 2, ay = H * 0.42
+    ctx.fillStyle = "#1e293b"; ctx.beginPath(); ctx.roundRect(ax, ay, aw, aw, 10); ctx.fill()
+    const avatarSrc = cfg.type === "dshann" ? data.teamLogo : data.avatarUrl
+    if (avatarSrc) try {
+      const av = await loadImg(avatarSrc)
+      ctx.save(); ctx.beginPath(); ctx.roundRect(ax, ay, aw, aw, 10); ctx.clip()
+      ctx.drawImage(av, ax, ay, aw, aw); ctx.restore()
+    } catch {}
+    const name = cfg.type === "dshann" ? data.teamName : data.name
+    ctx.fillStyle = "white"; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center"
+    ctx.shadowColor = "black"; ctx.shadowBlur = 8
+    ctx.fillText(name || "", W / 2, ay + aw + 34)
+    if (cfg.type === "week_best_player" && data.points) {
+      ctx.fillStyle = "#4ade80"; ctx.font = "bold 18px sans-serif"
+      ctx.fillText(`${data.points}pts · ${data.wins}W`, W / 2, ay + aw + 60)
+    }
+    ctx.shadowBlur = 0
+  }
+
+  const link = document.createElement("a")
+  link.download = `${cfg.label.replace(/ /g,"_")}_card.png`
+  link.href = canvas.toDataURL("image/png")
+  link.click()
+}
+
+function DownloadCelebrationCard() {
+  const { data: settings = {} } = useSettings()
+  const [loading, setLoading] = useState({})
+
+  async function handle(cfg) {
+    const key = `celebration_${cfg.type}_data`
+    const raw = settings[key]
+    if (!raw) return alert(`No ${cfg.label} card data yet — trigger it first by completing the tournament`)
+    setLoading(l => ({ ...l, [cfg.type]: true }))
+    try {
+      const data = JSON.parse(raw)
+      await downloadCard(cfg, data)
+    } catch (e) { alert("Download failed: " + e.message) }
+    finally { setLoading(l => ({ ...l, [cfg.type]: false })) }
+  }
+
+  return (
+    <div className="card p-5 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-white mb-1">Download Celebration Cards</p>
+        <p className="text-xs text-slate-500">Downloads the most recent card for each tournament.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {CARD_CONFIG.map(cfg => (
+          <button key={cfg.type}
+            onClick={() => handle(cfg)}
+            disabled={loading[cfg.type]}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-border
+                       bg-pitch-800 text-slate-300 hover:text-white hover:border-accent/40
+                       text-sm font-medium transition-all disabled:opacity-40 text-left">
+            <Download className="w-4 h-4 flex-shrink-0 text-accent" />
+            {loading[cfg.type] ? "Generating…" : cfg.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── FeaturedPanelCard ─────────────────────────────────────────────────────────
 const PANEL_OPTIONS = [
   { value: "standings",  label: "Dshann League (Default)" },
@@ -797,6 +921,7 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Market Value</p>
       <ResetMVCard />
+      <DownloadCelebrationCard />
       <RecalcMVCard />
       <GeneratePowerRankingsCard />
       <TriggerWeeklyHonoursCard />
