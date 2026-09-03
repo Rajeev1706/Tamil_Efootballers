@@ -101,8 +101,13 @@ router.post("/trigger-celebration", async (req, res, next) => {
       await upsert("weekly_celebration_power_grade",   powerRank.grade || "")
     }
 
-    // Clear power rankings table (reset for next week)
+    // Clear power rankings table (reset for next period)
     await query("DELETE FROM weekly_power_rankings")
+    // Save reset timestamp so rankings accumulate from this point
+    await query(
+      "INSERT INTO app_settings (key,value) VALUES ('power_ranking_last_reset_at',$1) ON CONFLICT (key) DO UPDATE SET value=$1",
+      [new Date().toISOString()]
+    )
 
     res.json({ success: true, trending, powerRank })
   } catch (err) { next(err) }
