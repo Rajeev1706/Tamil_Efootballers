@@ -7,19 +7,20 @@ const router = Router()
 
 // ── Core computation ──────────────────────────────────────────────────────────
 export async function computeAndSnapshotRankings() {
-  // Compute week boundaries (Mon 00:00 → Sun 23:59 IST = UTC+5:30)
-  const now       = new Date()
-  // Week start = most recent Monday 00:00 IST
-  const dayOfWeek = (now.getUTCDay() + 7 - 1) % 7  // Mon=0 … Sun=6
-  const weekStart = new Date(now)
-  weekStart.setUTCDate(now.getUTCDate() - dayOfWeek)
-  weekStart.setUTCHours(0 - 5, 60 - 30, 0, 0)  // Monday 00:00 IST = Sun 18:30 UTC prev week
-  const weekEnd   = new Date(weekStart)
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6)
-  weekEnd.setUTCHours(18, 29, 59, 999)   // Sunday 23:59:59 IST
+  const now = new Date()
 
-  const weekStartDate = weekStart.toISOString().slice(0, 10)
-  const weekEndDate   = weekEnd.toISOString().slice(0, 10)
+  // Use last reset date as start — accumulate since last trigger
+  const lastResetRes = await query(
+    "SELECT value FROM app_settings WHERE key = 'power_ranking_last_reset_at'"
+  )
+  const lastReset = lastResetRes.rows[0]?.value
+    ? new Date(lastResetRes.rows[0].value)
+    : new Date(0)  // epoch = all time if never triggered
+
+  const weekStartDate = lastReset.toISOString().slice(0, 10)
+  const weekEndDate   = now.toISOString().slice(0, 10)
+  const weekStart     = lastReset
+  const weekEnd       = now
 
   // Get all match_records from this week
   const { rows } = await query(`
@@ -68,7 +69,8 @@ export async function computeAndSnapshotRankings() {
   return { weekStart: weekStartDate, weekEnd: weekEndDate, count: rows.length }
 }
 
-// ── Cron: every Sunday at 7:00am IST (1:30am UTC) ────────────────────────────
+// ── Cron: every Sunday at 7:00am IST (1:30am UTC) — auto-snapshot current standings ──
+// This just refreshes the snapshot; actual reset only happens via admin trigger
 cron.schedule("30 1 * * 0", async () => {
   console.log("[power-rankings] Sunday cron triggered — computing weekly rankings")
   try {
