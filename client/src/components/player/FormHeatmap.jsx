@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
-import { Calendar } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import api from "../../lib/api"
 import { cn } from "../../lib/utils"
 
@@ -13,20 +13,20 @@ function getDominantResult(matches) {
   return "draw"
 }
 
-const RESULT_BG = {
-  win:  "bg-emerald-500/80 border-emerald-400/40",
-  draw: "bg-amber-400/80 border-amber-300/40",
-  loss: "bg-rose-500/80 border-rose-400/40",
-}
-const RESULT_TEXT = {
-  win: "text-emerald-200", draw: "text-amber-200", loss: "text-rose-200"
-}
+const MONTH_NAMES = ["January","February","March","April","May","June",
+                     "July","August","September","October","November","December"]
+const DAY_LABELS  = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+const CELL_STYLE = {
+  win:     { bg: "bg-emerald-500",    text: "text-white",     border: "border-emerald-400/50" },
+  draw:    { bg: "bg-amber-400",      text: "text-white",     border: "border-amber-300/50"   },
+  loss:    { bg: "bg-rose-500",       text: "text-white",     border: "border-rose-400/50"    },
+  empty:   { bg: "bg-pitch-800/50",   text: "text-slate-700", border: "border-white/5"        },
+  outside: { bg: "bg-transparent",    text: "text-slate-800", border: "border-transparent"    },
+}
 
 export default function FormHeatmap({ playerId, seasonNumber }) {
-  const [tooltip, setTooltip] = useState(null)
+  const [viewDate, setViewDate] = useState(null) // null = auto to latest match month
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["form-heatmap", playerId, seasonNumber],
@@ -44,136 +44,132 @@ export default function FormHeatmap({ playerId, seasonNumber }) {
     dayMap[day].push(m)
   }
 
-  const dates = Object.keys(dayMap).sort()
-  const firstDate = new Date(dates[0])
-  const lastDate  = new Date(dates[dates.length - 1])
+  const allDates = Object.keys(dayMap).sort()
+  const lastMatchDate = new Date(allDates[allDates.length - 1])
 
-  // Start from Monday of first match week
-  const startDate = new Date(firstDate)
-  const dow = (startDate.getDay() + 6) % 7
-  startDate.setDate(startDate.getDate() - dow)
+  // Current view month
+  const activeDate = viewDate || new Date(lastMatchDate.getFullYear(), lastMatchDate.getMonth(), 1)
+  const year  = activeDate.getFullYear()
+  const month = activeDate.getMonth()
 
-  // Build weeks
-  const weeks = []
-  let current = new Date(startDate)
-  while (current <= lastDate) {
-    const week = []
-    for (let d = 0; d < 7; d++) {
-      week.push(new Date(current))
-      current.setDate(current.getDate() + 1)
+  // First day of month (adjust for Mon=0)
+  const firstOfMonth = new Date(year, month, 1)
+  const lastOfMonth  = new Date(year, month + 1, 0)
+  const startOffset  = (firstOfMonth.getDay() + 6) % 7  // Mon=0
+
+  // Build calendar grid (6 rows × 7 cols)
+  const cells = []
+  for (let i = 0; i < 42; i++) {
+    const dayNum = i - startOffset + 1
+    if (dayNum < 1 || dayNum > lastOfMonth.getDate()) {
+      cells.push(null)
+    } else {
+      cells.push(new Date(year, month, dayNum))
     }
-    weeks.push(week)
   }
 
-  const totalMatches = data.length
-  const wins   = data.filter(m => m.result === "win").length
-  const losses = data.filter(m => m.result === "loss").length
-  const draws  = data.filter(m => m.result === "draw").length
+  // Remove trailing empty rows
+  let rows = []
+  for (let r = 0; r < 6; r++) {
+    const row = cells.slice(r * 7, r * 7 + 7)
+    if (row.some(d => d !== null)) rows.push(row)
+  }
+
+  // Month stats
+  const monthMatches = allDates
+    .filter(d => d.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`))
+    .flatMap(d => dayMap[d])
+  const mWins   = monthMatches.filter(m => m.result === "win").length
+  const mDraws  = monthMatches.filter(m => m.result === "draw").length
+  const mLosses = monthMatches.filter(m => m.result === "loss").length
+
+  const canPrev = new Date(year, month - 1, 1) >= new Date(new Date(allDates[0]).getFullYear(), new Date(allDates[0]).getMonth(), 1)
+  const canNext = new Date(year, month + 1, 1) <= new Date(lastMatchDate.getFullYear(), lastMatchDate.getMonth(), 1)
+
+  function prevMonth() { setViewDate(new Date(year, month - 1, 1)) }
+  function nextMonth() { setViewDate(new Date(year, month + 1, 1)) }
 
   return (
-    <div className="card p-5 space-y-3">
+    <div className="card p-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-500" />
           <p className="text-sm font-semibold text-white">Match Activity</p>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />{wins}W</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" />{draws}D</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />{losses}L</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />{mWins}W</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400 inline-block" />{mDraws}D</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" />{mLosses}L</span>
         </div>
       </div>
 
-      {/* Calendar grid */}
-      <div className="overflow-x-auto">
-        <div style={{ minWidth: weeks.length * 34 + 40 }}>
-          {/* Month + date headers */}
-          <div className="flex ml-10">
-            {weeks.map((week, wi) => {
-              // Show month label at start of each month
-              const firstDay = week[0]
-              const showMonth = wi === 0 || firstDay.getDate() <= 7
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={prevMonth}
+          disabled={!canPrev}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400
+                     hover:bg-pitch-800 hover:text-white disabled:opacity-20 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <p className="text-sm font-bold text-white">
+          {MONTH_NAMES[month]} {year}
+        </p>
+        <button
+          onClick={nextMonth}
+          disabled={!canNext}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400
+                     hover:bg-pitch-800 hover:text-white disabled:opacity-20 transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {DAY_LABELS.map(d => (
+          <div key={d} className="text-center text-[10px] text-slate-600 font-semibold py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar rows */}
+      <div className="space-y-1">
+        {rows.map((row, ri) => (
+          <div key={ri} className="grid grid-cols-7 gap-1">
+            {row.map((day, ci) => {
+              if (!day) return <div key={ci} />
+              const key     = day.toISOString().slice(0, 10)
+              const matches = dayMap[key] || []
+              const result  = matches.length > 0 ? getDominantResult(matches) : null
+              const style   = result ? CELL_STYLE[result] : CELL_STYLE.empty
+
               return (
-                <div key={wi} className="flex-shrink-0" style={{ width: 30, marginRight: 4 }}>
-                  {showMonth && (
-                    <p className="text-[9px] text-slate-400 font-semibold whitespace-nowrap mb-1">
-                      {MONTH_NAMES[firstDay.getMonth()]}
-                    </p>
+                <div
+                  key={ci}
+                  className={cn(
+                    "rounded-lg border flex flex-col items-center justify-center py-2 transition-all",
+                    style.bg, style.border,
+                    matches.length > 0 && "cursor-default hover:opacity-80"
                   )}
-                  {!showMonth && <div className="mb-1 h-3" />}
+                >
+                  <span className={cn("text-xs font-bold", style.text)}>
+                    {day.getDate()}
+                  </span>
+                  {matches.length > 0 && (
+                    <span className="text-[9px] font-medium opacity-80" style={{ color: "inherit" }}>
+                      {matches.length > 1 ? `${matches.length}m` : result?.slice(0,1).toUpperCase()}
+                    </span>
+                  )}
                 </div>
               )
             })}
           </div>
-
-          {/* Day rows */}
-          {DAY_LABELS.map((dayLabel, di) => (
-            <div key={di} className="flex items-center mb-1">
-              {/* Day label */}
-              <span className="text-[9px] text-slate-600 w-9 flex-shrink-0 font-medium">{dayLabel}</span>
-
-              {/* Cells */}
-              {weeks.map((week, wi) => {
-                const day = week[di]
-                const key = day.toISOString().slice(0, 10)
-                const matches = dayMap[key] || []
-                const result  = matches.length > 0 ? getDominantResult(matches) : null
-                const isFuture = day > new Date()
-                const isOutOfRange = day < firstDate || day > lastDate
-
-                return (
-                  <div
-                    key={wi}
-                    className={cn(
-                      "flex-shrink-0 rounded-sm border flex items-center justify-center cursor-default transition-opacity",
-                      result ? RESULT_BG[result] : "bg-pitch-800/60 border-white/5",
-                      (isFuture || isOutOfRange) && "opacity-20"
-                    )}
-                    style={{ width: 30, height: 22, marginRight: 4 }}
-                    onMouseEnter={() => matches.length > 0 && setTooltip({ key, matches, result })}
-                    onMouseLeave={() => setTooltip(null)}
-                  >
-                    <span className={cn(
-                      "text-[9px] font-semibold select-none",
-                      result ? RESULT_TEXT[result] : "text-slate-700"
-                    )}>
-                      {day.getDate()}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
 
-      {/* Tooltip */}
-      {tooltip && (
-        <div className="px-3 py-2 bg-pitch-800 border border-surface-border rounded-lg text-xs">
-          <p className="text-slate-400 mb-1">
-            {new Date(tooltip.key).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
-          </p>
-          <p className="text-white font-medium">
-            {tooltip.matches.length} match{tooltip.matches.length > 1 ? "es" : ""} —{" "}
-            <span className={cn(
-              tooltip.result === "win" ? "text-emerald-400" :
-              tooltip.result === "loss" ? "text-rose-400" : "text-amber-400"
-            )}>
-              {tooltip.result === "win" ? "Win" : tooltip.result === "loss" ? "Loss" : "Draw"}
-            </span>
-          </p>
-          {tooltip.matches.length > 1 && (
-            <p className="text-slate-500 mt-0.5">
-              {tooltip.matches.filter(m => m.result === "win").length}W{" "}
-              {tooltip.matches.filter(m => m.result === "draw").length}D{" "}
-              {tooltip.matches.filter(m => m.result === "loss").length}L
-            </p>
-          )}
-        </div>
-      )}
-
-      <p className="text-xs text-slate-600">{totalMatches} matches this season</p>
+      <p className="text-xs text-slate-600 mt-3">{monthMatches.length} matches in {MONTH_NAMES[month]}</p>
     </div>
   )
 }

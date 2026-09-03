@@ -389,13 +389,15 @@ export default function PlayerProfile() {
           {/* Season summary */}
           <SeasonSummary player={player} />
 
-          {/* Form heatmap */}
-          <FormHeatmap playerId={player.id} seasonNumber={player.seasonNumber} />
-
           {/* Tournament history */}
           <TournamentHistory playerId={player.id} />
 
         </div>
+      </div>
+
+      {/* ── Match Activity — full width above percentile ── */}
+      <div className="mt-6">
+        <FormHeatmap playerId={player.id} seasonNumber={player.seasonNumber} />
       </div>
 
       {/* ── Percentile Rankings ── */}
