@@ -680,6 +680,89 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
   )
 }
 
+
+// ── Knockout Export Card ──────────────────────────────────────────────────────
+function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
+  const roundFixtures = fixtures.filter(f => f.knockout_round === round)
+  return (
+    <div ref={exportRef} style={{
+      position: "fixed", left: visible ? 0 : "-9999px", top: 0,
+      width: 1400, background: "#050810", padding: "36px 40px",
+      fontFamily: "system-ui, sans-serif", overflow: "visible",
+      zIndex: visible ? 9999 : -1, opacity: visible ? 1 : 0, pointerEvents: "none",
+    }}>
+      <img src={logoUrl} alt="" style={{
+        position: "absolute", top: "50%", left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: 320, height: 320, objectFit: "contain", opacity: 0.04, pointerEvents: "none",
+      }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
+        <img src={logoUrl} alt="TEC" style={{ width: 48, height: 48, objectFit: "contain" }} />
+        <div>
+          <p style={{ color: "#64748b", fontSize: 12, textTransform: "uppercase", letterSpacing: 2, margin: 0 }}>
+            Tamil Efootballers · Duo Tournament S{season}
+          </p>
+          <p style={{ color: "#ffffff", fontSize: 26, fontWeight: 800, margin: 0 }}>
+            {ROUND_LABELS[round] || round} Fixtures
+          </p>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px" }}>
+        {roundFixtures.map(f => {
+          const set1HomeWins = (f.set1_home_score ?? 0) > (f.set1_away_score ?? 0)
+          const set2HomeWins = (f.set2_home_score ?? 0) > (f.set2_away_score ?? 0)
+          const set1AwayWins = (f.set1_away_score ?? 0) > (f.set1_home_score ?? 0)
+          const set2AwayWins = (f.set2_away_score ?? 0) > (f.set2_home_score ?? 0)
+          const done = f.status === "completed"
+          return (
+            <div key={f.id} style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 10, padding: "10px 16px", marginBottom: 7,
+            }}>
+              <p style={{ color: "#64748b", fontSize: 10, fontWeight: 700, margin: "0 0 8px 0" }}>
+                {f.homeDuoName} vs {f.awayDuoName}
+              </p>
+              {/* Set 1 */}
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ flex: 1, textAlign: "right" }}>
+                  <span style={{ color: set1HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1HomeWins ? 700 : 400 }}>{f.homeSet1Name}</span>
+                </div>
+                <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
+                  {done
+                    ? <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 800, fontFamily: "monospace" }}>{f.set1_home_score ?? 0} – {f.set1_away_score ?? 0}</span>
+                    : <span style={{ color: "#334155", fontSize: 11, fontWeight: 600 }}>vs</span>
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ color: set1AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1AwayWins ? 700 : 400 }}>{f.awaySet1Name}</span>
+                </div>
+              </div>
+              <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 0 6px 0" }} />
+              {/* Set 2 */}
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <div style={{ flex: 1, textAlign: "right" }}>
+                  <span style={{ color: set2HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2HomeWins ? 700 : 400 }}>{f.homeSet2Name}</span>
+                </div>
+                <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
+                  {done
+                    ? <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 800, fontFamily: "monospace" }}>{f.set2_home_score ?? 0} – {f.set2_away_score ?? 0}</span>
+                    : <span style={{ color: "#334155", fontSize: 11, fontWeight: 600 }}>vs</span>
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ color: set2AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2AwayWins ? 700 : 400 }}>{f.awaySet2Name}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
 function FixturesByRound({ fixtures, onSave, saving, season }) {
   const rounds = [...new Set(fixtures.map(f => f.round_number).filter(Boolean))].sort((a,b) => a-b)
   const [activeRound, setActiveRound] = useState(rounds[0] || 1)
@@ -749,6 +832,71 @@ function FixturesByRound({ fixtures, onSave, saving, season }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
+// ── KnockoutTab — shows knockout rounds with per-round Export PNG ─────────────
+function KnockoutTab({ fixtures, rounds, season, scoreMut, deciderSetupMut, deciderResultMut }) {
+  const [activeRound, setActiveRound] = useState(rounds[0] || "r16")
+  const [exporting, setExporting]     = useState(false)
+  const [showExport, setShowExport]   = useState(false)
+  const exportRef = useRef(null)
+
+  if (rounds.length === 0) return <p className="text-slate-500 text-sm text-center py-8">Knockout not generated yet.</p>
+
+  async function handleExport() {
+    if (!exportRef.current) return
+    setShowExport(true); setExporting(true)
+    await new Promise(r => setTimeout(r, 400))
+    try {
+      const el = exportRef.current
+      const { toPng } = await import("html-to-image")
+      const dataUrl = await toPng(el, {
+        cacheBust: true, pixelRatio: 2, backgroundColor: "#050810",
+        width: el.scrollWidth, height: el.scrollHeight,
+      })
+      const link = document.createElement("a")
+      link.download = `Duo-${ROUND_LABELS[activeRound] || activeRound}-Fixtures.png`
+      link.href = dataUrl; link.click()
+    } catch (err) { alert("Export failed: " + (err?.message || "")) }
+    finally { setExporting(false); setShowExport(false) }
+  }
+
+  const roundFixtures = fixtures.filter(f => f.knockout_round === activeRound)
+
+  return (
+    <div className="space-y-4">
+      <KnockoutExportCard round={activeRound} fixtures={fixtures} exportRef={exportRef} visible={showExport} season={season} />
+      {/* Round tabs + Export */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {rounds.map(r => (
+            <button key={r} onClick={() => setActiveRound(r)}
+              className={cn("px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
+                activeRound === r ? "bg-accent text-white border-accent" : "bg-pitch-800 text-slate-400 border-surface-border hover:text-white")}>
+              {ROUND_LABELS[r] || r}
+            </button>
+          ))}
+        </div>
+        <button onClick={handleExport} disabled={exporting}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+          <Download className="w-3.5 h-3.5" />
+          {exporting ? "Exporting…" : "Export PNG"}
+        </button>
+      </div>
+      {/* Fixtures */}
+      <div className="space-y-2">
+        {roundFixtures.map(f => (
+          <FixtureRow key={f.id} fixture={f}
+            onSave={(id, scores) => scoreMut.mutate({ id, scores })}
+            saving={scoreMut.isPending}
+            onDeciderSetup={(id, hp, ap) => deciderSetupMut.mutate({ id, homePlayerId: hp, awayPlayerId: ap })}
+            onDeciderResult={(id, hs, as_) => deciderResultMut.mutate({ id, homeScore: hs, awayScore: as_ })}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+
 export default function DuoTournamentAdmin() {
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -943,26 +1091,14 @@ export default function DuoTournamentAdmin() {
               )}
               {activeTab === "fixtures" && <FixturesByRound fixtures={groupFixtures} onSave={(id, scores) => scoreMut.mutate({ id, scores })} saving={scoreMut.isPending} season={season} />}
               {activeTab === "knockout" && (
-                <div className="space-y-6">
-                  {knockoutRounds.length === 0
-                    ? <p className="text-slate-500 text-sm text-center py-8">Knockout not generated yet.</p>
-                    : knockoutRounds.map(round => (
-                        <div key={round}>
-                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{ROUND_LABELS[round] || round}</h3>
-                          <div className="space-y-2">
-                            {knockoutFixtures.filter(f => f.knockout_round === round).map(f => (
-                              <FixtureRow key={f.id} fixture={f}
-                                onSave={(id, scores) => scoreMut.mutate({ id, scores })}
-                                saving={scoreMut.isPending}
-                                onDeciderSetup={(id, homePlayerId, awayPlayerId) => deciderSetupMut.mutate({ id, homePlayerId, awayPlayerId })}
-                                onDeciderResult={(id, homeScore, awayScore) => deciderResultMut.mutate({ id, homeScore, awayScore })}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                  }
-                </div>
+                <KnockoutTab
+                  fixtures={knockoutFixtures}
+                  rounds={knockoutRounds}
+                  season={season}
+                  scoreMut={scoreMut}
+                  deciderSetupMut={deciderSetupMut}
+                  deciderResultMut={deciderResultMut}
+                />
               )}
             </>
           )}
