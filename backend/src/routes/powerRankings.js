@@ -5,20 +5,20 @@ import cron from "node-cron"
 
 const router = Router()
 
-// ── Core computation ──────────────────────────────────────────────────────────
-export async function computeAndSnapshotRankings() {
+// ── Shared helper: compute the live 4-day rolling window ─────────────────────
+// Returns { weekStart, weekEnd, rows } where rows are already ranked 1…N.
+// Pulls player + team details in a single JOIN so callers don't need a
+// second round-trip.
+async function computeLive() {
   const now = new Date()
 
-  // Rolling window: today + last 3 days = 4 days total
-  const weekStart = new Date(now)
-  weekStart.setDate(weekStart.getDate() - 3)
-  weekStart.setHours(0, 0, 0, 0)
+  const windowStart = new Date(now)
+  windowStart.setDate(windowStart.getDate() - 3)
+  windowStart.setHours(0, 0, 0, 0)
 
-  const weekStartDate = weekStart.toISOString().slice(0, 10)
+  const weekStartDate = windowStart.toISOString().slice(0, 10)
   const weekEndDate   = now.toISOString().slice(0, 10)
-  const weekEnd       = now
 
-  // Get all match_records from this week
   const { rows } = await query(`
     SELECT
       mr.player_id,
@@ -27,13 +27,30 @@ export async function computeAndSnapshotRankings() {
       COUNT(*) FILTER (WHERE mr.result = 'loss')::int AS losses,
       COUNT(*)::int                                    AS matches,
       (COUNT(*) FILTER (WHERE mr.result = 'win')  * 3 +
-       COUNT(*) FILTER (WHERE mr.result = 'draw') * 1)::int AS points
+       COUNT(*) FILTER (WHERE mr.result = 'draw') * 1)::int AS points,
+      p.id, p.name, p.grade,
+      p.avatar_id  AS "avatarId",
+      p.avatar_url AS "avatarUrl",
+      t.name       AS "teamName",
+      t.logo_url   AS "teamLogo"
     FROM match_records mr
-    WHERE mr.recorded_at >= $1 AND mr.recorded_at <= $2
-    GROUP BY mr.player_id
+    JOIN players p   ON p.id  = mr.player_id
+    LEFT JOIN teams t ON t.id = p.team_id
+    WHERE mr.recorded_at >= $1
+      AND mr.recorded_at <= $2
+    GROUP BY
+      mr.player_id, p.id, p.name, p.grade,
+      p.avatar_id, p.avatar_url, t.name, t.logo_url
     HAVING COUNT(*) >= 1
     ORDER BY points DESC, wins DESC, matches DESC
-  `, [weekStart.toISOString(), weekEnd.toISOString()])
+  `, [windowStart.toISOString(), now.toISOString()])
+
+  return { weekStartDate, weekEndDate, rows }
+}
+
+// ── Core computation + snapshot (used by cron & manual trigger) ───────────────
+export async function computeAndSnapshotRankings() {
+  const { weekStartDate, weekEndDate, rows } = await computeLive()
 
   if (rows.length === 0) return { weekStart: weekStartDate, weekEnd: weekEndDate, count: 0 }
 
@@ -47,7 +64,7 @@ export async function computeAndSnapshotRankings() {
   `, [weekStartDate])
   const prevRankMap = Object.fromEntries(prevRanks.map(r => [r.player_id, r.rank]))
 
-  // Delete existing snapshot for this week and re-insert
+  // Delete existing snapshot for this window and re-insert (top 50 archived)
   await query("DELETE FROM weekly_power_rankings WHERE week_start = $1", [weekStartDate])
 
   for (let i = 0; i < Math.min(rows.length, 50); i++) {
@@ -65,10 +82,9 @@ export async function computeAndSnapshotRankings() {
   return { weekStart: weekStartDate, weekEnd: weekEndDate, count: rows.length }
 }
 
-// ── Cron: every Sunday at 7:00am IST (1:30am UTC) — auto-snapshot current standings ──
-// This just refreshes the snapshot; actual reset only happens via admin trigger
+// ── Cron: every Sunday at 7:00am IST (1:30am UTC) — archive current standings ─
 cron.schedule("30 1 * * 0", async () => {
-  console.log("[power-rankings] Sunday cron triggered — computing weekly rankings")
+  console.log("[power-rankings] Sunday cron triggered — archiving weekly rankings")
   try {
     const result = await computeAndSnapshotRankings()
     console.log(`[power-rankings] Snapshot saved — ${result.count} players ranked for ${result.weekStart}`)
@@ -77,31 +93,48 @@ cron.schedule("30 1 * * 0", async () => {
   }
 }, { timezone: "UTC" })
 
-// ── GET /api/power-rankings/current — latest snapshot ────────────────────────
+// ── GET /api/power-rankings/current — LIVE ranking from match_records ─────────
+// Always computed fresh from the last 4 days so new results appear instantly.
+// Prev-rank comes from the last archived snapshot (not the live window) so the
+// change indicator shows movement vs the previous week, not vs 5 minutes ago.
 router.get("/current", async (req, res, next) => {
   try {
-    const { rows } = await query(`
-      SELECT
-        wpr.rank, wpr.prev_rank AS "prevRank", wpr.points,
-        wpr.wins, wpr.draws, wpr.losses, wpr.matches,
-        wpr.week_start AS "weekStart", wpr.week_end AS "weekEnd",
-        p.id, p.name, p.grade,
-        p.avatar_id  AS "avatarId",
-        p.avatar_url AS "avatarUrl",
-        t.name AS "teamName",
-        t.logo_url AS "teamLogo"
-      FROM weekly_power_rankings wpr
-      JOIN players p ON p.id = wpr.player_id
-      LEFT JOIN teams t ON t.id = p.team_id
-      WHERE wpr.week_start = (SELECT MAX(week_start) FROM weekly_power_rankings)
-      ORDER BY wpr.rank ASC
-      LIMIT 15
-    `)
-    res.json(rows)
+    const { weekStartDate, weekEndDate, rows } = await computeLive()
+
+    // Fetch prev-week ranks from the snapshot table for rank-change badges
+    const { rows: prevRanks } = await query(`
+      SELECT player_id, rank
+      FROM weekly_power_rankings
+      WHERE week_start = (
+        SELECT MAX(week_start) FROM weekly_power_rankings WHERE week_start < $1
+      )
+    `, [weekStartDate])
+    const prevRankMap = Object.fromEntries(prevRanks.map(r => [r.player_id, r.rank]))
+
+    const result = rows.slice(0, 15).map((r, i) => ({
+      rank:     i + 1,
+      prevRank: prevRankMap[r.player_id] || null,
+      points:   r.points,
+      wins:     r.wins,
+      draws:    r.draws,
+      losses:   r.losses,
+      matches:  r.matches,
+      weekStart: weekStartDate,
+      weekEnd:   weekEndDate,
+      id:        r.id,
+      name:      r.name,
+      grade:     r.grade,
+      avatarId:  r.avatarId,
+      avatarUrl: r.avatarUrl,
+      teamName:  r.teamName,
+      teamLogo:  r.teamLogo,
+    }))
+
+    res.json(result)
   } catch (err) { next(err) }
 })
 
-// ── GET /api/power-rankings/history — past snapshots list ────────────────────
+// ── GET /api/power-rankings/history — past archived snapshots list ────────────
 router.get("/history", async (req, res, next) => {
   try {
     const { rows } = await query(`
@@ -114,7 +147,7 @@ router.get("/history", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── GET /api/power-rankings/week/:weekStart — snapshot for a specific week ───
+// ── GET /api/power-rankings/week/:weekStart — archived snapshot for a past week
 router.get("/week/:weekStart", async (req, res, next) => {
   try {
     const { rows } = await query(`
@@ -127,7 +160,7 @@ router.get("/week/:weekStart", async (req, res, next) => {
         p.avatar_url AS "avatarUrl",
         t.name AS "teamName", t.logo_url AS "teamLogo"
       FROM weekly_power_rankings wpr
-      JOIN players p ON p.id = wpr.player_id
+      JOIN players p   ON p.id  = wpr.player_id
       LEFT JOIN teams t ON t.id = p.team_id
       WHERE wpr.week_start = $1
       ORDER BY wpr.rank ASC
@@ -136,7 +169,7 @@ router.get("/week/:weekStart", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── POST /api/power-rankings/generate — admin manual trigger ─────────────────
+// ── POST /api/power-rankings/generate — admin: archive a snapshot right now ───
 router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
     const result = await computeAndSnapshotRankings()
