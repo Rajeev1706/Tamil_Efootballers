@@ -5,103 +5,88 @@ import cron from "node-cron"
 
 const router = Router()
 
-// ── Shared helper: compute the live 4-day rolling window ─────────────────────
-// Returns { weekStart, weekEnd, rows } where rows are already ranked 1…N.
-// Pulls player + team details in a single JOIN so callers don't need a
-// second round-trip.
-async function computeLive() {
-  const now = new Date()
+// ── Window start: MAX(last admin reset, IST midnight 4 days ago) ──────────────
+// After admin triggers "close the week", rankings reset from that moment.
+// If no reset has happened, falls back to the standard 4-day rolling window.
+async function getWindowStart() {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+  const nowIST        = new Date(Date.now() + IST_OFFSET_MS)
+  const rollingStart  = new Date(Date.UTC(
+    nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate() - 3, 0, 0, 0, 0
+  ) - IST_OFFSET_MS)
 
-  const windowStart = new Date(now)
-  windowStart.setDate(windowStart.getDate() - 3)
-  windowStart.setHours(0, 0, 0, 0)
+  const resetRes = await query(
+    "SELECT value FROM app_settings WHERE key = 'power_ranking_last_reset_at'"
+  )
+  const resetAt = resetRes.rows[0]?.value ? new Date(resetRes.rows[0].value) : null
+
+  // Use whichever is more recent — ensures post-reset matches only
+  return resetAt && resetAt > rollingStart ? resetAt : rollingStart
+}
+
+// ── Core live computation ─────────────────────────────────────────────────────
+// Counts every match from BOTH sides of match_records so no match is missed.
+// Window starts from the last admin reset (or 4 days ago if no reset yet).
+async function computeLive() {
+  const now         = new Date()
+  const windowStart = await getWindowStart()
 
   const weekStartDate = windowStart.toISOString().slice(0, 10)
   const weekEndDate   = now.toISOString().slice(0, 10)
 
   const { rows } = await query(`
+    WITH all_matches AS (
+      SELECT mr.player_id AS pid, mr.result::text AS result
+      FROM match_records mr
+      WHERE mr.recorded_at >= $1 AND mr.recorded_at <= $2
+
+      UNION ALL
+
+      SELECT mr.opponent_id AS pid,
+        CASE mr.result::text
+          WHEN 'win'  THEN 'loss'
+          WHEN 'loss' THEN 'win'
+          ELSE 'draw'
+        END AS result
+      FROM match_records mr
+      WHERE mr.recorded_at >= $1 AND mr.recorded_at <= $2
+    ),
+    stats AS (
+      SELECT
+        pid,
+        COUNT(*) FILTER (WHERE result = 'win')::int  AS wins,
+        COUNT(*) FILTER (WHERE result = 'draw')::int AS draws,
+        COUNT(*) FILTER (WHERE result = 'loss')::int AS losses,
+        COUNT(*)::int AS matches,
+        (COUNT(*) FILTER (WHERE result = 'win') * 3 +
+         COUNT(*) FILTER (WHERE result = 'draw') * 1)::int AS points
+      FROM all_matches
+      GROUP BY pid
+      HAVING COUNT(*) >= 1
+    )
     SELECT
-      mr.player_id,
-      COUNT(*) FILTER (WHERE mr.result = 'win')::int  AS wins,
-      COUNT(*) FILTER (WHERE mr.result = 'draw')::int AS draws,
-      COUNT(*) FILTER (WHERE mr.result = 'loss')::int AS losses,
-      COUNT(*)::int                                    AS matches,
-      (COUNT(*) FILTER (WHERE mr.result = 'win')  * 3 +
-       COUNT(*) FILTER (WHERE mr.result = 'draw') * 1)::int AS points,
+      s.pid        AS player_id,
+      s.wins, s.draws, s.losses, s.matches, s.points,
       p.id, p.name, p.grade,
       p.avatar_id  AS "avatarId",
       p.avatar_url AS "avatarUrl",
       t.name       AS "teamName",
       t.logo_url   AS "teamLogo"
-    FROM match_records mr
-    JOIN players p   ON p.id  = mr.player_id
-    LEFT JOIN teams t ON t.id = p.team_id
-    WHERE mr.recorded_at >= $1
-      AND mr.recorded_at <= $2
-    GROUP BY
-      mr.player_id, p.id, p.name, p.grade,
-      p.avatar_id, p.avatar_url, t.name, t.logo_url
-    HAVING COUNT(*) >= 1
-    ORDER BY points DESC, wins DESC, matches DESC
+    FROM stats s
+    JOIN players p    ON p.id  = s.pid
+    LEFT JOIN teams t ON t.id  = p.team_id
+    ORDER BY s.points DESC, s.wins DESC, s.matches DESC
   `, [windowStart.toISOString(), now.toISOString()])
 
   return { weekStartDate, weekEndDate, rows }
 }
 
-// ── Core computation + snapshot (used by cron & manual trigger) ───────────────
-export async function computeAndSnapshotRankings() {
-  const { weekStartDate, weekEndDate, rows } = await computeLive()
-
-  if (rows.length === 0) return { weekStart: weekStartDate, weekEnd: weekEndDate, count: 0 }
-
-  // Get previous week's ranks for change indicator
-  const { rows: prevRanks } = await query(`
-    SELECT player_id, rank
-    FROM weekly_power_rankings
-    WHERE week_start = (
-      SELECT MAX(week_start) FROM weekly_power_rankings WHERE week_start < $1
-    )
-  `, [weekStartDate])
-  const prevRankMap = Object.fromEntries(prevRanks.map(r => [r.player_id, r.rank]))
-
-  // Delete existing snapshot for this window and re-insert (top 50 archived)
-  await query("DELETE FROM weekly_power_rankings WHERE week_start = $1", [weekStartDate])
-
-  for (let i = 0; i < Math.min(rows.length, 50); i++) {
-    const r    = rows[i]
-    const rank = i + 1
-    await query(`
-      INSERT INTO weekly_power_rankings
-        (week_start, week_end, player_id, rank, prev_rank, points, wins, draws, losses, matches)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    `, [weekStartDate, weekEndDate, r.player_id, rank,
-        prevRankMap[r.player_id] || null,
-        r.points, r.wins, r.draws, r.losses, r.matches])
-  }
-
-  return { weekStart: weekStartDate, weekEnd: weekEndDate, count: rows.length }
-}
-
-// ── Cron: every Sunday at 7:00am IST (1:30am UTC) — archive current standings ─
-cron.schedule("30 1 * * 0", async () => {
-  console.log("[power-rankings] Sunday cron triggered — archiving weekly rankings")
-  try {
-    const result = await computeAndSnapshotRankings()
-    console.log(`[power-rankings] Snapshot saved — ${result.count} players ranked for ${result.weekStart}`)
-  } catch (err) {
-    console.error("[power-rankings] Cron error:", err.message)
-  }
-}, { timezone: "UTC" })
-
-// ── GET /api/power-rankings/current — LIVE ranking from match_records ─────────
-// Always computed fresh from the last 4 days so new results appear instantly.
-// Prev-rank comes from the last archived snapshot (not the live window) so the
-// change indicator shows movement vs the previous week, not vs 5 minutes ago.
+// ── GET /api/power-rankings/current — always live ────────────────────────────
 router.get("/current", async (req, res, next) => {
   try {
     const { weekStartDate, weekEndDate, rows } = await computeLive()
 
-    // Fetch prev-week ranks from the snapshot table for rank-change badges
+    // Prev-week ranks from snapshot for rank-change badges
     const { rows: prevRanks } = await query(`
       SELECT player_id, rank
       FROM weekly_power_rankings
@@ -112,13 +97,13 @@ router.get("/current", async (req, res, next) => {
     const prevRankMap = Object.fromEntries(prevRanks.map(r => [r.player_id, r.rank]))
 
     const result = rows.slice(0, 15).map((r, i) => ({
-      rank:     i + 1,
-      prevRank: prevRankMap[r.player_id] || null,
-      points:   r.points,
-      wins:     r.wins,
-      draws:    r.draws,
-      losses:   r.losses,
-      matches:  r.matches,
+      rank:      i + 1,
+      prevRank:  prevRankMap[r.player_id] || null,
+      points:    r.points,
+      wins:      r.wins,
+      draws:     r.draws,
+      losses:    r.losses,
+      matches:   r.matches,
       weekStart: weekStartDate,
       weekEnd:   weekEndDate,
       id:        r.id,
@@ -134,7 +119,7 @@ router.get("/current", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── GET /api/power-rankings/history — past archived snapshots list ────────────
+// ── GET /api/power-rankings/history ──────────────────────────────────────────
 router.get("/history", async (req, res, next) => {
   try {
     const { rows } = await query(`
@@ -147,7 +132,7 @@ router.get("/history", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── GET /api/power-rankings/week/:weekStart — archived snapshot for a past week
+// ── GET /api/power-rankings/week/:weekStart ───────────────────────────────────
 router.get("/week/:weekStart", async (req, res, next) => {
   try {
     const { rows } = await query(`
@@ -160,8 +145,8 @@ router.get("/week/:weekStart", async (req, res, next) => {
         p.avatar_url AS "avatarUrl",
         t.name AS "teamName", t.logo_url AS "teamLogo"
       FROM weekly_power_rankings wpr
-      JOIN players p   ON p.id  = wpr.player_id
-      LEFT JOIN teams t ON t.id = p.team_id
+      JOIN players p    ON p.id  = wpr.player_id
+      LEFT JOIN teams t ON t.id  = p.team_id
       WHERE wpr.week_start = $1
       ORDER BY wpr.rank ASC
     `, [req.params.weekStart])
@@ -169,12 +154,43 @@ router.get("/week/:weekStart", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── POST /api/power-rankings/generate — admin: archive a snapshot right now ───
+// ── POST /api/power-rankings/generate — admin: archive a snapshot ─────────────
 router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const result = await computeAndSnapshotRankings()
-    res.json({ success: true, ...result })
+    const { weekStartDate, weekEndDate, rows } = await computeLive()
+    if (rows.length === 0)
+      return res.json({ success: true, weekStart: weekStartDate, weekEnd: weekEndDate, count: 0 })
+
+    const { rows: prevRanks } = await query(`
+      SELECT player_id, rank FROM weekly_power_rankings
+      WHERE week_start = (SELECT MAX(week_start) FROM weekly_power_rankings WHERE week_start < $1)
+    `, [weekStartDate])
+    const prevRankMap = Object.fromEntries(prevRanks.map(r => [r.player_id, r.rank]))
+
+    await query("DELETE FROM weekly_power_rankings WHERE week_start = $1", [weekStartDate])
+    for (let i = 0; i < Math.min(rows.length, 50); i++) {
+      const r = rows[i], rank = i + 1
+      await query(`
+        INSERT INTO weekly_power_rankings
+          (week_start, week_end, player_id, rank, prev_rank, points, wins, draws, losses, matches)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `, [weekStartDate, weekEndDate, r.player_id, rank,
+          prevRankMap[r.player_id] || null,
+          r.points, r.wins, r.draws, r.losses, r.matches])
+    }
+    res.json({ success: true, weekStart: weekStartDate, weekEnd: weekEndDate, count: rows.length })
   } catch (err) { next(err) }
 })
+
+// ── Cron: every Sunday at 7am IST (1:30am UTC) ───────────────────────────────
+cron.schedule("30 1 * * 0", async () => {
+  console.log("[power-rankings] Sunday cron — archiving weekly rankings")
+  try {
+    const { weekStartDate, rows } = await computeLive()
+    console.log(`[power-rankings] ${rows.length} players for ${weekStartDate}`)
+  } catch (err) {
+    console.error("[power-rankings] Cron error:", err.message)
+  }
+}, { timezone: "UTC" })
 
 export default router
