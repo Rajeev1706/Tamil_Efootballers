@@ -161,6 +161,12 @@ router.post("/trigger-celebration", async (req, res, next) => {
     await upsert("weekly_celebration_power_team",    powerRank.teamName || "")
     await upsert("weekly_celebration_power_grade",   powerRank.grade || "")
 
+    // ── Auto-increment winner's Week Best Player trophy ────────────────────
+    await query(
+      "UPDATE players SET trophy13_count = COALESCE(trophy13_count, 0) + 1 WHERE id = $1",
+      [powerRank.id]
+    )
+
     // ── Reset: new window starts from NOW() ──────────────────────────────────
     // powerRankings.js reads this value and uses it as the window start,
     // so all match_records before this moment are excluded from rankings.
