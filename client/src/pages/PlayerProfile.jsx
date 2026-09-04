@@ -20,7 +20,8 @@ import revolutionTrophy   from "../../images/revolution.png"
 import europaTrophy       from "../../images/europa.png"
 import duoTrophy          from "../../images/duo.png"
 import duoBootTrophy      from "../../images/duoboot.png"
-import championshipTrophy  from "../../images/championship.png" 
+import championshipTrophy  from "../../images/championship.png"
+import weekBestTrophy      from "../../images/weektrophy.png"
 
 const FormDot = ({ result }) => {
   const cls = { W: "bg-emerald-500", D: "bg-amber-400", L: "bg-rose-500" }
@@ -119,6 +120,7 @@ function TrophyCase({ player }) {
     { image: uclGBTrophy,         label: "UCL Golden Boot",         count: player.trophy7Count  ?? 0 },
     { image: duoBootTrophy,        label: "Duo Golden Boot",         count: player.trophy11Count ?? 0 },
     { image: championshipTrophy,   label: "Championship",            count: player.trophy12Count ?? 0 },
+    { image: weekBestTrophy,       label: "Week Best Player",         count: player.trophy13Count ?? 0 },
   ]
   const total = trophies.reduce((a, t) => a + t.count, 0)
   return (
