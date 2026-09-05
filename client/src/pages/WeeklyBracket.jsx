@@ -19,15 +19,16 @@ function getRoundLabel(round, totalRounds) {
   return `Round ${round}`
 }
 
-// Short label for the source round (one level before current)
+// Short label for the SOURCE round (one level BEFORE the current round)
 function getPrevRoundShort(round, totalRounds) {
-  const fromEnd = totalRounds - round
-  if (fromEnd === 1) return "Final"
-  if (fromEnd === 2) return "SF"
-  if (fromEnd === 3) return "QF"
-  if (fromEnd === 4) return "R16"
-  if (fromEnd === 5) return "R32"
-  if (fromEnd === 6) return "R64"
+  const fromEnd = totalRounds - (round - 1)
+  if (fromEnd === 0) return "F"
+  if (fromEnd === 1) return "SF"
+  if (fromEnd === 2) return "QF"
+  if (fromEnd === 3) return "R16"
+  if (fromEnd === 4) return "R32"
+  if (fromEnd === 5) return "R64"
+  if (fromEnd === 6) return "R128"
   if (fromEnd === 7) return "R128"
   return `R${round - 1}`
 }
