@@ -5,23 +5,29 @@ import cron from "node-cron"
 
 const router = Router()
 
-// ── Window start: MAX(last admin reset, IST midnight 4 days ago) ──────────────
-// After admin triggers "close the week", rankings reset from that moment.
-// If no reset has happened, falls back to the standard 4-day rolling window.
+// ── Window start: only resets when admin explicitly triggers ─────────────────
+// Uses power_ranking_last_reset_at as the fixed window start.
+// If admin has never triggered a reset, falls back to IST Monday of current week
+// so the window is stable and doesn't shift every day automatically.
 async function getWindowStart() {
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-  const nowIST        = new Date(Date.now() + IST_OFFSET_MS)
-  const rollingStart  = new Date(Date.UTC(
-    nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate() - 3, 0, 0, 0, 0
-  ) - IST_OFFSET_MS)
-
   const resetRes = await query(
     "SELECT value FROM app_settings WHERE key = 'power_ranking_last_reset_at'"
   )
   const resetAt = resetRes.rows[0]?.value ? new Date(resetRes.rows[0].value) : null
 
-  // Use whichever is more recent — ensures post-reset matches only
-  return resetAt && resetAt > rollingStart ? resetAt : rollingStart
+  // If admin has triggered a reset, use that as the fixed start
+  if (resetAt) return resetAt
+
+  // Fallback: start of current IST week (Monday midnight IST)
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+  const nowIST        = new Date(Date.now() + IST_OFFSET_MS)
+  const dayOfWeek     = nowIST.getUTCDay() // 0=Sun, 1=Mon...
+  const daysToMonday  = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const mondayIST     = new Date(Date.UTC(
+    nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate() - daysToMonday, 0, 0, 0, 0
+  ) - IST_OFFSET_MS)
+
+  return mondayIST
 }
 
 // ── Core live computation ─────────────────────────────────────────────────────

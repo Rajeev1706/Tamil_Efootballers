@@ -14,13 +14,17 @@ async function getLivePowerRank1() {
   )
   const resetAt = resetRes.rows[0]?.value ? new Date(resetRes.rows[0].value) : null
 
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-  const nowIST        = new Date(Date.now() + IST_OFFSET_MS)
-  const rollingStart  = new Date(Date.UTC(
-    nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate() - 3, 0, 0, 0, 0
-  ) - IST_OFFSET_MS)
-
-  const windowStart = resetAt && resetAt > rollingStart ? resetAt : rollingStart
+  // If admin has triggered a reset use that, otherwise start of current IST week
+  let windowStart = resetAt
+  if (!windowStart) {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+    const nowIST        = new Date(Date.now() + IST_OFFSET_MS)
+    const dayOfWeek     = nowIST.getUTCDay()
+    const daysToMonday  = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    windowStart = new Date(Date.UTC(
+      nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate() - daysToMonday, 0, 0, 0, 0
+    ) - IST_OFFSET_MS)
+  }
 
   const { rows } = await query(`
     WITH all_matches AS (
