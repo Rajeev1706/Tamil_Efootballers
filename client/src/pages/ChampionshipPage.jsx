@@ -87,7 +87,6 @@ function TeamRow({ team, rank }) {
                   <PlayerAvatarIcon player={p} size="sm" />
                   <div className="min-w-0">
                     <p className="text-sm text-white font-medium truncate">{p.name}</p>
-                    <p className="text-[10px] text-slate-500">{p.grade}-grade</p>
                   </div>
                 </div>
                 <p className={cn(
