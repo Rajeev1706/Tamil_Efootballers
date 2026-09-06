@@ -988,6 +988,21 @@ router.post("/recalc-tournament-history", authenticate, adminOnly, async (req, r
 })
 
 
+
+// ── GET /api/players/:id/bdr-breakdown — BDR points breakdown by source ──────
+router.get("/:id/bdr-breakdown", async (req, res, next) => {
+  try {
+    const { rows } = await query(`
+      SELECT label, SUM(amount)::int AS total
+      FROM player_bdr_breakdown
+      WHERE player_id = $1 AND amount > 0
+      GROUP BY label
+      ORDER BY total DESC
+    `, [req.params.id])
+    res.json(rows)
+  } catch (err) { next(err) }
+})
+
 export default router
 // ── GET /api/players/:id/tournament-history ───────────────────────────────────
 // Returns per-player tournament history across Weekly, Revolution, UCL, Duo.

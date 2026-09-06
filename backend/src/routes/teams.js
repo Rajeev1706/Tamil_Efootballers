@@ -3,7 +3,7 @@ import { z } from "zod"
 import bcrypt from "bcryptjs"
 import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
-import { claimAward, addBdr, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
+import { claimAward, addBdr, addBdrWithLabel, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { generatePlayoffs } from "../services/playoffs.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { recalcMarketValue } from "../services/marketValue.js"
@@ -1494,15 +1494,15 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
         const thirdPlaceId = q2.winner_team_id === q2.team1_id ? q2.team2_id : q2.team1_id
 
         const placements = [
-          { teamId: winnerId,      bdr: 12, flatPts: 12 },
-          { teamId: loserId,       bdr: 9,  flatPts: 9  },
-          { teamId: thirdPlaceId,  bdr: 7,  flatPts: 7  },
-          { teamId: fourthPlaceId, bdr: 5,  flatPts: 5  },
+          { teamId: winnerId,      bdr: 12, flatPts: 12, label: "Team League Champion"  },
+          { teamId: loserId,       bdr: 9,  flatPts: 9,  label: "Team League Runner-up" },
+          { teamId: thirdPlaceId,  bdr: 7,  flatPts: 7,  label: "Team League 3rd Place" },
+          { teamId: fourthPlaceId, bdr: 5,  flatPts: 5,  label: "Team League 4th Place" },
         ]
-        for (const { teamId, bdr, flatPts } of placements) {
+        for (const { teamId, bdr, flatPts, label } of placements) {
           const playersRes = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
           for (const p of playersRes.rows) {
-            await addBdr(p.id, bdr)
+            await addBdrWithLabel(p.id, bdr, label)
             await addLeagueBdr(p.id, bdr) // track league BDR separately
           }
           await addTeamChampionshipPts(teamId, flatPts) // flat team pts

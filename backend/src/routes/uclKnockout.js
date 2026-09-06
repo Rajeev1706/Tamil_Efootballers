@@ -4,7 +4,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
-import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { claimAward, addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
@@ -359,7 +359,8 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     // Award new winner's diff
     if (winnerId && winnerDiff > 0) {
-      await addBdr(winnerId, winnerDiff)
+      const uclLabel = match.round === TOTAL_ROUNDS ? "UCL Champion" : `UCL Knockout Round ${match.round}`
+      await addBdrWithLabel(winnerId, winnerDiff, uclLabel)
     }
 
     // Recalc MV for both (BDR affects MV)
@@ -412,7 +413,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
           ORDER BY goals DESC, conceded ASC
           LIMIT 1
         `, [match.tournament_id])
-        if (goldenBootRes.rows[0]?.goals > 0) await addBdr(goldenBootRes.rows[0].id, 6)
+        if (goldenBootRes.rows[0]?.goals > 0) await addBdrWithLabel(goldenBootRes.rows[0].id, 6, "UCL Knockout Golden Boot")
       }
 
       // Trophy awards — runs EVERY time completion is detected (unlike the
