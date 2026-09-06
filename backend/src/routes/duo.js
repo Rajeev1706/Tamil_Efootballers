@@ -575,30 +575,25 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       }
 
       // ── BDR for knockout rounds ───────────────────────────────────────────
-      // Only award when fixture was NOT already completed — prevents double-allocation on re-save
-      const wasAlreadyCompleted = fix.status === "completed"
-      if (fix.knockout_round && winnerPairId && !needsDecider && !wasAlreadyCompleted) {
+      // claimAward ensures BDR is awarded exactly ONCE per fixture, no matter
+      // how many times the result is edited and re-saved.
+      if (fix.knockout_round && winnerPairId && !needsDecider) {
         const loserPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
         const loserPair   = winnerPairId === fix.home_pair_id ? awayPair : homePair
         const winnerPair  = winnerPairId === fix.home_pair_id ? homePair : awayPair
 
-        // BDR per round (for loser — reaching that round)
-        const LOSER_BDR = { qf: 4, sf: 6, final: 8 }
-        // BDR for winner of final
+        const LOSER_BDR  = { qf: 4, sf: 6, final: 8 }
         const WINNER_BDR = { final: 10 }
-
-        const loserBdr  = LOSER_BDR[fix.knockout_round]
-        const winnerBdr = WINNER_BDR[fix.knockout_round]
-
-        // Award loser BDR (for reaching this round)
+        const loserBdr   = LOSER_BDR[fix.knockout_round]
+        const winnerBdr  = WINNER_BDR[fix.knockout_round]
         const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
-        if (loserBdr) {
+
+        if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
           await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo")
           await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo")
         }
 
-        // Award winner BDR (champion only)
-        if (winnerBdr) {
+        if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
           await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion")
           await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion")
         }
@@ -1123,8 +1118,7 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       await recalcForm(fix.decider_home_player_id)
       await recalcForm(fix.decider_away_player_id)
 
-      // BDR awards — only if not already completed (prevents double-allocation on re-save)
-      const wasAlreadyDone = fix.status === "completed"
+      // BDR awards — claimAward ensures exactly once per fixture regardless of re-saves
       const winnerPair = winnerPairId === fix.home_pair_id ? homePair : awayPair
       const loserPair  = loserPairId  === fix.home_pair_id ? homePair : awayPair
       const LOSER_BDR  = { qf: 4, sf: 6, final: 8 }
@@ -1132,11 +1126,11 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       const loserBdr   = LOSER_BDR[fix.knockout_round]
       const winnerBdr  = WINNER_BDR[fix.knockout_round]
       const deciderLoserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
-      if (loserBdr && !wasAlreadyDone) {
+      if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
         await addBdrWithLabel(loserPair.set1_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo")
         await addBdrWithLabel(loserPair.set2_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo")
       }
-      if (winnerBdr && !wasAlreadyDone) {
+      if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
         await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion")
         await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion")
       }
