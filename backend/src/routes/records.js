@@ -470,6 +470,10 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
     await query(`UPDATE ucl_fixtures SET match_record_id = NULL, status = 'pending', player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
     await query(`UPDATE ucl_knockout_matches SET match_record_id = NULL, status = 'pending', winner_id = NULL, player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
     await query(`UPDATE weekly_tournament_matches SET match_record_id = NULL, status = 'pending', winner_id = NULL, player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
+    await query(`UPDATE duo_fixtures SET set1_match_record_id = NULL WHERE set1_match_record_id = $1`, [mrId])
+    await query(`UPDATE duo_fixtures SET set2_match_record_id = NULL WHERE set2_match_record_id = $1`, [mrId])
+    await query(`UPDATE duo_fixtures SET decider_match_record_id = NULL WHERE decider_match_record_id = $1`, [mrId])
+    await query(`UPDATE revolution_matches SET match_record_id = NULL, status = 'pending', winner_id = NULL, player1_score = NULL, player2_score = NULL WHERE match_record_id = $1`, [mrId])
 
     const result = await query(
       "DELETE FROM match_records WHERE id = $1 RETURNING player_id, opponent_id",
