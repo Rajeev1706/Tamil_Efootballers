@@ -163,7 +163,9 @@ router.post("/trigger-celebration", async (req, res, next) => {
     await upsert("weekly_celebration_power_points",  powerRank.points)
     await upsert("weekly_celebration_power_wins",    powerRank.wins)
     await upsert("weekly_celebration_power_team",    powerRank.teamName || "")
-    await upsert("weekly_celebration_power_grade",   powerRank.grade || "")
+    await upsert("weekly_celebration_power_grade",      powerRank.grade || "")
+    await upsert("weekly_celebration_power_avatar_url", powerRank.avatarUrl || "")
+    await upsert("weekly_celebration_power_avatar_id",  powerRank.avatarId != null ? String(powerRank.avatarId) : "")
 
     // ── Auto-increment winner's Week Best Player trophy ────────────────────
     await query(

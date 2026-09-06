@@ -5,6 +5,7 @@ import LetterReveal    from "../common/LetterReveal"
 import CountUp         from "../common/CountUp"
 import weekCardImg     from "../../../images/weekcard.png"
 import weekTrophyImg   from "../../../images/weektrophy.png"
+import { getAvatarById } from "../../lib/avatars"
 
 const AUTO_DISMISS_SEC = 10
 
@@ -14,6 +15,10 @@ export default function WeeklyCelebrationOverlay({ settings, onDismiss }) {
   const audioRef = useRef(null)
 
   const powerName   = settings.weekly_celebration_power_name
+  const avatarUrl   = settings.weekly_celebration_power_avatar_url
+  const avatarId    = settings.weekly_celebration_power_avatar_id
+  const preset      = getAvatarById(avatarId ? parseInt(avatarId) : null)
+  const avatarSrc   = avatarUrl || preset?.full || preset?.thumb
   const powerPoints = parseInt(settings.weekly_celebration_power_points || "0")
   const powerWins   = settings.weekly_celebration_power_wins
 
@@ -83,13 +88,22 @@ export default function WeeklyCelebrationOverlay({ settings, onDismiss }) {
           style={{ top: "36%", left: "50%", transform: "translateX(-50%)", width: "26%", paddingTop: "26%" }}
         >
           <div className="absolute inset-0 rounded-xl bg-green-500/20 blur-md animate-glow-pulse" />
-          <div
-            className="absolute inset-0 w-full h-full rounded-xl bg-pitch-800 border border-green-500/20
-                       flex items-center justify-center font-black text-white/30"
-            style={{ fontSize: "clamp(16px, 3.5vw, 28px)" }}
-          >
-            {powerName?.[0]}
-          </div>
+          {avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt={powerName}
+              className="absolute inset-0 w-full h-full object-cover rounded-xl border border-green-500/20"
+              style={{ boxShadow: "0 0 16px rgba(34,197,94,0.4)" }}
+            />
+          ) : (
+            <div
+              className="absolute inset-0 w-full h-full rounded-xl bg-pitch-800 border border-green-500/20
+                         flex items-center justify-center font-black text-white/30"
+              style={{ fontSize: "clamp(16px, 3.5vw, 28px)" }}
+            >
+              {powerName?.[0]}
+            </div>
+          )}
         </div>
 
         {/* Player name — below avatar */}
