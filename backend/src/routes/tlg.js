@@ -11,7 +11,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
-import { addBdr, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
+import { addBdr, addBdrWithLabel, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 // BDR for final standings — same as regular Team League playoffs
@@ -29,11 +29,11 @@ const TLG_CHAMP_PTS = {
   seventh_place:   { winner: 0,  loser: 0 },
 }
 
-async function awardBdrToTeam(teamId, bdr) {
+async function awardBdrToTeam(teamId, bdr, label) {
   if (!bdr || !teamId) return
   const players = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
   for (const p of players.rows) {
-    await addBdr(p.id, bdr)
+    await addBdrWithLabel(p.id, bdr, label || "TLG")
     await addLeagueBdr(p.id, bdr) // track league BDR separately
   }
 }

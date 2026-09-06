@@ -4,7 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
-import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { claimAward, addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
 import { incrementHistory } from "../services/tournamentHistoryService.js"
 
 const router = Router()
@@ -285,7 +285,7 @@ router.patch("/fixtures/:id", authenticate, adminOnly, async (req, res, next) =>
           }))
           .sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf)
 
-        if (ranked[0]) await addBdr(ranked[0].id, 2)
+        if (ranked[0]) await addBdrWithLabel(ranked[0].id, 2, "UCL Group Stage Winner")
       }
     }
 

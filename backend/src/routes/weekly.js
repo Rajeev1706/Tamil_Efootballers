@@ -4,7 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
-import { claimAward, addBdr } from "../services/bdrAwards.js"
+import { claimAward, addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 import { incrementHistory, roundLabel, saveActiveCelebration } from "../services/tournamentHistoryService.js"
@@ -456,7 +456,8 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     // Award new winner's diff
     if (winnerId && winnerDiff > 0) {
-      await addBdr(winnerId, winnerDiff)
+      const weeklyLabel = match.round === finalRound ? "Weekly Champion" : `Weekly Tournament Round ${match.round}`
+      await addBdrWithLabel(winnerId, winnerDiff, weeklyLabel)
     }
 
     // Recalc MV for both (BDR affects MV)
@@ -515,7 +516,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
           ORDER BY goals DESC, conceded ASC
           LIMIT 1
         `, [match.tournament_id])
-        if (goldenBootRes.rows[0]?.goals > 0) await addBdr(goldenBootRes.rows[0].id, 4)
+        if (goldenBootRes.rows[0]?.goals > 0) await addBdrWithLabel(goldenBootRes.rows[0].id, 4, "Weekly Golden Boot")
       }
 
       // Trophy awards — runs EVERY time completion is detected (unlike the

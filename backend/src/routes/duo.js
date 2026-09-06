@@ -4,7 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
-import { addBdr } from "../services/bdrAwards.js"
+import { addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 import { incrementHistory, saveActiveCelebration } from "../services/tournamentHistoryService.js"
@@ -591,15 +591,16 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
         const winnerBdr = WINNER_BDR[fix.knockout_round]
 
         // Award loser BDR (for reaching this round)
+        const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
         if (loserBdr) {
-          await addBdr(loserPair.set1_player_id, loserBdr)
-          await addBdr(loserPair.set2_player_id, loserBdr)
+          await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo")
+          await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo")
         }
 
         // Award winner BDR (champion only)
         if (winnerBdr) {
-          await addBdr(winnerPair.set1_player_id, winnerBdr)
-          await addBdr(winnerPair.set2_player_id, winnerBdr)
+          await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion")
+          await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion")
         }
 
         // Runner-up (Final loser) gets 8 already above.
@@ -642,7 +643,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           `, [seasonNum])
           const topScorer = gbRes.rows[0]
           if (topScorer?.goals > 0) {
-            await addBdr(topScorer.player_id, 3)
+            await addBdrWithLabel(topScorer.player_id, 3, "Duo Golden Boot")
             // ── Duo Golden Boot trophy (trophy11) ─────────────────────────────
             await awardOrReassignTrophy({
               sourceKey:    `duo_golden_boot_s${seasonNum}`,
@@ -1130,13 +1131,14 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       const WINNER_BDR = { final: 10 }
       const loserBdr   = LOSER_BDR[fix.knockout_round]
       const winnerBdr  = WINNER_BDR[fix.knockout_round]
+      const deciderLoserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
       if (loserBdr && !wasAlreadyDone) {
-        await addBdr(loserPair.set1_player_id, loserBdr)
-        await addBdr(loserPair.set2_player_id, loserBdr)
+        await addBdrWithLabel(loserPair.set1_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo")
+        await addBdrWithLabel(loserPair.set2_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo")
       }
       if (winnerBdr && !wasAlreadyDone) {
-        await addBdr(winnerPair.set1_player_id, winnerBdr)
-        await addBdr(winnerPair.set2_player_id, winnerBdr)
+        await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion")
+        await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion")
       }
 
       // Advance winner in bracket
@@ -1192,7 +1194,7 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
         `, [seasonNum])
         const topScorer = gbRes.rows[0]
         if (topScorer?.goals > 0) {
-          await addBdr(topScorer.player_id, 3)
+          await addBdrWithLabel(topScorer.player_id, 3, "Duo Golden Boot")
           await awardOrReassignTrophy({
             sourceKey:    `duo_golden_boot_s${seasonNum}`,
             trophyColumn: "trophy11_count",
