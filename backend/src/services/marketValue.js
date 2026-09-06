@@ -79,7 +79,7 @@ const TROPHY_BONUS = {
   trophy8_count:  15, // Revolution Trophy
   trophy9_count:  10, // Europa Trophy
   trophy10_count: 15, // Duo Tournament
-  trophy11_count: 8,  // Duo Golden Boot
+  trophy11_count: 10, // Duo Golden Boot
 }
 
 function resultWeight(result, ownGrade, opponentGrade) {
