@@ -575,8 +575,9 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       }
 
       // ── BDR for knockout rounds ───────────────────────────────────────────
-      // Only award when this is a knockout match and a winner is known (not needs_decider)
-      if (fix.knockout_round && winnerPairId && !needsDecider) {
+      // Only award when fixture was NOT already completed — prevents double-allocation on re-save
+      const wasAlreadyCompleted = fix.status === "completed"
+      if (fix.knockout_round && winnerPairId && !needsDecider && !wasAlreadyCompleted) {
         const loserPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
         const loserPair   = winnerPairId === fix.home_pair_id ? awayPair : homePair
         const winnerPair  = winnerPairId === fix.home_pair_id ? homePair : awayPair
@@ -1121,18 +1122,19 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       await recalcForm(fix.decider_home_player_id)
       await recalcForm(fix.decider_away_player_id)
 
-      // BDR awards
+      // BDR awards — only if not already completed (prevents double-allocation on re-save)
+      const wasAlreadyDone = fix.status === "completed"
       const winnerPair = winnerPairId === fix.home_pair_id ? homePair : awayPair
       const loserPair  = loserPairId  === fix.home_pair_id ? homePair : awayPair
       const LOSER_BDR  = { qf: 4, sf: 6, final: 8 }
       const WINNER_BDR = { final: 10 }
       const loserBdr   = LOSER_BDR[fix.knockout_round]
       const winnerBdr  = WINNER_BDR[fix.knockout_round]
-      if (loserBdr) {
+      if (loserBdr && !wasAlreadyDone) {
         await addBdr(loserPair.set1_player_id, loserBdr)
         await addBdr(loserPair.set2_player_id, loserBdr)
       }
-      if (winnerBdr) {
+      if (winnerBdr && !wasAlreadyDone) {
         await addBdr(winnerPair.set1_player_id, winnerBdr)
         await addBdr(winnerPair.set2_player_id, winnerBdr)
       }
