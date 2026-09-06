@@ -1186,6 +1186,14 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
           ON CONFLICT (key) DO UPDATE SET value = $2
         `, [`duo_champion_completed_at_${seasonNum}`, new Date().toISOString()])
 
+        // ── Trigger celebration card ──────────────────────────────────────────
+        const p1 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`, [winnerPair.set1_player_id])).rows[0]
+        const p2 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`, [winnerPair.set2_player_id])).rows[0]
+        await saveActiveCelebration("duo", {
+          p1Name: p1?.name, p1Avatar: p1?.avatarUrl,
+          p2Name: p2?.name, p2Avatar: p2?.avatarUrl,
+        })
+
         const gbRes = await q(`
           SELECT mr.player_id, SUM(mr.player_score) AS goals
           FROM match_records mr
