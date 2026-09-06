@@ -406,9 +406,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       // Knockout tiebreaker chain: sets → aggregate → decider
       if (homeSets > awaySets)       winnerPairId = fix.home_pair_id
       else if (awaySets > homeSets)  winnerPairId = fix.away_pair_id
-      else if (homeAgg > awayAgg)    winnerPairId = fix.home_pair_id
-      else if (awayAgg > homeAgg)    winnerPairId = fix.away_pair_id
-      else                           needsDecider = true
+      else                           needsDecider = true  // 1-1 → always go to decider
     } else {
       // Group stage: set wins determine result; draw (1-1) is allowed
       if (homeSets > awaySets)      winnerPairId = fix.home_pair_id
