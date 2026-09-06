@@ -366,6 +366,9 @@ function PairsView({ season, groupMap }) {
 
 // ── Score Entry + Fixture Row (unchanged) ─────────────────────────────────────
 function ScoreEntry({ fixture, onSave, saving }) {
+  // Lock set score inputs when decider result is already saved — prevent accidental overwrite
+  const deciderCompleted = fixture.status === "completed" && fixture.decider_home_score != null
+
   const [scores, setScores] = useState({
     set1HomeScore: fixture.set1_home_score ?? "",
     set1AwayScore: fixture.set1_away_score ?? "",
@@ -387,10 +390,12 @@ function ScoreEntry({ fixture, onSave, saving }) {
             <p className="text-xs text-slate-400 mb-1">{homeName} vs {awayName}</p>
             <div className="flex items-center gap-2">
               <input type="number" min="0" value={scores[homeK]} onChange={e => set(homeK, e.target.value)}
-                className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white" />
+                disabled={deciderCompleted}
+                className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed" />
               <span className="text-slate-500">–</span>
               <input type="number" min="0" value={scores[awayK]} onChange={e => set(awayK, e.target.value)}
-                className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white" />
+                disabled={deciderCompleted}
+                className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed" />
             </div>
           </div>
         ))}
@@ -417,17 +422,25 @@ function ScoreEntry({ fixture, onSave, saving }) {
           </div>
         )
       })()}
-      <button onClick={() => onSave(fixture.id, scores)} disabled={saving}
-        className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold w-full justify-center hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95">
-        <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Result"}
-      </button>
+      {deciderCompleted ? (
+        <p className="text-xs text-center text-orange-400 bg-orange-400/5 border border-orange-400/20 rounded-lg py-2">
+          ⚡ Decided via decider match — edit via the Decider section below
+        </p>
+      ) : (
+        <button onClick={() => onSave(fixture.id, scores)} disabled={saving}
+          className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold w-full justify-center hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95">
+          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Result"}
+        </button>
+      )}
     </div>
   )
 }
 
 // ── Decider Entry — shown when knockout fixture is 1-1 with equal aggregate ──
 function DeciderEntry({ fixture, onSetup, onResult }) {
-  const hasPlayers = fixture.decider_home_player_id && fixture.decider_away_player_id
+  const hasPlayers   = fixture.decider_home_player_id && fixture.decider_away_player_id
+  const deciderDone  = fixture.decider_home_score != null && fixture.decider_away_score != null
+  const [editing, setEditing]     = useState(false)
   const [homeScore, setHomeScore] = useState("")
   const [awayScore, setAwayScore] = useState("")
 
@@ -447,9 +460,35 @@ function DeciderEntry({ fixture, onSetup, onResult }) {
   const homeName = homePlayers.find(p => p.id === (fixture.decider_home_player_id || selHome))?.name
   const awayName = awayPlayers.find(p => p.id === (fixture.decider_away_player_id || selAway))?.name
 
+  // Show completed decider result with edit option
+  if (deciderDone && !editing) {
+    const homeWon = fixture.decider_home_score > fixture.decider_away_score
+    return (
+      <div className="mt-2 p-3 bg-emerald-400/5 border border-emerald-400/20 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest">⚡ Decider Result</p>
+          <button onClick={() => setEditing(true)} className="text-xs text-slate-400 hover:text-white transition-colors">Edit</button>
+        </div>
+        <div className="flex items-center justify-center gap-3">
+          <span className={cn("text-sm font-semibold truncate", homeWon ? "text-emerald-400" : "text-slate-400")}>{homeName}</span>
+          <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded text-sm">
+            {fixture.decider_home_score} – {fixture.decider_away_score}
+          </span>
+          <span className={cn("text-sm font-semibold truncate", !homeWon ? "text-emerald-400" : "text-slate-400")}>{awayName}</span>
+        </div>
+        <p className="text-[10px] text-center text-slate-600">
+          {homeWon ? homeName : awayName} wins the tie
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="mt-2 p-3 bg-orange-400/5 border border-orange-400/30 rounded-xl space-y-3">
-      <p className="text-xs font-bold text-orange-400 uppercase tracking-widest">⚡ Decider Match — Pick one player from each pair</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-orange-400 uppercase tracking-widest">⚡ Decider Match — Pick one player from each pair</p>
+        {editing && <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-white">Cancel</button>}
+      </div>
 
       {/* Player selection */}
       <div className="grid grid-cols-2 gap-3">
@@ -527,6 +566,10 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }
   const awaySets = ((fixture.set1_away_score > fixture.set1_home_score ? 1 : 0) +
                     (fixture.set2_away_score > fixture.set2_home_score ? 1 : 0))
 
+  const hasDecider = isCompleted && homeSets === awaySets && fixture.decider_home_score != null
+  const homeWon    = isCompleted && fixture.winner_pair_id === fixture.home_pair_id
+  const awayWon    = isCompleted && fixture.winner_pair_id === fixture.away_pair_id
+
   return (
     <div className={cn("border rounded-xl overflow-hidden",
       needsDecider ? "border-orange-400/40" : "border-surface-border")}>
@@ -538,11 +581,22 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }
             <p className="text-xs text-slate-500 truncate">{fixture.homeSet1Name} & {fixture.homeSet2Name}</p>
           </div>
           {isCompleted ? (
-            <div className="flex items-center gap-2 mx-4">
-              <span className={cn("text-lg font-bold font-mono", homeSets > awaySets ? "text-emerald-400" : "text-slate-400")}>{homeSets}</span>
-              <span className="text-slate-600">–</span>
-              <span className={cn("text-lg font-bold font-mono", awaySets > homeSets ? "text-emerald-400" : "text-slate-400")}>{awaySets}</span>
-            </div>
+            hasDecider ? (
+              <div className="flex flex-col items-center gap-0.5 mx-4">
+                <div className="flex items-center gap-1.5">
+                  <span className={cn("text-base font-bold font-mono", homeWon ? "text-emerald-400" : "text-slate-400")}>{fixture.decider_home_score}</span>
+                  <span className="text-slate-600 text-xs">–</span>
+                  <span className={cn("text-base font-bold font-mono", awayWon ? "text-emerald-400" : "text-slate-400")}>{fixture.decider_away_score}</span>
+                </div>
+                <span className="text-[9px] text-orange-400 font-bold">DECIDER</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mx-4">
+                <span className={cn("text-lg font-bold font-mono", homeSets > awaySets ? "text-emerald-400" : "text-slate-400")}>{homeSets}</span>
+                <span className="text-slate-600">–</span>
+                <span className={cn("text-lg font-bold font-mono", awaySets > homeSets ? "text-emerald-400" : "text-slate-400")}>{awaySets}</span>
+              </div>
+            )
           ) : needsDecider ? (
             <span className="text-xs text-orange-400 font-bold mx-4">1-1 DECIDER</span>
           ) : (
@@ -558,7 +612,7 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }
       {open && (
         <div className="px-4 pb-4 space-y-3">
           <ScoreEntry fixture={fixture} onSave={onSave} saving={saving} />
-          {needsDecider && fixture.knockout_round && (
+          {(needsDecider || hasDecider) && fixture.knockout_round && (
             <DeciderEntry
               fixture={fixture}
               onSetup={onDeciderSetup}
