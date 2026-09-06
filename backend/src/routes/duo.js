@@ -729,26 +729,35 @@ router.post("/knockout/advance", authenticate, adminOnly, async (req, res, next)
 
     const completedRes = await query(`
       SELECT winner_pair_id FROM duo_fixtures
-      WHERE knockout_round = $1 AND status = 'completed'
-      AND home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $2)
+      WHERE knockout_round = $1 AND status IN ('completed', 'needs_decider')
+      AND (
+        home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $2)
+        OR away_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $2)
+      )
       ORDER BY match_number ASC
     `, [fromRound, seasonNumber])
 
     const winners = completedRes.rows.map(r => r.winner_pair_id).filter(Boolean)
     if (winners.length < 2) return res.status(400).json({ error: "Not enough completed matches" })
 
-    const shuffled = shuffle(winners)
+    // Keep bracket order — QF1 winner vs QF2 winner, QF3 winner vs QF4 winner etc.
+    // Do NOT shuffle: the bracket pairing must follow match order, not random draw.
+    const ordered = winners
 
-    // Delete existing next round fixtures
+    // Delete existing next round fixtures for this season (handles NULL slots too)
     await query(`
       DELETE FROM duo_fixtures WHERE knockout_round = $1
-      AND home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $2)
+      AND (
+        home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $2)
+        OR away_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $2)
+        OR (home_pair_id IS NULL AND away_pair_id IS NULL)
+      )
     `, [nextRound, seasonNumber])
 
-    for (let i = 0; i < Math.floor(shuffled.length / 2); i++) {
+    for (let i = 0; i < Math.floor(ordered.length / 2); i++) {
       await query(
         "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending')",
-        [shuffled[i*2], shuffled[i*2+1], nextRound, i+1]
+        [ordered[i*2], ordered[i*2+1], nextRound, i+1]
       )
     }
 
