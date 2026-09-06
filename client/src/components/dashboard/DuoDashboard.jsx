@@ -182,8 +182,11 @@ export default function DuoDashboard() {
             <div>
               {visibleFixtures.map(f => {
                 const isCompleted = f.status === "completed"
-                const homeWon = isCompleted && f.home_agg > f.away_agg
-                const awayWon = isCompleted && f.away_agg > f.home_agg
+                const fHomeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
+                const fAwaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
+                const fHasDecider = isCompleted && fHomeSets === fAwaySets && f.decider_home_score != null
+                const homeWon = isCompleted && f.winner_pair_id === f.home_pair_id
+                const awayWon = isCompleted && f.winner_pair_id === f.away_pair_id
                 return (
                   <div key={f.id} className="border-b border-surface-border/50">
                     {/* Aggregate row */}
@@ -195,7 +198,7 @@ export default function DuoDashboard() {
                       <span className="flex-shrink-0 text-xs px-2">
                         {isCompleted ? (
                           <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
-                            {f.home_agg} – {f.away_agg}
+                            {fHasDecider ? `D: ${f.decider_home_score}–${f.decider_away_score}` : `${fHomeSets}–${fAwaySets}`}
                           </span>
                         ) : (
                           <span className="text-slate-600">vs</span>
@@ -258,8 +261,11 @@ export default function DuoDashboard() {
               <div>
                 {koMatches.map(f => {
                   const isCompleted = f.status === "completed"
-                  const homeWon = isCompleted && f.home_agg > f.away_agg
-                  const awayWon = isCompleted && f.away_agg > f.home_agg
+                  const fHomeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
+                  const fAwaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
+                  const fHasDecider = isCompleted && fHomeSets === fAwaySets && f.decider_home_score != null
+                  const homeWon = isCompleted && f.winner_pair_id === f.home_pair_id
+                  const awayWon = isCompleted && f.winner_pair_id === f.away_pair_id
                   return (
                     <div key={f.id} className="border-b border-surface-border/50">
                       <div className="flex items-center px-5 py-3.5">
@@ -270,7 +276,7 @@ export default function DuoDashboard() {
                         </span>
                         <div className="px-4 flex-shrink-0">
                           {isCompleted
-                            ? <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded text-xs">{f.home_agg} – {f.away_agg}</span>
+                            ? <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded text-xs">{fHasDecider ? `D: ${f.decider_home_score}–${f.decider_away_score}` : `${fHomeSets}–${fAwaySets}`}</span>
                             : <span className="text-xs text-slate-600">vs</span>
                           }
                         </div>
@@ -291,6 +297,24 @@ export default function DuoDashboard() {
                             <span className="font-mono px-3">{f.set2_home_score}–{f.set2_away_score}</span>
                             <span className="flex-1">{f.awaySet2Name}</span>
                           </div>
+                          {fHasDecider && (
+                            <div className="mt-1 pt-1 border-t border-surface-border/30 space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className={cn("flex-1 text-right font-semibold", f.decider_home_score > f.decider_away_score ? "text-emerald-400" : "text-slate-500")}>
+                                  {f.homeSet1Id === f.decider_home_player_id ? f.homeSet1Name : f.homeSet2Name}
+                                </span>
+                                <span className="font-mono px-3 text-orange-400 font-bold text-[10px]">DECIDER {f.decider_home_score}–{f.decider_away_score}</span>
+                                <span className={cn("flex-1 font-semibold", f.decider_away_score > f.decider_home_score ? "text-emerald-400" : "text-slate-500")}>
+                                  {f.awaySet1Id === f.decider_away_player_id ? f.awaySet1Name : f.awaySet2Name}
+                                </span>
+                              </div>
+                              <div className="flex justify-center">
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2.5 py-0.5 rounded-full">
+                                  {homeWon ? f.homeDuoName : f.awayDuoName} advance ✓
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
