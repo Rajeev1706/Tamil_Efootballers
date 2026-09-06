@@ -1135,13 +1135,24 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
         const NEXT_ROUND = { r16: "qf", qf: "sf", sf: "final" }
         const nextRound  = NEXT_ROUND[fix.knockout_round]
         if (nextRound) {
-          const col = fix.match_number % 2 !== 0 ? "home_pair_id" : "away_pair_id"
+          // odd match → fills home_pair_id, even match → fills away_pair_id
+          const col           = fix.match_number % 2 !== 0 ? "home_pair_id" : "away_pair_id"
+          const targetMatch   = Math.ceil(fix.match_number / 2)
+          const seasonNumber  = homePair.season_number
+
+          // WHERE checks both home AND away pair ids for season match so the
+          // update works regardless of which slot was filled first.
+          // Also handles fully-empty slots (both NULL) for the first winner placed.
           await q(`
             UPDATE duo_fixtures SET ${col} = $1
             WHERE knockout_round = $2
-            AND home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $3)
-            AND match_number = $4
-          `, [winnerPairId, nextRound, homePair.season_number, Math.ceil(fix.match_number / 2)])
+            AND match_number     = $3
+            AND (
+              home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $4)
+              OR away_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $4)
+              OR (home_pair_id IS NULL AND away_pair_id IS NULL)
+            )
+          `, [winnerPairId, nextRound, targetMatch, seasonNumber])
         }
       }
 
