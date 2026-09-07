@@ -148,15 +148,20 @@ router.post("/start", authenticate, adminOnly, async (req, res, next) => {
 // Max 2 per team, enforced here.
 router.post("/retain", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { sessionId, teamId, playerId, price } = z.object({
+    const { sessionId, teamId, playerId } = z.object({
       sessionId: z.number().int(), teamId: z.number().int(),
-      playerId: z.number().int(), price: z.number().int().min(0),
+      playerId: z.number().int(),
     }).parse(req.body)
 
     const countRes = await query("SELECT COUNT(*) FROM auction_retentions WHERE session_id=$1 AND team_id=$2", [sessionId, teamId])
     if (parseInt(countRes.rows[0].count) >= 2) {
       return res.status(400).json({ error: "This team has already retained the maximum of 2 players." })
     }
+
+    // Auto-calculate retention price = MAX(auction_price, market_value)
+    const playerRes = await query("SELECT auction_price, market_value FROM players WHERE id=$1", [playerId])
+    const p = playerRes.rows[0]
+    const price = Math.max(p?.auction_price || 0, p?.market_value || 0)
 
     await query(
       "INSERT INTO auction_retentions (session_id, team_id, player_id, price) VALUES ($1,$2,$3,$4)",
