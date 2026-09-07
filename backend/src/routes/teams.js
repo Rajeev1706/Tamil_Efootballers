@@ -657,6 +657,7 @@ router.get("/championship", async (_req, res, next) => {
         -- championship_pts = flat team league points (not × squad size)
         -- SUM(bdr_points - league_bdr) = all non-league-format BDR (UCL, weekly, etc.)
         (t.championship_pts + COALESCE(SUM(p.bdr_points - p.league_bdr), 0))::int AS "totalBdr",
+        t.championship_pts::int AS "leaguePts",
         COUNT(p.id)::int AS "playerCount",
         JSON_AGG(
           JSON_BUILD_OBJECT(
