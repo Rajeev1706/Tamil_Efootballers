@@ -663,10 +663,10 @@ router.get("/championship", async (_req, res, next) => {
             'id',        p.id,
             'name',      p.name,
             'grade',     p.grade,
-            'bdrPoints', p.bdr_points,
+            'bdrPoints', (p.bdr_points - COALESCE(p.league_bdr, 0)),
             'avatarId',  p.avatar_id,
             'avatarUrl', p.avatar_url
-          ) ORDER BY p.bdr_points DESC
+          ) ORDER BY (p.bdr_points - COALESCE(p.league_bdr, 0)) DESC
         ) FILTER (WHERE p.id IS NOT NULL) AS players
       FROM teams t
       LEFT JOIN players p ON p.team_id = t.id
