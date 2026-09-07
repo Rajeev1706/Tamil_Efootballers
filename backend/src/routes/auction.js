@@ -58,7 +58,7 @@ async function getFullAuctionState() {
 
   const salesRes = await query(`
     SELECT s.id, s.player_id AS "playerId", p.name AS "playerName",
-           s.team_id AS "teamId", t.name AS "teamName", s.price, s.round, s.rtm_used AS "rtmUsed"
+           s.team_id AS "teamId", t.name AS "teamName", s.price, s.round, s.rtm_used AS "rtmUsed", s.rtm_team_id AS "rtmTeamId"
     FROM auction_sales s
     JOIN players p ON s.player_id = p.id
     JOIN teams t ON s.team_id = t.id
@@ -408,12 +408,24 @@ router.post("/bid", authenticate, adminOnly, async (req, res, next) => {
 // real team and deducts the real budget — live, not batched.
 router.post("/sell", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { sessionId, rtmUsed, overrideTeamId, overridePrice } = z.object({
+    const { sessionId, rtmUsed, overrideTeamId, overridePrice, rtmTeamId } = z.object({
       sessionId: z.number().int(),
       rtmUsed: z.boolean().default(false),
       overrideTeamId: z.number().int().optional(),
       overridePrice: z.number().int().positive().optional(),
+      rtmTeamId: z.number().int().optional(), // team that triggered RTM (may differ from buyer)
     }).parse(req.body)
+
+    // ── RTM limit check — max 2 RTMs per team per auction ──────────────────
+    if (rtmUsed && rtmTeamId) {
+      const rtmCountRes = await query(
+        "SELECT COUNT(*)::int AS count FROM auction_sales WHERE session_id=$1 AND rtm_team_id=$2",
+        [sessionId, rtmTeamId]
+      )
+      if (rtmCountRes.rows[0].count >= 2) {
+        return res.status(400).json({ error: "This team has already used both their RTM cards (2/2)." })
+      }
+    }
     const sessionRes = await query("SELECT * FROM auction_sessions WHERE id=$1", [sessionId])
     const session = sessionRes.rows[0]
     if (!session?.current_player_id || !session.current_bidder_team_id) {
@@ -428,8 +440,11 @@ router.post("/sell", authenticate, adminOnly, async (req, res, next) => {
     if (finalPrice > teamRes.rows[0].budget) return res.status(400).json({ error: "That team doesn't have enough budget for this price." })
 
     await query(
-      "INSERT INTO auction_sales (session_id, player_id, team_id, price, round, rtm_used) VALUES ($1,$2,$3,$4,$5,$6)",
-      [sessionId, session.current_player_id, finalTeamId, finalPrice, session.round, rtmUsed]
+      "INSERT INTO auction_sales (session_id, player_id, team_id, price, round, rtm_used, rtm_team_id) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+      // rtm_team_id only set when prev team actually buys via RTM (prevTeamWins)
+      // If they triggered RTM but declined, rtmTeamId is still passed but we only
+      // count it when finalTeamId === rtmTeamId (prev team actually matched and bought)
+      [sessionId, session.current_player_id, finalTeamId, finalPrice, session.round, rtmUsed, rtmUsed && rtmTeamId && finalTeamId === rtmTeamId ? rtmTeamId : null]
     )
     await query("UPDATE auction_pool SET status='sold' WHERE session_id=$1 AND player_id=$2", [sessionId, session.current_player_id])
     await query("UPDATE players SET next_team_id=$1, auction_price=$2 WHERE id=$3", [finalTeamId, finalPrice, session.current_player_id])

@@ -252,22 +252,36 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
 }
 
 // ── RTM modal (3-step, purely local state) ───────────────────────────────
-function RtmModal({ player, currentBidderName, currentBid, prevTeamName, onResolve, onClose }) {
+function RtmModal({ player, currentBidderName, currentBid, prevTeamName, rtmUsedCount = 0, onResolve, onClose }) {
   const [step, setStep] = useState(1)
   const [finalBid, setFinalBid] = useState(currentBid)
+  const rtmRemaining = 2 - rtmUsedCount
+  const rtmBlocked = rtmUsedCount >= 2
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
       <div className="card p-6 max-w-sm w-full mx-4">
         {step === 1 && (
           <>
-            <h3 className="font-bold text-white mb-2">🃏 RTM Opportunity</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold text-white">🃏 RTM Opportunity</h3>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${rtmBlocked ? "bg-rose-400/20 text-rose-400" : "bg-accent/20 text-accent"}`}>
+                RTM {rtmUsedCount}/2 used
+              </span>
+            </div>
             <p className="text-sm text-slate-400 mb-4">
               <strong>{prevTeamName}</strong>, your former player <strong>{player}</strong> is about to be sold to <strong>{currentBidderName}</strong> for ₹{currentBid}. Use your Right to Match?
+              {rtmBlocked && <span className="block mt-2 text-rose-400 font-semibold">⛔ {prevTeamName} has used both RTM cards (2/2). Cannot RTM.</span>}
             </p>
             <div className="flex gap-2">
               <button onClick={() => onResolve({ rtmUsed: false })} className="flex-1 py-2 rounded-lg border border-surface-border text-slate-400">No, let them go</button>
-              <button onClick={() => setStep(2)} className="flex-1 py-2 rounded-lg bg-accent text-white font-semibold">Yes, use RTM</button>
+              <button
+                onClick={() => setStep(2)}
+                disabled={rtmBlocked}
+                className="flex-1 py-2 rounded-lg bg-accent text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {rtmBlocked ? "RTM Unavailable" : `Yes, use RTM (${rtmRemaining} left)`}
+              </button>
             </div>
           </>
         )}
@@ -614,13 +628,14 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
           currentBidderName={session.currentBidderTeamName}
           currentBid={session.currentBid}
           prevTeamName={teamNameById[currentPoolEntry.prevTeamId]}
+          rtmUsedCount={sales.filter(s => s.rtmTeamId === currentPoolEntry.prevTeamId).length}
           onClose={() => setShowRtm(false)}
           onResolve={(decision) => {
             if (!decision.rtmUsed) { doSell({}); return }
             if (decision.prevTeamWins) {
-              doSell({ overrideTeamId: currentPoolEntry.prevTeamId, overridePrice: decision.finalBid, rtmUsed: true })
+              doSell({ overrideTeamId: currentPoolEntry.prevTeamId, overridePrice: decision.finalBid, rtmUsed: true, rtmTeamId: currentPoolEntry.prevTeamId })
             } else {
-              doSell({ overrideTeamId: session.currentBidderTeamId, overridePrice: decision.finalBid, rtmUsed: true })
+              doSell({ overrideTeamId: session.currentBidderTeamId, overridePrice: decision.finalBid, rtmUsed: true, rtmTeamId: currentPoolEntry.prevTeamId })
             }
           }}
         />
