@@ -30,11 +30,15 @@ router.get("/", async (req, res, next) => {
     if (teamId) { conditions.push(`"teamId" = $${params.length+1}`); params.push(teamId) }
     if (grade)  { conditions.push(`grade = $${params.length+1}`);    params.push(grade)  }
     const where  = conditions.length ? " WHERE " + conditions.join(" AND ") : ""
+    // Fix WHERE to use pf. prefix to avoid ambiguity
+    const whereFixed = where
+      .replace('"teamId"', 'pf."teamId"')
+      .replace('grade', 'pf.grade')
     const result = await query(
       `SELECT
-        id, name, alias, grade, "auctionPrice", "marketValue", "bdrPoints",
-        form, "trophy1Count", "trophy2Count", "trophy3Count", "trophy4Count",
-        "trophy5Count", "trophy6Count", "trophy7Count", "trophy8Count",
+        pf.id, pf.name, pf.alias, pf.grade, pf."auctionPrice", pf."marketValue", pf."bdrPoints",
+        pf.form, pf."trophy1Count", pf."trophy2Count", pf."trophy3Count", pf."trophy4Count",
+        pf."trophy5Count", pf."trophy6Count", pf."trophy7Count", pf."trophy8Count",
         pf."trophy9Count", pf."trophy10Count", pf."trophy11Count", pf."trophy13Count",
         pf."isCaptain", pf."gradeFloor", pf."gradeCeiling",
         pf.team, pf."teamId", pf."teamLogo",
@@ -43,7 +47,7 @@ router.get("/", async (req, res, next) => {
         nt.name AS "nextTeamName"
       FROM players_full pf
       JOIN players p ON p.id = pf.id
-      LEFT JOIN teams nt ON nt.id = p.next_team_id${where} ORDER BY pf."bdrPoints" DESC`, params
+      LEFT JOIN teams nt ON nt.id = p.next_team_id${whereFixed} ORDER BY pf."bdrPoints" DESC`, params
     )
     res.json(result.rows)
   } catch (err) { next(err) }

@@ -182,16 +182,24 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
             </div>
             {teamRetentions.length < 2 && (
               <div className="flex gap-2">
-                <select value={pick.playerId || ""} onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, playerId: e.target.value } }))}
+                <select value={pick.playerId || ""} onChange={e => {
+                    const pid = e.target.value
+                    const player = allPlayers.find(p => String(p.id) === pid)
+                    const autoPrice = player ? Math.max(player.auctionPrice || 0, player.marketValue || 0) : ""
+                    setPicks(p => ({ ...p, [team.id]: { ...pick, playerId: pid, price: autoPrice } }))
+                  }}
                   className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                   <option value="">Select player…</option>
                   {allPlayers.filter(p => !retainedIds.has(p.id) && !pooledIds.has(p.id) && !captainIds.has(p.id)).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.name} (MV: {p.marketValue ?? 0} | AP: {p.auctionPrice ?? 0})</option>
                   ))}
                 </select>
-                <input type="number" placeholder="Price" value={pick.price || ""}
-                  onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, price: e.target.value } }))}
-                  className="w-24 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white" />
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-slate-500 mb-0.5">Retention Price</span>
+                  <input type="number" value={pick.price || ""}
+                    onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, price: e.target.value } }))}
+                    className="w-24 bg-pitch-800 border border-accent/40 rounded-lg px-2 py-1.5 text-sm text-accent font-bold text-center" />
+                </div>
                 <button
                   onClick={() => {
                     if (!pick.playerId || !pick.price) return
