@@ -368,29 +368,29 @@ export default function UclResults() {
         />
       )}
 
-      {/* Summary + round tabs + export */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-slate-400">{totalCompleted}/{fixtures.length} fixtures logged</p>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
-            <button onClick={() => setActiveRound("all")}
-              className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
-              )}>All</button>
-            {rounds.map(r => (
-              <button key={r} onClick={() => setActiveRound(r)}
-                className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                  activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
-                )}>Round {r}</button>
-            ))}
-          </div>
+      {/* Summary + export on one row, tabs on own scrollable row */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-slate-400">{totalCompleted}/{fixtures.length} fixtures logged</p>
           {activeRound !== "all" && (
             <button onClick={handleExport} disabled={exporting}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
               <Download className="w-3.5 h-3.5" />
               {exporting ? "Exporting…" : "Export PNG"}
             </button>
           )}
+        </div>
+        <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
+          <button onClick={() => setActiveRound("all")}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex-shrink-0",
+              activeRound === "all" ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+            )}>All</button>
+          {rounds.map(r => (
+            <button key={r} onClick={() => setActiveRound(r)}
+              className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex-shrink-0",
+                activeRound === r ? "bg-surface text-white border border-surface-border" : "text-slate-500 hover:text-white"
+              )}>Round {r}</button>
+          ))}
         </div>
       </div>
 
