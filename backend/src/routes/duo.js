@@ -638,7 +638,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           `, [seasonNum])
           const topScorer = gbRes.rows[0]
           if (topScorer?.goals > 0) {
-            await addBdrWithLabel(topScorer.player_id, 3, "Duo Golden Boot")
+            await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot")
             // ── Duo Golden Boot trophy (trophy11) ─────────────────────────────
             await awardOrReassignTrophy({
               sourceKey:    `duo_golden_boot_s${seasonNum}`,
@@ -1196,7 +1196,7 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
         `, [seasonNum])
         const topScorer = gbRes.rows[0]
         if (topScorer?.goals > 0) {
-          await addBdrWithLabel(topScorer.player_id, 3, "Duo Golden Boot")
+          await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot")
           await awardOrReassignTrophy({
             sourceKey:    `duo_golden_boot_s${seasonNum}`,
             trophyColumn: "trophy11_count",
