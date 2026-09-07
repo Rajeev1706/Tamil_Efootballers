@@ -316,7 +316,15 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
               CAP
             </span>
           ) : (
-            <span className="font-mono text-sm text-slate-400">{player.auctionPrice}</span>
+            <>
+              <span className="font-mono text-sm text-slate-400">{player.auctionPrice}</span>
+              {player.nextTeamName && (
+                <div className="mt-2 flex items-center gap-1.5 px-2 py-1 bg-amber-400/10 border border-amber-400/20 rounded-lg">
+                  <span className="text-[10px] font-bold text-amber-400">NEXT SEASON →</span>
+                  <span className="text-xs text-amber-300 font-semibold">{player.nextTeamName}</span>
+                </div>
+              )}
+            </>
           )}
         </td>
 

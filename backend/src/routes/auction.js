@@ -266,8 +266,11 @@ router.post("/build-pool", authenticate, adminOnly, async (req, res, next) => {
       return res.status(400).json({ error: "Add at least one player to the pool before starting." })
     }
 
+    // Players stay in their current team during the auction (team_id unchanged).
+    // next_team_id will be set when they are sold, and migrated to team_id
+    // when the admin starts the new season. Reset next_team_id and auction_price.
     await query(
-      `UPDATE players SET team_id = NULL, auction_price = 0
+      `UPDATE players SET next_team_id = NULL, auction_price = 0
        WHERE id IN (SELECT player_id FROM auction_pool WHERE session_id = $1)`,
       [sessionId]
     )
@@ -429,7 +432,7 @@ router.post("/sell", authenticate, adminOnly, async (req, res, next) => {
       [sessionId, session.current_player_id, finalTeamId, finalPrice, session.round, rtmUsed]
     )
     await query("UPDATE auction_pool SET status='sold' WHERE session_id=$1 AND player_id=$2", [sessionId, session.current_player_id])
-    await query("UPDATE players SET team_id=$1, auction_price=$2 WHERE id=$3", [finalTeamId, finalPrice, session.current_player_id])
+    await query("UPDATE players SET next_team_id=$1, auction_price=$2 WHERE id=$3", [finalTeamId, finalPrice, session.current_player_id])
     await query("UPDATE teams SET budget = budget - $1 WHERE id=$2", [finalPrice, finalTeamId])
     await query("UPDATE auction_sessions SET current_player_id=NULL, current_bid=NULL, current_bidder_team_id=NULL, version = version + 1 WHERE id=$1", [sessionId])
 
@@ -541,7 +544,7 @@ router.post("/undo-last-sale", authenticate, adminOnly, async (req, res, next) =
     if (!lastSale) return res.status(400).json({ error: "No sale to undo." })
 
     await query("UPDATE teams SET budget = budget + $1 WHERE id=$2", [lastSale.price, lastSale.team_id])
-    await query("UPDATE players SET team_id=NULL, auction_price=0 WHERE id=$1", [lastSale.player_id])
+    await query("UPDATE players SET next_team_id=NULL, auction_price=0 WHERE id=$1", [lastSale.player_id])
     await query("UPDATE auction_pool SET status='pending' WHERE session_id=$1 AND player_id=$2", [sessionId, lastSale.player_id])
     await query("DELETE FROM auction_sales WHERE id=$1", [lastSale.id])
     await query("DELETE FROM auction_bid_log WHERE session_id=$1 AND player_id=$2", [sessionId, lastSale.player_id])
@@ -593,7 +596,7 @@ router.delete("/:sessionId", authenticate, adminOnly, async (req, res, next) => 
       const salesRes = await query("SELECT * FROM auction_sales WHERE session_id=$1", [req.params.sessionId])
       for (const sale of salesRes.rows) {
         await query("UPDATE teams SET budget = budget + $1 WHERE id=$2", [sale.price, sale.team_id])
-        await query("UPDATE players SET team_id=NULL, auction_price=0 WHERE id=$1", [sale.player_id])
+        await query("UPDATE players SET next_team_id=NULL, auction_price=0 WHERE id=$1", [sale.player_id])
       }
     }
 
