@@ -34,8 +34,9 @@ export default function UclStandings({ onPlayerClick }) {
     (group?.players ?? []).map(p => p.id)
   )
 
-  // Batch size set by admin — controls how many fixtures show at once within the active round
-  const batchSize = Math.max(1, parseInt(settings.ucl_fixtures_per_batch || "1"))
+  // maxVisibleRound set by admin — controls up to which round fixtures are shown.
+  // e.g. if set to 2, rounds 1 and 2 are shown. Round 3+ is hidden until admin increments.
+  const maxVisibleRound = Math.max(1, parseInt(settings.ucl_fixtures_per_batch || "1"))
 
   const roundsByNumber = fixtures.reduce((acc, f) => {
     (acc[f.roundNumber] ??= []).push(f)
@@ -43,36 +44,19 @@ export default function UclStandings({ onPlayerClick }) {
   }, {})
   const allRoundNumbers = Object.keys(roundsByNumber).map(Number).sort((a, b) => a - b)
 
-  // Rounds unlock sequentially — a round only shows once all fixtures in previous rounds are done
-  const firstIncompleteRound = allRoundNumbers.find(r =>
+  // Only show rounds up to maxVisibleRound
+  const unlockedRounds = allRoundNumbers.filter(r => r <= maxVisibleRound)
+
+  const firstIncompleteRound = unlockedRounds.find(r =>
     roundsByNumber[r].some(f => f.status !== "completed")
   )
-  const unlockedRounds = firstIncompleteRound != null
-    ? allRoundNumbers.filter(r => r <= firstIncompleteRound)
-    : allRoundNumbers
 
   const currentFixtureRound = unlockedRounds.includes(activeFixtureRound)
     ? activeFixtureRound
     : (unlockedRounds[unlockedRounds.length - 1] ?? 1)
 
-  // Within the active (first incomplete) round, only show fixtures in batches of batchSize.
-  // Completed rounds always show all their fixtures.
-  const getVisibleFixtures = (roundNum) => {
-    const roundFixtures = roundsByNumber[roundNum] || []
-    const isActiveRound = roundNum === firstIncompleteRound
-    if (!isActiveRound) return roundFixtures // completed round — show all
-
-    // Active round: find how many completed fixtures there are,
-    // then show up to the next full batch
-    const completedCount = roundFixtures.filter(f => f.status === "completed").length
-    const visibleCount   = Math.min(
-      Math.ceil((completedCount + 1) / batchSize) * batchSize,
-      roundFixtures.length
-    )
-    return roundFixtures.slice(0, visibleCount)
-  }
-
-  const visibleFixtures = getVisibleFixtures(currentFixtureRound)
+  // Show ALL fixtures for unlocked rounds — no per-batch filtering within a round
+  const visibleFixtures = roundsByNumber[currentFixtureRound] || []
 
   const [activeKoRound, setActiveKoRound] = useState(1)
   const [view, setView] = useState("table") // "table" | "scorers" | "knockout"

@@ -354,10 +354,10 @@ export default function UclGroupsAdmin() {
       <div className="card px-5 py-4 flex items-center gap-4 flex-wrap">
         <Settings className="w-4 h-4 text-slate-500 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white">Fixtures shown per batch</p>
+          <p className="text-sm font-semibold text-white">Rounds visible on dashboard</p>
           <p className="text-xs text-slate-500 mt-0.5">
             Controls how many fixtures unlock on the public dashboard at once.
-            Currently: <span className="text-accent font-semibold">{currentBatch}</span> per batch
+            Showing rounds 1 – <span className="text-accent font-semibold">{currentBatch}</span> on public dashboard
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
