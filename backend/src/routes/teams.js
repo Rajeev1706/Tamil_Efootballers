@@ -964,7 +964,14 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
 // meant to persist as permanent history regardless of season resets.
 async function clearCurrentSeasonData(q) {
   await q(`UPDATE teams SET played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, score_points = 0`)
-  await q(`UPDATE players SET market_value = 0, form = '{}', bdr_points = 0`)
+
+  // ── Migrate auction results: move next_team_id → team_id for all players ──
+  // Players sold in the auction have next_team_id set. On new season start,
+  // they officially move to their new team. Players not sold keep their team.
+  await q(`UPDATE players SET team_id = next_team_id WHERE next_team_id IS NOT NULL`)
+  await q(`UPDATE players SET next_team_id = NULL`)
+
+  await q(`UPDATE players SET market_value = 0, form = '{}', bdr_points = 0, league_bdr = 0`)
   await q(`DELETE FROM fixtures`)
   await q(`DELETE FROM fixture_lineups`)
   await q(`DELETE FROM trade_requests`)

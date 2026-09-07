@@ -35,11 +35,15 @@ router.get("/", async (req, res, next) => {
         id, name, alias, grade, "auctionPrice", "marketValue", "bdrPoints",
         form, "trophy1Count", "trophy2Count", "trophy3Count", "trophy4Count",
         "trophy5Count", "trophy6Count", "trophy7Count", "trophy8Count",
-        "trophy9Count", "trophy10Count", "trophy11Count", "trophy13Count",
-        "isCaptain", "gradeFloor", "gradeCeiling",
-        team, "teamId", "teamLogo",
-        "avatarId", "avatarUrl", "imageUrl"
-      FROM players_full${where} ORDER BY "bdrPoints" DESC`, params
+        pf."trophy9Count", pf."trophy10Count", pf."trophy11Count", pf."trophy13Count",
+        pf."isCaptain", pf."gradeFloor", pf."gradeCeiling",
+        pf.team, pf."teamId", pf."teamLogo",
+        pf."avatarId", pf."avatarUrl", pf."imageUrl",
+        p.next_team_id AS "nextTeamId",
+        nt.name AS "nextTeamName"
+      FROM players_full pf
+      JOIN players p ON p.id = pf.id
+      LEFT JOIN teams nt ON nt.id = p.next_team_id${where} ORDER BY pf."bdrPoints" DESC`, params
     )
     res.json(result.rows)
   } catch (err) { next(err) }
