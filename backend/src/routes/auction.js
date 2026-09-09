@@ -158,10 +158,10 @@ router.post("/retain", authenticate, adminOnly, async (req, res, next) => {
       return res.status(400).json({ error: "This team has already retained the maximum of 2 players." })
     }
 
-    // Auto-calculate retention price = MAX(auction_price, market_value)
-    const playerRes = await query("SELECT auction_price, market_value FROM players WHERE id=$1", [playerId])
+    // Auto-calculate retention price = MAX(base_value, auction_price, market_value)
+    const playerRes = await query("SELECT auction_price, market_value, base_value FROM players WHERE id=$1", [playerId])
     const p = playerRes.rows[0]
-    const price = Math.max(p?.auction_price || 0, p?.market_value || 0)
+    const price = Math.max(p?.base_value || 0, p?.auction_price || 0, p?.market_value || 0)
 
     await query(
       "INSERT INTO auction_retentions (session_id, team_id, player_id, price) VALUES ($1,$2,$3,$4)",

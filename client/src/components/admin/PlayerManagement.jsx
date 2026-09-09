@@ -20,6 +20,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
   const [bdrDelta, setBdrDelta]       = useState("")
   const [isCaptain, setIsCaptain]     = useState(player.isCaptain ?? false)
   const [auctionPrice, setAuctionPrice] = useState(player.auctionPrice ?? "")
+  const [baseValue, setBaseValue]         = useState(player.baseValue ?? "")
   const [trophyYear, setTrophyYear] = useState(new Date().getFullYear())
   const [trophy1, setTrophy1] = useState(player.trophy1Count ?? 0)
   const [trophy2, setTrophy2] = useState(player.trophy2Count ?? 0)
@@ -92,6 +93,9 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
     if (!isCaptain && parseInt(auctionPrice) !== player.auctionPrice) {
       body.auctionPrice = parseInt(auctionPrice) || 0
     }
+    if (parseInt(baseValue) !== (player.baseValue ?? 0)) {
+      body.baseValue = parseInt(baseValue) || 0
+    }
     // Grade ceiling / floor — send whenever they differ from what's stored
     const savedCeiling = player.gradeCeiling ?? ""
     const savedFloor   = player.gradeFloor   ?? ""
@@ -143,6 +147,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
     setTeamId(player.teamId ?? "")
     setIsCaptain(player.isCaptain ?? false)
     setAuctionPrice(player.auctionPrice ?? "")
+    setBaseValue(player.baseValue ?? "")
     // Reset year selector back to current year and restore player's current counts
     setTrophyYear(new Date().getFullYear())
     const base = {
@@ -324,6 +329,19 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
                   <span className="text-xs text-amber-300 font-semibold">{player.nextTeamName}</span>
                 </div>
               )}
+              <div className="mt-2 pt-2 border-t border-surface-border/40">
+                <p className="text-[10px] text-slate-500 mb-1 font-semibold uppercase tracking-wide">Base Value (admin only)</p>
+                {editing ? (
+                  <input type="number" min="0" value={baseValue}
+                    onChange={e => setBaseValue(e.target.value)}
+                    className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40"
+                    placeholder="e.g. 350" />
+                ) : (
+                  <span className="font-mono text-sm text-rose-400 font-bold">
+                    {player.baseValue > 0 ? `₹${player.baseValue}` : "Not set"}
+                  </span>
+                )}
+              </div>
             </>
           )}
         </td>
