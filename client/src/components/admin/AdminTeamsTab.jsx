@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Trophy, ChevronDown, ChevronUp, Plus, Trash2, Check } from "lucide-react"
+import { Trophy, ChevronDown, ChevronUp, Plus, Trash2, Check, Download, Loader2 } from "lucide-react"
 import api, { teamsApi } from "../../lib/api"
 import { cn } from "../../lib/utils"
 import { useCachedImage } from "../../hooks/useCachedImage"
@@ -54,11 +54,167 @@ function BulkBudgetCard() {
   )
 }
 
+
+// ── Squad image generator ─────────────────────────────────────────────────────
+async function downloadSquadImage(team) {
+  // Fetch players for this team
+  const res     = await api.get(`/players?teamId=${team.id}`)
+  const players = res.data || []
+
+  // Captain first, then sort by auction price desc
+  const captain = players.find(p => p.isCaptain)
+  const rest    = players
+    .filter(p => !p.isCaptain)
+    .sort((a, b) => (b.auctionPrice ?? 0) - (a.auctionPrice ?? 0))
+  const ordered = [...(captain ? [captain] : []), ...rest]
+
+  // Canvas setup
+  const W = 700, ROW_H = 44, HEADER = 180, FOOTER = 40
+  const H = HEADER + ordered.length * ROW_H + FOOTER
+  const canvas = document.createElement("canvas")
+  canvas.width  = W
+  canvas.height = H
+  const ctx = canvas.getContext("2d")
+
+  // Background — try to load team logo as blurred bg
+  if (team.logoUrl) {
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image(); i.crossOrigin = "anonymous"
+        i.onload = () => res(i); i.onerror = rej
+        i.src = team.logoUrl
+      })
+      ctx.save()
+      ctx.filter = "blur(40px) brightness(0.25)"
+      ctx.drawImage(img, -100, -100, W + 200, H + 200)
+      ctx.restore()
+      ctx.filter = "none"
+    } catch (_) {}
+  }
+
+  // Dark overlay
+  ctx.fillStyle = "rgba(10,14,23,0.82)"
+  ctx.fillRect(0, 0, W, H)
+
+  // Team logo (circle)
+  if (team.logoUrl) {
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image(); i.crossOrigin = "anonymous"
+        i.onload = () => res(i); i.onerror = rej
+        i.src = team.logoUrl
+      })
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(W / 2, 62, 44, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.drawImage(img, W / 2 - 44, 18, 88, 88)
+      ctx.restore()
+    } catch (_) {}
+  }
+
+  // Team name
+  ctx.fillStyle = "#ffffff"
+  ctx.font      = "bold 26px sans-serif"
+  ctx.textAlign = "center"
+  ctx.fillText(team.name, W / 2, 134)
+
+  // Column headers
+  const Y_HEAD = HEADER - 10
+  ctx.fillStyle = "#64748b"
+  ctx.font      = "bold 11px sans-serif"
+  ctx.textAlign = "left"
+  ctx.fillText("#",         36, Y_HEAD)
+  ctx.fillText("PLAYER",    72, Y_HEAD)
+  ctx.textAlign = "right"
+  ctx.fillText("AUCTION ₹", W - 152, Y_HEAD)
+  ctx.fillText("MV ₹",      W - 36,  Y_HEAD)
+
+  // Divider
+  ctx.strokeStyle = "#1e293b"
+  ctx.lineWidth   = 1
+  ctx.beginPath(); ctx.moveTo(24, HEADER - 2); ctx.lineTo(W - 24, HEADER - 2); ctx.stroke()
+
+  // Player rows
+  ordered.forEach((p, i) => {
+    const y       = HEADER + i * ROW_H
+    const isCap   = p.isCaptain
+    const isEven  = i % 2 === 0
+
+    // Row bg
+    ctx.fillStyle = isEven ? "rgba(255,255,255,0.03)" : "transparent"
+    ctx.fillRect(24, y + 4, W - 48, ROW_H - 2)
+
+    // Serial
+    ctx.fillStyle = "#475569"
+    ctx.font      = "bold 12px monospace"
+    ctx.textAlign = "left"
+    ctx.fillText(String(i + 1).padStart(2, "0"), 36, y + ROW_H / 2 + 5)
+
+    // Captain badge
+    if (isCap) {
+      ctx.fillStyle = "#f59e0b"
+      ctx.font      = "bold 9px sans-serif"
+      ctx.fillText("C", 62, y + ROW_H / 2 + 4)
+    }
+
+    // Player name
+    ctx.fillStyle = isCap ? "#f59e0b" : "#f1f5f9"
+    ctx.font      = isCap ? "bold 14px sans-serif" : "500 14px sans-serif"
+    ctx.textAlign = "left"
+    ctx.fillText(p.name, 72, y + ROW_H / 2 + 5)
+
+    // Grade badge
+    const gradeColors = { S: "#f59e0b", "A+": "#a78bfa", A: "#60a5fa", B: "#34d399", C: "#94a3b8" }
+    ctx.fillStyle = gradeColors[p.grade] || "#94a3b8"
+    ctx.font      = "bold 10px sans-serif"
+    ctx.textAlign = "left"
+    ctx.fillText(p.grade, 220, y + ROW_H / 2 + 5)
+
+    // Auction price
+    ctx.fillStyle = "#f97316"
+    ctx.font      = "bold 13px monospace"
+    ctx.textAlign = "right"
+    ctx.fillText(p.auctionPrice > 0 ? `₹${p.auctionPrice}` : "—", W - 152, y + ROW_H / 2 + 5)
+
+    // Market value
+    ctx.fillStyle = "#22d3ee"
+    ctx.font      = "bold 13px monospace"
+    ctx.textAlign = "right"
+    ctx.fillText(p.marketValue > 0 ? `₹${p.marketValue}` : "—", W - 36, y + ROW_H / 2 + 5)
+
+    // Row divider
+    ctx.strokeStyle = "#1e293b"
+    ctx.lineWidth   = 0.5
+    ctx.beginPath(); ctx.moveTo(24, y + ROW_H); ctx.lineTo(W - 24, y + ROW_H); ctx.stroke()
+  })
+
+  // Footer
+  ctx.fillStyle = "#334155"
+  ctx.font      = "11px sans-serif"
+  ctx.textAlign = "center"
+  ctx.fillText("Tamil Efootballers · Season 8", W / 2, H - 14)
+
+  // Download
+  const link    = document.createElement("a")
+  link.download = `${team.name.replace(/\s+/g, "_")}_squad.png`
+  link.href     = canvas.toDataURL("image/png")
+  link.click()
+}
+
 // ── Per-team trophy manager ────────────────────────────────────────────────────
 function TeamCard({ team }) {
-  const qc      = useQueryClient()
-  const logoSrc = useCachedImage(team.logoUrl)
-  const [open, setOpen] = useState(false)
+  const qc           = useQueryClient()
+  const logoSrc      = useCachedImage(team.logoUrl)
+  const [open, setOpen]         = useState(false)
+  const [downloading, setDl]    = useState(false)
+
+  async function handleDownload(e) {
+    e.stopPropagation()
+    setDl(true)
+    try { await downloadSquadImage({ ...team, logoUrl: team.logoUrl }) }
+    finally { setDl(false) }
+  }
 
   // Fetch trophies for this team when expanded
   const { data, isLoading } = useQuery({
