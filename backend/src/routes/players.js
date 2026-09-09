@@ -44,7 +44,8 @@ router.get("/", async (req, res, next) => {
         pf.team, pf."teamId", pf."teamLogo",
         pf."avatarId", pf."avatarUrl", pf."imageUrl",
         p.next_team_id AS "nextTeamId",
-        nt.name AS "nextTeamName"
+        nt.name AS "nextTeamName",
+        p.base_value AS "baseValue"
       FROM players_full pf
       JOIN players p ON p.id = pf.id
       LEFT JOIN teams nt ON nt.id = p.next_team_id${whereFixed} ORDER BY pf."bdrPoints" DESC`, params
@@ -152,7 +153,7 @@ const createSchema = z.object({
 router.post("/", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      name, alias, teamId, grade, isCaptain, auctionPrice,
+      name, alias, teamId, grade, isCaptain, auctionPrice, baseValue,
       trophy1Count, trophy2Count, trophy3Count, trophy4Count,
     } = createSchema.parse(req.body)
 
@@ -172,7 +173,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
 
     const result = await query(`
       INSERT INTO players (
-        name, alias, team_id, grade, is_captain, auction_price, market_value,
+        name, alias, team_id, grade, is_captain, auction_price, market_value, base_value,
         trophy1_count, trophy2_count, trophy3_count, trophy4_count
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -181,6 +182,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
                 is_captain    AS "isCaptain",
                 auction_price AS "auctionPrice",
                 market_value  AS "marketValue",
+                base_value    AS "baseValue",
                 bdr_points    AS "bdrPoints",
                 team_id       AS "teamId",
                 trophy1_count AS "trophy1Count",
@@ -271,7 +273,7 @@ router.patch("/:id/avatar", async (req, res, next) => {
 router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      name, alias, grade, gradeFloor, gradeCeiling, bdrDelta, isCaptain, auctionPrice, teamId, imageUrl,
+      name, alias, grade, gradeFloor, gradeCeiling, bdrDelta, isCaptain, auctionPrice, baseValue, teamId, imageUrl,
       trophy1Count, trophy2Count, trophy3Count, trophy4Count, trophy5Count, trophy6Count, trophy7Count,
       trophy13Count,
     } = updateSchema.parse(req.body)
@@ -302,7 +304,8 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         trophy5_count = COALESCE($13, trophy5_count),
         trophy6_count = COALESCE($14, trophy6_count),
         trophy7_count  = COALESCE($15, trophy7_count),
-        trophy13_count = COALESCE($18, trophy13_count)
+        trophy13_count = COALESCE($18, trophy13_count),
+        base_value     = COALESCE($19, base_value)
       WHERE id = $16
       RETURNING id, name, alias, grade, grade_floor AS "gradeFloor", grade_ceiling AS "gradeCeiling",
                 image_url     AS "imageUrl",
@@ -318,7 +321,8 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
                 trophy5_count AS "trophy5Count",
                 trophy6_count AS "trophy6Count",
                 trophy7_count  AS "trophy7Count",
-                trophy13_count AS "trophy13Count"
+                trophy13_count AS "trophy13Count",
+                base_value     AS "baseValue"
     `, [
       name ?? null, alias ?? null, grade ?? null,
       bdrDelta ?? null, isCaptain ?? null, auctionPriceValue,
@@ -327,7 +331,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       trophy4Count ?? null, trophy5Count ?? null,
       trophy6Count ?? null, trophy7Count ?? null,
       req.params.id, teamIdProvided,
-      trophy13Count ?? null,
+      trophy13Count ?? null, baseValue ?? null,
 
     ])
 
