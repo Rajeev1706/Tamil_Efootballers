@@ -176,7 +176,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
         name, alias, team_id, grade, is_captain, auction_price, market_value, base_value,
         trophy1_count, trophy2_count, trophy3_count, trophy4_count
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING id, name, alias, grade,
                 image_url     AS "imageUrl",
                 is_captain    AS "isCaptain",
@@ -191,7 +191,7 @@ router.post("/", authenticate, adminOnly, async (req, res, next) => {
                 trophy4_count AS "trophy4Count"
     `, [
       name, alias || null, teamId ?? null, grade, isCaptain,
-      finalAuctionPrice, finalMarketValue,
+      finalAuctionPrice, finalMarketValue, baseValue ?? 0,
       trophy1Count, trophy2Count, trophy3Count, trophy4Count,
     ])
     res.status(201).json(result.rows[0])
