@@ -329,20 +329,21 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
                   <span className="text-xs text-amber-300 font-semibold">{player.nextTeamName}</span>
                 </div>
               )}
-              <div className="mt-2 pt-2 border-t border-surface-border/40">
-                <p className="text-[10px] text-slate-500 mb-1 font-semibold uppercase tracking-wide">Base Value (admin only)</p>
-                {editing ? (
-                  <input type="number" min="0" value={baseValue}
-                    onChange={e => setBaseValue(e.target.value)}
-                    className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40"
-                    placeholder="e.g. 350" />
-                ) : (
-                  <span className="font-mono text-sm text-rose-400 font-bold">
-                    {player.baseValue > 0 ? `₹${player.baseValue}` : "Not set"}
-                  </span>
-                )}
-              </div>
             </>
+          )}
+        </td>
+
+        {/* Base Value — admin only */}
+        <td className="py-3.5 px-4 text-center">
+          {editing ? (
+            <input type="number" min="0" value={baseValue}
+              onChange={e => setBaseValue(e.target.value)}
+              className="w-20 bg-pitch-900 border border-surface-border rounded-lg px-2 py-1 text-sm text-white font-mono text-center focus:outline-none focus:border-rose-400/40"
+              placeholder="0" />
+          ) : (
+            <span className="font-mono text-sm font-bold text-rose-400">
+              {player.baseValue > 0 ? player.baseValue : <span className="text-slate-600">—</span>}
+            </span>
           )}
         </td>
 
@@ -530,7 +531,7 @@ export default function PlayerManagement({ players, onPlayerClick }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-border">
-                {["Player / Team","Grade","Auction","Market value","BDR points",""].map(h => (
+                {["Player / Team","Grade","Auction","Base Value","Market value","BDR points",""].map(h => (
                   <th key={h} className={cn(
                     "py-3 text-xs font-semibold text-slate-500 tracking-wide uppercase",
                     h === "Player / Team" || h === "" ? "px-5 text-left" : "px-4 text-center",
