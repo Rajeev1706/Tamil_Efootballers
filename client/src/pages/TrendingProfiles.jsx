@@ -72,9 +72,6 @@ export default function TrendingProfiles() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-white truncate">{p.name}</p>
-                      <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[p.grade] || GRADE_COLORS.C)}>
-                        {p.grade}
-                      </span>
                     </div>
                     <p className="text-xs text-slate-500 truncate">{p.teamName || "No team"}</p>
                   </div>
