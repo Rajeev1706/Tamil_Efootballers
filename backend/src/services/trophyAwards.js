@@ -25,16 +25,19 @@ import { query } from "../db/pool.js"
 import { recalcMarketValue } from "./marketValue.js"
 
 const VALID_TROPHY_COLUMNS = new Set([
-  "trophy2_count", // Team League
-  "trophy3_count", // Weekly
-  "trophy4_count", // UCL
-  "trophy5_count", // Weekly Golden Boot
-  "trophy6_count", // Team League Golden Boot
-  "trophy7_count", // UCL Golden Boot
-  "trophy8_count", // Revolution
-  "trophy9_count", // Europa (Team League Group KO format)
+  "trophy1_count",  // Ballon d'Or
+  "trophy2_count",  // Team League
+  "trophy3_count",  // Weekly
+  "trophy4_count",  // UCL
+  "trophy5_count",  // Weekly Golden Boot
+  "trophy6_count",  // Team League Golden Boot
+  "trophy7_count",  // UCL Golden Boot
+  "trophy8_count",  // Revolution
+  "trophy9_count",  // Europa (Team League Group KO format)
   "trophy10_count", // Duo Tournament
   "trophy11_count", // Duo Golden Boot
+  "trophy12_count", // Championship
+  "trophy13_count", // Week Best Player
 ])
 
 function assertValidColumn(col) {
