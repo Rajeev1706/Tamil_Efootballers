@@ -23,6 +23,7 @@ import WeeklyTournamentCelebration from "../components/common/WeeklyTournamentCe
 import DshannLeagueCelebration     from "../components/common/DshannLeagueCelebration"
 import RevolutionCelebration       from "../components/common/RevolutionCelebration"
 import BallonDorCelebration from "../components/common/BallonDorCelebration"
+import ChampionshipCelebration from "../components/common/ChampionshipCelebration"
 import DuoWinnerCelebration from "../components/common/DuoWinnerCelebration"
 import weeklyTrophyLogo from "../../images/Weekly.png"
 import teamLeagueTrophyLogo from "../../images/Team League.png"
@@ -483,7 +484,30 @@ export default function CommonDashboard() {
   // which already includes the UCL awards since those apply server-side
   // before this data is ever fetched.
   const [showBallonDorCelebration, setShowBallonDorCelebration] = useState(false)
+  const [showChampionshipCelebration, setShowChampionshipCelebration] = useState(false)
   const [showWeeklyHonours, setShowWeeklyHonours] = useState(false)
+  // TEST-ONLY: ?testChampionshipCelebration=TeamName previews instantly
+  const testChampActive = urlParams.has("testChampionshipCelebration")
+  const testChampParam  = urlParams.get("testChampionshipCelebration")
+  const testChampTeam   = testChampParam && !["1","true"].includes(testChampParam)
+    ? teams.find(t => t.name.toLowerCase().includes(testChampParam.toLowerCase()))
+    : (teams[0] ?? null)
+  useEffect(() => {
+    if (!testChampActive) return
+    setShowChampionshipCelebration(true)
+  }, [testChampActive])
+
+  // Championship winning team players (UCL winner's team)
+  const championshipTeamId = uclKnockout?.matches
+    ?.find(m => m.round === uclKnockout?.totalRounds && m.status === "completed")
+    ?.winnerId
+    ? players.find(p => p.id === uclKnockout?.matches?.find(m => m.round === uclKnockout?.totalRounds && m.status === "completed")?.winnerId)?.teamId
+    : null
+  const championshipTeamPlayers = championshipTeamId
+    ? players.filter(p => p.teamId === championshipTeamId)
+    : []
+  const championshipTeam = teams.find(t => t.id === championshipTeamId)
+
   const ballonDorWinner = players.length > 0
     ? [...players].sort((a, b) => b.bdrPoints - a.bdrPoints)[0]
     : null
@@ -769,6 +793,19 @@ export default function CommonDashboard() {
           bdrPoints={displayBallonDorWinner.bdrPoints}
           avatarImage={resolveAvatar(displayBallonDorWinner).thumb}
           bgImage={resolveAvatar(displayBallonDorWinner).bg}
+        />
+      ) : showChampionshipCelebration ? (
+        <ChampionshipCelebration
+          teamName={testChampActive
+            ? (testChampTeam?.name ?? "ADRENALINE")
+            : (championshipTeam?.name ?? "Champions")}
+          teamLogo={testChampActive ? testChampTeam?.logoUrl : championshipTeam?.logoUrl}
+          players={testChampActive
+            ? (players.filter(p => p.teamId === testChampTeam?.id).length > 0
+                ? players.filter(p => p.teamId === testChampTeam?.id)
+                : ["Sidhu","Sri","Abdul","Pappali","Gokul Sanjay","Aakash","Karthi","Vicky","Nithish JB5","Jefery","Gowri Shankar"].map(name => ({ name })))
+            : championshipTeamPlayers}
+          onDismiss={dismissCelebration}
         />
       ) : null}
       {/* Live auction banner — only shows when an auction is actually active */}
