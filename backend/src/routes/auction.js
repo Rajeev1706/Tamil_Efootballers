@@ -159,8 +159,20 @@ router.post("/retain", authenticate, adminOnly, async (req, res, next) => {
     }
 
     // Auto-calculate retention price = MAX(base_value, auction_price, market_value)
-    const playerRes = await query("SELECT auction_price, market_value, base_value FROM players WHERE id=$1", [playerId])
+    const playerRes = await query("SELECT auction_price, market_value, base_value, team_id FROM players WHERE id=$1", [playerId])
     const p = playerRes.rows[0]
+
+    // Validate: player must belong to this team OR to this team's predecessor
+    if (p?.team_id && p.team_id !== teamId) {
+      const predCheck = await query(
+        "SELECT 1 FROM teams WHERE id=$1 AND predecessor_team_id=$2",
+        [teamId, p.team_id]
+      )
+      if (predCheck.rows.length === 0) {
+        return res.status(400).json({ error: "This player does not belong to your team or your predecessor team." })
+      }
+    }
+
     const price = Math.max(p?.base_value || 0, p?.auction_price || 0, p?.market_value || 0)
 
     await query(
@@ -219,9 +231,18 @@ router.post("/pool/add", authenticate, adminOnly, async (req, res, next) => {
     if (retainedRes.rows.length > 0) return res.status(400).json({ error: "This player is already retained — can't also add them to the pool." })
 
     const cardType = GRADE_TO_CARD[player.grade] || "silver"
+
+    // If the player's current team has a successor (relegated → promoted replacement),
+    // use the successor team as prev_team_id so they get RTM/retention rights
+    let effectivePrevTeamId = player.team_id
+    if (player.team_id) {
+      const succRes = await query("SELECT successor_team_id FROM teams WHERE id=$1", [player.team_id])
+      effectivePrevTeamId = succRes.rows[0]?.successor_team_id ?? player.team_id
+    }
+
     await query(
       "INSERT INTO auction_pool (session_id, player_id, card_type, prev_team_id) VALUES ($1,$2,$3,$4)",
-      [sessionId, playerId, cardType, player.team_id]
+      [sessionId, playerId, cardType, effectivePrevTeamId]
     )
     res.json({ success: true, cardType })
     broadcastAuctionUpdate(getFullAuctionState)
@@ -709,6 +730,51 @@ router.get("/price-history/:playerId", async (req, res, next) => {
       LIMIT 5
     `, [req.params.playerId])
     res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
+// ── POST /api/auction/succession — link relegated team to new team ────────────
+router.post("/succession", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { relegatedTeamId, newTeamId } = z.object({
+      relegatedTeamId: z.number().int(),
+      newTeamId:       z.number().int(),
+    }).parse(req.body)
+
+    // Set successor on relegated team, predecessor on new team
+    await query("UPDATE teams SET successor_team_id=$1 WHERE id=$2",   [newTeamId,       relegatedTeamId])
+    await query("UPDATE teams SET predecessor_team_id=$1 WHERE id=$2", [relegatedTeamId, newTeamId])
+
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// ── DELETE /api/auction/succession/:newTeamId — remove succession link ────────
+router.delete("/succession/:newTeamId", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const newTeamId = parseInt(req.params.newTeamId)
+    const predRes = await query("SELECT predecessor_team_id FROM teams WHERE id=$1", [newTeamId])
+    const relegatedTeamId = predRes.rows[0]?.predecessor_team_id
+    if (relegatedTeamId) {
+      await query("UPDATE teams SET successor_team_id=NULL WHERE id=$1",   [relegatedTeamId])
+    }
+    await query("UPDATE teams SET predecessor_team_id=NULL WHERE id=$1", [newTeamId])
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// ── GET /api/auction/succession — get all active succession links ─────────────
+router.get("/succession", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(`
+      SELECT
+        t1.id AS relegated_id,   t1.name AS relegated_name,
+        t2.id AS new_team_id,    t2.name AS new_team_name
+      FROM teams t1
+      JOIN teams t2 ON t2.id = t1.successor_team_id
+      WHERE t1.successor_team_id IS NOT NULL
+    `)
+    res.json(rows)
   } catch (err) { next(err) }
 })
 
