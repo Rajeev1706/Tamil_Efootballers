@@ -26,34 +26,33 @@ router.get("/season-records", async (req, res, next) => {
 router.post("/season-records", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      seasonNumber, seasonName, year, championTeam, championPts,
+      seasonNumber, seasonName, year,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners,
-      duoWinner, championshipWinner, notes
+      duoWinner, championshipWinner, championshipPlayers, notes
     } = req.body
 
-    // Ensure new columns exist
-    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner          TEXT`).catch(() => {})
-    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner             TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner    TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_players   TEXT[] DEFAULT '{}'`).catch(() => {})
 
     const result = await query(`
       INSERT INTO season_records (
-        season_number, season_name, year, champion_team, champion_pts,
+        season_number, season_name, year,
         top_scorer, top_scorer_goals, highest_mv_player, highest_mv,
         longest_streak_player, longest_streak,
         ballondor_winner, team_league_winner, team_league_players, ucl_winner, weekly_winners,
-        duo_winner, championship_winner, notes
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        duo_winner, championship_winner, championship_players, notes
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
       RETURNING *
     `, [
       seasonNumber, seasonName, year || new Date().getFullYear(),
-      championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers || [],
       uclWinner, weeklyWinners || [],
-      duoWinner || null, championshipWinner || null, notes
+      duoWinner || null, championshipWinner || null, championshipPlayers || [], notes
     ])
     res.status(201).json(result.rows[0])
   } catch (err) { next(err) }
@@ -63,35 +62,35 @@ router.post("/season-records", authenticate, adminOnly, async (req, res, next) =
 router.patch("/season-records/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     const {
-      seasonNumber, seasonName, year, championTeam, championPts,
+      seasonNumber, seasonName, year,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers, uclWinner, weeklyWinners,
-      duoWinner, championshipWinner, notes
+      duoWinner, championshipWinner, championshipPlayers, notes
     } = req.body
 
-    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner          TEXT`).catch(() => {})
-    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS duo_winner             TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_winner    TEXT`).catch(() => {})
+    await query(`ALTER TABLE season_records ADD COLUMN IF NOT EXISTS championship_players   TEXT[] DEFAULT '{}'`).catch(() => {})
 
     const result = await query(`
       UPDATE season_records SET
         season_number = $1, season_name = $2, year = $3,
-        champion_team = $4, champion_pts = $5,
-        top_scorer = $6, top_scorer_goals = $7,
-        highest_mv_player = $8, highest_mv = $9,
-        longest_streak_player = $10, longest_streak = $11,
-        ballondor_winner = $12, team_league_winner = $13,
-        team_league_players = $14, ucl_winner = $15,
-        weekly_winners = $16, duo_winner = $17, championship_winner = $18, notes = $19
-      WHERE id = $20 RETURNING *
+        top_scorer = $4, top_scorer_goals = $5,
+        highest_mv_player = $6, highest_mv = $7,
+        longest_streak_player = $8, longest_streak = $9,
+        ballondor_winner = $10, team_league_winner = $11,
+        team_league_players = $12, ucl_winner = $13,
+        weekly_winners = $14, duo_winner = $15,
+        championship_winner = $16, championship_players = $17, notes = $18
+      WHERE id = $19 RETURNING *
     `, [
       seasonNumber, seasonName, year || new Date().getFullYear(),
-      championTeam, championPts,
       topScorer, topScorerGoals, highestMvPlayer, highestMv,
       longestStreakPlayer, longestStreak,
       ballondorWinner, teamLeagueWinner, teamLeaguePlayers || [],
       uclWinner, weeklyWinners || [],
-      duoWinner || null, championshipWinner || null, notes,
+      duoWinner || null, championshipWinner || null, championshipPlayers || [], notes,
       req.params.id
     ])
     if (!result.rows[0]) return res.status(404).json({ error: "Record not found" })
@@ -776,10 +775,25 @@ router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) =
       LIMIT 1
     `, [season]))
 
-    // Championship winner — team with highest championship_pts
-    const champshipRes = await safe(() => query(
-      `SELECT name FROM teams WHERE championship_pts > 0 ORDER BY championship_pts DESC LIMIT 1`
-    ))
+    // Championship winner — UCL winner's team (highest BDR = ADRENALINE)
+    const champshipRes = await safe(() => query(`
+      SELECT t.id, t.name
+      FROM ucl_knockout_tournaments ukt
+      JOIN ucl_knockout_matches ukm
+        ON ukm.tournament_id = ukt.id AND ukm.round = ukt.total_rounds
+        AND ukm.status = 'completed' AND ukm.winner_id IS NOT NULL
+      JOIN players p ON p.id = ukm.winner_id
+      JOIN teams t ON t.id = p.team_id
+      WHERE ukt.status = 'completed' ORDER BY ukt.created_at DESC LIMIT 1
+    `))
+    let championshipPlayers = []
+    if (champshipRes?.rows[0]?.id) {
+      const cpRes = await safe(() => query(
+        "SELECT name FROM players WHERE team_id = $1 ORDER BY name",
+        [champshipRes.rows[0].id]
+      ))
+      championshipPlayers = cpRes?.rows?.map(p => p.name) ?? []
+    }
 
     // Weekly winners from existing season record, padded to 4 slots
     const existingRes = await safe(() => query(
@@ -802,6 +816,7 @@ router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) =
       uclWinner:           uclRes?.rows[0]?.player_name ?? null,
       duoWinner:           duoRes?.rows[0]?.duo_name ?? null,
       championshipWinner:  champshipRes?.rows[0]?.name ?? null,
+      championshipPlayers,
       weeklyWinners,
       season,
     })
