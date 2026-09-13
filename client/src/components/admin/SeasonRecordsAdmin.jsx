@@ -9,12 +9,12 @@ const YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR - 2 + i)
 
 const EMPTY = {
   seasonNumber: "", seasonName: "", year: String(CURRENT_YEAR),
-  championTeam: "", championPts: "",
   topScorer: "", topScorerGoals: "",
   highestMvPlayer: "", highestMv: "",
   longestStreakPlayer: "", longestStreak: "",
   ballondorWinner: "", teamLeagueWinner: "",
-  uclWinner: "", duoWinner: "", championshipWinner: "",
+  uclWinner: "", duoWinner: "",
+  championshipTeam: "", championshipPlayers: [""],
   weeklyWinners: ["", "", "", ""],
   teamLeaguePlayers: [""],
   notes: ""
@@ -47,6 +47,7 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
     ...initial,
     weeklyWinners: normaliseWeekly(initial.weeklyWinners),
     teamLeaguePlayers: initial.teamLeaguePlayers?.length ? initial.teamLeaguePlayers : [""],
+    championshipPlayers: initial.championshipPlayers?.length ? initial.championshipPlayers : [""],
   })
   const [autofilling, setAutofilling] = useState(false)
   const set = (key) => (val) => setForm(f => ({ ...f, [key]: val }))
@@ -74,7 +75,8 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
         teamLeaguePlayers:   data.teamLeaguePlayers?.length ? data.teamLeaguePlayers : f.teamLeaguePlayers,
         uclWinner:           data.uclWinner           ?? f.uclWinner,
         duoWinner:           data.duoWinner           ?? f.duoWinner,
-        championshipWinner:  data.championshipWinner  ?? f.championshipWinner,
+        championshipTeam:    data.championshipWinner  ?? f.championshipTeam,
+        championshipPlayers: data.championshipPlayers?.length ? data.championshipPlayers : f.championshipPlayers,
         weeklyWinners:       normaliseWeekly(data.weeklyWinners),
       }))
     } catch (err) {
@@ -116,8 +118,6 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
       <div className="border-t border-surface-border pt-3">
         <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">Team & Player Records</p>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Champion Team"            value={form.championTeam}        onChange={set("championTeam")}        placeholder="Japan" />
-          <Field label="Champion Points"          value={form.championPts}         onChange={set("championPts")}         type="number" placeholder="64" />
           <Field label="Top Scorer"               value={form.topScorer}           onChange={set("topScorer")}           placeholder="Sidhu" />
           <Field label="Goals Scored"             value={form.topScorerGoals}      onChange={set("topScorerGoals")}      type="number" placeholder="14" />
           <Field label="Highest MV Player"        value={form.highestMvPlayer}     onChange={set("highestMvPlayer")}     placeholder="Sidhu" />
@@ -130,10 +130,9 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
       <div className="border-t border-surface-border pt-3">
         <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-3">Trophy Winners</p>
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <Field label="Ballon d'Or Winner"        value={form.ballondorWinner}    onChange={set("ballondorWinner")}    placeholder="Sidhu" />
-          <Field label="UCL Winner"                value={form.uclWinner}          onChange={set("uclWinner")}          placeholder="Gnana" />
-          <Field label="Team of Champions (Team)"  value={form.championshipWinner} onChange={set("championshipWinner")} placeholder="Germany" />
-          <Field label="Duo Tournament Winner"     value={form.duoWinner}          onChange={set("duoWinner")}          placeholder="Sidhu & Sathyan" />
+          <Field label="Ballon d'Or Winner"    value={form.ballondorWinner} onChange={set("ballondorWinner")} placeholder="Sidhu" />
+          <Field label="UCL Winner"            value={form.uclWinner}       onChange={set("uclWinner")}       placeholder="Gnana" />
+          <Field label="Duo Tournament Winner" value={form.duoWinner}       onChange={set("duoWinner")}       placeholder="Sidhu & Sathyan" />
         </div>
 
         {/* Dshann League — team name + squad players */}
@@ -171,6 +170,49 @@ function SeasonForm({ initial = EMPTY, onSave, onCancel, saving }) {
               ))}
               <button
                 onClick={() => set("teamLeaguePlayers")([...(form.teamLeaguePlayers || [""]), ""])}
+                className="text-xs text-accent hover:text-accent/80 transition-colors mt-1"
+              >
+                + Add player
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Team Championship — team name + squad players */}
+        <div className="bg-pitch-800 border border-surface-border rounded-xl p-4 mb-4">
+          <p className="text-xs text-slate-400 font-semibold mb-3">🏆 Team Championship Winner</p>
+          <Field label="Winning Team Name" value={form.championshipTeam} onChange={set("championshipTeam")} placeholder="ADRENALINE" />
+          <div className="mt-3">
+            <p className="text-xs text-slate-500 font-medium mb-2">Squad Players</p>
+            <div className="space-y-2">
+              {(form.championshipPlayers || [""]).map((player, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs text-slate-600 w-5 flex-shrink-0">{idx + 1}.</span>
+                  <input
+                    type="text"
+                    value={player}
+                    onChange={e => {
+                      const updated = [...(form.championshipPlayers || [""])]
+                      updated[idx] = e.target.value
+                      set("championshipPlayers")(updated)
+                    }}
+                    placeholder={`Player ${idx + 1} name`}
+                    className="flex-1 bg-pitch-900 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                  />
+                  {(form.championshipPlayers || [""]).length > 1 && (
+                    <button
+                      onClick={() => {
+                        const updated = [...(form.championshipPlayers || [""])]
+                        updated.splice(idx, 1)
+                        set("championshipPlayers")(updated)
+                      }}
+                      className="text-slate-600 hover:text-rose-400 transition-colors px-1 flex-shrink-0"
+                    >✕</button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => set("championshipPlayers")([...(form.championshipPlayers || [""]), ""])}
                 className="text-xs text-accent hover:text-accent/80 transition-colors mt-1"
               >
                 + Add player
@@ -247,8 +289,8 @@ function SeasonCard({ record, onEdit, onDelete }) {
           </div>
           <div className="text-left">
             <p className="text-sm font-semibold text-white">{record.season_name} · {record.year}</p>
-            {record.champion_team && (
-              <p className="text-xs text-slate-500">🏆 {record.champion_team} · {record.champion_pts} pts</p>
+            {record.championship_winner && (
+              <p className="text-xs text-slate-500">🏆 {record.championship_winner}</p>
             )}
           </div>
         </div>
@@ -280,9 +322,10 @@ function SeasonCard({ record, onEdit, onDelete }) {
               ["Top Scorer",   record.top_scorer,           `${record.top_scorer_goals ?? 0} goals`],
               ["Highest MV",   record.highest_mv_player,    `MV ${record.highest_mv ?? 0}`],
               ["Win Streak",   record.longest_streak_player,`${record.longest_streak ?? 0} wins`],
-              ["Ballon d'Or",  record.ballondor_winner,     "Winner"],
-              ["Dshann League",record.team_league_winner,   "Winner"],
-              ["UCL",          record.ucl_winner,           "Winner"],
+              ["Ballon d\'Or",  record.ballondor_winner,     "Winner"],
+              ["Dshann League", record.team_league_winner,   "Winner"],
+              ["UCL",           record.ucl_winner,           "Winner"],
+              ["Championship",  record.championship_winner,  "Team Champions"],
             ].filter(([, val]) => val).map(([label, val, sub]) => (
               <div key={label} className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
                 <p className="text-xs text-slate-500 mb-1">{label}</p>
@@ -297,6 +340,19 @@ function SeasonCard({ record, onEdit, onDelete }) {
               <p className="text-xs text-slate-500 mb-2">Dshann League Champions Squad — {record.team_league_winner}</p>
               <div className="flex flex-wrap gap-1.5">
                 {record.team_league_players.filter(Boolean).map((p, i) => (
+                  <span key={i} className="text-xs bg-pitch-900 border border-surface-border rounded-full px-2.5 py-1 text-slate-300">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {record.championship_winner && Array.isArray(record.championship_players) && record.championship_players.filter(Boolean).length > 0 && (
+            <div className="bg-pitch-800 rounded-xl p-3 border border-surface-border">
+              <p className="text-xs text-slate-500 mb-2">🏆 Team Championship Squad — {record.championship_winner}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {record.championship_players.filter(Boolean).map((p, i) => (
                   <span key={i} className="text-xs bg-pitch-900 border border-surface-border rounded-full px-2.5 py-1 text-slate-300">
                     {p}
                   </span>
@@ -342,8 +398,6 @@ export default function SeasonRecordsAdmin() {
       seasonNumber:        parseInt(form.seasonNumber),
       seasonName:          form.seasonName,
       year:                parseInt(form.year) || CURRENT_YEAR,
-      championTeam:        form.championTeam || null,
-      championPts:         form.championPts ? parseInt(form.championPts) : null,
       topScorer:           form.topScorer || null,
       topScorerGoals:      form.topScorerGoals ? parseInt(form.topScorerGoals) : null,
       highestMvPlayer:     form.highestMvPlayer || null,
@@ -355,7 +409,8 @@ export default function SeasonRecordsAdmin() {
       teamLeaguePlayers:   (form.teamLeaguePlayers || []).filter(Boolean),
       uclWinner:           form.uclWinner || null,
       duoWinner:           form.duoWinner || null,
-      championshipWinner:  form.championshipWinner || null,
+      championshipWinner:  form.championshipTeam || null,
+      championshipPlayers: (form.championshipPlayers || []).filter(Boolean),
       // Only save non-empty weekly winners; drop trailing empty slots
       weeklyWinners:       (form.weeklyWinners || []).filter(Boolean),
       notes:               form.notes || null,
@@ -421,8 +476,6 @@ export default function SeasonRecordsAdmin() {
               seasonNumber:        editingRecord.season_number,
               seasonName:          editingRecord.season_name,
               year:                editingRecord.year ?? CURRENT_YEAR,
-              championTeam:        editingRecord.champion_team ?? "",
-              championPts:         editingRecord.champion_pts ?? "",
               topScorer:           editingRecord.top_scorer ?? "",
               topScorerGoals:      editingRecord.top_scorer_goals ?? "",
               highestMvPlayer:     editingRecord.highest_mv_player ?? "",
@@ -436,7 +489,10 @@ export default function SeasonRecordsAdmin() {
                                      : [""],
               uclWinner:           editingRecord.ucl_winner ?? "",
               duoWinner:           editingRecord.duo_winner ?? "",
-              championshipWinner:  editingRecord.championship_winner ?? "",
+              championshipTeam:    editingRecord.championship_winner ?? "",
+              championshipPlayers: editingRecord.championship_players?.filter(Boolean).length
+                                     ? editingRecord.championship_players.filter(Boolean)
+                                     : [""],
               weeklyWinners:       editingRecord.weekly_winners ?? [],
               notes:               editingRecord.notes ?? "",
             }}
