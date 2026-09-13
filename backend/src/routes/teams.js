@@ -775,16 +775,17 @@ router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) =
       LIMIT 1
     `, [season]))
 
-    // Championship winner — UCL winner's team (highest BDR = ADRENALINE)
+    // Championship winner — UCL winner's team
     const champshipRes = await safe(() => query(`
       SELECT t.id, t.name
       FROM ucl_knockout_tournaments ukt
       JOIN ucl_knockout_matches ukm
-        ON ukm.tournament_id = ukt.id AND ukm.round = ukt.total_rounds
+        ON ukm.tournament_id = ukt.id
         AND ukm.status = 'completed' AND ukm.winner_id IS NOT NULL
       JOIN players p ON p.id = ukm.winner_id
       JOIN teams t ON t.id = p.team_id
-      WHERE ukt.status = 'completed' ORDER BY ukt.created_at DESC LIMIT 1
+      WHERE ukt.status = 'completed'
+      ORDER BY ukt.created_at DESC, ukm.round DESC LIMIT 1
     `))
     let championshipPlayers = []
     if (champshipRes?.rows[0]?.id) {
