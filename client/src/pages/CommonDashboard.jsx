@@ -805,7 +805,10 @@ export default function CommonDashboard() {
                 ? players.filter(p => p.teamId === testChampTeam?.id)
                 : ["Sidhu","Sri","Abdul","Pappali","Gokul Sanjay","Aakash","Karthi","Vicky","Nithish JB5","Jefery","Gowri Shankar"].map(name => ({ name })))
             : championshipTeamPlayers}
-          onDismiss={dismissCelebration}
+          onDismiss={() => {
+            setShowChampionshipCelebration(false)
+            if (celebQueue && celebIndex < celebQueue.length) dismissCelebration()
+          }}
         />
       ) : null}
       {/* Live auction banner — only shows when an auction is actually active */}
