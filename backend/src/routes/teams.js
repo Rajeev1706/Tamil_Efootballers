@@ -369,6 +369,7 @@ router.get("/", async (req, res, next) => {
       )
       SELECT
         t.id, t.name, t.logo_url AS "logoUrl", t.anthem_url AS "anthemUrl", t.score_points, t.created_at, t.budget, t.budget AS purse,
+        t.predecessor_team_id AS "predecessorTeamId", t.successor_team_id AS "successorTeamId",
         COALESCE(ts.played, 0) AS played,
         COALESCE(ts.won, 0)    AS won,
         COALESCE(ts.drawn, 0)  AS drawn,
@@ -876,6 +877,7 @@ router.get("/:id", authenticate, async (req, res, next) => {
       )
       SELECT
         t.id, t.name, t.logo_url AS "logoUrl", t.anthem_url AS "anthemUrl", t.score_points, t.created_at, t.budget, t.budget AS purse,
+        t.predecessor_team_id AS "predecessorTeamId", t.successor_team_id AS "successorTeamId",
         COALESCE(ts.played, 0) AS played,
         COALESCE(ts.won, 0)    AS won,
         COALESCE(ts.drawn, 0)  AS drawn,

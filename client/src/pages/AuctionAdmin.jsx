@@ -17,8 +17,73 @@ import { useBumpOnChange } from "../hooks/useBumpOnChange"
 import TeamPanel from "../components/auction/TeamPanel"
 import PoolPanel from "../components/auction/AuctionPoolPanel"
 import { useAuctionSocket } from "../hooks/useAuctionSocket"
+import api from "../lib/api"
 
 const CARD_COLORS = { silver: "border-slate-400 text-slate-300", gold: "border-gold text-gold", purple: "border-purple-400 text-purple-300" }
+
+// ── Succession Linker — relegated team → new team ────────────────────────────
+function SuccessionLinker({ teams }) {
+  const [relegatedId, setRelegatedId] = useState("")
+  const [newTeamId,   setNewTeamId]   = useState("")
+  const [links, setLinks]             = useState([])
+  const [saving, setSaving]           = useState(false)
+
+  useEffect(() => {
+    api.get("/auction/succession").then(r => setLinks(r.data)).catch(() => {})
+  }, [])
+
+  async function handleLink() {
+    if (!relegatedId || !newTeamId) return
+    setSaving(true)
+    try {
+      await api.post("/auction/succession", {
+        relegatedTeamId: Number(relegatedId),
+        newTeamId:       Number(newTeamId),
+      })
+      const r = await api.get("/auction/succession")
+      setLinks(r.data)
+      setRelegatedId(""); setNewTeamId("")
+    } finally { setSaving(false) }
+  }
+
+  async function handleRemove(newTid) {
+    await api.delete(`/auction/succession/${newTid}`)
+    setLinks(l => l.filter(x => x.new_team_id !== newTid))
+  }
+
+  return (
+    <div className="mb-5 space-y-3">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Team Succession (Relegated → New)</p>
+
+      {links.map(l => (
+        <div key={l.new_team_id} className="flex items-center gap-2 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
+          <span className="text-xs text-amber-300 flex-1">
+            <span className="font-semibold">{l.new_team_name}</span> inherits RTM & retention from <span className="line-through text-slate-500">{l.relegated_name}</span>
+          </span>
+          <button onClick={() => handleRemove(l.new_team_id)} className="text-slate-500 hover:text-rose-400 text-xs">✕</button>
+        </div>
+      ))}
+
+      <div className="flex gap-2">
+        <select value={relegatedId} onChange={e => setRelegatedId(e.target.value)}
+          className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-xs text-white">
+          <option value="">Relegated team…</option>
+          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <span className="text-slate-500 text-xs self-center">→</span>
+        <select value={newTeamId} onChange={e => setNewTeamId(e.target.value)}
+          className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-xs text-white">
+          <option value="">New team…</option>
+          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <button onClick={handleLink} disabled={!relegatedId || !newTeamId || saving}
+          className="px-3 py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 text-xs font-semibold disabled:opacity-40">
+          Link
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── Screen 0: no session yet ────────────────────────────────────────────
 function StartScreen() {
@@ -114,6 +179,9 @@ function StartScreen() {
         </p>
       </div>
 
+      {/* Team Succession — link relegated teams to new teams */}
+      <SuccessionLinker teams={teams} />
+
       <p className="text-xs text-slate-600 mb-4 text-center">To change the budget, go to Admin → Teams → Common Auction Budget.</p>
       <button onClick={handleStart}
         disabled={startAuction.isPending || selectedTeams.length === 0}
@@ -190,8 +258,14 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
                   }}
                   className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                   <option value="">Select player…</option>
-                  {allPlayers.filter(p => !retainedIds.has(p.id) && !pooledIds.has(p.id) && !captainIds.has(p.id)).map(p => (
-                    <option key={p.id} value={p.id}>{p.name} (MV: {p.marketValue ?? 0} | AP: {p.auctionPrice ?? 0})</option>
+                  {allPlayers.filter(p =>
+                    !retainedIds.has(p.id) && !pooledIds.has(p.id) && !captainIds.has(p.id) &&
+                    (p.teamId === team.id || p.teamId === team.predecessorTeamId)
+                  ).map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (MV: {p.marketValue ?? 0} | AP: {p.auctionPrice ?? 0})
+                      {p.teamId !== team.id ? " [Predecessor]" : ""}
+                    </option>
                   ))}
                 </select>
                 <div className="flex flex-col items-center">
