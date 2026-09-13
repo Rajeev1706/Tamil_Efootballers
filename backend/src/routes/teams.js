@@ -703,18 +703,33 @@ router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) =
       `SELECT name, market_value FROM players ORDER BY market_value DESC LIMIT 1`
     ))
 
-    // Longest win streak this season
+    // Longest win streak this season — counts BOTH sides of each match
     const streakRes = await safe(() => query(`
-      SELECT p.name, MAX(streak) AS longest
-      FROM (
-        SELECT player_id, COUNT(*) AS streak
-        FROM (
-          SELECT player_id, result,
-            ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY recorded_at, id) -
-            ROW_NUMBER() OVER (PARTITION BY player_id, result ORDER BY recorded_at, id) AS grp
-          FROM match_records WHERE result = 'win' AND season_number = $1
-        ) g GROUP BY player_id, grp
-      ) s JOIN players p ON p.id = s.player_id
+      WITH all_results AS (
+        SELECT player_id AS pid, result::text AS res, recorded_at, id
+        FROM match_records WHERE season_number = $1
+
+        UNION ALL
+
+        SELECT opponent_id AS pid,
+          CASE result::text WHEN 'win' THEN 'loss' WHEN 'loss' THEN 'win' ELSE 'draw' END AS res,
+          recorded_at, id
+        FROM match_records WHERE season_number = $1
+      ),
+      ordered AS (
+        SELECT pid,
+          res,
+          ROW_NUMBER() OVER (PARTITION BY pid ORDER BY recorded_at, id) -
+          ROW_NUMBER() OVER (PARTITION BY pid, res ORDER BY recorded_at, id) AS grp
+        FROM all_results
+      ),
+      streaks AS (
+        SELECT pid, COUNT(*) AS streak
+        FROM ordered WHERE res = 'win'
+        GROUP BY pid, grp
+      )
+      SELECT p.name, MAX(s.streak) AS longest
+      FROM streaks s JOIN players p ON p.id = s.pid
       GROUP BY p.id, p.name ORDER BY longest DESC LIMIT 1
     `, [season]))
 
