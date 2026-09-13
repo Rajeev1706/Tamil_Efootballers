@@ -39,6 +39,8 @@ function SeasonDetail({ record }) {
     ? record.weekly_winners.filter(Boolean) : []
   const squadPlayers  = Array.isArray(record.team_league_players)
     ? record.team_league_players.filter(Boolean) : []
+  const champPlayers  = Array.isArray(record.championship_players)
+    ? record.championship_players.filter(Boolean) : []
 
   return (
     <div className="space-y-5 mt-5">
@@ -84,7 +86,12 @@ function SeasonDetail({ record }) {
             sub={squadPlayers.length > 0 ? `Squad: ${squadPlayers.join(", ")}` : null}
           />
           <TrophyRow image={uclImg}           label="UCL"            winner={record.ucl_winner} />
-          <TrophyRow image={championshipImg}  label="Team of Champions"   winner={record.championship_winner} />
+          <TrophyRow
+            image={championshipImg}
+            label="Team Championship"
+            winner={record.championship_winner}
+            sub={champPlayers.length > 0 ? `Squad: ${champPlayers.join(", ")}` : null}
+          />
           <TrophyRow image={duoImg}           label="Duo Tournament" winner={record.duo_winner} />
           {/* Weekly — per week */}
           {weeklyWinners.length > 0 && (
