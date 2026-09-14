@@ -1112,7 +1112,7 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
 // without ever touching match_records or trophy counts, since those are
 // meant to persist as permanent history regardless of season resets.
 async function clearCurrentSeasonData(q) {
-  await q(`UPDATE teams SET played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, score_points = 0`)
+  await q(`UPDATE teams SET played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, score_points = 0, championship_pts = 0`)
 
   // ── Migrate auction results: move next_team_id → team_id for all players ──
   // Players sold in the auction have next_team_id set. On new season start,
@@ -1182,7 +1182,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       )
       SELECT
         p.id, p.name,
-        p.grade AS current_grade, p.grade_floor, p.grade_ceiling,
+        p.grade::text AS current_grade, p.grade_floor::text AS grade_floor, p.grade_ceiling::text AS grade_ceiling,
         c.matches, c.wins,
         ROUND(c.wins::numeric / NULLIF(c.matches,0) * 100, 2) AS win_rate
       FROM combined c
