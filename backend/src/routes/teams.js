@@ -1196,7 +1196,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
     const rankToGrade = (rank) => {
       if (rank <= 10) return "S"
       if (rank <= 20) return "A"
-      if (rank <= 50) return "B"
+      if (rank <= 40) return "B"
       return "C"
     }
     const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
@@ -1228,7 +1228,7 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
 
       if (finalGrade !== current) {
         await query(
-          `UPDATE players SET grade = $1 WHERE id = $2`,
+          `UPDATE players SET grade = $1::player_grade WHERE id = $2`,
           [finalGrade, player.id]
         )
         const floorTag = floor ? ` [floor: ${floor}]` : " [auto]"
@@ -1389,7 +1389,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
 
       if (finalGrade !== current) {
         await query(
-          `UPDATE players SET grade = $1 WHERE id = $2`,
+          `UPDATE players SET grade = $1::player_grade WHERE id = $2`,
           [finalGrade, player.id]
         )
         const tag = floor ? ` [floor: ${floor}]` : ceiling ? ` [ceiling: ${ceiling}]` : ' [auto]'
