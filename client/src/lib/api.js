@@ -48,15 +48,15 @@ export const teamsApi = {
   topScorers:   ()   => api.get("/teams/top-scorers").then(r => r.data),
   bestLeaguePerformer: (id) => api.get(`/teams/${id}/best-league-performer`).then(r => r.data),
   hallOfFame:      ()        => api.get("/teams/hall-of-fame").then(r => r.data),
-  seasonReset:     ()        => api.post("/teams/season-reset").then(r => r.data),
+  seasonReset:     ()        => api.post("/teams/season-reset", {}).then(r => r.data),
   recalcGrades:    ()        => api.post("/teams/recalc-grades", {}).then(r => r.data),
-  incrementYear:   ()        => api.post("/teams/increment-year").then(r => r.data),
+  incrementYear:   ()        => api.post("/teams/increment-year", {}).then(r => r.data),
   trophyHistory:    ()       => api.get("/teams/trophy-history").then(r => r.data),
   trophyHistoryYear: (year)  => api.get(`/teams/trophy-history/${year}`).then(r => r.data),
   trophyCurrent:    ()       => api.get("/teams/trophy-current").then(r => r.data),
   trophyYears:      ()       => api.get("/teams/trophy-years").then(r => r.data),
   updateTrophyYear:  (data)  => api.post("/teams/update-trophy-year", data).then(r => r.data),
-  seasonDelete:    ()        => api.post("/teams/season-delete").then(r => r.data),
+  seasonDelete:    ()        => api.post("/teams/season-delete", {}).then(r => r.data),
   seasonRecords:   ()        => api.get("/teams/season-records").then(r => r.data),
   createSeasonRecord: (body) => api.post("/teams/season-records", body).then(r => r.data),
   updateSeasonRecord: (id, body) => api.patch(`/teams/season-records/${id}`, body).then(r => r.data),
@@ -131,7 +131,7 @@ export const uclApi = {
   standings:         ()              => api.get("/ucl/standings").then(r => r.data),
   topScorers:        ()              => api.get("/ucl/top-scorers").then(r => r.data),
   generate:          (playerIds)     => api.post("/ucl/generate", { playerIds }).then(r => r.data),
-  activate:          ()              => api.post("/ucl/activate").then(r => r.data),
+  activate:          ()              => api.post("/ucl/activate", {}).then(r => r.data),
   fixtures:          ()              => api.get("/ucl/fixtures").then(r => r.data),
   fixturesPublic:    (groupId)       => api.get(`/ucl/fixtures/public/${groupId}`).then(r => r.data),
   saveFixture:       (id, s1, s2, isWalkover = false) => api.patch(`/ucl/fixtures/${id}`, { player1Score: s1, player2Score: s2, isWalkover }).then(r => r.data),
@@ -226,7 +226,7 @@ export const auctionIntelApi = {
   h2hVsSquad:     (playerId, myTeamId) => api.get(`/auction-intel/h2h-vs-squad/${playerId}`, { params: { myTeamId } }).then(r => r.data),
   auctionHistory: ()                   => api.get("/auction-intel/auction-history").then(r => r.data),
   mvTrajectory:   (playerId)           => api.get(`/auction-intel/mv-trajectory/${playerId}`).then(r => r.data),
-  snapshotMV:     ()                   => api.post("/auction-intel/snapshot-mv").then(r => r.data),
+  snapshotMV:     ()                   => api.post("/auction-intel/snapshot-mv", {}).then(r => r.data),
 }
 
 export const auctionTargetsApi = {
@@ -303,7 +303,7 @@ export const tlgApi = {
   list:             ()                      => api.get("/tlg/list").then(r => r.data),
   current:          ()                      => api.get("/tlg/current").then(r => r.data),
   get:              (id)                    => api.get(`/tlg/${id}`).then(r => r.data),
-  create:           ()                      => api.post("/tlg").then(r => r.data),
+  create:           ()                      => api.post("/tlg", {}).then(r => r.data),
   draw:             (id, teamIds)           => api.post(`/tlg/${id}/draw`, { teamIds }).then(r => r.data),
   saveFixture:      (id, homeScore, awayScore, isWalkover) =>
     api.patch(`/tlg/fixtures/${id}`, { homeScore, awayScore, isWalkover }).then(r => r.data),
@@ -316,7 +316,7 @@ export const tlgApi = {
 
 export const teamKnockoutApi = {
   current:       ()                          => api.get("/team-knockout/current").then(r => r.data),
-  generate:      ()                          => api.post("/team-knockout/generate").then(r => r.data),
+  generate:      ()                          => api.post("/team-knockout/generate", {}).then(r => r.data),
   toss:          (matchId)                   => api.post(`/team-knockout/matches/${matchId}/toss`).then(r => r.data),
   tossChoice:    (matchId, homeChoice)       => api.post(`/team-knockout/matches/${matchId}/toss/choice`, { homeChoice }).then(r => r.data),
   forceWinner:   (matchId, winnerId)         => api.post(`/team-knockout/matches/${matchId}/force-winner`, { winnerId }).then(r => r.data),

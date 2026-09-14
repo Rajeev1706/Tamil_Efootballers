@@ -397,9 +397,25 @@ function RecalcGradesCard() {
     setLoading(true); setError(null); setResult(null)
     try {
       const data = await teamsApi.recalcGrades()
-      setResult(data)
+      if (data?.success) {
+        setResult(data)
+      } else {
+        setError(data?.error || "Recalculation failed")
+      }
     } catch (err) {
-      setError(err?.response?.data?.error || "Recalculation failed")
+      // If the request actually succeeded before the error, don't show failure
+      const msg = err?.response?.data?.error || err?.message || ""
+      if (msg.includes("message channel") || msg.includes("network") || !msg) {
+        // Likely a service worker reload — retry once
+        try {
+          const data = await teamsApi.recalcGrades()
+          setResult(data)
+        } catch (e2) {
+          setError(e2?.response?.data?.error || "Recalculation failed")
+        }
+      } else {
+        setError(msg)
+      }
     } finally { setLoading(false) }
   }
 
