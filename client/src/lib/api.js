@@ -49,7 +49,7 @@ export const teamsApi = {
   bestLeaguePerformer: (id) => api.get(`/teams/${id}/best-league-performer`).then(r => r.data),
   hallOfFame:      ()        => api.get("/teams/hall-of-fame").then(r => r.data),
   seasonReset:     ()        => api.post("/teams/season-reset").then(r => r.data),
-  recalcGrades:    ()        => api.post("/teams/recalc-grades").then(r => r.data),
+  recalcGrades:    ()        => api.post("/teams/recalc-grades", {}).then(r => r.data),
   incrementYear:   ()        => api.post("/teams/increment-year").then(r => r.data),
   trophyHistory:    ()       => api.get("/teams/trophy-history").then(r => r.data),
   trophyHistoryYear: (year)  => api.get(`/teams/trophy-history/${year}`).then(r => r.data),
