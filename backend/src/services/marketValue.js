@@ -179,4 +179,21 @@ export async function recalcMarketValue(playerId) {
 
   const mv = await calculateMarketValue(playerId)
   await query("UPDATE players SET market_value = $1 WHERE id = $2", [mv, playerId])
+
+  // Save to mv_history — keep only last 5 entries per player
+  await query(`
+    INSERT INTO mv_history (player_id, market_value)
+    VALUES ($1, $2)
+  `, [playerId, mv]).catch(() => {})
+
+  await query(`
+    DELETE FROM mv_history
+    WHERE player_id = $1
+      AND id NOT IN (
+        SELECT id FROM mv_history
+        WHERE player_id = $1
+        ORDER BY recorded_at DESC
+        LIMIT 5
+      )
+  `, [playerId]).catch(() => {})
 }
