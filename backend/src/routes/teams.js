@@ -1201,17 +1201,18 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
     }
     const GRADE_NUM = { S: 4, A: 3, B: 2, C: 1 }
 
+    // Compute final grades for all eligible players
+    const updates = []
     for (let i = 0; i < eligible.length; i++) {
       const player      = eligible[i]
       const rank        = i + 1
-
       const targetGrade = rankToGrade(rank)
       const current     = player.current_grade
       const floor       = player.grade_floor
       const tgtNum      = GRADE_NUM[targetGrade] || 1
+      let finalGrade    = current
+      const ceiling     = player.grade_ceiling
 
-      let finalGrade = current
-      const ceiling = player.grade_ceiling
       if (floor && ceiling) {
         const floorNum   = GRADE_NUM[floor]   || 1
         const ceilingNum = GRADE_NUM[ceiling] || 4
@@ -1227,21 +1228,20 @@ router.post("/recalc-grades", authenticate, adminOnly, async (req, res, next) =>
       }
 
       if (finalGrade !== current) {
-        await query(
-          `UPDATE players SET grade = $1::player_grade WHERE id = $2`,
-          [finalGrade, player.id]
-        )
-        const floorTag = floor ? ` [floor: ${floor}]` : " [auto]"
-        gradeUpdateLog.push({
-          name: player.name,
-          from: current,
-          to: finalGrade,
-          rank,
-          winRate: player.win_rate,
-          matches: player.matches,
-          floor: floor || null,
-        })
+        updates.push({ id: player.id, grade: finalGrade, name: player.name, from: current, rank, winRate: player.win_rate, matches: player.matches, floor: floor || null })
+        gradeUpdateLog.push({ name: player.name, from: current, to: finalGrade, rank, winRate: player.win_rate, matches: player.matches, floor: floor || null })
       }
+    }
+
+    // Bulk UPDATE in one query instead of N individual queries
+    if (updates.length > 0) {
+      const cases    = updates.map((u, i) => `WHEN id = $${i * 2 + 1} THEN $${i * 2 + 2}::player_grade`).join(" ")
+      const ids      = updates.map(u => u.id)
+      const params   = updates.flatMap(u => [u.id, u.grade])
+      await query(
+        `UPDATE players SET grade = CASE ${cases} ELSE grade END WHERE id = ANY($${params.length + 1}::int[])`,
+        [...params, ids]
+      )
     }
 
     // ── Second pass: apply floor/ceiling to players with < 20 matches ────────
