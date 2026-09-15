@@ -93,7 +93,10 @@ function TeamRow({ team, rank }) {
                   "text-sm font-bold font-mono text-right",
                   p.bdrPoints > 0 ? "text-accent" : "text-slate-600"
                 )}>
-                  {p.bdrPoints ?? 0}
+                  <span className="text-emerald-400">{p.bdrPoints ?? 0}</span>
+                  {(p.revolutionPts ?? 0) > 0 && (
+                    <span className="text-rose-400 ml-1.5">+{p.revolutionPts}</span>
+                  )}
                 </p>
               </div>
             ))

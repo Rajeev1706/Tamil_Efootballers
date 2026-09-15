@@ -663,15 +663,17 @@ router.get("/championship", async (_req, res, next) => {
         -- SUM(bdr_points - league_bdr) = all non-league-format BDR (UCL, weekly, etc.)
         (t.championship_pts + COALESCE(SUM(p.bdr_points - p.league_bdr), 0))::int AS "totalBdr",
         t.championship_pts::int AS "leaguePts",
+        COALESCE(t.revolution_pts, 0)::int AS "revolutionPts",
         COUNT(p.id)::int AS "playerCount",
         JSON_AGG(
           JSON_BUILD_OBJECT(
-            'id',        p.id,
-            'name',      p.name,
-            'grade',     p.grade,
-            'bdrPoints', (p.bdr_points - COALESCE(p.league_bdr, 0)),
-            'avatarId',  p.avatar_id,
-            'avatarUrl', p.avatar_url
+            'id',           p.id,
+            'name',         p.name,
+            'grade',        p.grade,
+            'bdrPoints',    (p.bdr_points - COALESCE(p.league_bdr, 0)),
+            'revolutionPts', COALESCE(t.revolution_pts, 0),
+            'avatarId',     p.avatar_id,
+            'avatarUrl',    p.avatar_url
           ) ORDER BY (p.bdr_points - COALESCE(p.league_bdr, 0)) DESC
         ) FILTER (WHERE p.id IS NOT NULL) AS players
       FROM teams t
