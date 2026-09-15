@@ -384,6 +384,11 @@ router.get("/", async (req, res, next) => {
         ) AS position
       FROM teams t
       LEFT JOIN team_stats ts ON ts.team_id = t.id
+      WHERE t.id IN (
+        SELECT DISTINCT home_team_id FROM fixtures
+        UNION
+        SELECT DISTINCT away_team_id FROM fixtures
+      )
       ORDER BY position
     `, [season])
     res.json(result.rows)
