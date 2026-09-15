@@ -12,25 +12,63 @@ import logoUrl from "../../../images/logo.png"
 
 // ── Generate Full Season ───────────────────────────────────────────────────
 function GenerateSeasonCard({ hasExistingFixtures }) {
-  const [step, setStep]     = useState("idle")
-  const [format, setFormat] = useState(null)
-  const [result, setResult] = useState(null)
+  const [step, setStep]         = useState("idle")
+  const [format, setFormat]     = useState(null)
+  const [result, setResult]     = useState(null)
+  const [selectedTeams, setSelectedTeams] = useState([])
+  const { data: allTeams = [] } = useTeams()
   const generate = useGenerateSeasonFixtures()
 
+  const toggleTeam = (id) => setSelectedTeams(prev =>
+    prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+  )
+
   const handleGenerate = () => {
-    generate.mutate({ format }, {
+    generate.mutate({ format, teamIds: selectedTeams.length > 0 ? selectedTeams : undefined }, {
       onSuccess: (data) => { setResult(data); setStep("idle") },
       onError: (err) => alert(err.response?.data?.error || "Failed to generate fixtures"),
     })
   }
 
-  const reset = () => { setStep("idle"); setFormat(null) }
+  const reset = () => { setStep("idle"); setFormat(null); setSelectedTeams([]) }
 
   if (hasExistingFixtures) {
     return (
       <div className="card px-4 py-3 flex items-center gap-2 text-xs text-slate-500">
         <Lock className="w-3.5 h-3.5 flex-shrink-0" />
         Fixtures already exist for this season — delete them all first if you want to auto-generate a fresh double round-robin schedule instead.
+      </div>
+    )
+  }
+
+  if (step === "pick-teams") {
+    return (
+      <div className="card px-5 py-4">
+        <p className="text-sm font-semibold text-white mb-1">Select teams for this season</p>
+        <p className="text-xs text-slate-500 mb-4">Choose which teams participate. Leave all unselected to include everyone.</p>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {allTeams.map(t => (
+            <button key={t.id} onClick={() => toggleTeam(t.id)}
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                selectedTeams.includes(t.id) ? "border-accent bg-accent/10" : "border-surface-border hover:border-accent/40"
+              }`}>
+              {t.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain rounded flex-shrink-0" />}
+              <span className="text-sm text-white truncate">{t.name}</span>
+              {selectedTeams.includes(t.id) && <Check className="w-3.5 h-3.5 text-accent ml-auto flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500 mb-3">
+          {selectedTeams.length === 0
+            ? `All ${allTeams.length} teams selected (default)`
+            : `${selectedTeams.length} of ${allTeams.length} teams selected`}
+        </p>
+        <div className="flex gap-2">
+          <button onClick={reset} className="flex-1 py-2 rounded-xl border border-surface-border text-slate-400 text-sm">Cancel</button>
+          <button onClick={() => setStep("pick-format")} className="flex-1 py-2 rounded-xl bg-accent text-white font-semibold text-sm">
+            Next → Choose Format
+          </button>
+        </div>
       </div>
     )
   }
@@ -98,7 +136,7 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
           </p>
         )}
       </div>
-      <button onClick={() => setStep("pick-format")} className="btn-primary text-sm px-4 py-2">
+      <button onClick={() => setStep("pick-teams")} className="btn-primary text-sm px-4 py-2">
         + Auto-generate schedule
       </button>
     </div>

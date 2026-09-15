@@ -201,8 +201,15 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
       return res.status(400).json({ error: "Fixtures already exist. Delete them first if you want to regenerate the schedule." })
     }
 
-    const teamsRes = await query("SELECT id FROM teams ORDER BY id")
-    const teamIds = teamsRes.rows.map(r => r.id)
+    // Accept optional teamIds from request body to restrict which teams get fixtures
+    const requestedTeamIds = req.body.teamIds
+    let teamIds
+    if (Array.isArray(requestedTeamIds) && requestedTeamIds.length >= 2) {
+      teamIds = requestedTeamIds.map(Number)
+    } else {
+      const teamsRes = await query("SELECT id FROM teams ORDER BY id")
+      teamIds = teamsRes.rows.map(r => r.id)
+    }
     if (teamIds.length < 2) {
       return res.status(400).json({ error: "Need at least 2 teams to generate a schedule." })
     }
