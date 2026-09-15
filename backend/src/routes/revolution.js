@@ -375,7 +375,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // Delete old match record if this is an edit
     if (oldMrId) await query("DELETE FROM match_records WHERE id = $1", [oldMrId])
 
-    // If final — award trophy8 only (no BDR for Revolution)
+    // If final — award trophy8 + championship points to winner/runner-up teams
     if (match.round === match.total_rounds) {
       await awardOrReassignTrophy({
         sourceKey:    `revolution-champion-${match.tournament_id}`,
@@ -383,6 +383,22 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         playerId:     winnerId,
         seasonNumber: season,
       })
+
+      // Award championship_pts to winner's team (+2) and runner-up's team (+1)
+      // Uses claimAward to prevent double-allocation on re-save
+      const { claimAward } = await import("../services/bdrAwards.js")
+
+      const winnerTeamRes = await query("SELECT team_id FROM players WHERE id=$1", [winnerId])
+      const loserTeamRes  = await query("SELECT team_id FROM players WHERE id=$1", [loserId])
+      const winnerTeamId  = winnerTeamRes.rows[0]?.team_id
+      const loserTeamId   = loserTeamRes.rows[0]?.team_id
+
+      if (winnerTeamId && await claimAward(`rev_winner_team_${match.tournament_id}`, winnerTeamId)) {
+        await query("UPDATE teams SET championship_pts = championship_pts + 2 WHERE id=$1", [winnerTeamId])
+      }
+      if (loserTeamId && await claimAward(`rev_runnerup_team_${match.tournament_id}`, loserTeamId)) {
+        await query("UPDATE teams SET championship_pts = championship_pts + 1 WHERE id=$1", [loserTeamId])
+      }
     }
 
     // ── Advance winner to next round ────────────────────────────────────────
