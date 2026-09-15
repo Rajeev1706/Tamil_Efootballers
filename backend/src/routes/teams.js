@@ -665,13 +665,33 @@ router.get("/championship", async (_req, res, next) => {
         t.championship_pts::int AS "leaguePts",
         COALESCE(t.revolution_pts, 0)::int AS "revolutionPts",
         COUNT(p.id)::int AS "playerCount",
+        -- Get all Revolution winner/runner-up player IDs for this team
+        COALESCE((
+          SELECT ARRAY_AGG(DISTINCT rm.winner_id)
+          FROM revolution_matches rm
+          JOIN revolution_tournaments rt ON rt.id = rm.tournament_id
+          WHERE rm.round = (SELECT MAX(round) FROM revolution_matches WHERE tournament_id = rt.id)
+            AND rm.status = 'completed'
+            AND rm.winner_id IN (SELECT id FROM players WHERE team_id = t.id)
+        ), '{}') AS "revWinnerIds",
+        COALESCE((
+          SELECT ARRAY_AGG(DISTINCT
+            CASE WHEN rm.player1_id != rm.winner_id THEN rm.player1_id ELSE rm.player2_id END
+          )
+          FROM revolution_matches rm
+          JOIN revolution_tournaments rt ON rt.id = rm.tournament_id
+          WHERE rm.round = (SELECT MAX(round) FROM revolution_matches WHERE tournament_id = rt.id)
+            AND rm.status = 'completed'
+            AND (rm.player1_id IN (SELECT id FROM players WHERE team_id = t.id)
+              OR rm.player2_id IN (SELECT id FROM players WHERE team_id = t.id))
+            AND rm.winner_id NOT IN (SELECT id FROM players WHERE team_id = t.id)
+        ), '{}') AS "revRunnerUpIds",
         JSON_AGG(
           JSON_BUILD_OBJECT(
             'id',           p.id,
             'name',         p.name,
             'grade',        p.grade,
             'bdrPoints',    (p.bdr_points - COALESCE(p.league_bdr, 0)),
-            'revolutionPts', COALESCE(t.revolution_pts, 0),
             'avatarId',     p.avatar_id,
             'avatarUrl',    p.avatar_url
           ) ORDER BY (p.bdr_points - COALESCE(p.league_bdr, 0)) DESC

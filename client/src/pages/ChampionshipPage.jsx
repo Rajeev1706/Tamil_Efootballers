@@ -94,8 +94,11 @@ function TeamRow({ team, rank }) {
                   p.bdrPoints > 0 ? "text-accent" : "text-slate-600"
                 )}>
                   <span className="text-emerald-400">{p.bdrPoints ?? 0}</span>
-                  {(p.revolutionPts ?? 0) > 0 && (
-                    <span className="text-rose-400 ml-1.5">+{p.revolutionPts}</span>
+                  {(team.revWinnerIds ?? []).includes(p.id) && (
+                    <span className="text-rose-400 ml-1.5 text-xs font-bold">+2 REV</span>
+                  )}
+                  {(team.revRunnerUpIds ?? []).includes(p.id) && (
+                    <span className="text-rose-400 ml-1.5 text-xs font-bold">+1 REV</span>
                   )}
                 </p>
               </div>
@@ -111,6 +114,14 @@ function TeamRow({ team, rank }) {
                  team.leaguePts === 4  ? "TLG Europa Winner" : "TLG"} (team award)
               </p>
               <p className="text-xs font-bold text-accent">+{team.leaguePts}</p>
+            </div>
+          )}
+          {(team.revolutionPts ?? 0) > 0 && (
+            <div className="flex items-center justify-between px-5 py-2 border-t border-surface-border/40">
+              <p className="text-xs text-slate-500 italic">
+                Revolution {team.revolutionPts >= 2 ? "Winner" : "Runner-up"} (team award)
+              </p>
+              <p className="text-xs font-bold text-rose-400">+{team.revolutionPts}</p>
             </div>
           )}
           <div className="flex items-center justify-between px-5 py-3 bg-pitch-900/40">
