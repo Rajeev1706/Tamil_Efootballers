@@ -394,10 +394,10 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       const loserTeamId   = loserTeamRes.rows[0]?.team_id
 
       if (winnerTeamId && await claimAward(`rev_winner_team_${match.tournament_id}`, winnerTeamId)) {
-        await query("UPDATE teams SET championship_pts = championship_pts + 2 WHERE id=$1", [winnerTeamId])
+        await query("UPDATE teams SET revolution_pts = COALESCE(revolution_pts,0) + 2 WHERE id=$1", [winnerTeamId])
       }
       if (loserTeamId && await claimAward(`rev_runnerup_team_${match.tournament_id}`, loserTeamId)) {
-        await query("UPDATE teams SET championship_pts = championship_pts + 1 WHERE id=$1", [loserTeamId])
+        await query("UPDATE teams SET revolution_pts = COALESCE(revolution_pts,0) + 1 WHERE id=$1", [loserTeamId])
       }
     }
 
