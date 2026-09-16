@@ -141,30 +141,46 @@ export default function StandingsTable({ teams, players, onPlayerClick, view: co
                 const homeWon = isCompleted && f.homeScore > f.awayScore
                 const awayWon = isCompleted && f.awayScore > f.homeScore
                 return (
-                  <div key={f.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-border/50">
-                    <span
-                      className={cn("flex-1 min-w-0 flex items-center justify-end gap-1.5 truncate font-medium text-right pr-3",
-                        homeWon ? "text-emerald-400" : "text-white"
-                      )}>
-                      {f.home ?? "TBD"}
-                      <TeamLogoIcon logoUrl={f.homeLogo} name={f.home} />
-                    </span>
-                    <span className="flex-shrink-0 text-xs px-2">
-                      {isCompleted ? (
-                        <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
-                          {f.homeScore} - {f.awayScore}
+                  <div key={f.id} className="border-b border-surface-border/50">
+                    <div className="flex items-center justify-between px-5 py-3">
+                      <span
+                        className={cn("flex-1 min-w-0 flex items-center justify-end gap-1.5 truncate font-medium text-right pr-3",
+                          homeWon ? "text-emerald-400" : "text-white"
+                        )}>
+                        {f.home ?? "TBD"}
+                        <TeamLogoIcon logoUrl={f.homeLogo} name={f.home} />
+                      </span>
+                      <span className="flex-shrink-0 text-xs px-2">
+                        {isCompleted ? (
+                          <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded">
+                            {f.homeScore} - {f.awayScore}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">vs</span>
+                        )}
+                      </span>
+                      <span
+                        className={cn("flex-1 min-w-0 flex items-center gap-1.5 truncate font-medium pl-3",
+                          awayWon ? "text-emerald-400" : "text-white"
+                        )}>
+                        <TeamLogoIcon logoUrl={f.awayLogo} name={f.away} />
+                        {f.away ?? "TBD"}
+                      </span>
+                    </div>
+                    {f.liveResultsLogged !== undefined && (
+                      <div className="flex justify-end px-5 pb-2">
+                        <span className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                          isCompleted
+                            ? "bg-emerald-400/15 text-emerald-400"
+                            : f.liveResultsLogged > 0
+                              ? "bg-amber-400/15 text-amber-400"
+                              : "bg-surface-border text-slate-600"
+                        )}>
+                          {f.liveResultsLogged}/{f.totalPlayers ?? 10} logged
                         </span>
-                      ) : (
-                        <span className="text-slate-600">vs</span>
-                      )}
-                    </span>
-                    <span
-                      className={cn("flex-1 min-w-0 flex items-center gap-1.5 truncate font-medium pl-3",
-                        awayWon ? "text-emerald-400" : "text-white"
-                      )}>
-                      <TeamLogoIcon logoUrl={f.awayLogo} name={f.away} />
-                      {f.away ?? "TBD"}
-                    </span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
