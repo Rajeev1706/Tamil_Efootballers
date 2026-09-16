@@ -661,30 +661,22 @@ router.get("/championship", async (_req, res, next) => {
         t.logo_url       AS "logoUrl",
         -- championship_pts = flat team league points (not × squad size)
         -- SUM(bdr_points - league_bdr) = all non-league-format BDR (UCL, weekly, etc.)
-        (t.championship_pts + COALESCE(SUM(p.bdr_points - p.league_bdr), 0))::int AS "totalBdr",
+        (t.championship_pts + COALESCE(t.revolution_pts, 0) + COALESCE(SUM(p.bdr_points - p.league_bdr), 0))::int AS "totalBdr",
         t.championship_pts::int AS "leaguePts",
         COALESCE(t.revolution_pts, 0)::int AS "revolutionPts",
         COUNT(p.id)::int AS "playerCount",
-        -- Get all Revolution winner/runner-up player IDs for this team
+        -- Revolution winners/runners-up tracked per player in bdr_awards_log
         COALESCE((
-          SELECT ARRAY_AGG(DISTINCT rm.winner_id)
-          FROM revolution_matches rm
-          JOIN revolution_tournaments rt ON rt.id = rm.tournament_id
-          WHERE rm.round = (SELECT MAX(round) FROM revolution_matches WHERE tournament_id = rt.id)
-            AND rm.status = 'completed'
-            AND rm.winner_id IN (SELECT id FROM players WHERE team_id = t.id)
+          SELECT ARRAY_AGG(bal.reference_id)
+          FROM bdr_awards_log bal
+          WHERE bal.award_type LIKE 'rev_winner_player_%'
+            AND bal.reference_id IN (SELECT id FROM players WHERE team_id = t.id)
         ), '{}') AS "revWinnerIds",
         COALESCE((
-          SELECT ARRAY_AGG(DISTINCT
-            CASE WHEN rm.player1_id != rm.winner_id THEN rm.player1_id ELSE rm.player2_id END
-          )
-          FROM revolution_matches rm
-          JOIN revolution_tournaments rt ON rt.id = rm.tournament_id
-          WHERE rm.round = (SELECT MAX(round) FROM revolution_matches WHERE tournament_id = rt.id)
-            AND rm.status = 'completed'
-            AND (rm.player1_id IN (SELECT id FROM players WHERE team_id = t.id)
-              OR rm.player2_id IN (SELECT id FROM players WHERE team_id = t.id))
-            AND rm.winner_id NOT IN (SELECT id FROM players WHERE team_id = t.id)
+          SELECT ARRAY_AGG(bal.reference_id)
+          FROM bdr_awards_log bal
+          WHERE bal.award_type LIKE 'rev_runnerup_player_%'
+            AND bal.reference_id IN (SELECT id FROM players WHERE team_id = t.id)
         ), '{}') AS "revRunnerUpIds",
         JSON_AGG(
           JSON_BUILD_OBJECT(
