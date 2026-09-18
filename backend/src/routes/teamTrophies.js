@@ -202,22 +202,37 @@ router.get("/:teamId", async (req, res, next) => {
       return { ...h, squad: squadRes.rows, seasonStats: statsRes.rows[0] || {} }
     }))
 
-    // Win rate from all completed fixtures (all-time)
+    // Win rate computed from match_records grouped by fixture — survives season
+    // resets unlike the fixtures table. team_id on match_records stores the
+    // team the player was on at match time, so this is accurate across all seasons.
+    // A fixture is a "win" when the team had more individual match wins than losses.
     const winRateRes = await query(`
+      WITH fixture_results AS (
+        SELECT
+          mr.fixture_id,
+          COUNT(*) FILTER (WHERE mr.result = 'win')  AS match_wins,
+          COUNT(*) FILTER (WHERE mr.result = 'loss') AS match_losses,
+          COUNT(*) FILTER (WHERE mr.result = 'draw') AS match_draws
+        FROM match_records mr
+        WHERE mr.team_id = $1
+          AND mr.match_type = 'league'
+        GROUP BY mr.fixture_id
+      ),
+      fixture_outcomes AS (
+        SELECT
+          CASE
+            WHEN match_wins > match_losses THEN 'win'
+            WHEN match_wins < match_losses THEN 'loss'
+            ELSE 'draw'
+          END AS outcome
+        FROM fixture_results
+      )
       SELECT
-        COUNT(*)::int AS played,
-        COUNT(*) FILTER (WHERE
-          (f.home_team_id = $1 AND f.home_score > f.away_score) OR
-          (f.away_team_id = $1 AND f.away_score > f.home_score)
-        )::int AS wins,
-        COUNT(*) FILTER (WHERE f.home_score = f.away_score)::int AS draws,
-        COUNT(*) FILTER (WHERE
-          (f.home_team_id = $1 AND f.home_score < f.away_score) OR
-          (f.away_team_id = $1 AND f.away_score < f.home_score)
-        )::int AS losses
-      FROM fixtures f
-      WHERE (f.home_team_id = $1 OR f.away_team_id = $1)
-        AND f.status = 'completed'
+        COUNT(*)::int                                         AS played,
+        COUNT(*) FILTER (WHERE outcome = 'win')::int         AS wins,
+        COUNT(*) FILTER (WHERE outcome = 'draw')::int        AS draws,
+        COUNT(*) FILTER (WHERE outcome = 'loss')::int        AS losses
+      FROM fixture_outcomes
     `, [req.params.teamId])
 
     const wr = winRateRes.rows[0] || {}
