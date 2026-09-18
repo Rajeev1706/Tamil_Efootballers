@@ -202,42 +202,16 @@ router.get("/:teamId", async (req, res, next) => {
       return { ...h, squad: squadRes.rows, seasonStats: statsRes.rows[0] || {} }
     }))
 
-    // Win rate computed from match_records grouped by fixture — survives season
-    // resets unlike the fixtures table. team_id on match_records stores the
-    // team the player was on at match time, so this is accurate across all seasons.
-    // A fixture is a "win" when the team had more individual match wins than losses.
-    const winRateRes = await query(`
-      WITH fixture_results AS (
-        SELECT
-          mr.fixture_id,
-          COUNT(*) FILTER (WHERE mr.result = 'win')  AS match_wins,
-          COUNT(*) FILTER (WHERE mr.result = 'loss') AS match_losses,
-          COUNT(*) FILTER (WHERE mr.result = 'draw') AS match_draws
-        FROM match_records mr
-        WHERE mr.team_id = $1
-          AND mr.match_type = 'league'
-        GROUP BY mr.fixture_id
-      ),
-      fixture_outcomes AS (
-        SELECT
-          CASE
-            WHEN match_wins > match_losses THEN 'win'
-            WHEN match_wins < match_losses THEN 'loss'
-            ELSE 'draw'
-          END AS outcome
-        FROM fixture_results
-      )
-      SELECT
-        COUNT(*)::int                                         AS played,
-        COUNT(*) FILTER (WHERE outcome = 'win')::int         AS wins,
-        COUNT(*) FILTER (WHERE outcome = 'draw')::int        AS draws,
-        COUNT(*) FILTER (WHERE outcome = 'loss')::int        AS losses
-      FROM fixture_outcomes
-    `, [req.params.teamId])
-
-    const wr = winRateRes.rows[0] || {}
-    const winRate = wr.played > 0
-      ? Math.round((wr.wins / wr.played) * 1000) / 10
+    // Overall win rate — aggregate seasonStats from S8 onwards (S6/S7 had no
+    // team_id on match_records and fixtures are deleted, so those seasons
+    // can't be recovered). S8 is the baseline; every future season adds to it.
+    const WIN_RATE_FROM_SEASON = 8
+    const totalMatches = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.matches || 0) : s, 0)
+    const totalWins    = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.wins    || 0) : s, 0)
+    const totalDraws   = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.draws   || 0) : s, 0)
+    const totalLosses  = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.losses  || 0) : s, 0)
+    const overallRate  = totalMatches > 0
+      ? Math.round((totalWins / totalMatches) * 1000) / 10
       : null
 
     // Summary stats
@@ -257,11 +231,11 @@ router.get("/:teamId", async (req, res, next) => {
       history:  historyWithSquad,
       stats:    statsRes.rows[0] || {},
       winRate: {
-        played: wr.played || 0,
-        wins:   wr.wins   || 0,
-        draws:  wr.draws  || 0,
-        losses: wr.losses || 0,
-        rate:   winRate,
+        played: totalMatches,
+        wins:   totalWins,
+        draws:  totalDraws,
+        losses: totalLosses,
+        rate:   overallRate,
       },
     })
   } catch (err) { next(err) }
