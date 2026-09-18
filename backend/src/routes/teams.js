@@ -1470,12 +1470,26 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     const champMap = {}
     for (const row of champRes.rows) champMap[row.team_id] = row.champ_pos
 
-    // Determine relegated teams (bottom 2 of league if 8+ teams played)
+    // Determine relegated team — use the result of the seventh_place TLG
+    // knockout match (stored in app_settings) rather than blindly relegating
+    // the bottom 2 by league position. The 7th/8th place playoff loser is the
+    // true relegated team; the winner survives regardless of league finish.
     const playedTeams = standingsRes.rows
     const relegationCutoff = playedTeams.length >= 8 ? playedTeams.length - 1 : null
 
+    const relegatedRes = await query(
+      "SELECT value FROM app_settings WHERE key = 'tlg_relegated_team_id'"
+    )
+    const relegatedTeamId = relegatedRes.rows[0]?.value
+      ? parseInt(relegatedRes.rows[0].value)
+      : null
+
     for (const team of playedTeams) {
-      const relegated = relegationCutoff ? team.league_pos >= relegationCutoff : false
+      // If a relegation playoff was played, only the actual loser is relegated.
+      // Fall back to bottom-2-by-position only when no playoff result exists.
+      const relegated = relegatedTeamId
+        ? team.team_id === relegatedTeamId
+        : (relegationCutoff ? team.league_pos >= relegationCutoff : false)
       await query(`
         INSERT INTO team_season_history
           (team_id, season_number, year, team_league_pos, championship_pos, relegated)
