@@ -384,24 +384,58 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
         seasonNumber: season,
       })
 
-      // Award championship_pts to winner's team (+2) and runner-up's team (+1)
-      // Uses claimAward to prevent double-allocation on re-save
-      const { claimAward } = await import("../services/bdrAwards.js")
+      // Award championship_pts to winner's team (+2) and runner-up's team (+1).
+      //
+      // We use a wipe-and-reapply reconciliation instead of claimAward here.
+      // claimAward's ON CONFLICT DO NOTHING means correcting a final result
+      // (re-saving with a different winner) silently stacks new entries on top
+      // of the old ones — both teams end up with winner AND runner-up pts.
+      // The reconciliation below always produces the correct state regardless
+      // of how many times the final is saved or corrected.
+      const tournId = match.tournament_id
 
       const winnerTeamRes = await query("SELECT team_id FROM players WHERE id=$1", [winnerId])
       const loserTeamRes  = await query("SELECT team_id FROM players WHERE id=$1", [loserId])
       const winnerTeamId  = winnerTeamRes.rows[0]?.team_id
       const loserTeamId   = loserTeamRes.rows[0]?.team_id
 
-      if (winnerTeamId && await claimAward(`rev_winner_team_${match.tournament_id}`, winnerTeamId)) {
-        await query("UPDATE teams SET revolution_pts = COALESCE(revolution_pts,0) + 2 WHERE id=$1", [winnerTeamId])
-        // Track winner player ID for championship page display
-        await claimAward(`rev_winner_player_${match.tournament_id}`, winnerId)
+      // Step 1 — reverse any pts that were previously applied for this final
+      const prevWinnerTeams = await query(
+        "SELECT reference_id FROM bdr_awards_log WHERE award_type = $1",
+        [`rev_winner_team_${tournId}`]
+      )
+      const prevRunnerTeams = await query(
+        "SELECT reference_id FROM bdr_awards_log WHERE award_type = $1",
+        [`rev_runnerup_team_${tournId}`]
+      )
+      for (const row of prevWinnerTeams.rows) {
+        await query("UPDATE teams SET revolution_pts = GREATEST(0, revolution_pts - 2) WHERE id=$1", [row.reference_id])
       }
-      if (loserTeamId && await claimAward(`rev_runnerup_team_${match.tournament_id}`, loserTeamId)) {
+      for (const row of prevRunnerTeams.rows) {
+        await query("UPDATE teams SET revolution_pts = GREATEST(0, revolution_pts - 1) WHERE id=$1", [row.reference_id])
+      }
+
+      // Step 2 — delete all stale log entries for this final
+      await query(
+        "DELETE FROM bdr_awards_log WHERE award_type = ANY($1::text[])",
+        [[
+          `rev_winner_team_${tournId}`,
+          `rev_runnerup_team_${tournId}`,
+          `rev_winner_player_${tournId}`,
+          `rev_runnerup_player_${tournId}`,
+        ]]
+      )
+
+      // Step 3 — insert the correct entries and apply pts fresh
+      if (winnerTeamId) {
+        await query("UPDATE teams SET revolution_pts = COALESCE(revolution_pts,0) + 2 WHERE id=$1", [winnerTeamId])
+        await query("INSERT INTO bdr_awards_log (award_type, reference_id) VALUES ($1,$2)", [`rev_winner_team_${tournId}`, winnerTeamId])
+        await query("INSERT INTO bdr_awards_log (award_type, reference_id) VALUES ($1,$2)", [`rev_winner_player_${tournId}`, winnerId])
+      }
+      if (loserTeamId) {
         await query("UPDATE teams SET revolution_pts = COALESCE(revolution_pts,0) + 1 WHERE id=$1", [loserTeamId])
-        // Track runner-up player ID for championship page display
-        await claimAward(`rev_runnerup_player_${match.tournament_id}`, loserId)
+        await query("INSERT INTO bdr_awards_log (award_type, reference_id) VALUES ($1,$2)", [`rev_runnerup_team_${tournId}`, loserTeamId])
+        await query("INSERT INTO bdr_awards_log (award_type, reference_id) VALUES ($1,$2)", [`rev_runnerup_player_${tournId}`, loserId])
       }
     }
 
