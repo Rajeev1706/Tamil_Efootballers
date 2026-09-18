@@ -520,14 +520,25 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       }
     }
 
-    // When all GROUP STAGE fixtures are complete, check format and act accordingly
-    // Knockout leg fixtures (is_knockout_leg=true) are handled separately
-    const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed' AND group_stage = true`)
+    // When all fixtures are complete, check format and act accordingly.
+    // Knockout leg fixtures (is_knockout_leg=true) are handled separately above.
+    //
+    // IMPORTANT: league-only fixtures are created WITHOUT group_stage=true (they
+    // default to false), so we must read the format FIRST and use the correct
+    // remaining-count query per format:
+    //   • "league"          → all non-knockout-leg fixtures must be done
+    //   • "league_knockout" → only group-stage (group_stage=true) fixtures
+    //                         need to be done before playoffs are generated
+    const seasonRes  = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const formatRes  = await query("SELECT value FROM app_settings WHERE key = 'team_league_format'")
+    const season     = parseInt(seasonRes.rows[0]?.value || "1")
+    const format     = formatRes.rows[0]?.value || "league_knockout"
+
+    const remainingRes = format === "league"
+      ? await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed' AND (is_knockout_leg IS NULL OR is_knockout_leg = false)`)
+      : await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed' AND group_stage = true`)
+
     if (parseInt(remainingRes.rows[0].count) === 0) {
-      const seasonRes  = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
-      const formatRes  = await query("SELECT value FROM app_settings WHERE key = 'team_league_format'")
-      const season     = parseInt(seasonRes.rows[0]?.value || "1")
-      const format     = formatRes.rows[0]?.value || "league_knockout"
 
       if (format === "league") {
         // League-only: top of the table wins immediately — award trophies now
@@ -610,7 +621,7 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
           // Use teams.points directly — same source as the league table display
           const standingsRes = await query(`
             SELECT id AS team_id,
-              ROW_NUMBER() OVER (ORDER BY points DESC, goals_for - goals_against DESC, goals_for DESC) AS pos
+              ROW_NUMBER() OVER (ORDER BY score_points DESC, gf - ga DESC, gf DESC) AS pos
             FROM teams
             ORDER BY points DESC
             LIMIT 8
