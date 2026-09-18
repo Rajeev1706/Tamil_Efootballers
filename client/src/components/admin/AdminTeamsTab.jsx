@@ -374,8 +374,8 @@ function TeamCard({ team }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function AdminTeamsTab() {
   const { data: teams = [], isLoading } = useQuery({
-    queryKey: ["teams"],
-    queryFn:  teamsApi.list,
+    queryKey: ["teams-all"],
+    queryFn:  teamsApi.listAll,
   })
 
   return (
