@@ -3,7 +3,7 @@ import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { generatePlayoffs } from "../services/playoffs.js"
-import { addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
+import { addBdr, addBdrWithLabel, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
@@ -634,7 +634,11 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
             if (bdr > 0) {
               const label = posLabel[row.pos] || "Team League"
               const teamPlayers = await query("SELECT id FROM players WHERE team_id = $1", [row.team_id])
-              for (const p of teamPlayers.rows) await addBdrWithLabel(p.id, bdr, label)
+              for (const p of teamPlayers.rows) {
+                await addBdrWithLabel(p.id, bdr, label)
+                await addLeagueBdr(p.id, bdr)
+              }
+              await addTeamChampionshipPts(row.team_id, bdr)
             }
           }
 
