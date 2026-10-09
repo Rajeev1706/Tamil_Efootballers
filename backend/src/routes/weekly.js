@@ -501,22 +501,35 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     if (parseInt(remaining.rows[0].count) === 0) {
       await query("UPDATE weekly_tournaments SET status = 'completed', completed_at = NOW() WHERE id = $1", [match.tournament_id])
 
-      // Golden Boot BDR — awarded at tournament end since top scorer can
-      // change until the last match. Uses claimAward to fire only once.
-      if (await claimAward("weekly_tournament_gb", match.tournament_id)) {
-        const goldenBootRes = await query(`
-          SELECT p.id,
-            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
-            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
-          FROM players p
-          JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='weekly'
-          JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
-          WHERE wtm.tournament_id = $1
-          GROUP BY p.id
-          ORDER BY goals DESC, conceded ASC
-          LIMIT 1
-        `, [match.tournament_id])
-        if (goldenBootRes.rows[0]?.goals > 0) await addBdrWithLabel(goldenBootRes.rows[0].id, 4, "Weekly Golden Boot")
+      // Golden Boot BDR — edit-safe: tracks current holder in app_settings
+      // and reassigns whenever the top scorer changes (e.g. after a result edit).
+      // Uses the same pattern as awardOrReassignTrophy so edits always correct it.
+      const gbHolderKey = `weekly_gb_holder_${match.tournament_id}`
+      const gbHolderRes = await query("SELECT value FROM app_settings WHERE key = $1", [gbHolderKey])
+      const oldGbHolderId = gbHolderRes.rows[0]?.value ? parseInt(gbHolderRes.rows[0].value) : null
+
+      const goldenBootRes = await query(`
+        SELECT p.id,
+          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
+          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
+        FROM players p
+        JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='weekly'
+        JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
+        WHERE wtm.tournament_id = $1
+        GROUP BY p.id
+        ORDER BY goals DESC, conceded ASC
+        LIMIT 1
+      `, [match.tournament_id])
+      const newGbHolder = goldenBootRes.rows[0]?.goals > 0 ? goldenBootRes.rows[0] : null
+
+      if (oldGbHolderId !== (newGbHolder?.id ?? null)) {
+        if (oldGbHolderId) await addBdr(oldGbHolderId, -4)
+        if (newGbHolder)   await addBdrWithLabel(newGbHolder.id, 4, "Weekly Golden Boot")
+        await query(
+          `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+           ON CONFLICT (key) DO UPDATE SET value = $2`,
+          [gbHolderKey, newGbHolder?.id?.toString() ?? ""]
+        )
       }
 
       // Trophy awards — runs EVERY time completion is detected (unlike the
