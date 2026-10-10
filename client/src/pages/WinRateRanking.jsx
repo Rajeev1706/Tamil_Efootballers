@@ -10,10 +10,11 @@ import RankBadge from "../components/common/RankBadge"
 import { useRankChanges } from "../hooks/useRankChanges"
 
 const TYPES = [
-  { id: "overall", label: "Overall"     },
-  { id: "league",  label: "Dshann League" },
-  { id: "weekly",  label: "Weekly"      },
-  { id: "ucl",     label: "UCL"         },
+  { id: "overall",    label: "Overall"          },
+  { id: "league",     label: "Dshann League"    },
+  { id: "weekly",     label: "Weekly"           },
+  { id: "ucl",        label: "UCL"              },
+  { id: "revolution", label: "Revolution Trophy" },
 ]
 
 const FormDot = ({ result }) => {
@@ -102,7 +103,7 @@ export default function WinRateRanking() {
               <h2 className="text-base font-semibold text-white">
                 {TYPES.find(t => t.id === activeType)?.label} ·{" "}
                 {activeSeason === "all" ? "All Seasons" : activeSeason === "current" ? `Season ${currentSeason}` : `Season ${activeSeason}`}
-                {activeSeason === "all" && ` · min ${activeType === "overall" ? 20 : activeType === "league" ? 14 : activeType === "ucl" ? 8 : 10} matches`}
+                {activeSeason === "all" && ` · min ${activeType === "overall" ? 20 : activeType === "league" ? 14 : activeType === "ucl" ? 8 : activeType === "revolution" ? 4 : 10} matches`}
                 {activeSeason !== "all" && ` · min matches apply`}
               </h2>
             </div>
