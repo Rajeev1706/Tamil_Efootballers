@@ -457,7 +457,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     // Award new winner's diff
     if (winnerId && winnerDiff > 0) {
       const weeklyLabel = match.round === finalRound ? "Weekly Champion" : `Weekly Tournament Round ${match.round}`
-      await addBdrWithLabel(winnerId, winnerDiff, weeklyLabel)
+      await addBdrWithLabel(winnerId, winnerDiff, weeklyLabel, season)
     }
 
     // Recalc MV for both (BDR affects MV)
@@ -524,7 +524,7 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
       if (oldGbHolderId !== (newGbHolder?.id ?? null)) {
         if (oldGbHolderId) await addBdr(oldGbHolderId, -4)
-        if (newGbHolder)   await addBdrWithLabel(newGbHolder.id, 4, "Weekly Golden Boot")
+        if (newGbHolder)   await addBdrWithLabel(newGbHolder.id, 4, "Weekly Golden Boot", season)
         await query(
           `INSERT INTO app_settings (key, value) VALUES ($1, $2)
            ON CONFLICT (key) DO UPDATE SET value = $2`,

@@ -38,11 +38,13 @@ const LABEL_COLOR = {
 }
 
 function BreakdownRow({ playerId }) {
-  const { data = [], isLoading } = useQuery({
+  const { data = {}, isLoading } = useQuery({
     queryKey: ["bdr-breakdown", playerId],
     queryFn: () => api.get(`/players/${playerId}/bdr-breakdown`).then(r => r.data),
     staleTime: 1000 * 60 * 5,
   })
+  const rows = Array.isArray(data) ? data : (data.rows ?? [])
+  const _data = rows
 
   if (isLoading) return (
     <div className="px-5 py-3 border-t border-surface-border/50">
@@ -50,7 +52,7 @@ function BreakdownRow({ playerId }) {
     </div>
   )
 
-  if (data.length === 0) return (
+  if (_data.length === 0) return (
     <div className="px-5 py-3 border-t border-surface-border/50">
       <p className="text-xs text-slate-600 italic">
         No breakdown available — points were awarded before this feature was added
@@ -61,7 +63,7 @@ function BreakdownRow({ playerId }) {
   return (
     <div className="px-5 py-3 border-t border-surface-border/50 space-y-1.5">
       <p className="text-[10px] text-slate-600 font-semibold uppercase tracking-widest mb-2">BDR Breakdown</p>
-      {data.map((row, i) => (
+      {_data.map((row, i) => (
         <div key={i} className="flex items-center justify-between gap-4">
           <span className={cn("text-xs font-medium", LABEL_COLOR[row.label] || "text-slate-400")}>
             {row.label}
@@ -76,13 +78,29 @@ function BreakdownRow({ playerId }) {
   )
 }
 
+// Fetch current-season BDR totals for all players from breakdown table
+function useSeasonBdrTotals() {
+  return useQuery({
+    queryKey: ["bdr-season-totals"],
+    queryFn: () => api.get("/players/bdr-season-totals").then(r => r.data),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export default function BDRRanking({ players, onPlayerClick }) {
   const [expandedId, setExpandedId] = useState(null)
+  const { data: seasonTotals = {} } = useSeasonBdrTotals()
 
-  const sorted = [...players].sort((a, b) =>
-    (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
+  // Use current-season BDR if available, fall back to all-time bdrPoints
+  const withSeasonPts = players.map(p => ({
+    ...p,
+    displayBdr: seasonTotals[p.id] ?? p.bdrPoints,
+  }))
+
+  const sorted = [...withSeasonPts].sort((a, b) =>
+    (b.displayBdr - a.displayBdr) || a.name.localeCompare(b.name)
   )
-  const maxPts = sorted[0]?.bdrPoints || 1
+  const maxPts = sorted[0]?.displayBdr || 1
   const rankChanges = useRankChanges("bdr-ranking", sorted.map(p => p.id))
 
   function toggleExpand(e, playerId) {
@@ -103,7 +121,7 @@ export default function BDRRanking({ players, onPlayerClick }) {
       <div className="divide-y divide-surface-border">
         {sorted.map((player, idx) => {
           const isFirst    = idx === 0
-          const barPct     = (player.bdrPoints / maxPts) * 100
+          const barPct     = (player.displayBdr / maxPts) * 100
           const isExpanded = expandedId === player.id
 
           return (
@@ -167,7 +185,7 @@ export default function BDRRanking({ players, onPlayerClick }) {
                 {/* Points */}
                 <div className="text-right flex-shrink-0">
                   <span className={cn("font-bold text-sm font-mono", isFirst ? "text-gold" : "text-white")}>
-                    {player.bdrPoints.toLocaleString()}
+                    {player.displayBdr.toLocaleString()}
                   </span>
                   <p className="text-xs text-slate-600 mt-0.5">pts</p>
                 </div>
