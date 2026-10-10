@@ -575,6 +575,7 @@ router.get("/trophy-history/:year", async (req, res, next) => {
     }
 
     // Past year — read from trophy history table (if exists)
+    // Try with trophy8–11 columns first; if they don't exist yet, fall back to trophy1–7 only
     try {
       const r = await query(`
         SELECT p.id, p.name, p.grade,
@@ -591,7 +592,7 @@ router.get("/trophy-history/:year", async (req, res, next) => {
           COALESCE(h.trophy9_count,0) AS "trophy9Count",
           COALESCE(h.trophy10_count,0) AS "trophy10Count",
           COALESCE(h.trophy11_count,0) AS "trophy11Count",
-          COALESCE(h.trophy13_count,0) AS "trophy13Count"
+          0 AS "trophy13Count"
         FROM players p
         LEFT JOIN teams t ON t.id = p.team_id
         LEFT JOIN player_trophy_history h ON h.player_id = p.id AND h.year = $1
@@ -599,8 +600,31 @@ router.get("/trophy-history/:year", async (req, res, next) => {
       `, [year])
       return res.json(r.rows)
     } catch {
-      // History table doesn't exist yet — return empty
-      return res.json([])
+      // trophy8–11 columns may not exist yet — fall back to trophy1–7 only
+      try {
+        const r = await query(`
+          SELECT p.id, p.name, p.grade,
+            p.avatar_id AS "avatarId", p.avatar_url AS "avatarUrl",
+            p.team_id AS "teamId", t.name AS team, t.logo_url AS "teamLogo",
+            COALESCE(h.trophy1_count,0) AS "trophy1Count",
+            COALESCE(h.trophy2_count,0) AS "trophy2Count",
+            COALESCE(h.trophy3_count,0) AS "trophy3Count",
+            COALESCE(h.trophy4_count,0) AS "trophy4Count",
+            COALESCE(h.trophy5_count,0) AS "trophy5Count",
+            COALESCE(h.trophy6_count,0) AS "trophy6Count",
+            COALESCE(h.trophy7_count,0) AS "trophy7Count",
+            0 AS "trophy8Count", 0 AS "trophy9Count",
+            0 AS "trophy10Count", 0 AS "trophy11Count", 0 AS "trophy13Count"
+          FROM players p
+          LEFT JOIN teams t ON t.id = p.team_id
+          LEFT JOIN player_trophy_history h ON h.player_id = p.id AND h.year = $1
+          ORDER BY p.name
+        `, [year])
+        return res.json(r.rows)
+      } catch {
+        // History table doesn't exist at all — return empty
+        return res.json([])
+      }
     }
   } catch (err) { next(err) }
 })
