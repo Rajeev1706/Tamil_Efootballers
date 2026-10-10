@@ -54,6 +54,23 @@ router.get("/", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /api/players/bdr-season-totals — current-season BDR points per player
+router.get("/bdr-season-totals", async (req, res, next) => {
+  try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "6")
+    const result = await query(`
+      SELECT player_id AS id, COALESCE(SUM(amount), 0)::int AS total
+      FROM player_bdr_breakdown
+      WHERE season_number = $1
+      GROUP BY player_id
+    `, [season])
+    const map = {}
+    for (const row of result.rows) map[row.id] = row.total
+    res.json(map)
+  } catch (err) { next(err) }
+})
+
 // GET /api/players/:id — public
 router.get("/:id", async (req, res, next) => {
   try {
@@ -1004,13 +1021,15 @@ router.post("/recalc-tournament-history", authenticate, adminOnly, async (req, r
 // ── GET /api/players/:id/bdr-breakdown — BDR points breakdown by source ──────
 router.get("/:id/bdr-breakdown", async (req, res, next) => {
   try {
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "6")
     const { rows } = await query(`
       SELECT label, SUM(amount)::int AS total
       FROM player_bdr_breakdown
-      WHERE player_id = $1 AND amount > 0
+      WHERE player_id = $1 AND amount > 0 AND season_number = $2
       GROUP BY label
       ORDER BY total DESC
-    `, [req.params.id])
+    `, [req.params.id, season])
     res.json(rows)
   } catch (err) { next(err) }
 })
