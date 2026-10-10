@@ -16,18 +16,12 @@ router.get("/seasons", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── GET /api/winrate?type=overall|league|weekly|ucl&season=all|current|N ─────
-// Returns players ranked by win rate with minimum 10 matches played.
-// season param: "all" = all seasons combined
-//               "current" = current season only
-//               number = specific past season
+// ── GET /api/winrate?type=overall|league|weekly|ucl|revolution&season=all|current|N ─────
 router.get("/", async (req, res, next) => {
   try {
     const type   = req.query.type   || "overall"
     const season = req.query.season || "all"
 
-    // Check if UCL group stage exists for current season
-    // If yes and viewing current season OVERALL → threshold = 20
     let minMatches
     if (season !== "all") {
       if (season === "current" && type === "overall") {
@@ -35,22 +29,26 @@ router.get("/", async (req, res, next) => {
         const uclStarted = (uclRes.rows[0]?.cnt || 0) > 0
         minMatches = uclStarted ? 20 : 1
       } else {
-        // League: 4, weekly/ucl: 1 regardless of UCL stage
         minMatches = type === "league" ? 4 : 1
       }
     } else {
       // All seasons — higher thresholds
-      minMatches = type === "overall" ? 20
-                 : type === "league"  ? 14
-                 : type === "ucl"     ? 8
+      minMatches = type === "overall"    ? 20
+                 : type === "league"     ? 14
+                 : type === "ucl"        ? 8
+                 : type === "revolution" ? 4
                  : 10  // weekly
     }
 
-    // Match type filter
-    const typeFilter = type === "overall" ? "" :
-      `AND mr.match_type = '${
-        type === "league" ? "league" : type === "weekly" ? "weekly" : "ucl"
-      }'`
+    // Match type filter — fixed: revolution was falling through to 'ucl'
+    const matchTypeName =
+      type === "league"     ? "league"     :
+      type === "weekly"     ? "weekly"     :
+      type === "ucl"        ? "ucl"        :
+      type === "revolution" ? "revolution" :
+      null
+
+    const typeFilter = matchTypeName ? `AND mr.match_type = '${matchTypeName}'` : ""
 
     // Season filter
     let seasonFilter = ""
