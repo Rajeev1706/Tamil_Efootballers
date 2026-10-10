@@ -152,7 +152,8 @@ export default function PlayerTrophyCabinet() {
     bdr:        ["trophy1Count"],
     league:     ["trophy2Count","trophy6Count"],
     ucl:        ["trophy4Count","trophy7Count"],
-    weekly:     ["trophy3Count","trophy5Count","trophy13Count"],
+    weekly:     ["trophy3Count","trophy5Count"],
+    weekbest:   ["trophy13Count"],
     revolution: ["trophy8Count"],
     duo:        ["trophy10Count","trophy11Count"],
   }
@@ -231,6 +232,7 @@ export default function PlayerTrophyCabinet() {
           { id: "league",     label: "Dshann League" },
           { id: "ucl",        label: "UCL" },
           { id: "weekly",     label: "Weekly" },
+          { id: "weekbest",   label: "Week Best" },
           { id: "revolution", label: "Revolution" },
           { id: "duo",        label: "Duo" },
         ].map(f => (
