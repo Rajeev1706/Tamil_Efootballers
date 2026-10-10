@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, X, Download } from "lucide-react"
+import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, X, Download, Upload } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
 import { useSettings } from "../../lib/queries"
 import { toPng } from "html-to-image"
 import logoUrl from "../../../images/logo.png"
 import { cn } from "../../lib/utils"
+import { uploadTeamLogo } from "../../lib/supabase"
 
 const ROUND_LABELS = { r16: "Round of 16", qf: "Quarter Finals", sf: "Semi Finals", final: "Final" }
 
@@ -21,11 +22,15 @@ const GRADE_COLORS = {
 // ── Pair Creator — admin manually creates pairs ───────────────────────────────
 function PairCreator({ season, drawStatus }) {
   const qc = useQueryClient()
-  const [name, setName]       = useState("")
-  const [player1Id, setP1]    = useState("")
-  const [player2Id, setP2]    = useState("")
-  const [search, setSearch]   = useState("")
-  const [error, setError]     = useState("")
+  const [name, setName]               = useState("")
+  const [player1Id, setP1]            = useState("")
+  const [player2Id, setP2]            = useState("")
+  const [error, setError]             = useState("")
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [uploadingLogo, setUL]        = useState(false)
+  const [patchingId, setPatchingId]   = useState(null)   // pair id being logo-patched
+  const logoInputRef                  = useRef(null)
+  const patchInputRef                 = useRef(null)
 
   const locked = drawStatus === "drawn" || drawStatus === "revealed"
 
@@ -46,10 +51,12 @@ function PairCreator({ season, drawStatus }) {
       player1Id: Number(player1Id),
       player2Id: Number(player2Id),
       duoName: name.trim(),
+      logoUrl: logoPreview || null,
     }).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["duo-pairs", season] })
       setName(""); setP1(""); setP2(""); setError("")
+      setLogoPreview(null)
     },
     onError: (err) => setError(err?.response?.data?.error || "Failed to add pair"),
   })
@@ -60,13 +67,44 @@ function PairCreator({ season, drawStatus }) {
     onError: (err) => alert(err?.response?.data?.error || "Failed to delete pair"),
   })
 
+  const patchLogoMut = useMutation({
+    mutationFn: ({ id, logoUrl }) => api.patch(`/duo/pairs/${id}/logo`, { logoUrl }).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["duo-pairs", season] }),
+    onError: (err) => alert(err?.response?.data?.error || "Logo update failed"),
+  })
+
+  async function handleLogoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUL(true)
+    try {
+      const url = await uploadTeamLogo("duo-" + Date.now(), file)
+      setLogoPreview(url)
+    } catch (err) {
+      setError("Logo upload failed: " + (err?.message || ""))
+    } finally {
+      setUL(false)
+      e.target.value = ""
+    }
+  }
+
+  async function handlePatchLogo(pairId, e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPatchingId(pairId)
+    try {
+      const url = await uploadTeamLogo("duo-" + pairId, file)
+      patchLogoMut.mutate({ id: pairId, logoUrl: url })
+    } catch (err) {
+      alert("Logo upload failed: " + (err?.message || ""))
+    } finally {
+      setPatchingId(null)
+      e.target.value = ""
+    }
+  }
+
   // Build set of player IDs already used so they can't be double-picked
   const usedIds = new Set(pairs.flatMap(p => [p.set1Id, p.set2Id]))
-  const filteredPlayers = allPlayers.filter(p =>
-    !usedIds.has(p.id) &&
-    (p.name?.toLowerCase().includes(search.toLowerCase()) ||
-     p.grade?.toLowerCase().includes(search.toLowerCase()))
-  )
 
   const canAdd = name.trim().length > 0 && player1Id && player2Id && player1Id !== player2Id
 
@@ -77,20 +115,40 @@ function PairCreator({ season, drawStatus }) {
         <div className="card p-5 space-y-4">
           <h3 className="text-sm font-bold text-white">Add Duo Pair</h3>
 
+          {/* Logo upload */}
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Team Logo <span className="normal-case">(optional)</span></p>
+            <div className="flex items-center gap-3">
+              {logoPreview ? (
+                <img src={logoPreview} alt="logo" className="w-12 h-12 rounded-xl object-cover border border-surface-border flex-shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-pitch-800 border border-dashed border-surface-border flex items-center justify-center flex-shrink-0">
+                  <Upload className="w-4 h-4 text-slate-600" />
+                </div>
+              )}
+              <div className="flex flex-col gap-1">
+                <button type="button" onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="text-xs text-accent hover:text-accent/80 transition-colors disabled:opacity-50">
+                  {uploadingLogo ? "Uploading…" : logoPreview ? "Change logo" : "Upload logo"}
+                </button>
+                {logoPreview && (
+                  <button type="button" onClick={() => setLogoPreview(null)}
+                    className="text-xs text-rose-400 hover:text-rose-300 transition-colors">
+                    Remove
+                  </button>
+                )}
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </div>
+          </div>
+
           {/* Team name */}
           <div>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Team Name</p>
             <input value={name} onChange={e => setName(e.target.value)}
               placeholder="e.g. Thunder Bolt"
               className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
-          </div>
-
-          {/* Player search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search available players…"
-              className="w-full pl-9 pr-4 py-2 bg-pitch-800 border border-surface-border rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
           </div>
 
           {/* Two player selects */}
@@ -104,7 +162,6 @@ function PairCreator({ season, drawStatus }) {
                   <option value="">Pick player…</option>
                   {allPlayers
                     .filter(p => !usedIds.has(p.id) || p.id === Number(val))
-                    .filter(p => !search || p.name?.toLowerCase().includes(search.toLowerCase()))
                     .map(p => (
                       <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
                     ))}
@@ -118,7 +175,7 @@ function PairCreator({ season, drawStatus }) {
           )}
           {error && <p className="text-xs text-rose-400">{error}</p>}
 
-          <button onClick={() => addMut.mutate()} disabled={!canAdd || addMut.isPending}
+          <button onClick={() => addMut.mutate()} disabled={!canAdd || addMut.isPending || uploadingLogo}
             className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-accent/90 disabled:opacity-50 transition-all">
             <Users className="w-4 h-4" />
             {addMut.isPending ? "Adding…" : "Add Pair"}
@@ -138,6 +195,14 @@ function PairCreator({ season, drawStatus }) {
         {pairs.map((pair, idx) => (
           <div key={pair.id} className="flex items-center gap-3 px-4 py-3 bg-pitch-800 rounded-xl border border-surface-border">
             <span className="text-xs text-slate-600 w-5 flex-shrink-0 font-mono">{idx + 1}</span>
+            {/* Logo thumbnail */}
+            {pair.logoUrl ? (
+              <img src={pair.logoUrl} alt={pair.duoName} className="w-8 h-8 rounded-lg object-cover border border-surface-border flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-pitch-900 border border-surface-border flex items-center justify-center flex-shrink-0">
+                <span className="text-[9px] font-bold text-slate-600">{pair.duoName?.slice(0,2).toUpperCase()}</span>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{pair.duoName}</p>
               <p className="text-xs text-slate-500 truncate">{pair.set1Name} & {pair.set2Name}</p>
@@ -147,11 +212,25 @@ function PairCreator({ season, drawStatus }) {
                 {pair.groupName}
               </span>
             )}
+            {/* Logo upload button for existing pairs */}
             {!locked && (
-              <button onClick={() => { if (window.confirm("Delete this pair?")) deleteMut.mutate(pair.id) }}
-                className="text-slate-600 hover:text-rose-400 transition-colors p-1 flex-shrink-0">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              <>
+                <label className={cn(
+                  "text-xs px-2 py-1 rounded-lg border cursor-pointer transition-colors flex-shrink-0",
+                  patchingId === pair.id
+                    ? "text-slate-500 border-slate-700 cursor-not-allowed"
+                    : "text-slate-400 border-surface-border hover:text-accent hover:border-accent/40"
+                )}>
+                  {patchingId === pair.id ? "…" : <Upload className="w-3 h-3" />}
+                  <input type="file" accept="image/*" className="hidden"
+                    disabled={patchingId === pair.id}
+                    onChange={(e) => handlePatchLogo(pair.id, e)} />
+                </label>
+                <button onClick={() => { if (window.confirm("Delete this pair?")) deleteMut.mutate(pair.id) }}
+                  className="text-slate-600 hover:text-rose-400 transition-colors p-1 flex-shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
             )}
           </div>
         ))}

@@ -22,6 +22,7 @@ const router = Router()
         set1_player_id  INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
         set2_player_id  INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
         duo_name        TEXT NOT NULL,
+        logo_url        TEXT,
         created_at      TIMESTAMPTZ DEFAULT NOW()
       )
     `)
@@ -73,6 +74,8 @@ const router = Router()
         UNIQUE(season_number, player_id)
       )
     `)
+    // Add logo_url to duo_pairs if it doesn't exist yet
+    await query(`ALTER TABLE duo_pairs ADD COLUMN IF NOT EXISTS logo_url TEXT`)
     // Ensure all extended trophy columns exist (trophy8/9 may not be in base migrate.js)
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy8_count  INT DEFAULT 0`)
     await query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS trophy9_count  INT DEFAULT 0`)
@@ -774,6 +777,7 @@ router.get("/pairs", async (req, res, next) => {
     const result = await query(`
       SELECT
         dp.id, dp.duo_name AS "duoName", dp.season_number AS "seasonNumber",
+        dp.logo_url AS "logoUrl",
         p1.id AS "set1Id", p1.name AS "set1Name", p1.grade AS "set1Grade",
         p2.id AS "set2Id", p2.name AS "set2Name", p2.grade AS "set2Grade",
         dg.name AS "groupName"
@@ -792,11 +796,12 @@ router.get("/pairs", async (req, res, next) => {
 // ── POST /api/duo/pairs — admin: manually create a duo pair ──────────────────
 router.post("/pairs", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { seasonNumber, player1Id, player2Id, duoName } = z.object({
+    const { seasonNumber, player1Id, player2Id, duoName, logoUrl } = z.object({
       seasonNumber: z.number().int().positive(),
       player1Id:    z.number().int().positive(),
       player2Id:    z.number().int().positive(),
       duoName:      z.string().min(1).max(80),
+      logoUrl:      z.string().url().optional().nullable(),
     }).parse(req.body)
 
     if (player1Id === player2Id) {
@@ -824,12 +829,13 @@ router.post("/pairs", authenticate, adminOnly, async (req, res, next) => {
     }
 
     const pr = await query(
-      "INSERT INTO duo_pairs (season_number, set1_player_id, set2_player_id, duo_name) VALUES ($1,$2,$3,$4) RETURNING id",
-      [seasonNumber, player1Id, player2Id, duoName]
+      "INSERT INTO duo_pairs (season_number, set1_player_id, set2_player_id, duo_name, logo_url) VALUES ($1,$2,$3,$4,$5) RETURNING id",
+      [seasonNumber, player1Id, player2Id, duoName, logoUrl || null]
     )
 
     const fresh = await query(`
       SELECT dp.id, dp.duo_name AS "duoName", dp.season_number AS "seasonNumber",
+        dp.logo_url AS "logoUrl",
         p1.id AS "set1Id", p1.name AS "set1Name", p1.grade AS "set1Grade",
         p2.id AS "set2Id", p2.name AS "set2Name", p2.grade AS "set2Grade"
       FROM duo_pairs dp
@@ -861,6 +867,21 @@ router.delete("/pairs/:id", authenticate, adminOnly, async (req, res, next) => {
 
     await query("DELETE FROM duo_pairs WHERE id = $1", [req.params.id])
     res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// ── PATCH /api/duo/pairs/:id/logo — admin: set/update logo for a duo pair ─────
+router.patch("/pairs/:id/logo", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { logoUrl } = z.object({
+      logoUrl: z.string().url().nullable(),
+    }).parse(req.body)
+
+    const pairRes = await query("SELECT id FROM duo_pairs WHERE id = $1", [req.params.id])
+    if (!pairRes.rows[0]) return res.status(404).json({ error: "Pair not found" })
+
+    await query("UPDATE duo_pairs SET logo_url = $1 WHERE id = $2", [logoUrl, req.params.id])
+    res.json({ success: true, logoUrl })
   } catch (err) { next(err) }
 })
 

@@ -135,8 +135,18 @@ export default function DuoDashboard() {
                     <span className={cn("text-sm font-medium", i < 2 ? "text-emerald-400" : "text-slate-500")}>{i + 1}</span>
                   </td>
                   <td className="py-3 px-4">
-                    <p className="font-medium text-white">{m.duoName}</p>
-                    <p className="text-xs text-slate-500">{m.set1Name} + {m.set2Name}</p>
+                    <div className="flex items-center gap-2.5">
+                      {m.logoUrl
+                        ? <img src={m.logoUrl} alt={m.duoName} className="w-8 h-8 rounded-lg object-cover border border-surface-border flex-shrink-0" />
+                        : <div className="w-8 h-8 rounded-lg bg-pitch-800 border border-surface-border flex items-center justify-center text-[9px] font-bold text-slate-500 flex-shrink-0">
+                            {m.duoName?.slice(0,2).toUpperCase()}
+                          </div>
+                      }
+                      <div>
+                        <p className="font-medium text-white">{m.duoName}</p>
+                        <p className="text-xs text-slate-500">{m.set1Name} + {m.set2Name}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3 px-2 text-center text-slate-400">{m.played}</td>
                   <td className="py-3 px-2 text-center text-emerald-400 font-semibold">{m.won}</td>
