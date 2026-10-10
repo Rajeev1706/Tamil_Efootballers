@@ -273,8 +273,28 @@ router.get("/current", async (req, res, next) => {
       }
     }
 
+    // Draw status
+    const statusRes = await query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      [`duo_draw_status_${seasonNum}`]
+    ).catch(() => ({ rows: [] }))
+    const drawStatus = statusRes.rows[0]?.value || "pending"
+
+    // Hide groups/fixtures until revealed
+    if (drawStatus !== "revealed") {
+      return res.json({
+        seasonNumber: seasonNum,
+        drawStatus,
+        groups: [],
+        fixtures: [],
+        topScorers: [],
+        champion: null,
+      })
+    }
+
     res.json({
       seasonNumber: seasonNum,
+      drawStatus,
       groups: groups.rows,
       fixtures: fixtures.rows,
       topScorers: topScorers.rows,
@@ -283,39 +303,30 @@ router.get("/current", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── POST /api/duo/generate — admin: create draw ───────────────────────────────
+// ── POST /api/duo/generate — admin: assign manually-created pairs to groups ───
 router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { seasonNumber } = z.object({ seasonNumber: z.number().int().positive() }).parse(req.body)
 
-    // Use admin-selected sets from duo_selections table
-    const set1Res = await query(
-      `SELECT p.id, p.name, p.grade::text AS grade
-       FROM duo_selections ds JOIN players p ON p.id = ds.player_id
-       WHERE ds.season_number = $1 AND ds.set_number = 1
-       ORDER BY RANDOM()`,
+    // Load existing manually-created pairs for this season
+    const pairsRes = await query(
+      `SELECT dp.id, dp.duo_name,
+              p1.id AS set1_id, p1.name AS set1_name,
+              p2.id AS set2_id, p2.name AS set2_name
+       FROM duo_pairs dp
+       JOIN players p1 ON p1.id = dp.set1_player_id
+       JOIN players p2 ON p2.id = dp.set2_player_id
+       WHERE dp.season_number = $1
+       ORDER BY dp.id ASC`,
       [seasonNumber]
     )
-    const set2Res = await query(
-      `SELECT p.id, p.name, p.grade::text AS grade
-       FROM duo_selections ds JOIN players p ON p.id = ds.player_id
-       WHERE ds.season_number = $1 AND ds.set_number = 2
-       ORDER BY RANDOM()`,
-      [seasonNumber]
-    )
-
-    if (set1Res.rows.length === 0 || set2Res.rows.length === 0) {
-      return res.status(400).json({ error: "Please confirm Set 1 and Set 2 selections first" })
+    const pairs = pairsRes.rows
+    if (pairs.length < 2) {
+      return res.status(400).json({ error: "Create at least 2 duo pairs before starting the draw" })
     }
 
-    const set1 = shuffle(set1Res.rows)
-    const set2 = shuffle(set2Res.rows)
-    const pairCount = Math.min(set1.length, set2.length)
-
-    if (pairCount < 2) return res.status(400).json({ error: "Not enough players to form pairs" })
-
     await withTransaction(async ({ query: q }) => {
-      // Wipe existing season data
+      // Wipe existing groups / fixtures for re-draw (keeps the pairs)
       const existingGroups = await q("SELECT id FROM duo_groups WHERE season_number = $1", [seasonNumber])
       const gIds = existingGroups.rows.map(r => r.id)
       if (gIds.length > 0) {
@@ -323,23 +334,11 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
         await q("DELETE FROM duo_group_members WHERE group_id = ANY($1::int[])", [gIds])
         await q("DELETE FROM duo_groups WHERE id = ANY($1::int[])", [gIds])
       }
-      await q("DELETE FROM duo_pairs WHERE season_number = $1", [seasonNumber])
 
-      // Create pairs
-      const pairs = []
-      for (let i = 0; i < pairCount; i++) {
-        const p1 = set1[i], p2 = set2[i]
-        const duoName = `${p1.name.split(" ")[0]} & ${p2.name.split(" ")[0]}`
-        const pr = await q(
-          "INSERT INTO duo_pairs (season_number, set1_player_id, set2_player_id, duo_name) VALUES ($1,$2,$3,$4) RETURNING id",
-          [seasonNumber, p1.id, p2.id, duoName]
-        )
-        pairs.push({ id: pr.rows[0].id, set1: p1, set2: p2, duoName })
-      }
-
-      // Distribute into 8 groups (round-robin)
+      // Shuffle pairs and distribute into up to 8 groups
       const shuffledPairs = shuffle(pairs)
-      const groupCount = Math.min(8, Math.floor(pairCount / 2))
+      const pairCount  = shuffledPairs.length
+      const groupCount = Math.min(8, Math.ceil(pairCount / 2))
       const usedGroupNames = GROUP_NAMES.slice(0, groupCount)
 
       const groups = []
@@ -348,23 +347,23 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
           "INSERT INTO duo_groups (season_number, name, status) VALUES ($1,$2,'active') RETURNING id",
           [seasonNumber, name]
         )
-        groups.push({ id: gr.rows[0].id, name, pairs: [] })
+        groups.push({ id: gr.rows[0].id, name, pairIds: [] })
       }
 
-      // Assign pairs to groups round-robin
+      // Round-robin assignment
       shuffledPairs.forEach((pair, idx) => {
-        groups[idx % groupCount].pairs.push(pair)
+        groups[idx % groupCount].pairIds.push(pair.id)
       })
 
-      // Create group members + round-robin fixtures
+      // Insert members + fixtures for each group
       for (const group of groups) {
-        for (const pair of group.pairs) {
+        for (const pairId of group.pairIds) {
           await q(
             "INSERT INTO duo_group_members (group_id, duo_pair_id) VALUES ($1,$2)",
-            [group.id, pair.id]
+            [group.id, pairId]
           )
         }
-        const fixtures = roundRobinFixtures(group.pairs.map(p => p.id))
+        const fixtures = roundRobinFixtures(group.pairIds)
         for (const fix of fixtures) {
           await q(
             "INSERT INTO duo_fixtures (group_id, home_pair_id, away_pair_id, round_number, status) VALUES ($1,$2,$3,$4,'pending')",
@@ -372,9 +371,15 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
           )
         }
       }
+
+      // Mark draw as done (hidden from public until revealed)
+      await q(`
+        INSERT INTO app_settings (key, value) VALUES ($1, 'drawn')
+        ON CONFLICT (key) DO UPDATE SET value = 'drawn'
+      `, [`duo_draw_status_${seasonNumber}`])
     })
 
-    res.json({ success: true, message: `${pairCount} duo pairs created across groups for Season ${seasonNumber}` })
+    res.json({ success: true, message: `${pairs.length} pairs drawn into groups for Season ${seasonNumber}` })
   } catch (err) { next(err) }
 })
 
@@ -762,7 +767,7 @@ router.post("/knockout/advance", authenticate, adminOnly, async (req, res, next)
   } catch (err) { next(err) }
 })
 
-// ── GET /api/duo/pairs — get all pairs for a season ───────────────────────────
+// ── GET /api/duo/pairs — get all pairs for a season (with group if assigned) ──
 router.get("/pairs", async (req, res, next) => {
   try {
     const { season } = req.query
@@ -770,14 +775,129 @@ router.get("/pairs", async (req, res, next) => {
       SELECT
         dp.id, dp.duo_name AS "duoName", dp.season_number AS "seasonNumber",
         p1.id AS "set1Id", p1.name AS "set1Name", p1.grade AS "set1Grade",
+        p2.id AS "set2Id", p2.name AS "set2Name", p2.grade AS "set2Grade",
+        dg.name AS "groupName"
+      FROM duo_pairs dp
+      JOIN players p1 ON p1.id = dp.set1_player_id
+      JOIN players p2 ON p2.id = dp.set2_player_id
+      LEFT JOIN duo_group_members dgm ON dgm.duo_pair_id = dp.id
+      LEFT JOIN duo_groups dg ON dg.id = dgm.group_id AND dg.season_number = dp.season_number
+      WHERE dp.season_number = $1
+      ORDER BY dg.name ASC NULLS LAST, dp.id ASC
+    `, [season || 1])
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
+// ── POST /api/duo/pairs — admin: manually create a duo pair ──────────────────
+router.post("/pairs", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { seasonNumber, player1Id, player2Id, duoName } = z.object({
+      seasonNumber: z.number().int().positive(),
+      player1Id:    z.number().int().positive(),
+      player2Id:    z.number().int().positive(),
+      duoName:      z.string().min(1).max(80),
+    }).parse(req.body)
+
+    if (player1Id === player2Id) {
+      return res.status(400).json({ error: "A pair must have two different players" })
+    }
+
+    // Prevent players from appearing in multiple pairs this season
+    const dupCheck = await query(`
+      SELECT dp.duo_name FROM duo_pairs dp
+      WHERE dp.season_number = $1
+        AND (dp.set1_player_id = ANY($2::int[]) OR dp.set2_player_id = ANY($2::int[]))
+    `, [seasonNumber, [player1Id, player2Id]])
+    if (dupCheck.rows.length > 0) {
+      return res.status(400).json({ error: "One or both players are already in a pair this season" })
+    }
+
+    // Cannot add pairs once draw has started
+    const statusRes = await query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      [`duo_draw_status_${seasonNumber}`]
+    ).catch(() => ({ rows: [] }))
+    const drawStatus = statusRes.rows[0]?.value
+    if (drawStatus === "drawn" || drawStatus === "revealed") {
+      return res.status(400).json({ error: "Cannot add pairs after the draw has been made" })
+    }
+
+    const pr = await query(
+      "INSERT INTO duo_pairs (season_number, set1_player_id, set2_player_id, duo_name) VALUES ($1,$2,$3,$4) RETURNING id",
+      [seasonNumber, player1Id, player2Id, duoName]
+    )
+
+    const fresh = await query(`
+      SELECT dp.id, dp.duo_name AS "duoName", dp.season_number AS "seasonNumber",
+        p1.id AS "set1Id", p1.name AS "set1Name", p1.grade AS "set1Grade",
         p2.id AS "set2Id", p2.name AS "set2Name", p2.grade AS "set2Grade"
       FROM duo_pairs dp
       JOIN players p1 ON p1.id = dp.set1_player_id
       JOIN players p2 ON p2.id = dp.set2_player_id
-      WHERE dp.season_number = $1
-      ORDER BY dp.duo_name ASC
-    `, [season || 1])
-    res.json(result.rows)
+      WHERE dp.id = $1
+    `, [pr.rows[0].id])
+
+    res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
+// ── DELETE /api/duo/pairs/:id — admin: delete a pair (only before draw) ───────
+router.delete("/pairs/:id", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const pairRes = await query("SELECT * FROM duo_pairs WHERE id = $1", [req.params.id])
+    const pair = pairRes.rows[0]
+    if (!pair) return res.status(404).json({ error: "Pair not found" })
+
+    // Cannot delete once draw is done
+    const statusRes = await query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      [`duo_draw_status_${pair.season_number}`]
+    ).catch(() => ({ rows: [] }))
+    const drawStatus = statusRes.rows[0]?.value
+    if (drawStatus === "drawn" || drawStatus === "revealed") {
+      return res.status(400).json({ error: "Cannot delete pairs after the draw has been made" })
+    }
+
+    await query("DELETE FROM duo_pairs WHERE id = $1", [req.params.id])
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// ── POST /api/duo/reveal — admin: reveal the draw to the public ───────────────
+router.post("/reveal", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { seasonNumber } = z.object({ seasonNumber: z.number().int().positive() }).parse(req.body)
+
+    const statusRes = await query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      [`duo_draw_status_${seasonNumber}`]
+    ).catch(() => ({ rows: [] }))
+    const drawStatus = statusRes.rows[0]?.value
+
+    if (drawStatus !== "drawn") {
+      return res.status(400).json({ error: "Draw must be completed before revealing" })
+    }
+
+    await query(`
+      INSERT INTO app_settings (key, value) VALUES ($1, 'revealed')
+      ON CONFLICT (key) DO UPDATE SET value = 'revealed'
+    `, [`duo_draw_status_${seasonNumber}`])
+
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
+// ── GET /api/duo/draw-status — get draw status for a season ──────────────────
+router.get("/draw-status", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { season } = req.query
+    if (!season) return res.status(400).json({ error: "season required" })
+    const statusRes = await query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      [`duo_draw_status_${season}`]
+    ).catch(() => ({ rows: [] }))
+    res.json({ drawStatus: statusRes.rows[0]?.value || "pending" })
   } catch (err) { next(err) }
 })
 

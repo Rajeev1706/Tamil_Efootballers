@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { useDraftState } from "../../hooks/useDraftState"
-import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, CheckCircle, X, Pencil, Download } from "lucide-react"
+import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, Search, X, Download } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
 import { useSettings } from "../../lib/queries"
@@ -19,347 +18,148 @@ const GRADE_COLORS = {
   C:    "bg-slate-500/20 text-slate-400 border-slate-500/40",
 }
 
-// ── Set Selection UI ──────────────────────────────────────────────────────────
-function SetSelection({ season, onConfirmed }) {
+// ── Pair Creator — admin manually creates pairs ───────────────────────────────
+function PairCreator({ season, drawStatus }) {
   const qc = useQueryClient()
-  const [step, setStep]       = useState(1) // 1 = pick Set 1, 2 = pick Set 2
-  const [set1, setSet1, clearSet1Draft] = useDraftState(`draft_duo_set1_${season}`, [])
-  const [set2, setSet2, clearSet2Draft] = useDraftState(`draft_duo_set2_${season}`, [])
+  const [name, setName]       = useState("")
+  const [player1Id, setP1]    = useState("")
+  const [player2Id, setP2]    = useState("")
   const [search, setSearch]   = useState("")
+  const [error, setError]     = useState("")
+
+  const locked = drawStatus === "drawn" || drawStatus === "revealed"
 
   const { data: allPlayers = [] } = useQuery({
     queryKey: ["players"],
     queryFn:  () => api.get("/players").then(r => r.data),
   })
 
-  const { data: savedSets } = useQuery({
-    queryKey: ["duo-sets", season],
-    queryFn:  () => api.get(`/duo/sets?season=${season}`).then(r => r.data),
+  const { data: pairs = [], isLoading: pairsLoading } = useQuery({
+    queryKey: ["duo-pairs", season],
+    queryFn:  () => api.get(`/duo/pairs?season=${season}`).then(r => r.data),
     enabled:  !!season,
   })
 
-  const saveMut = useMutation({
-    mutationFn: ({ set1Ids, set2Ids }) => api.post("/duo/sets", {
+  const addMut = useMutation({
+    mutationFn: () => api.post("/duo/pairs", {
       seasonNumber: season,
-      set1PlayerIds: set1Ids,
-      set2PlayerIds: set2Ids,
+      player1Id: Number(player1Id),
+      player2Id: Number(player2Id),
+      duoName: name.trim(),
     }).then(r => r.data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["duo-sets", season] })
-      onConfirmed()
+      qc.invalidateQueries({ queryKey: ["duo-pairs", season] })
+      setName(""); setP1(""); setP2(""); setError("")
     },
+    onError: (err) => setError(err?.response?.data?.error || "Failed to add pair"),
   })
 
-  const clearMut = useMutation({
-    mutationFn: () => api.delete(`/duo/sets?season=${season}`).then(r => r.data),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ["duo-sets", season] }),
+  const deleteMut = useMutation({
+    mutationFn: (id) => api.delete(`/duo/pairs/${id}`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["duo-pairs", season] }),
+    onError: (err) => alert(err?.response?.data?.error || "Failed to delete pair"),
   })
 
-  // If sets already confirmed, show summary
-  if (savedSets?.confirmed) {
-    return (
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-bold text-white">Sets Confirmed</h3>
-            <span className="text-xs text-slate-500">{savedSets.set1.length} pairs ready</span>
-          </div>
-          <button onClick={() => clearMut.mutate()}
-            className="text-xs text-slate-500 hover:text-rose-400 transition-colors flex items-center gap-1">
-            <X className="w-3 h-3" /> Edit selections
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {[{ label: "Set 1", players: savedSets.set1, color: "text-accent" },
-            { label: "Set 2", players: savedSets.set2, color: "text-emerald-400" }].map(({ label, players, color }) => (
-            <div key={label}>
-              <p className={cn("text-xs font-bold uppercase tracking-widest mb-2", color)}>{label} ({players.length})</p>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {players.map(p => (
-                  <div key={p.id} className="flex items-center gap-2 text-xs text-slate-300 py-0.5">
-                    <span className={cn("text-[9px] font-bold px-1 py-0.5 rounded border", GRADE_COLORS[p.grade] || GRADE_COLORS.C)}>
-                      {p.grade}
-                    </span>
-                    {p.name}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const set1Ids = new Set(set1.map(p => p.id))
-  const set2Ids = new Set(set2.map(p => p.id))
-
-  const availableForStep = allPlayers.filter(p => {
-    if (step === 1) return !set1Ids.has(p.id)
-    return !set1Ids.has(p.id) && !set2Ids.has(p.id)
-  })
-
-  const filtered = availableForStep.filter(p =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.grade?.toLowerCase().includes(search.toLowerCase())
+  // Build set of player IDs already used so they can't be double-picked
+  const usedIds = new Set(pairs.flatMap(p => [p.set1Id, p.set2Id]))
+  const filteredPlayers = allPlayers.filter(p =>
+    !usedIds.has(p.id) &&
+    (p.name?.toLowerCase().includes(search.toLowerCase()) ||
+     p.grade?.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const currentSet = step === 1 ? set1 : set2
-  const setCurrentSet = step === 1 ? setSet1 : setSet2
-  const currentIds = step === 1 ? set1Ids : set2Ids
-
-  const togglePlayer = (player) => {
-    setCurrentSet(prev =>
-      prev.find(p => p.id === player.id)
-        ? prev.filter(p => p.id !== player.id)
-        : prev.length < 32 ? [...prev, player] : prev
-    )
-  }
-
-  const canConfirm = set1.length > 0 && set1.length === set2.length
+  const canAdd = name.trim().length > 0 && player1Id && player2Id && player1Id !== player2Id
 
   return (
-    <div className="card p-5 space-y-4">
-      {/* Step header */}
-      <div className="flex items-center gap-4">
-        {[1, 2].map(s => (
-          <button key={s} onClick={() => setStep(s)}
-            className={cn("flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all border",
-              step === s
-                ? s === 1 ? "bg-accent/15 text-accent border-accent/30" : "bg-emerald-400/15 text-emerald-400 border-emerald-400/30"
-                : "text-slate-500 border-surface-border hover:text-white"
-            )}>
-            Set {s}
-            <span className="text-xs opacity-70">({s === 1 ? set1.length : set2.length}/32)</span>
+    <div className="space-y-4">
+      {/* Create form — hidden once draw is done */}
+      {!locked && (
+        <div className="card p-5 space-y-4">
+          <h3 className="text-sm font-bold text-white">Add Duo Pair</h3>
+
+          {/* Team name */}
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Team Name</p>
+            <input value={name} onChange={e => setName(e.target.value)}
+              placeholder="e.g. Thunder Bolt"
+              className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
+          </div>
+
+          {/* Player search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search available players…"
+              className="w-full pl-9 pr-4 py-2 bg-pitch-800 border border-surface-border rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
+          </div>
+
+          {/* Two player selects */}
+          <div className="grid grid-cols-2 gap-3">
+            {[{ label: "Player 1", val: player1Id, set: setP1 },
+              { label: "Player 2", val: player2Id, set: setP2 }].map(({ label, val, set }) => (
+              <div key={label}>
+                <p className="text-[10px] text-slate-500 mb-1">{label}</p>
+                <select value={val} onChange={e => set(e.target.value)}
+                  className="w-full bg-pitch-800 border border-surface-border rounded-xl px-2 py-2 text-sm text-white">
+                  <option value="">Pick player…</option>
+                  {allPlayers
+                    .filter(p => !usedIds.has(p.id) || p.id === Number(val))
+                    .filter(p => !search || p.name?.toLowerCase().includes(search.toLowerCase()))
+                    .map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
+                    ))}
+                </select>
+              </div>
+            ))}
+          </div>
+
+          {player1Id && player2Id && player1Id === player2Id && (
+            <p className="text-xs text-rose-400">Player 1 and Player 2 must be different</p>
+          )}
+          {error && <p className="text-xs text-rose-400">{error}</p>}
+
+          <button onClick={() => addMut.mutate()} disabled={!canAdd || addMut.isPending}
+            className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-accent/90 disabled:opacity-50 transition-all">
+            <Users className="w-4 h-4" />
+            {addMut.isPending ? "Adding…" : "Add Pair"}
           </button>
-        ))}
-
-      </div>
-
-      {/* Validation hint */}
-      {step === 2 && set2.length !== set1.length && set1.length > 0 && (
-        <p className="text-xs text-amber-400">
-          Select {set1.length} players for Set 2 to match Set 1 ({set2.length}/{set1.length})
-        </p>
-      )}
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search players…"
-          className="w-full pl-9 pr-4 py-2 bg-pitch-800 border border-surface-border rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
-      </div>
-
-      {/* Current set pills */}
-      {currentSet.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {currentSet.map(p => (
-            <button key={p.id} onClick={() => togglePlayer(p)}
-              className={cn("flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all",
-                step === 1
-                  ? "bg-accent/15 text-accent border-accent/30 hover:bg-accent/25"
-                  : "bg-emerald-400/15 text-emerald-400 border-emerald-400/30 hover:bg-emerald-400/25"
-              )}>
-              {p.name} <X className="w-3 h-3" />
-            </button>
-          ))}
         </div>
       )}
 
-      {/* Player list */}
-      <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
-        {filtered.length === 0 && (
-          <p className="text-xs text-slate-600 text-center py-4">
-            {step === 2 && set1.length === 0 ? "Select Set 1 first" : "No players available"}
-          </p>
+      {/* Pairs list */}
+      <div className="space-y-2">
+        {pairsLoading && <p className="text-slate-500 text-sm text-center py-4">Loading…</p>}
+        {!pairsLoading && pairs.length === 0 && (
+          <div className="text-center py-8 text-slate-500">
+            <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No pairs yet — add your first duo above</p>
+          </div>
         )}
-        {filtered.map(p => {
-          const selected = currentIds.has(p.id)
-          return (
-            <button key={p.id} onClick={() => togglePlayer(p)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all border",
-                selected
-                  ? step === 1
-                    ? "bg-accent/15 border-accent/30 text-white"
-                    : "bg-emerald-400/15 border-emerald-400/30 text-white"
-                  : "bg-pitch-800 border-surface-border text-slate-300 hover:border-slate-500"
-              )}>
-              <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[p.grade] || GRADE_COLORS.C)}>
-                {p.grade}
+        {pairs.map((pair, idx) => (
+          <div key={pair.id} className="flex items-center gap-3 px-4 py-3 bg-pitch-800 rounded-xl border border-surface-border">
+            <span className="text-xs text-slate-600 w-5 flex-shrink-0 font-mono">{idx + 1}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{pair.duoName}</p>
+              <p className="text-xs text-slate-500 truncate">{pair.set1Name} & {pair.set2Name}</p>
+            </div>
+            {pair.groupName && (
+              <span className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-lg flex-shrink-0">
+                {pair.groupName}
               </span>
-              <span className="flex-1 text-left truncate">{p.name}</span>
-              {p.team_name && <span className="text-xs text-slate-600 flex-shrink-0 truncate max-w-24">{p.team_name}</span>}
-              {selected && <CheckCircle className="w-4 h-4 flex-shrink-0 text-accent" />}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-2 border-t border-surface-border">
-        <div className="text-xs text-slate-500">
-          Set 1: <span className="text-accent font-bold">{set1.length}</span> · Set 2: <span className="text-emerald-400 font-bold">{set2.length}</span>
-          {set1.length > 0 && set2.length > 0 && set1.length !== set2.length && (
-            <span className="text-amber-400 ml-2">⚠ Counts must match</span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {step === 1 && set1.length > 0 && (
-            <button onClick={() => setStep(2)}
-              className="px-4 py-2 rounded-xl bg-accent text-pitch-900 text-sm font-bold hover:bg-accent/90">
-              Next → Set 2
-            </button>
-          )}
-          {step === 2 && (
-            <button onClick={() => setStep(1)}
-              className="px-4 py-2 rounded-xl border border-surface-border text-slate-400 text-sm hover:text-white">
-              ← Back
-            </button>
-          )}
-          {canConfirm && (
-            <button
-              onClick={() => saveMut.mutate({ set1Ids: set1.map(p => p.id), set2Ids: set2.map(p => p.id) })}
-              disabled={saveMut.isPending}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-500/90 disabled:opacity-50">
-              <Save className="w-4 h-4" />
-              {saveMut.isPending ? "Saving…" : `Confirm Sets (${set1.length} pairs)`}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Pairs View ────────────────────────────────────────────────────────────────
-function PairsView({ season, groupMap }) {
-  const qc = useQueryClient()
-  const { data: pairs = [] } = useQuery({
-    queryKey: ["duo-pairs", season],
-    queryFn:  () => api.get(`/duo/pairs?season=${season}`).then(r => r.data),
-  })
-  const { data: allPlayers = [] } = useQuery({
-    queryKey: ["players"],
-    queryFn:  () => api.get("/players").then(r => r.data),
-  })
-
-  const [editingPairId, setEditingPairId] = useState(null)
-  const [editSet1, setEditSet1] = useState("")
-  const [editSet2, setEditSet2] = useState("")
-
-  const editMut = useMutation({
-    mutationFn: ({ id, set1PlayerId, set2PlayerId }) =>
-      api.patch(`/duo/pairs/${id}`, { set1PlayerId, set2PlayerId }).then(r => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["duo-pairs"] })
-      qc.invalidateQueries({ queryKey: ["duo", season] })
-      setEditingPairId(null)
-    },
-    onError: (err) => alert(err?.response?.data?.error || "Failed to update pair"),
-  })
-
-  const set1Players = allPlayers
-  const set2Players  = allPlayers
-
-  const pairGroupMap = {}
-  Object.entries(groupMap).forEach(([groupName, members]) => {
-    members.forEach(m => { pairGroupMap[m.duoPairId] = groupName })
-  })
-
-  if (pairs.length === 0) return <div className="text-center py-12 text-slate-500 text-sm">No pairs generated yet.</div>
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between px-4 py-2 bg-pitch-800/50 rounded-lg border border-surface-border">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Set 1</p>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Set 2</p>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Group</p>
-      </div>
-      {pairs.map((pair, idx) => (
-        <div key={pair.id} className="bg-pitch-800 rounded-xl border border-surface-border hover:border-accent/30 transition-colors overflow-hidden">
-          {/* Pair row */}
-          <div className="flex items-center gap-3 px-4 py-3">
-            <span className="text-xs text-slate-600 w-5 flex-shrink-0">{idx + 1}</span>
-            <div className="flex-1 flex items-center gap-2 min-w-0">
-              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[pair.set1Grade] || GRADE_COLORS.C)}>{pair.set1Grade}</span>
-              <span className="text-sm font-semibold text-white truncate">{pair.set1Name}</span>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <div className="w-6 h-px bg-slate-600" />
-              <span className="text-xs text-slate-500 font-bold">DUO</span>
-              <div className="w-6 h-px bg-slate-600" />
-            </div>
-            <div className="flex-1 flex items-center gap-2 min-w-0 justify-end">
-              <span className="text-sm font-semibold text-white truncate">{pair.set2Name}</span>
-              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0", GRADE_COLORS[pair.set2Grade] || GRADE_COLORS.C)}>{pair.set2Grade}</span>
-            </div>
-            <div className="w-20 flex-shrink-0 flex items-center justify-end gap-2">
-              {pairGroupMap[pair.id]
-                ? <span className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-lg">{pairGroupMap[pair.id]}</span>
-                : <span className="text-xs text-slate-600">—</span>}
-              <button
-                onClick={() => {
-                  if (editingPairId === pair.id) { setEditingPairId(null); return }
-                  setEditingPairId(pair.id)
-                  setEditSet1(pair.set1Id)
-                  setEditSet2(pair.set2Id)
-                }}
-                className="text-slate-500 hover:text-accent transition-colors p-1"
-                title="Edit pair"
-              >
-                <Pencil className="w-3.5 h-3.5" />
+            )}
+            {!locked && (
+              <button onClick={() => { if (window.confirm("Delete this pair?")) deleteMut.mutate(pair.id) }}
+                className="text-slate-600 hover:text-rose-400 transition-colors p-1 flex-shrink-0">
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
-            </div>
+            )}
           </div>
+        ))}
+      </div>
 
-          {/* Edit panel */}
-          {editingPairId === pair.id && (
-            <div className="border-t border-surface-border px-4 pb-4 pt-3 bg-pitch-900/50 space-y-3">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Replace players</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[10px] text-slate-500 mb-1">Set 1</p>
-                  <select value={editSet1} onChange={e => setEditSet1(Number(e.target.value))}
-                    className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
-                    {set1Players.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-500 mb-1">Set 2</p>
-                  <select value={editSet2} onChange={e => setEditSet2(Number(e.target.value))}
-                    className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
-                    {set2Players.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.grade})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              {editSet1 === editSet2 && (
-                <p className="text-xs text-rose-400">Set 1 and Set 2 must be different players</p>
-              )}
-              <div className="flex gap-2">
-                <button onClick={() => setEditingPairId(null)}
-                  className="px-3 py-1.5 rounded-lg border border-surface-border text-slate-400 text-xs hover:text-white transition-colors">
-                  Cancel
-                </button>
-                <button
-                  onClick={() => editMut.mutate({ id: pair.id, set1PlayerId: editSet1, set2PlayerId: editSet2 })}
-                  disabled={editMut.isPending || editSet1 === editSet2}
-                  className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold disabled:opacity-50 transition-colors"
-                >
-                  {editMut.isPending ? "Saving…" : "Save Changes"}
-                </button>
-              </div>
-              <p className="text-[10px] text-slate-600">⚠ Any played fixtures for this pair will be reset to pending</p>
-            </div>
-          )}
-        </div>
-      ))}
+      {!locked && pairs.length > 0 && (
+        <p className="text-xs text-slate-600 text-center">{pairs.length} pair{pairs.length !== 1 ? "s" : ""} ready — use "Start Draw" above when done</p>
+      )}
     </div>
   )
 }
@@ -955,27 +755,40 @@ export default function DuoTournamentAdmin() {
   const { data: settings = {} } = useSettings()
   const currentSeason = settings.current_season ? parseInt(settings.current_season) : null
   const [season, setSeason] = useState(null)
-  const [activeTab, setActiveTab] = useState("groups")
-  const [setsConfirmed, setSetsConfirmed] = useState(false)
+  const [activeTab, setActiveTab] = useState("pairs")
 
-  // Set season to current season once settings load (only on first load)
   useEffect(() => {
     if (currentSeason && season === null) setSeason(currentSeason)
   }, [currentSeason])
 
+  // Admin-only draw status (always visible to admin regardless of public status)
+  const { data: statusData, refetch: refetchStatus } = useQuery({
+    queryKey: ["duo-draw-status", season],
+    queryFn:  () => api.get(`/duo/draw-status?season=${season}`).then(r => r.data),
+    enabled:  !!season,
+  })
+  const drawStatus = statusData?.drawStatus || "pending"
+
+  // Public data (groups/fixtures only appear after revealed)
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["duo", season],
     queryFn:  () => api.get(`/duo/current?season=${season}`).then(r => r.data),
     enabled:  !!season,
   })
 
-  const { data: savedSets } = useQuery({
-    queryKey: ["duo-sets", season],
-    queryFn:  () => api.get(`/duo/sets?season=${season}`).then(r => r.data),
-    enabled:  !!season,
-  })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["duo"] })
+    qc.invalidateQueries({ queryKey: ["duo-draw-status", season] })
+    qc.invalidateQueries({ queryKey: ["duo-pairs", season] })
+    refetch()
+    refetchStatus()
+  }
 
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ["duo"] }); refetch() }
+  const drawMut = useMutation({
+    mutationFn: () => api.post("/duo/generate", { seasonNumber: season }).then(r => r.data),
+    onSuccess:  () => { invalidate() },
+    onError: (err) => alert(err?.response?.data?.error || "Failed to start draw"),
+  })
 
   const knockoutMut = useMutation({
     mutationFn: (sn) => api.post("/duo/knockout/generate", { seasonNumber: sn }).then(r => r.data),
@@ -989,7 +802,7 @@ export default function DuoTournamentAdmin() {
 
   const deleteMut = useMutation({
     mutationFn: (sn) => api.delete(`/duo/season/${sn}`).then(r => r.data),
-    onSuccess:  () => { invalidate(); setActiveTab("groups") },
+    onSuccess:  () => { invalidate(); setActiveTab("pairs") },
   })
 
   const deciderSetupMut = useMutation({
@@ -1026,8 +839,9 @@ export default function DuoTournamentAdmin() {
     groupMap[row.name].push(row)
   })
 
-  const setsReady = savedSets?.confirmed
-  const drawDone  = groups.length > 0
+  const isRevealed = drawStatus === "revealed"
+  const isDrawn    = drawStatus === "drawn"
+  const isPending  = drawStatus === "pending"
 
   return (
     <div className="space-y-6">
@@ -1038,33 +852,54 @@ export default function DuoTournamentAdmin() {
           <h2 className="text-lg font-bold text-white">Duo Tournament</h2>
           <div className="flex items-center gap-2">
             <label className="text-xs text-slate-400">Season</label>
-            <input type="number" value={season} onChange={e => setSeason(Number(e.target.value))}
+            <input type="number" value={season ?? ""} onChange={e => setSeason(Number(e.target.value))}
               className="w-16 bg-pitch-900 border border-surface-border rounded-lg px-2 py-1 text-sm text-white text-center" />
           </div>
+          {/* Draw status badge */}
+          {season && (
+            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border",
+              isPending  ? "bg-slate-700/50 text-slate-400 border-slate-600"  :
+              isDrawn    ? "bg-amber-400/15 text-amber-400 border-amber-400/30" :
+              "bg-emerald-400/15 text-emerald-400 border-emerald-400/30"
+            )}>
+              {isPending ? "SETUP" : isDrawn ? "DRAWN — HIDDEN" : "REVEALED"}
+            </span>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* Draw button — only after sets confirmed */}
-          {setsReady && !drawDone && (
-            <button onClick={() => navigate(`/duo/draw/${season}`)}
-              className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90">
-              <Shuffle className="w-4 h-4" /> Draw Pairs
+          {/* Start Draw — only in pending phase */}
+          {isPending && (
+            <button onClick={() => { if (window.confirm("Start the draw? This will randomly assign pairs to groups.")) drawMut.mutate() }}
+              disabled={drawMut.isPending}
+              className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
+              <Shuffle className="w-4 h-4" /> {drawMut.isPending ? "Drawing…" : "Start Draw"}
             </button>
           )}
-          {/* Re-draw after draw is done */}
-          {drawDone && (
+          {/* Reveal Draw — only in drawn phase */}
+          {isDrawn && (
             <button onClick={() => navigate(`/duo/draw/${season}`)}
-              className="flex items-center gap-2 bg-accent/20 text-accent border border-accent/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/30">
-              <Shuffle className="w-4 h-4" /> Re-draw
+              className="flex items-center gap-2 bg-amber-400/20 text-amber-400 border border-amber-400/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400/30">
+              <Shuffle className="w-4 h-4" /> Reveal Draw
             </button>
           )}
-          {drawDone && (
+          {/* Re-draw — only in drawn phase */}
+          {isDrawn && (
+            <button onClick={() => { if (window.confirm("Re-draw? This will shuffle groups again (pairs stay).")) drawMut.mutate() }}
+              disabled={drawMut.isPending}
+              className="flex items-center gap-2 bg-slate-700/50 text-slate-300 border border-slate-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700">
+              Re-draw
+            </button>
+          )}
+          {/* Delete season */}
+          {(isDrawn || isRevealed) && (
             <button onClick={() => { if (window.confirm(`Delete all Season ${season} duo data?`)) deleteMut.mutate(season) }}
               disabled={deleteMut.isPending}
               className="flex items-center gap-2 bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-500/30 disabled:opacity-50">
               <Trash2 className="w-4 h-4" /> Delete Season
             </button>
           )}
-          {drawDone && knockoutRounds.length === 0 && (
+          {/* Generate Knockout */}
+          {isRevealed && knockoutRounds.length === 0 && (
             <button onClick={() => knockoutMut.mutate(season)} disabled={knockoutMut.isPending}
               className="flex items-center gap-2 bg-gold/20 text-gold border border-gold/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gold/30 disabled:opacity-50">
               <Trophy className="w-4 h-4" /> Generate Knockout
@@ -1084,13 +919,24 @@ export default function DuoTournamentAdmin() {
         </div>
       </div>
 
-      {/* Set Selection — shown when draw not done yet */}
-      {!drawDone && (
-        <SetSelection season={season} onConfirmed={() => setSetsConfirmed(true)} />
+      {/* Phase: pending or drawn — show pairs (with create form if pending) */}
+      {(isPending || isDrawn) && (
+        <>
+          {isDrawn && (
+            <div className="flex items-center gap-3 px-4 py-3 bg-amber-400/5 border border-amber-400/20 rounded-xl">
+              <Shuffle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-amber-400">Draw complete — groups assigned</p>
+                <p className="text-xs text-slate-400">Groups are hidden from the public until you reveal the draw. Click <strong>Reveal Draw</strong> to launch the live reveal screen.</p>
+              </div>
+            </div>
+          )}
+          <PairCreator season={season} drawStatus={drawStatus} />
+        </>
       )}
 
-      {/* Tabs */}
-      {drawDone && (
+      {/* Phase: revealed — full tabs */}
+      {isRevealed && (
         <>
           <div className="flex gap-1 border-b border-surface-border">
             {["pairs", "groups", "fixtures", "knockout"].map(tab => (
@@ -1103,8 +949,8 @@ export default function DuoTournamentAdmin() {
           </div>
           {isLoading ? <div className="text-center py-12 text-slate-500">Loading...</div> : (
             <>
-              {activeTab === "pairs"    && <PairsView season={season} groupMap={groupMap} />}
-              {activeTab === "groups"   && (
+              {activeTab === "pairs" && <PairCreator season={season} drawStatus={drawStatus} />}
+              {activeTab === "groups" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(groupMap).map(([groupName, members]) => (
                     <div key={groupName} className="card overflow-hidden">
@@ -1155,13 +1001,6 @@ export default function DuoTournamentAdmin() {
             </>
           )}
         </>
-      )}
-
-      {!drawDone && !setsReady && !isLoading && (
-        <div className="text-center py-8 text-slate-500">
-          <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Select Set 1 and Set 2 players above, then confirm to enable the Draw button.</p>
-        </div>
       )}
     </div>
   )
