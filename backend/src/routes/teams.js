@@ -420,7 +420,8 @@ router.get("/trophy-history", async (req, res, next) => {
         (p.trophy8_count  + COALESCE(h.trophy8_total,  0))::int AS "trophy8Count",
         (p.trophy9_count  + COALESCE(h.trophy9_total,  0))::int AS "trophy9Count",
         (p.trophy10_count + COALESCE(h.trophy10_total, 0))::int AS "trophy10Count",
-        (p.trophy11_count + COALESCE(h.trophy11_total, 0))::int AS "trophy11Count"
+        (p.trophy11_count + COALESCE(h.trophy11_total, 0))::int AS "trophy11Count",
+        (COALESCE(p.trophy13_count, 0) + COALESCE(h.trophy13_total, 0))::int AS "trophy13Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
       LEFT JOIN (
@@ -436,7 +437,8 @@ router.get("/trophy-history", async (req, res, next) => {
           SUM(trophy8_count)  AS trophy8_total,
           SUM(COALESCE(trophy9_count,  0)) AS trophy9_total,
           SUM(COALESCE(trophy10_count, 0)) AS trophy10_total,
-          SUM(COALESCE(trophy11_count, 0)) AS trophy11_total
+          SUM(COALESCE(trophy11_count, 0)) AS trophy11_total,
+          SUM(COALESCE(trophy13_count, 0)) AS trophy13_total
         FROM player_trophy_history
         GROUP BY player_id
       ) h ON h.player_id = p.id
@@ -452,7 +454,8 @@ router.get("/trophy-history", async (req, res, next) => {
           p.trophy7_count AS "trophy7Count", p.trophy8_count AS "trophy8Count",
           COALESCE(p.trophy9_count,  0) AS "trophy9Count",
           COALESCE(p.trophy10_count, 0) AS "trophy10Count",
-          COALESCE(p.trophy11_count, 0) AS "trophy11Count"
+          COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+          COALESCE(p.trophy13_count, 0) AS "trophy13Count"
         FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
       `)
     })
@@ -558,7 +561,12 @@ router.get("/trophy-history/:year", async (req, res, next) => {
           p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
           p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
           p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
-          p.trophy7_count AS "trophy7Count"
+          p.trophy7_count AS "trophy7Count",
+          p.trophy8_count AS "trophy8Count",
+          COALESCE(p.trophy9_count,  0) AS "trophy9Count",
+          COALESCE(p.trophy10_count, 0) AS "trophy10Count",
+          COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+          COALESCE(p.trophy13_count, 0) AS "trophy13Count"
         FROM players p
         LEFT JOIN teams t ON t.id = p.team_id
         ORDER BY p.name
@@ -578,7 +586,12 @@ router.get("/trophy-history/:year", async (req, res, next) => {
           COALESCE(h.trophy4_count,0) AS "trophy4Count",
           COALESCE(h.trophy5_count,0) AS "trophy5Count",
           COALESCE(h.trophy6_count,0) AS "trophy6Count",
-          COALESCE(h.trophy7_count,0) AS "trophy7Count"
+          COALESCE(h.trophy7_count,0) AS "trophy7Count",
+          COALESCE(h.trophy8_count,0) AS "trophy8Count",
+          COALESCE(h.trophy9_count,0) AS "trophy9Count",
+          COALESCE(h.trophy10_count,0) AS "trophy10Count",
+          COALESCE(h.trophy11_count,0) AS "trophy11Count",
+          COALESCE(h.trophy13_count,0) AS "trophy13Count"
         FROM players p
         LEFT JOIN teams t ON t.id = p.team_id
         LEFT JOIN player_trophy_history h ON h.player_id = p.id AND h.year = $1
@@ -613,7 +626,12 @@ router.get("/trophy-current", async (req, res, next) => {
         p.trophy4_count AS "trophy4Count",
         p.trophy5_count AS "trophy5Count",
         p.trophy6_count AS "trophy6Count",
-        p.trophy7_count AS "trophy7Count"
+        p.trophy7_count AS "trophy7Count",
+        p.trophy8_count AS "trophy8Count",
+        COALESCE(p.trophy9_count,  0) AS "trophy9Count",
+        COALESCE(p.trophy10_count, 0) AS "trophy10Count",
+        COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+        COALESCE(p.trophy13_count, 0) AS "trophy13Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
       ORDER BY p.name
@@ -626,7 +644,11 @@ router.get("/trophy-current", async (req, res, next) => {
           p.trophy1_count AS "trophy1Count", p.trophy2_count AS "trophy2Count",
           p.trophy3_count AS "trophy3Count", p.trophy4_count AS "trophy4Count",
           p.trophy5_count AS "trophy5Count", p.trophy6_count AS "trophy6Count",
-          p.trophy7_count AS "trophy7Count"
+          p.trophy7_count AS "trophy7Count", p.trophy8_count AS "trophy8Count",
+          COALESCE(p.trophy9_count,  0) AS "trophy9Count",
+          COALESCE(p.trophy10_count, 0) AS "trophy10Count",
+          COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+          COALESCE(p.trophy13_count, 0) AS "trophy13Count"
         FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
       `)
     })
