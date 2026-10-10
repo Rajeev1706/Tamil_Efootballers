@@ -191,6 +191,7 @@ router.get("/current", async (req, res, next) => {
         SELECT g.id, g.name, g.status,
           dgm.duo_pair_id AS "duoPairId",
           dp.duo_name AS "duoName",
+          dp.logo_url AS "logoUrl",
           p1.name AS "set1Name", p1.id AS "set1Id", p1.grade::text AS "set1Grade",
           p2.name AS "set2Name", p2.id AS "set2Id", p2.grade::text AS "set2Grade",
           dgm.played, dgm.won, dgm.drawn, dgm.lost,
@@ -597,13 +598,13 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
         const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
 
         if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
-          await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo")
-          await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo")
+          await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+          await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
         }
 
         if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
-          await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion")
-          await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion")
+          await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+          await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
         }
 
         // Runner-up (Final loser) gets 8 already above.
@@ -646,7 +647,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           `, [seasonNum])
           const topScorer = gbRes.rows[0]
           if (topScorer?.goals > 0) {
-            await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot")
+            await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
             // ── Duo Golden Boot trophy (trophy11) ─────────────────────────────
             await awardOrReassignTrophy({
               sourceKey:    `duo_golden_boot_s${seasonNum}`,
@@ -1268,12 +1269,12 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       const winnerBdr  = WINNER_BDR[fix.knockout_round]
       const deciderLoserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
       if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
-        await addBdrWithLabel(loserPair.set1_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo")
-        await addBdrWithLabel(loserPair.set2_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo")
+        await addBdrWithLabel(loserPair.set1_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+        await addBdrWithLabel(loserPair.set2_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
       }
       if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
-        await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion")
-        await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion")
+        await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+        await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
       }
 
       // Advance winner in bracket
@@ -1337,7 +1338,7 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
         `, [seasonNum])
         const topScorer = gbRes.rows[0]
         if (topScorer?.goals > 0) {
-          await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot")
+          await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
           await awardOrReassignTrophy({
             sourceKey:    `duo_golden_boot_s${seasonNum}`,
             trophyColumn: "trophy11_count",

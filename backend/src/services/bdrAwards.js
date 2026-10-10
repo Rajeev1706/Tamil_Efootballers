@@ -18,14 +18,17 @@ import { query } from "../db/pool.js"
   try {
     await query(`
       CREATE TABLE IF NOT EXISTS player_bdr_breakdown (
-        id          SERIAL PRIMARY KEY,
-        player_id   INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-        amount      INT NOT NULL,
-        label       TEXT NOT NULL,
-        awarded_at  TIMESTAMPTZ DEFAULT NOW()
+        id            SERIAL PRIMARY KEY,
+        player_id     INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+        amount        INT NOT NULL,
+        label         TEXT NOT NULL,
+        season_number INT,
+        awarded_at    TIMESTAMPTZ DEFAULT NOW()
       )
     `)
     await query(`CREATE INDEX IF NOT EXISTS idx_bdr_breakdown_player ON player_bdr_breakdown(player_id)`)
+    // Add season_number column if upgrading from older schema
+    await query(`ALTER TABLE player_bdr_breakdown ADD COLUMN IF NOT EXISTS season_number INT`)
   } catch (e) { console.error("[bdrAwards] breakdown migration:", e.message) }
 })()
 
@@ -59,7 +62,8 @@ export async function addBdr(playerId, delta) {
 }
 
 // Labeled add — used for first-time awards (logged to breakdown for display)
-export async function addBdrWithLabel(playerId, delta, label) {
+// seasonNumber should be passed from the caller (read from app_settings 'current_season')
+export async function addBdrWithLabel(playerId, delta, label, seasonNumber) {
   if (!playerId || !delta || !label) return
   await query(
     `UPDATE players SET bdr_points = GREATEST(0, bdr_points + $1) WHERE id = $2`,
@@ -67,8 +71,8 @@ export async function addBdrWithLabel(playerId, delta, label) {
   )
   if (delta > 0) {
     await query(
-      `INSERT INTO player_bdr_breakdown (player_id, amount, label) VALUES ($1, $2, $3)`,
-      [playerId, delta, label]
+      `INSERT INTO player_bdr_breakdown (player_id, amount, label, season_number) VALUES ($1, $2, $3, $4)`,
+      [playerId, delta, label, seasonNumber ?? null]
     )
   }
 }
