@@ -102,15 +102,48 @@ function DrawCard({ pair, flipped }) {
           )}
 
           {/* Team name + players */}
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", width: "100%" }}>
             <p style={{
               fontSize: 20, fontWeight: 900, color: "white",
-              margin: "0 0 6px", lineHeight: 1.25,
+              margin: "0 0 12px", lineHeight: 1.25,
               textShadow: `0 0 20px rgba(${rgb},0.5)`,
             }}>{pair.duoName}</p>
-            <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>
-              {pair.set1Name} &amp; {pair.set2Name}
-            </p>
+
+            {/* Divider */}
+            <div style={{
+              width: 32, height: 1,
+              background: `rgba(${rgb},0.4)`,
+              margin: "0 auto 12px",
+            }} />
+
+            {/* Player 1 */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+              marginBottom: 6,
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: accent, flexShrink: 0,
+                boxShadow: `0 0 6px ${accent}`,
+              }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>
+                {pair.set1Name}
+              </span>
+            </div>
+
+            {/* Player 2 */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: accent, flexShrink: 0,
+                boxShadow: `0 0 6px ${accent}`,
+              }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>
+                {pair.set2Name}
+              </span>
+            </div>
           </div>
         </div>
       </div>
