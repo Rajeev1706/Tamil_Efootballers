@@ -14,16 +14,24 @@ import goldenBootTrophy   from "../../images/Golden Boot.png"
 import teamLeagueGBTrophy from "../../images/team league_gb.png"
 import uclGBTrophy        from "../../images/ucl_gb.png"
 import revolutionTrophy   from "../../images/revolution.png"
+import europaTrophy       from "../../images/europa.png"
+import duoTrophy          from "../../images/duo.png"
+import duoBootTrophy      from "../../images/duoboot.png"
+import weekBestTrophy     from "../../images/weektrophy.png"
 
 const TROPHIES = [
-  { key: "trophy1Count", image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b" },
-  { key: "trophy2Count", image: teamLeagueTrophy,   label: "Dshann League",        color: "#10b981" },
-  { key: "trophy4Count", image: uclTrophy,          label: "UCL",                color: "#818cf8" },
-  { key: "trophy3Count", image: weeklyTrophy,       label: "Weekly",             color: "#38bdf8" },
-  { key: "trophy5Count", image: goldenBootTrophy,   label: "Weekly GB",          color: "#fbbf24" },
-  { key: "trophy6Count", image: teamLeagueGBTrophy, label: "League GB",          color: "#34d399" },
-  { key: "trophy7Count", image: uclGBTrophy,        label: "UCL GB",             color: "#a78bfa" },
-  { key: "trophy8Count", image: revolutionTrophy,   label: "Revolution",         color: "#f43f5e" },
+  { key: "trophy1Count",  image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b" },
+  { key: "trophy2Count",  image: teamLeagueTrophy,   label: "Dshann League",      color: "#10b981" },
+  { key: "trophy4Count",  image: uclTrophy,          label: "UCL",                color: "#818cf8" },
+  { key: "trophy3Count",  image: weeklyTrophy,       label: "Weekly",             color: "#38bdf8" },
+  { key: "trophy5Count",  image: goldenBootTrophy,   label: "Weekly GB",          color: "#fbbf24" },
+  { key: "trophy13Count", image: weekBestTrophy,     label: "Weekly Best Player", color: "#06b6d4" },
+  { key: "trophy6Count",  image: teamLeagueGBTrophy, label: "League GB",          color: "#34d399" },
+  { key: "trophy7Count",  image: uclGBTrophy,        label: "UCL GB",             color: "#a78bfa" },
+  { key: "trophy8Count",  image: revolutionTrophy,   label: "Revolution",         color: "#f43f5e" },
+  { key: "trophy9Count",  image: europaTrophy,       label: "Europa",             color: "#8b5cf6" },
+  { key: "trophy10Count", image: duoTrophy,          label: "Duo Tournament",     color: "#fb923c" },
+  { key: "trophy11Count", image: duoBootTrophy,      label: "Duo Golden Boot",    color: "#f97316" },
 ]
 
 export default function TrophyCabinet() {
