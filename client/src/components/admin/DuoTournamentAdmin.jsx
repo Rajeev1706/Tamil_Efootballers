@@ -799,64 +799,41 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
               {groupName}
             </p>
             {gFixtures.map(f => {
-              const s1HomeName = f.set1HomePlayerName || f.homeSet1Name
-              const s1AwayName = f.set1AwayPlayerName || f.awaySet1Name
-              const s2HomeName = f.set2HomePlayerName || f.homeSet2Name
-              const s2AwayName = f.set2AwayPlayerName || f.awaySet2Name
               const homeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
               const awaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
-              const done = f.status === "completed"
-              const set1HomeWins = (f.set1_home_score ?? 0) > (f.set1_away_score ?? 0)
-              const set2HomeWins = (f.set2_home_score ?? 0) > (f.set2_away_score ?? 0)
-              const set1AwayWins = (f.set1_away_score ?? 0) > (f.set1_home_score ?? 0)
-              const set2AwayWins = (f.set2_away_score ?? 0) > (f.set2_home_score ?? 0)
+              const done     = f.status === "completed"
+              const homeWon  = homeSets > awaySets
+              const awayWon  = awaySets > homeSets
               return (
                 <div key={f.id} style={{
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 10, padding: "10px 16px", marginBottom: 7,
+                  display: "flex", alignItems: "center",
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
-                    <div style={{ flex: 1, textAlign: "right" }}>
-                      <span style={{ color: set1HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1HomeWins ? 700 : 400 }}>{s1HomeName}</span>
-                    </div>
-                    <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
-                      {done
-                        ? <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 800, fontFamily: "monospace" }}>{f.set1_home_score ?? 0} – {f.set1_away_score ?? 0}</span>
-                        : <span style={{ color: "#334155", fontSize: 11, fontWeight: 600 }}>vs</span>
-                      }
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ color: set1AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1AwayWins ? 700 : 400 }}>{s1AwayName}</span>
-                    </div>
+                  {/* Home team */}
+                  <div style={{ flex: 1, textAlign: "right" }}>
+                    <span style={{ color: homeWon ? "#f1f5f9" : "#94a3b8", fontSize: 14, fontWeight: homeWon ? 700 : 500 }}>
+                      {f.homeDuoName}
+                    </span>
                   </div>
-                  <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 0 6px 0" }} />
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <div style={{ flex: 1, textAlign: "right" }}>
-                      <span style={{ color: set2HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2HomeWins ? 700 : 400 }}>{s2HomeName}</span>
-                    </div>
-                    <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
-                      {done
-                        ? <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 800, fontFamily: "monospace" }}>{f.set2_home_score ?? 0} – {f.set2_away_score ?? 0}</span>
-                        : <span style={{ color: "#334155", fontSize: 11, fontWeight: 600 }}>vs</span>
-                      }
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ color: set2AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2AwayWins ? 700 : 400 }}>{s2AwayName}</span>
-                    </div>
+
+                  {/* Score / vs */}
+                  <div style={{ padding: "0 16px", textAlign: "center", flexShrink: 0, minWidth: 64 }}>
+                    {done
+                      ? <span style={{ color: "#e2e8f0", fontSize: 15, fontWeight: 800, fontFamily: "monospace" }}>
+                          {homeSets} – {awaySets}
+                        </span>
+                      : <span style={{ color: "#334155", fontSize: 12, fontWeight: 600 }}>vs</span>
+                    }
                   </div>
-                  {done && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                        background: homeSets > awaySets ? "rgba(34,197,94,0.15)" : awaySets > homeSets ? "rgba(239,68,68,0.15)" : "rgba(234,179,8,0.15)",
-                        color: homeSets > awaySets ? "#4ade80" : awaySets > homeSets ? "#f87171" : "#facc15",
-                        border: `1px solid ${homeSets > awaySets ? "rgba(34,197,94,0.3)" : awaySets > homeSets ? "rgba(239,68,68,0.3)" : "rgba(234,179,8,0.3)"}`,
-                      }}>
-                        {homeSets > awaySets ? `${f.homeDuoName} wins ${homeSets}-${awaySets}` : awaySets > homeSets ? `${f.awayDuoName} wins ${awaySets}-${homeSets}` : "Draw 1-1"}
-                      </span>
-                    </div>
-                  )}
+
+                  {/* Away team */}
+                  <div style={{ flex: 1 }}>
+                    <span style={{ color: awayWon ? "#f1f5f9" : "#94a3b8", fontSize: 14, fontWeight: awayWon ? 700 : 500 }}>
+                      {f.awayDuoName}
+                    </span>
+                  </div>
                 </div>
               )
             })}
