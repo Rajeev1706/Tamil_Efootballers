@@ -224,6 +224,7 @@ export default function DuoDrawReveal() {
     return seq
   }, [groups])
 
+  const [started,     setStarted]     = useState(false)  // intro screen until "Start Reveal"
   const [revealStep,  setRevealStep]  = useState(0)
   const [isDrawing,   setIsDrawing]   = useState(false)
   const [showCard,    setShowCard]    = useState(null)   // pair in the centre stage
@@ -299,6 +300,91 @@ export default function DuoDrawReveal() {
   )
 
   const remaining = revealSequence.length - revealStep
+
+  // ── Intro screen (before reveal starts) ──────────────────────────────────────
+  if (!started && groups.length > 0) return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#03060f",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      color: "white",
+      position: "relative",
+      padding: "24px 20px",
+    }}>
+      {/* Background glow */}
+      <div style={{
+        position: "fixed", inset: 0, pointerEvents: "none",
+        background: "radial-gradient(ellipse 70% 50% at 50% 50%, rgba(34,211,238,0.07) 0%, transparent 70%)",
+      }} />
+
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", maxWidth: 480 }}>
+        <img src={logoUrl} style={{ width: 64, height: 64, objectFit: "contain", opacity: 0.9, marginBottom: 28 }} />
+
+        <p style={{ fontSize: 11, color: "#334155", textTransform: "uppercase", letterSpacing: 4, margin: "0 0 10px" }}>
+          Tamil Efootballers · Duo Tournament
+        </p>
+        <h1 style={{ fontSize: 32, fontWeight: 900, margin: "0 0 6px", lineHeight: 1.15 }}>
+          Group Stage Draw
+        </h1>
+        <p style={{ fontSize: 16, color: "#475569", margin: "0 0 40px" }}>Season {season}</p>
+
+        {/* Group count summary */}
+        <div style={{
+          display: "flex", justifyContent: "center", gap: 8,
+          flexWrap: "wrap", marginBottom: 44,
+        }}>
+          {groups.map(g => {
+            const accent = GROUP_ACCENT[g.groupName] || "#22d3ee"
+            return (
+              <div key={g.groupName} style={{
+                padding: "5px 14px", borderRadius: 20,
+                background: `rgba(${hexRgb(accent)},0.1)`,
+                border: `1px solid rgba(${hexRgb(accent)},0.3)`,
+                fontSize: 11, fontWeight: 700, color: accent,
+                letterSpacing: 1,
+              }}>
+                {g.groupName} · {g.pairs.length}
+              </div>
+            )
+          })}
+        </div>
+
+        <p style={{ fontSize: 13, color: "#334155", marginBottom: 32 }}>
+          {revealSequence.length} pairs across {groups.length} groups ready to be revealed
+        </p>
+
+        {/* Start Reveal button */}
+        <button
+          onClick={() => setStarted(true)}
+          style={{
+            padding: "16px 52px",
+            background: "linear-gradient(135deg, #22d3ee, #60a5fa)",
+            color: "#030f14",
+            border: "none", borderRadius: 14,
+            fontSize: 16, fontWeight: 900, letterSpacing: 0.5,
+            cursor: "pointer",
+            boxShadow: "0 0 40px rgba(34,211,238,0.35)",
+            transition: "transform 0.15s, box-shadow 0.15s",
+          }}
+          onMouseEnter={e => { e.target.style.transform = "scale(1.04)"; e.target.style.boxShadow = "0 0 60px rgba(34,211,238,0.5)" }}
+          onMouseLeave={e => { e.target.style.transform = "scale(1)";    e.target.style.boxShadow = "0 0 40px rgba(34,211,238,0.35)" }}
+        >
+          ▶ Start Reveal
+        </button>
+
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            display: "block", margin: "20px auto 0",
+            background: "transparent", color: "#334155",
+            border: "none", fontSize: 13, cursor: "pointer",
+          }}
+        >← Back</button>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{
