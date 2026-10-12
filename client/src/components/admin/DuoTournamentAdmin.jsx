@@ -228,7 +228,14 @@ function PairCreator({ season, drawStatus }) {
       </div>
 
       {!locked && pairs.length > 0 && (
-        <p className="text-xs text-slate-600 text-center">{pairs.length} pair{pairs.length !== 1 ? "s" : ""} ready — use "Start Draw" above when done</p>
+        <div className="space-y-1">
+          <p className="text-xs text-slate-600 text-center">{pairs.length} pair{pairs.length !== 1 ? "s" : ""} ready — use "Start Draw" above when done</p>
+          {pairs.length < 24 && (
+            <p className="text-xs text-amber-400/80 text-center">
+              ⚠️ Need at least 24 pairs for the draw ({24 - pairs.length} more needed — minimum 3 per group × 8 groups)
+            </p>
+          )}
+        </div>
       )}
     </div>
   )
