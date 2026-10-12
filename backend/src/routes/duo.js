@@ -981,6 +981,46 @@ router.get("/draw-status", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// ── GET /api/duo/admin-groups — admin: groups for reveal page (regardless of reveal status) ──
+router.get("/admin-groups", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { season } = req.query
+    if (!season) return res.status(400).json({ error: "season required" })
+
+    const result = await query(`
+      SELECT
+        g.name        AS "groupName",
+        dgm.duo_pair_id AS "pairId",
+        dp.duo_name   AS "duoName",
+        dp.logo_url   AS "logoUrl",
+        p1.name       AS "set1Name",
+        p2.name       AS "set2Name"
+      FROM duo_groups g
+      JOIN duo_group_members dgm ON dgm.group_id = g.id
+      JOIN duo_pairs dp          ON dp.id = dgm.duo_pair_id
+      JOIN players p1            ON p1.id = dp.set1_player_id
+      JOIN players p2            ON p2.id = dp.set2_player_id
+      WHERE g.season_number = $1
+      ORDER BY g.name ASC, dp.id ASC
+    `, [season])
+
+    // Collapse rows into { groupName, pairs[] }
+    const map = {}
+    for (const row of result.rows) {
+      if (!map[row.groupName]) map[row.groupName] = { groupName: row.groupName, pairs: [] }
+      map[row.groupName].pairs.push({
+        pairId:   row.pairId,
+        duoName:  row.duoName,
+        logoUrl:  row.logoUrl || null,
+        set1Name: row.set1Name,
+        set2Name: row.set2Name,
+      })
+    }
+
+    res.json({ groups: Object.values(map) })
+  } catch (err) { next(err) }
+})
+
 // ── PATCH /api/duo/pairs/:id — replace set1 or set2 player in a pair ──────────
 // When a player is swapped, any existing fixture scores involving this pair are
 // reset to pending (match records deleted) so results reflect the new player.
