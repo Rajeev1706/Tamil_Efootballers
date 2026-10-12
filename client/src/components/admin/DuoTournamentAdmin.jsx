@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, X, Download, Upload } from "lucide-react"
+import { Users, Shuffle, Trophy, ChevronDown, ChevronUp, Save, Trash2, X, Download, Upload, Pencil, Check } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import api from "../../lib/api"
 import { useSettings } from "../../lib/queries"
@@ -29,8 +29,14 @@ function PairCreator({ season, drawStatus }) {
   const [logoPreview, setLogoPreview] = useState(null)
   const [uploadingLogo, setUL]        = useState(false)
   const [patchingId, setPatchingId]   = useState(null)
+  const [editingPairId, setEditingId] = useState(null)
+  const [editP1, setEditP1]           = useState("")
+  const [editP2, setEditP2]           = useState("")
+  const [editLogoPreview, setEditLP]  = useState(null)
+  const [editUploading, setEditUL]    = useState(false)
   const logoInputRef                  = useRef(null)
   const patchInputRef                 = useRef(null)
+  const editLogoRef                   = useRef(null)
 
   const locked = drawStatus === "drawn" || drawStatus === "revealed"
 
@@ -71,6 +77,16 @@ function PairCreator({ season, drawStatus }) {
     mutationFn: ({ id, logoUrl }) => api.patch(`/duo/pairs/${id}/logo`, { logoUrl }).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["duo-pairs", season] }),
     onError: (err) => alert(err?.response?.data?.error || "Logo update failed"),
+  })
+
+  const editPairMut = useMutation({
+    mutationFn: ({ id, set1PlayerId, set2PlayerId }) =>
+      api.patch(`/duo/pairs/${id}`, { set1PlayerId, set2PlayerId }).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["duo-pairs", season] })
+      setEditingId(null)
+    },
+    onError: (err) => alert(err?.response?.data?.error || "Failed to update pair"),
   })
 
   async function handleLogoUpload(e) {
