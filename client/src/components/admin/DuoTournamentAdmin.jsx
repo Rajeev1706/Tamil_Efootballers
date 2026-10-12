@@ -119,6 +119,42 @@ function PairCreator({ season, drawStatus }) {
     }
   }
 
+  function openEdit(pair) {
+    setEditingId(pair.id)
+    setEditP1(String(pair.set1Id))
+    setEditP2(String(pair.set2Id))
+    setEditLP(pair.logoUrl || null)
+  }
+
+  async function handleEditLogoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setEditUL(true)
+    try {
+      const url = await uploadTeamLogo("duo-" + editingPairId, file)
+      setEditLP(url)
+    } catch (err) {
+      alert("Logo upload failed: " + (err?.message || ""))
+    } finally {
+      setEditUL(false)
+      e.target.value = ""
+    }
+  }
+
+  async function saveEdit(pair) {
+    // Save logo if changed
+    if (editLogoPreview !== pair.logoUrl) {
+      await patchLogoMut.mutateAsync({ id: pair.id, logoUrl: editLogoPreview || "" }).catch(() => {})
+    }
+    // Save players if changed
+    if (String(editP1) !== String(pair.set1Id) || String(editP2) !== String(pair.set2Id)) {
+      editPairMut.mutate({ id: pair.id, set1PlayerId: Number(editP1), set2PlayerId: Number(editP2) })
+    } else {
+      qc.invalidateQueries({ queryKey: ["duo-pairs", season] })
+      setEditingId(null)
+    }
+  }
+
   const usedIds = new Set(pairs.flatMap(p => [p.set1Id, p.set2Id]))
   const canAdd = name.trim().length > 0 && player1Id && player2Id && player1Id !== player2Id
 
@@ -201,46 +237,125 @@ function PairCreator({ season, drawStatus }) {
             <p className="text-sm">No pairs yet — add your first duo above</p>
           </div>
         )}
-        {pairs.map((pair, idx) => (
-          <div key={pair.id} className="flex items-center gap-3 px-4 py-3 bg-pitch-800 rounded-xl border border-surface-border">
-            <span className="text-xs text-slate-600 w-5 flex-shrink-0 font-mono">{idx + 1}</span>
-            {pair.logoUrl ? (
-              <img src={pair.logoUrl} alt={pair.duoName} className="w-8 h-8 rounded-lg object-cover border border-surface-border flex-shrink-0" />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-pitch-900 border border-surface-border flex items-center justify-center flex-shrink-0">
-                <span className="text-[9px] font-bold text-slate-600">{pair.duoName?.slice(0,2).toUpperCase()}</span>
+        {pairs.map((pair, idx) => {
+          const isEditing = editingPairId === pair.id
+          // players available for edit dropdowns: exclude used except current pair's own players
+          const usedExcludePair = new Set(pairs.flatMap(p => p.id === pair.id ? [] : [p.set1Id, p.set2Id]))
+
+          return (
+            <div key={pair.id} className="bg-pitch-800 rounded-xl border border-surface-border overflow-hidden">
+              {/* Row */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span className="text-xs text-slate-600 w-5 flex-shrink-0 font-mono">{idx + 1}</span>
+                {pair.logoUrl ? (
+                  <img src={pair.logoUrl} alt={pair.duoName} className="w-8 h-8 rounded-lg object-cover border border-surface-border flex-shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-pitch-900 border border-surface-border flex items-center justify-center flex-shrink-0">
+                    <span className="text-[9px] font-bold text-slate-600">{pair.duoName?.slice(0,2).toUpperCase()}</span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{pair.duoName}</p>
+                  <p className="text-xs text-slate-500 truncate">{pair.set1Name} & {pair.set2Name}</p>
+                </div>
+                {pair.groupName && (
+                  <span className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-lg flex-shrink-0">
+                    {pair.groupName}
+                  </span>
+                )}
+                {!locked && (
+                  <>
+                    <button
+                      onClick={() => isEditing ? setEditingId(null) : openEdit(pair)}
+                      className={cn(
+                        "p-1.5 rounded-lg border transition-colors flex-shrink-0",
+                        isEditing
+                          ? "text-accent border-accent/40 bg-accent/10"
+                          : "text-slate-400 border-surface-border hover:text-accent hover:border-accent/40"
+                      )}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => { if (window.confirm("Delete this pair?")) deleteMut.mutate(pair.id) }}
+                      className="text-slate-600 hover:text-rose-400 transition-colors p-1 flex-shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{pair.duoName}</p>
-              <p className="text-xs text-slate-500 truncate">{pair.set1Name} & {pair.set2Name}</p>
+
+              {/* Inline Edit Panel */}
+              {isEditing && (
+                <div className="border-t border-surface-border px-4 py-4 space-y-3 bg-pitch-900/60">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">Edit Pair</p>
+
+                  {/* Logo */}
+                  <div className="flex items-center gap-3">
+                    {editLogoPreview ? (
+                      <img src={editLogoPreview} alt="logo" className="w-10 h-10 rounded-lg object-cover border border-surface-border flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-pitch-800 border border-dashed border-surface-border flex items-center justify-center flex-shrink-0">
+                        <Upload className="w-3.5 h-3.5 text-slate-600" />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-0.5">
+                      <button type="button" onClick={() => editLogoRef.current?.click()}
+                        disabled={editUploading}
+                        className="text-xs text-accent hover:text-accent/80 transition-colors disabled:opacity-50 text-left">
+                        {editUploading ? "Uploading…" : editLogoPreview ? "Change logo" : "Upload logo"}
+                      </button>
+                      {editLogoPreview && (
+                        <button type="button" onClick={() => setEditLP(null)}
+                          className="text-xs text-rose-400 hover:text-rose-300 transition-colors text-left">
+                          Remove logo
+                        </button>
+                      )}
+                    </div>
+                    <input ref={editLogoRef} type="file" accept="image/*" onChange={handleEditLogoUpload} className="hidden" />
+                  </div>
+
+                  {/* Players */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Player 1", val: editP1, set: setEditP1, otherId: editP2 },
+                      { label: "Player 2", val: editP2, set: setEditP2, otherId: editP1 },
+                    ].map(({ label, val, set, otherId }) => (
+                      <div key={label}>
+                        <p className="text-[10px] text-slate-500 mb-1">{label}</p>
+                        <select value={val} onChange={e => set(e.target.value)}
+                          className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-xs text-white">
+                          <option value="">Pick player…</option>
+                          {allPlayers
+                            .filter(p => !usedExcludePair.has(p.id) || String(p.id) === val)
+                            .map(p => (
+                              <option key={p.id} value={p.id} disabled={String(p.id) === otherId}>
+                                {p.name} ({p.grade})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => saveEdit(pair)}
+                      disabled={!editP1 || !editP2 || editP1 === editP2 || editPairMut.isPending || editUploading}
+                      className="flex items-center gap-1.5 bg-accent text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-accent/90 disabled:opacity-50 transition-all">
+                      <Check className="w-3 h-3" />
+                      {editPairMut.isPending ? "Saving…" : "Save"}
+                    </button>
+                    <button onClick={() => setEditingId(null)}
+                      className="flex items-center gap-1.5 text-slate-400 border border-surface-border px-3 py-1.5 rounded-lg text-xs hover:text-white transition-colors">
+                      <X className="w-3 h-3" />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            {pair.groupName && (
-              <span className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-lg flex-shrink-0">
-                {pair.groupName}
-              </span>
-            )}
-            {!locked && (
-              <>
-                <label className={cn(
-                  "text-xs px-2 py-1 rounded-lg border cursor-pointer transition-colors flex-shrink-0",
-                  patchingId === pair.id
-                    ? "text-slate-500 border-slate-700 cursor-not-allowed"
-                    : "text-slate-400 border-surface-border hover:text-accent hover:border-accent/40"
-                )}>
-                  {patchingId === pair.id ? "…" : <Upload className="w-3 h-3" />}
-                  <input type="file" accept="image/*" className="hidden"
-                    disabled={patchingId === pair.id}
-                    onChange={(e) => handlePatchLogo(pair.id, e)} />
-                </label>
-                <button onClick={() => { if (window.confirm("Delete this pair?")) deleteMut.mutate(pair.id) }}
-                  className="text-slate-600 hover:text-rose-400 transition-colors p-1 flex-shrink-0">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {!locked && pairs.length > 0 && (
@@ -1104,7 +1219,7 @@ export default function DuoTournamentAdmin() {
           {isDrawn && (
             <button onClick={() => navigate(`/duo/draw/${season}`)}
               className="flex items-center gap-2 bg-amber-400/20 text-amber-400 border border-amber-400/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400/30">
-              <Shuffle className="w-4 h-4" /> Reveal Draw
+              <Shuffle className="w-4 h-4" /> View Draw
             </button>
           )}
           {isDrawn && (
