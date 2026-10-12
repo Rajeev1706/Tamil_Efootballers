@@ -62,8 +62,30 @@ function GroupTable({ groupName, members }) {
 
 function FixtureCard({ fixture }) {
   const isCompleted = fixture.status === "completed"
-  const homeWon = fixture.home_agg > fixture.away_agg
-  const awayWon = fixture.away_agg > fixture.home_agg
+  const isKnockout  = !!fixture.knockout_round
+
+  // Use admin-selected player names (populated at fixture generation for KO, admin-set for groups)
+  const set1HomeName = fixture.set1HomePlayerName || fixture.homeSet1Name
+  const set1AwayName = fixture.set1AwayPlayerName || fixture.awaySet1Name
+  const set2HomeName = fixture.set2HomePlayerName || fixture.homeSet2Name
+  const set2AwayName = fixture.set2AwayPlayerName || fixture.awaySet2Name
+
+  // For knockout: winner determined by set wins or decider, not aggregate
+  const homeSets = isKnockout && fixture.set1_home_score != null
+    ? ((fixture.set1_home_score > fixture.set1_away_score ? 1 : 0) + (fixture.set2_home_score > fixture.set2_away_score ? 1 : 0))
+    : null
+  const awaySets = isKnockout && fixture.set1_home_score != null
+    ? ((fixture.set1_away_score > fixture.set1_home_score ? 1 : 0) + (fixture.set2_away_score > fixture.set2_home_score ? 1 : 0))
+    : null
+
+  const homeWon = isKnockout
+    ? fixture.winner_pair_id === fixture.home_pair_id
+    : (fixture.set1_home_score ?? 0) + (fixture.set2_home_score ?? 0) > (fixture.set1_away_score ?? 0) + (fixture.set2_away_score ?? 0)
+  const awayWon = isKnockout
+    ? fixture.winner_pair_id === fixture.away_pair_id
+    : (fixture.set1_away_score ?? 0) + (fixture.set2_away_score ?? 0) > (fixture.set1_home_score ?? 0) + (fixture.set2_home_score ?? 0)
+
+  const hasDecider = !!fixture.koDeciderId
 
   return (
     <div className="card p-4">
@@ -73,10 +95,24 @@ function FixtureCard({ fixture }) {
           <p className="text-xs text-slate-500 truncate">{fixture.homeSet1Name} & {fixture.homeSet2Name}</p>
         </div>
         {isCompleted ? (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>{fixture.home_agg}</span>
-            <span className="text-slate-600">–</span>
-            <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>{fixture.away_agg}</span>
+          <div className="flex items-center gap-2 flex-shrink-0 text-center">
+            {isKnockout ? (
+              <>
+                <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>{homeSets}</span>
+                <span className="text-slate-600 text-xs">sets</span>
+                <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>{awaySets}</span>
+              </>
+            ) : (
+              <>
+                <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>
+                  {(fixture.set1_home_score ?? 0) + (fixture.set2_home_score ?? 0)}
+                </span>
+                <span className="text-slate-600">–</span>
+                <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>
+                  {(fixture.set1_away_score ?? 0) + (fixture.set2_away_score ?? 0)}
+                </span>
+              </>
+            )}
           </div>
         ) : (
           <span className="text-xs text-slate-500 px-2">vs</span>
@@ -87,9 +123,16 @@ function FixtureCard({ fixture }) {
         </div>
       </div>
       {isCompleted && (
-        <div className="mt-2 pt-2 border-t border-surface-border/50 grid grid-cols-2 gap-2 text-xs text-slate-500">
-          <div>Set 1: {fixture.set1_home_score}–{fixture.set1_away_score}</div>
-          <div className="text-right">Set 2: {fixture.set2_home_score}–{fixture.set2_away_score}</div>
+        <div className="mt-2 pt-2 border-t border-surface-border/50 space-y-1 text-xs text-slate-500">
+          <div className="grid grid-cols-2 gap-2">
+            <div>Set 1: {set1HomeName} {fixture.set1_home_score}–{fixture.set1_away_score} {set1AwayName}</div>
+            <div className="text-right">Set 2: {set2HomeName} {fixture.set2_home_score}–{fixture.set2_away_score} {set2AwayName}</div>
+          </div>
+          {hasDecider && (
+            <div className="text-center text-amber-400/80 font-semibold pt-0.5">
+              Decider: {fixture.koDeciderHomePlayerName} {fixture.koDeciderHomeScore}–{fixture.koDeciderAwayScore} {fixture.koDeciderAwayPlayerName}
+            </div>
+          )}
         </div>
       )}
     </div>
