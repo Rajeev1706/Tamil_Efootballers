@@ -212,15 +212,13 @@ export default function DuoDrawReveal() {
 
   const groups = useMemo(() => data?.groups || [], [data])
 
-  // Build reveal sequence: round-robin across groups so all groups fill together
-  // (Group A slot-1, Group B slot-1, …, Group H slot-1, Group A slot-2, …)
+  // Build reveal sequence: group by group — fill Group A completely, then B, then C…
   const revealSequence = useMemo(() => {
     if (!groups.length) return []
-    const maxLen = Math.max(...groups.map(g => g.pairs.length))
     const seq = []
-    for (let slot = 0; slot < maxLen; slot++) {
-      for (const g of groups) {
-        if (g.pairs[slot]) seq.push({ ...g.pairs[slot], groupName: g.groupName })
+    for (const g of groups) {
+      for (const pair of g.pairs) {
+        seq.push({ ...pair, groupName: g.groupName })
       }
     }
     return seq
