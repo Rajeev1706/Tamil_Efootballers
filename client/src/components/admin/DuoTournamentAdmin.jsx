@@ -28,7 +28,7 @@ function PairCreator({ season, drawStatus }) {
   const [error, setError]             = useState("")
   const [logoPreview, setLogoPreview] = useState(null)
   const [uploadingLogo, setUL]        = useState(false)
-  const [patchingId, setPatchingId]   = useState(null)   // pair id being logo-patched
+  const [patchingId, setPatchingId]   = useState(null)
   const logoInputRef                  = useRef(null)
   const patchInputRef                 = useRef(null)
 
@@ -103,19 +103,15 @@ function PairCreator({ season, drawStatus }) {
     }
   }
 
-  // Build set of player IDs already used so they can't be double-picked
   const usedIds = new Set(pairs.flatMap(p => [p.set1Id, p.set2Id]))
-
   const canAdd = name.trim().length > 0 && player1Id && player2Id && player1Id !== player2Id
 
   return (
     <div className="space-y-4">
-      {/* Create form — hidden once draw is done */}
       {!locked && (
         <div className="card p-5 space-y-4">
           <h3 className="text-sm font-bold text-white">Add Duo Pair</h3>
 
-          {/* Logo upload */}
           <div>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Team Logo <span className="normal-case">(optional)</span></p>
             <div className="flex items-center gap-3">
@@ -143,7 +139,6 @@ function PairCreator({ season, drawStatus }) {
             </div>
           </div>
 
-          {/* Team name */}
           <div>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Team Name</p>
             <input value={name} onChange={e => setName(e.target.value)}
@@ -151,7 +146,6 @@ function PairCreator({ season, drawStatus }) {
               className="w-full bg-pitch-800 border border-surface-border rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-accent/40" />
           </div>
 
-          {/* Two player selects */}
           <div className="grid grid-cols-2 gap-3">
             {[{ label: "Player 1", val: player1Id, set: setP1 },
               { label: "Player 2", val: player2Id, set: setP2 }].map(({ label, val, set }) => (
@@ -183,7 +177,6 @@ function PairCreator({ season, drawStatus }) {
         </div>
       )}
 
-      {/* Pairs list */}
       <div className="space-y-2">
         {pairsLoading && <p className="text-slate-500 text-sm text-center py-4">Loading…</p>}
         {!pairsLoading && pairs.length === 0 && (
@@ -195,7 +188,6 @@ function PairCreator({ season, drawStatus }) {
         {pairs.map((pair, idx) => (
           <div key={pair.id} className="flex items-center gap-3 px-4 py-3 bg-pitch-800 rounded-xl border border-surface-border">
             <span className="text-xs text-slate-600 w-5 flex-shrink-0 font-mono">{idx + 1}</span>
-            {/* Logo thumbnail */}
             {pair.logoUrl ? (
               <img src={pair.logoUrl} alt={pair.duoName} className="w-8 h-8 rounded-lg object-cover border border-surface-border flex-shrink-0" />
             ) : (
@@ -212,7 +204,6 @@ function PairCreator({ season, drawStatus }) {
                 {pair.groupName}
               </span>
             )}
-            {/* Logo upload button for existing pairs */}
             {!locked && (
               <>
                 <label className={cn(
@@ -243,10 +234,86 @@ function PairCreator({ season, drawStatus }) {
   )
 }
 
-// ── Score Entry + Fixture Row (unchanged) ─────────────────────────────────────
-function ScoreEntry({ fixture, onSave, saving }) {
-  // Lock set score inputs when decider result is already saved — prevent accidental overwrite
-  const deciderCompleted = fixture.status === "completed" && fixture.decider_home_score != null
+// ── Player Setup Entry — admin picks which player from each duo plays Set 1 ───
+function PlayerSetupEntry({ fixture, onSetup, setupMutPending }) {
+  const homePlayers = [
+    { id: fixture.homeSet1Id, name: fixture.homeSet1Name },
+    { id: fixture.homeSet2Id, name: fixture.homeSet2Name },
+  ].filter(p => p.id)
+  const awayPlayers = [
+    { id: fixture.awaySet1Id, name: fixture.awaySet1Name },
+    { id: fixture.awaySet2Id, name: fixture.awaySet2Name },
+  ].filter(p => p.id)
+
+  const [selHome, setSelHome] = useState("")
+  const [selAway, setSelAway] = useState("")
+
+  const set2Home = homePlayers.find(p => p.id !== Number(selHome))
+  const set2Away = awayPlayers.find(p => p.id !== Number(selAway))
+  const canConfirm = selHome && selAway
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Set Players</span>
+        <span className="text-[10px] text-slate-600">— pick Set 1 players, Set 2 auto-fills</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1">{fixture.homeDuoName} — Set 1</p>
+          <select value={selHome} onChange={e => setSelHome(e.target.value)}
+            className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
+            <option value="">Pick player…</option>
+            {homePlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1">{fixture.awayDuoName} — Set 1</p>
+          <select value={selAway} onChange={e => setSelAway(e.target.value)}
+            className="w-full bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
+            <option value="">Pick player…</option>
+            {awayPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {selHome && selAway && (
+        <div className="text-[11px] text-slate-400 bg-pitch-800 rounded-lg px-3 py-2 space-y-1">
+          <div className="flex gap-2">
+            <span className="text-slate-600 w-10 flex-shrink-0">Set 1:</span>
+            <span className="text-white font-semibold">{homePlayers.find(p => p.id === Number(selHome))?.name}</span>
+            <span className="text-slate-600">vs</span>
+            <span className="text-white font-semibold">{awayPlayers.find(p => p.id === Number(selAway))?.name}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="text-slate-600 w-10 flex-shrink-0">Set 2:</span>
+            <span className="text-white font-semibold">{set2Home?.name}</span>
+            <span className="text-slate-600">vs</span>
+            <span className="text-white font-semibold">{set2Away?.name}</span>
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={() => onSetup(fixture.id, Number(selHome), Number(selAway))}
+        disabled={!canConfirm || setupMutPending}
+        className="w-full bg-blue-500/20 border border-blue-400/40 text-blue-300 text-sm font-semibold py-2 rounded-lg disabled:opacity-40 hover:bg-blue-500/30 transition-colors"
+      >
+        {setupMutPending ? "Saving…" : "Confirm Players"}
+      </button>
+    </div>
+  )
+}
+
+// ── Score Entry ───────────────────────────────────────────────────────────────
+function ScoreEntry({ fixture, onSave, onPlayerSetup, playerSetupPending, saving }) {
+  const isKnockout = !!fixture.knockout_round
+  // For group: decider done if decider_home_score is set; for knockout: done if koDeciderId is set
+  const deciderCompleted = isKnockout
+    ? fixture.status === "completed" && fixture.koDeciderId != null
+    : fixture.status === "completed" && fixture.decider_home_score != null
+  const playersSet = !!(fixture.set1_home_player_id && fixture.set1_away_player_id)
 
   const [scores, setScores] = useState({
     set1HomeScore: fixture.set1_home_score ?? "",
@@ -255,14 +322,62 @@ function ScoreEntry({ fixture, onSave, saving }) {
     set2AwayScore: fixture.set2_away_score ?? "",
   })
   const set = (k, v) => setScores(s => ({ ...s, [k]: v }))
-  const homeAgg = (Number(scores.set1HomeScore) || 0) + (Number(scores.set2HomeScore) || 0)
-  const awayAgg = (Number(scores.set1AwayScore) || 0) + (Number(scores.set2AwayScore) || 0)
+
+  // Use admin-selected names if available, fall back to pair defaults
+  const set1HomeName = fixture.set1HomePlayerName || fixture.homeSet1Name
+  const set1AwayName = fixture.set1AwayPlayerName || fixture.awaySet1Name
+  const set2HomeName = fixture.set2HomePlayerName || fixture.homeSet2Name
+  const set2AwayName = fixture.set2AwayPlayerName || fixture.awaySet2Name
+
+  // For group stage only: show player setup if players not yet assigned
+  if (!isKnockout && !playersSet && fixture.status !== "completed") {
+    return (
+      <div className="mt-3 p-3 bg-pitch-900 rounded-xl border border-blue-400/20">
+        <PlayerSetupEntry
+          fixture={fixture}
+          onSetup={onPlayerSetup}
+          setupMutPending={playerSetupPending}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="mt-3 p-3 bg-pitch-900 rounded-xl border border-surface-border space-y-3">
+      {/* Players assigned banner */}
+      {isKnockout ? (
+        // Knockout: show violet random draw banner with the assigned matchups
+        <div className="text-[10px] text-violet-400 bg-violet-400/5 border border-violet-400/15 rounded-lg px-3 py-2 space-y-1">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Shuffle className="w-3 h-3" />
+            <span className="font-semibold">🎲 Random Draw</span>
+          </div>
+          <div className="text-slate-400">
+            Set 1: <span className="text-white">{set1HomeName}</span> vs <span className="text-white">{set1AwayName}</span>
+          </div>
+          <div className="text-slate-400">
+            Set 2: <span className="text-white">{set2HomeName}</span> vs <span className="text-white">{set2AwayName}</span>
+          </div>
+        </div>
+      ) : playersSet ? (
+        // Group stage: show blue "Players assigned" banner with reset button
+        <div className="text-[10px] text-blue-400 bg-blue-400/5 border border-blue-400/15 rounded-lg px-3 py-1.5 flex items-center justify-between">
+          <span>Players assigned</span>
+          {fixture.status !== "completed" && (
+            <button
+              onClick={() => onPlayerSetup(fixture.id, null, null)}
+              className="text-slate-500 hover:text-white transition-colors text-[10px]"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3">
-        {[{ label: "Set 1 Match", homeK: "set1HomeScore", awayK: "set1AwayScore", homeName: fixture.homeSet1Name, awayName: fixture.awaySet1Name },
-          { label: "Set 2 Match", homeK: "set2HomeScore", awayK: "set2AwayScore", homeName: fixture.homeSet2Name, awayName: fixture.awaySet2Name }
+        {[
+          { label: "Set 1 Match", homeK: "set1HomeScore", awayK: "set1AwayScore", homeName: set1HomeName, awayName: set1AwayName },
+          { label: "Set 2 Match", homeK: "set2HomeScore", awayK: "set2AwayScore", homeName: set2HomeName, awayName: set2AwayName },
         ].map(({ label, homeK, awayK, homeName, awayName }) => (
           <div key={label}>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{label}</p>
@@ -286,8 +401,6 @@ function ScoreEntry({ fixture, onSave, saving }) {
         const s2AwayScore = Number(scores.set2AwayScore) || 0
         const homeSets = (s1HomeScore > s1AwayScore ? 1 : 0) + (s2HomeScore > s2AwayScore ? 1 : 0)
         const awaySets = (s1AwayScore > s1HomeScore ? 1 : 0) + (s2AwayScore > s2HomeScore ? 1 : 0)
-        const homeAggPrev = s1HomeScore + s2HomeScore
-        const awayAggPrev = s1AwayScore + s2AwayScore
         let resultLabel = ""
         let resultColor = "text-amber-400"
         if (homeSets > awaySets) { resultLabel = `${fixture.homeDuoName} wins 2-0`; resultColor = "text-emerald-400" }
@@ -315,15 +428,11 @@ function ScoreEntry({ fixture, onSave, saving }) {
   )
 }
 
-// ── Decider Entry — shown when knockout fixture is 1-1 with equal aggregate ──
-function DeciderEntry({ fixture, onSetup, onResult }) {
-  const hasPlayers   = fixture.decider_home_player_id && fixture.decider_away_player_id
-  const deciderDone  = fixture.decider_home_score != null && fixture.decider_away_score != null
-  const [editing, setEditing]     = useState(false)
-  const [homeScore, setHomeScore] = useState("")
-  const [awayScore, setAwayScore] = useState("")
+// ── Knockout Decider Entry — single-step: pick players + enter score ──────────
+function KnockoutDeciderEntry({ fixture, onDecider, pending }) {
+  const deciderDone = fixture.koDeciderId != null
+  const [editing, setEditing] = useState(false)
 
-  // Build player options for each pair
   const homePlayers = [
     { id: fixture.homeSet1Id, name: fixture.homeSet1Name },
     { id: fixture.homeSet2Id, name: fixture.homeSet2Name },
@@ -333,15 +442,17 @@ function DeciderEntry({ fixture, onSetup, onResult }) {
     { id: fixture.awaySet2Id, name: fixture.awaySet2Name },
   ].filter(p => p.id)
 
-  const [selHome, setSelHome] = useState(fixture.decider_home_player_id || "")
-  const [selAway, setSelAway] = useState(fixture.decider_away_player_id || "")
+  const [selHome, setSelHome] = useState("")
+  const [selAway, setSelAway] = useState("")
+  const [homeScore, setHomeScore] = useState("")
+  const [awayScore, setAwayScore] = useState("")
 
-  const homeName = homePlayers.find(p => p.id === (fixture.decider_home_player_id || selHome))?.name
-  const awayName = awayPlayers.find(p => p.id === (fixture.decider_away_player_id || selAway))?.name
+  const isDraw = homeScore !== "" && awayScore !== "" && homeScore === awayScore
+  const canSubmit = selHome && selAway && homeScore !== "" && awayScore !== "" && !isDraw
 
-  // Show completed decider result with edit option
+  // Show result if decider is done and not editing
   if (deciderDone && !editing) {
-    const homeWon = fixture.decider_home_score > fixture.decider_away_score
+    const homeWon = fixture.koDeciderHomeScore > fixture.koDeciderAwayScore
     return (
       <div className="mt-2 p-3 bg-emerald-400/5 border border-emerald-400/20 rounded-xl space-y-2">
         <div className="flex items-center justify-between">
@@ -349,14 +460,18 @@ function DeciderEntry({ fixture, onSetup, onResult }) {
           <button onClick={() => setEditing(true)} className="text-xs text-slate-400 hover:text-white transition-colors">Edit</button>
         </div>
         <div className="flex items-center justify-center gap-3">
-          <span className={cn("text-sm font-semibold truncate", homeWon ? "text-emerald-400" : "text-slate-400")}>{homeName}</span>
-          <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded text-sm">
-            {fixture.decider_home_score} – {fixture.decider_away_score}
+          <span className={cn("text-sm font-semibold truncate", homeWon ? "text-emerald-400" : "text-slate-400")}>
+            {fixture.koDeciderHomePlayerName}
           </span>
-          <span className={cn("text-sm font-semibold truncate", !homeWon ? "text-emerald-400" : "text-slate-400")}>{awayName}</span>
+          <span className="font-mono font-bold text-white bg-pitch-800 px-2 py-0.5 rounded text-sm">
+            {fixture.koDeciderHomeScore} – {fixture.koDeciderAwayScore}
+          </span>
+          <span className={cn("text-sm font-semibold truncate", !homeWon ? "text-emerald-400" : "text-slate-400")}>
+            {fixture.koDeciderAwayPlayerName}
+          </span>
         </div>
         <p className="text-[10px] text-center text-slate-600">
-          {homeWon ? homeName : awayName} wins the tie
+          {homeWon ? fixture.koDeciderHomePlayerName : fixture.koDeciderAwayPlayerName} wins the tie
         </p>
       </div>
     )
@@ -365,89 +480,87 @@ function DeciderEntry({ fixture, onSetup, onResult }) {
   return (
     <div className="mt-2 p-3 bg-orange-400/5 border border-orange-400/30 rounded-xl space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-orange-400 uppercase tracking-widest">⚡ Decider Match — Pick one player from each pair</p>
+        <p className="text-xs font-bold text-orange-400 uppercase tracking-widest">⚡ Decider Match</p>
         {editing && <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-white">Cancel</button>}
       </div>
 
-      {/* Player selection */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <p className="text-[10px] text-slate-500 mb-1">{fixture.homeDuoName}</p>
-          <select
-            value={selHome}
-            onChange={e => setSelHome(Number(e.target.value))}
-            disabled={hasPlayers}
-            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white disabled:opacity-60"
-          >
+          <select value={selHome} onChange={e => setSelHome(e.target.value)}
+            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
             <option value="">Pick player…</option>
             {homePlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div>
           <p className="text-[10px] text-slate-500 mb-1">{fixture.awayDuoName}</p>
-          <select
-            value={selAway}
-            onChange={e => setSelAway(Number(e.target.value))}
-            disabled={hasPlayers}
-            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white disabled:opacity-60"
-          >
+          <select value={selAway} onChange={e => setSelAway(e.target.value)}
+            className="w-full bg-pitch-900 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
             <option value="">Pick player…</option>
             {awayPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       </div>
 
-      {!hasPlayers && (
-        <button
-          onClick={() => onSetup(fixture.id, selHome, selAway)}
-          disabled={!selHome || !selAway}
-          className="w-full bg-orange-500/20 border border-orange-400/40 text-orange-300 text-sm font-semibold py-2 rounded-lg disabled:opacity-40 hover:bg-orange-500/30 transition-colors"
-        >
-          Confirm Decider Players
-        </button>
+      {selHome && selAway && (
+        <p className="text-xs text-slate-400 text-center">
+          {homePlayers.find(p => p.id === Number(selHome))?.name} vs {awayPlayers.find(p => p.id === Number(selAway))?.name}
+        </p>
       )}
 
-      {/* Score entry — only after players are set */}
-      {hasPlayers && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-400 text-center">{homeName} vs {awayName}</p>
-          <div className="flex items-center gap-3 justify-center">
-            <input type="number" min="0" value={homeScore} onChange={e => setHomeScore(e.target.value)}
-              className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1.5 text-sm text-white" />
-            <span className="text-slate-500 font-bold">–</span>
-            <input type="number" min="0" value={awayScore} onChange={e => setAwayScore(e.target.value)}
-              className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1.5 text-sm text-white" />
-          </div>
-          {homeScore !== "" && awayScore !== "" && homeScore === awayScore && (
-            <p className="text-xs text-rose-400 text-center">Decider must have a winner — scores cannot be equal</p>
-          )}
-          <button
-            onClick={() => onResult(fixture.id, Number(homeScore), Number(awayScore))}
-            disabled={homeScore === "" || awayScore === "" || homeScore === awayScore}
-            className="w-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-sm font-semibold py-2 rounded-lg disabled:opacity-40 hover:bg-emerald-500/30 transition-colors"
-          >
-            Save Decider Result
-          </button>
-        </div>
+      <div className="flex items-center gap-3 justify-center">
+        <input type="number" min="0" value={homeScore} onChange={e => setHomeScore(e.target.value)}
+          className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1.5 text-sm text-white" />
+        <span className="text-slate-500 font-bold">–</span>
+        <input type="number" min="0" value={awayScore} onChange={e => setAwayScore(e.target.value)}
+          className="w-16 text-center bg-pitch-800 border border-surface-border rounded-lg py-1.5 text-sm text-white" />
+      </div>
+
+      {isDraw && (
+        <p className="text-xs text-rose-400 text-center">Decider must have a winner — scores cannot be equal</p>
       )}
+
+      <button
+        onClick={() => onDecider(fixture.id, Number(selHome), Number(selAway), Number(homeScore), Number(awayScore))}
+        disabled={!canSubmit || pending}
+        className="w-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-sm font-semibold py-2 rounded-lg disabled:opacity-40 hover:bg-emerald-500/30 transition-colors"
+      >
+        {pending ? "Saving…" : "Save Decider Result"}
+      </button>
     </div>
   )
 }
 
-function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }) {
+function FixtureRow({ fixture, onSave, onPlayerSetup, playerSetupPending, onDecider, knockoutDeciderPending, saving }) {
   const [open, setOpen] = useState(false)
-  const isCompleted    = fixture.status === "completed"
-  const needsDecider   = fixture.status === "needs_decider"
+  const isCompleted  = fixture.status === "completed"
+  const needsDecider = fixture.status === "needs_decider"
+  const isKnockout   = !!fixture.knockout_round
 
-  // Set wins from stored scores
   const homeSets = ((fixture.set1_home_score > fixture.set1_away_score ? 1 : 0) +
                     (fixture.set2_home_score > fixture.set2_away_score ? 1 : 0))
   const awaySets = ((fixture.set1_away_score > fixture.set1_home_score ? 1 : 0) +
                     (fixture.set2_away_score > fixture.set2_home_score ? 1 : 0))
 
-  const hasDecider = isCompleted && homeSets === awaySets && fixture.decider_home_score != null
-  const homeWon    = isCompleted && fixture.winner_pair_id === fixture.home_pair_id
-  const awayWon    = isCompleted && fixture.winner_pair_id === fixture.away_pair_id
+  // hasDecider: knockout uses koDeciderId, group stage uses decider_home_score
+  const hasDecider = isKnockout
+    ? isCompleted && fixture.koDeciderId != null
+    : isCompleted && homeSets === awaySets && fixture.decider_home_score != null
+
+  const homeWon = isCompleted && fixture.winner_pair_id === fixture.home_pair_id
+  const awayWon = isCompleted && fixture.winner_pair_id === fixture.away_pair_id
+
+  // Use admin-selected names for display
+  const set1HomeName = fixture.set1HomePlayerName || fixture.homeSet1Name
+  const set1AwayName = fixture.set1AwayPlayerName || fixture.awaySet1Name
+  const set2HomeName = fixture.set2HomePlayerName || fixture.homeSet2Name
+  const set2AwayName = fixture.set2AwayPlayerName || fixture.awaySet2Name
+  const playersSet   = !!(fixture.set1_home_player_id && fixture.set1_away_player_id)
+
+  // Decider scores: knockout uses koDecider fields, group stage uses old fields
+  const deciderHomeScore = isKnockout ? fixture.koDeciderHomeScore : fixture.decider_home_score
+  const deciderAwayScore = isKnockout ? fixture.koDeciderAwayScore : fixture.decider_away_score
 
   return (
     <div className={cn("border rounded-xl overflow-hidden",
@@ -457,15 +570,15 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }
         <div className="flex-1 flex items-center justify-between min-w-0">
           <div className="text-left min-w-0">
             <p className="text-sm font-semibold text-white truncate">{fixture.homeDuoName}</p>
-            <p className="text-xs text-slate-500 truncate">{fixture.homeSet1Name} & {fixture.homeSet2Name}</p>
+            <p className="text-xs text-slate-500 truncate">{set1HomeName} & {set2HomeName}</p>
           </div>
           {isCompleted ? (
             hasDecider ? (
               <div className="flex flex-col items-center gap-0.5 mx-4">
                 <div className="flex items-center gap-1.5">
-                  <span className={cn("text-base font-bold font-mono", homeWon ? "text-emerald-400" : "text-slate-400")}>{fixture.decider_home_score}</span>
+                  <span className={cn("text-base font-bold font-mono", homeWon ? "text-emerald-400" : "text-slate-400")}>{deciderHomeScore}</span>
                   <span className="text-slate-600 text-xs">–</span>
-                  <span className={cn("text-base font-bold font-mono", awayWon ? "text-emerald-400" : "text-slate-400")}>{fixture.decider_away_score}</span>
+                  <span className={cn("text-base font-bold font-mono", awayWon ? "text-emerald-400" : "text-slate-400")}>{deciderAwayScore}</span>
                 </div>
                 <span className="text-[9px] text-orange-400 font-bold">DECIDER</span>
               </div>
@@ -478,24 +591,32 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }
             )
           ) : needsDecider ? (
             <span className="text-xs text-orange-400 font-bold mx-4">1-1 DECIDER</span>
+          ) : !playersSet && !isKnockout ? (
+            <span className="text-[10px] text-blue-400 font-semibold mx-4 bg-blue-400/10 border border-blue-400/20 px-2 py-0.5 rounded-lg">Setup needed</span>
           ) : (
             <span className="text-xs text-slate-500 mx-4">vs</span>
           )}
           <div className="text-right min-w-0">
             <p className="text-sm font-semibold text-white truncate">{fixture.awayDuoName}</p>
-            <p className="text-xs text-slate-500 truncate">{fixture.awaySet1Name} & {fixture.awaySet2Name}</p>
+            <p className="text-xs text-slate-500 truncate">{set1AwayName} & {set2AwayName}</p>
           </div>
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3">
-          <ScoreEntry fixture={fixture} onSave={onSave} saving={saving} />
-          {(needsDecider || hasDecider) && fixture.knockout_round && (
-            <DeciderEntry
+          <ScoreEntry
+            fixture={fixture}
+            onSave={onSave}
+            onPlayerSetup={onPlayerSetup}
+            playerSetupPending={playerSetupPending}
+            saving={saving}
+          />
+          {(needsDecider || hasDecider) && isKnockout && (
+            <KnockoutDeciderEntry
               fixture={fixture}
-              onSetup={onDeciderSetup}
-              onResult={onDeciderResult}
+              onDecider={onDecider}
+              pending={knockoutDeciderPending}
             />
           )}
         </div>
@@ -504,7 +625,7 @@ function FixtureRow({ fixture, onSave, onDeciderSetup, onDeciderResult, saving }
   )
 }
 
-// ── Duo Export Card (hidden off-screen, rendered to PNG) ─────────────────────
+// ── Duo Export Card ───────────────────────────────────────────────────────────
 function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
   const roundFixtures = fixtures.filter(f => f.round_number === round)
   const byGroup = roundFixtures.reduce((acc, f) => {
@@ -519,13 +640,11 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
       fontFamily: "system-ui, sans-serif", overflow: "visible",
       zIndex: visible ? 9999 : -1, opacity: visible ? 1 : 0, pointerEvents: "none",
     }}>
-      {/* Watermark */}
       <img src={logoUrl} alt="" style={{
         position: "absolute", top: "50%", left: "50%",
         transform: "translate(-50%, -50%)",
         width: 320, height: 320, objectFit: "contain", opacity: 0.04, pointerEvents: "none",
       }} />
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32, position: "relative" }}>
         <img src={logoUrl} alt="TEC" style={{ width: 48, height: 48, objectFit: "contain" }} />
         <div>
@@ -535,7 +654,6 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
           <p style={{ color: "#ffffff", fontSize: 26, fontWeight: 800, margin: 0 }}>Round {round} Fixtures</p>
         </div>
       </div>
-      {/* Groups — 2 columns */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px", position: "relative" }}>
         {groupEntries.map(([groupName, gFixtures]) => (
           <div key={groupName}>
@@ -543,6 +661,10 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
               {groupName}
             </p>
             {gFixtures.map(f => {
+              const s1HomeName = f.set1HomePlayerName || f.homeSet1Name
+              const s1AwayName = f.set1AwayPlayerName || f.awaySet1Name
+              const s2HomeName = f.set2HomePlayerName || f.homeSet2Name
+              const s2AwayName = f.set2AwayPlayerName || f.awaySet2Name
               const homeSets = ((f.set1_home_score > f.set1_away_score ? 1 : 0) + (f.set2_home_score > f.set2_away_score ? 1 : 0))
               const awaySets = ((f.set1_away_score > f.set1_home_score ? 1 : 0) + (f.set2_away_score > f.set2_home_score ? 1 : 0))
               const done = f.status === "completed"
@@ -556,10 +678,9 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 10, padding: "10px 16px", marginBottom: 7,
                 }}>
-                  {/* Set 1 row */}
                   <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
                     <div style={{ flex: 1, textAlign: "right" }}>
-                      <span style={{ color: set1HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1HomeWins ? 700 : 400 }}>{f.homeSet1Name}</span>
+                      <span style={{ color: set1HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1HomeWins ? 700 : 400 }}>{s1HomeName}</span>
                     </div>
                     <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
                       {done
@@ -568,15 +689,13 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
                       }
                     </div>
                     <div style={{ flex: 1 }}>
-                      <span style={{ color: set1AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1AwayWins ? 700 : 400 }}>{f.awaySet1Name}</span>
+                      <span style={{ color: set1AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1AwayWins ? 700 : 400 }}>{s1AwayName}</span>
                     </div>
                   </div>
-                  {/* Divider */}
                   <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 0 6px 0" }} />
-                  {/* Set 2 row */}
                   <div style={{ display: "flex", alignItems: "center" }}>
                     <div style={{ flex: 1, textAlign: "right" }}>
-                      <span style={{ color: set2HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2HomeWins ? 700 : 400 }}>{f.homeSet2Name}</span>
+                      <span style={{ color: set2HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2HomeWins ? 700 : 400 }}>{s2HomeName}</span>
                     </div>
                     <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
                       {done
@@ -585,10 +704,9 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
                       }
                     </div>
                     <div style={{ flex: 1 }}>
-                      <span style={{ color: set2AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2AwayWins ? 700 : 400 }}>{f.awaySet2Name}</span>
+                      <span style={{ color: set2AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2AwayWins ? 700 : 400 }}>{s2AwayName}</span>
                     </div>
                   </div>
-                  {/* Match result badge */}
                   {done && (
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <span style={{
@@ -610,7 +728,6 @@ function DuoExportCard({ round, fixtures, exportRef, visible, season }) {
     </div>
   )
 }
-
 
 // ── Knockout Export Card ──────────────────────────────────────────────────────
 function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
@@ -640,6 +757,10 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px" }}>
         {roundFixtures.map(f => {
+          const s1HomeName = f.set1HomePlayerName || f.homeSet1Name
+          const s1AwayName = f.set1AwayPlayerName || f.awaySet1Name
+          const s2HomeName = f.set2HomePlayerName || f.homeSet2Name
+          const s2AwayName = f.set2AwayPlayerName || f.awaySet2Name
           const set1HomeWins = (f.set1_home_score ?? 0) > (f.set1_away_score ?? 0)
           const set2HomeWins = (f.set2_home_score ?? 0) > (f.set2_away_score ?? 0)
           const set1AwayWins = (f.set1_away_score ?? 0) > (f.set1_home_score ?? 0)
@@ -654,10 +775,9 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
               <p style={{ color: "#64748b", fontSize: 10, fontWeight: 700, margin: "0 0 8px 0" }}>
                 {f.homeDuoName} vs {f.awayDuoName}
               </p>
-              {/* Set 1 */}
               <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
                 <div style={{ flex: 1, textAlign: "right" }}>
-                  <span style={{ color: set1HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1HomeWins ? 700 : 400 }}>{f.homeSet1Name}</span>
+                  <span style={{ color: set1HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1HomeWins ? 700 : 400 }}>{s1HomeName}</span>
                 </div>
                 <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
                   {done
@@ -666,14 +786,13 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
                   }
                 </div>
                 <div style={{ flex: 1 }}>
-                  <span style={{ color: set1AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1AwayWins ? 700 : 400 }}>{f.awaySet1Name}</span>
+                  <span style={{ color: set1AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set1AwayWins ? 700 : 400 }}>{s1AwayName}</span>
                 </div>
               </div>
               <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 0 6px 0" }} />
-              {/* Set 2 */}
               <div style={{ display: "flex", alignItems: "center" }}>
                 <div style={{ flex: 1, textAlign: "right" }}>
-                  <span style={{ color: set2HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2HomeWins ? 700 : 400 }}>{f.homeSet2Name}</span>
+                  <span style={{ color: set2HomeWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2HomeWins ? 700 : 400 }}>{s2HomeName}</span>
                 </div>
                 <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
                   {done
@@ -682,7 +801,7 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
                   }
                 </div>
                 <div style={{ flex: 1 }}>
-                  <span style={{ color: set2AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2AwayWins ? 700 : 400 }}>{f.awaySet2Name}</span>
+                  <span style={{ color: set2AwayWins ? "#f1f5f9" : "#64748b", fontSize: 13, fontWeight: set2AwayWins ? 700 : 400 }}>{s2AwayName}</span>
                 </div>
               </div>
             </div>
@@ -694,7 +813,7 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
 }
 
 
-function FixturesByRound({ fixtures, onSave, saving, season }) {
+function FixturesByRound({ fixtures, onSave, onPlayerSetup, playerSetupPending, saving, season }) {
   const rounds = [...new Set(fixtures.map(f => f.round_number).filter(Boolean))].sort((a,b) => a-b)
   const [activeRound, setActiveRound] = useState(rounds[0] || 1)
   const [exporting, setExporting] = useState(false)
@@ -753,7 +872,16 @@ function FixturesByRound({ fixtures, onSave, saving, season }) {
           <div key={groupName}>
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{groupName}</h3>
             <div className="space-y-2">
-              {gFixtures.map(f => <FixtureRow key={f.id} fixture={f} onSave={onSave} saving={saving} />)}
+              {gFixtures.map(f => (
+                <FixtureRow
+                  key={f.id}
+                  fixture={f}
+                  onSave={onSave}
+                  onPlayerSetup={onPlayerSetup}
+                  playerSetupPending={playerSetupPending}
+                  saving={saving}
+                />
+              ))}
             </div>
           </div>
         ))}
@@ -762,9 +890,8 @@ function FixturesByRound({ fixtures, onSave, saving, season }) {
   )
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
-// ── KnockoutTab — shows knockout rounds with per-round Export PNG ─────────────
-function KnockoutTab({ fixtures, rounds, season, scoreMut, deciderSetupMut, deciderResultMut }) {
+// ── KnockoutTab ───────────────────────────────────────────────────────────────
+function KnockoutTab({ fixtures, rounds, season, scoreMut, playerSetupMut, knockoutDeciderMut }) {
   const [activeRound, setActiveRound] = useState(rounds[0] || "r16")
   const [exporting, setExporting]     = useState(false)
   const [showExport, setShowExport]   = useState(false)
@@ -795,7 +922,6 @@ function KnockoutTab({ fixtures, rounds, season, scoreMut, deciderSetupMut, deci
   return (
     <div className="space-y-4">
       <KnockoutExportCard round={activeRound} fixtures={fixtures} exportRef={exportRef} visible={showExport} season={season} />
-      {/* Round tabs + Export */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex gap-2 flex-wrap">
           {rounds.map(r => (
@@ -812,14 +938,15 @@ function KnockoutTab({ fixtures, rounds, season, scoreMut, deciderSetupMut, deci
           {exporting ? "Exporting…" : "Export PNG"}
         </button>
       </div>
-      {/* Fixtures */}
       <div className="space-y-2">
         {roundFixtures.map(f => (
           <FixtureRow key={f.id} fixture={f}
             onSave={(id, scores) => scoreMut.mutate({ id, scores })}
             saving={scoreMut.isPending}
-            onDeciderSetup={(id, hp, ap) => deciderSetupMut.mutate({ id, homePlayerId: hp, awayPlayerId: ap })}
-            onDeciderResult={(id, hs, as_) => deciderResultMut.mutate({ id, homeScore: hs, awayScore: as_ })}
+            onPlayerSetup={(id, hp, ap) => playerSetupMut.mutate({ id, set1HomePlayerId: hp, set1AwayPlayerId: ap })}
+            playerSetupPending={playerSetupMut.isPending}
+            onDecider={(id, hp, ap, hs, as_) => knockoutDeciderMut.mutate({ id, homePlayerId: hp, awayPlayerId: ap, homeScore: hs, awayScore: as_ })}
+            knockoutDeciderPending={knockoutDeciderMut.isPending}
           />
         ))}
       </div>
@@ -840,7 +967,6 @@ export default function DuoTournamentAdmin() {
     if (currentSeason && season === null) setSeason(currentSeason)
   }, [currentSeason])
 
-  // Admin-only draw status (always visible to admin regardless of public status)
   const { data: statusData, refetch: refetchStatus } = useQuery({
     queryKey: ["duo-draw-status", season],
     queryFn:  () => api.get(`/duo/draw-status?season=${season}`).then(r => r.data),
@@ -848,7 +974,6 @@ export default function DuoTournamentAdmin() {
   })
   const drawStatus = statusData?.drawStatus || "pending"
 
-  // Public data (groups/fixtures only appear after revealed)
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["duo", season],
     queryFn:  () => api.get(`/duo/current?season=${season}`).then(r => r.data),
@@ -884,16 +1009,18 @@ export default function DuoTournamentAdmin() {
     onSuccess:  () => { invalidate(); setActiveTab("pairs") },
   })
 
-  const deciderSetupMut = useMutation({
-    mutationFn: ({ id, homePlayerId, awayPlayerId }) =>
-      api.post(`/duo/fixtures/${id}/decider/setup`, { homePlayerId, awayPlayerId }).then(r => r.data),
+  // ── Player setup mutation (group stage) ───────────────────────────────────
+  const playerSetupMut = useMutation({
+    mutationFn: ({ id, set1HomePlayerId, set1AwayPlayerId }) =>
+      api.post(`/duo/fixtures/${id}/player-setup`, { set1HomePlayerId, set1AwayPlayerId }).then(r => r.data),
     onSuccess: () => invalidate(),
-    onError: (err) => alert(err?.response?.data?.error || "Failed to set decider players"),
+    onError: (err) => alert(err?.response?.data?.error || "Failed to set players"),
   })
 
-  const deciderResultMut = useMutation({
-    mutationFn: ({ id, homeScore, awayScore }) =>
-      api.post(`/duo/fixtures/${id}/decider/result`, { homeScore, awayScore }).then(r => r.data),
+  // ── Knockout decider mutation (single-step: players + score in one call) ──
+  const knockoutDeciderMut = useMutation({
+    mutationFn: ({ id, homePlayerId, awayPlayerId, homeScore, awayScore }) =>
+      api.post(`/duo/fixtures/${id}/knockout-decider`, { homePlayerId, awayPlayerId, homeScore, awayScore }).then(r => r.data),
     onSuccess: () => invalidate(),
     onError: (err) => alert(err?.response?.data?.error || "Failed to save decider result"),
   })
@@ -924,7 +1051,6 @@ export default function DuoTournamentAdmin() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Users className="w-5 h-5 text-accent" />
@@ -934,7 +1060,6 @@ export default function DuoTournamentAdmin() {
             <input type="number" value={season ?? ""} onChange={e => setSeason(Number(e.target.value))}
               className="w-16 bg-pitch-900 border border-surface-border rounded-lg px-2 py-1 text-sm text-white text-center" />
           </div>
-          {/* Draw status badge */}
           {season && (
             <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border",
               isPending  ? "bg-slate-700/50 text-slate-400 border-slate-600"  :
@@ -946,7 +1071,6 @@ export default function DuoTournamentAdmin() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* Start Draw — only in pending phase */}
           {isPending && (
             <button onClick={() => { if (window.confirm("Start the draw? This will randomly assign pairs to groups.")) drawMut.mutate() }}
               disabled={drawMut.isPending}
@@ -954,14 +1078,12 @@ export default function DuoTournamentAdmin() {
               <Shuffle className="w-4 h-4" /> {drawMut.isPending ? "Drawing…" : "Start Draw"}
             </button>
           )}
-          {/* Reveal Draw — only in drawn phase */}
           {isDrawn && (
             <button onClick={() => navigate(`/duo/draw/${season}`)}
               className="flex items-center gap-2 bg-amber-400/20 text-amber-400 border border-amber-400/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400/30">
               <Shuffle className="w-4 h-4" /> Reveal Draw
             </button>
           )}
-          {/* Re-draw — only in drawn phase */}
           {isDrawn && (
             <button onClick={() => { if (window.confirm("Re-draw? This will shuffle groups again (pairs stay).")) drawMut.mutate() }}
               disabled={drawMut.isPending}
@@ -969,7 +1091,6 @@ export default function DuoTournamentAdmin() {
               Re-draw
             </button>
           )}
-          {/* Delete season */}
           {(isDrawn || isRevealed) && (
             <button onClick={() => { if (window.confirm(`Delete all Season ${season} duo data?`)) deleteMut.mutate(season) }}
               disabled={deleteMut.isPending}
@@ -977,7 +1098,6 @@ export default function DuoTournamentAdmin() {
               <Trash2 className="w-4 h-4" /> Delete Season
             </button>
           )}
-          {/* Generate Knockout */}
           {isRevealed && knockoutRounds.length === 0 && (
             <button onClick={() => knockoutMut.mutate(season)} disabled={knockoutMut.isPending}
               className="flex items-center gap-2 bg-gold/20 text-gold border border-gold/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gold/30 disabled:opacity-50">
@@ -998,7 +1118,6 @@ export default function DuoTournamentAdmin() {
         </div>
       </div>
 
-      {/* Phase: pending or drawn — show pairs (with create form if pending) */}
       {(isPending || isDrawn) && (
         <>
           {isDrawn && (
@@ -1014,7 +1133,6 @@ export default function DuoTournamentAdmin() {
         </>
       )}
 
-      {/* Phase: revealed — full tabs */}
       {isRevealed && (
         <>
           <div className="flex gap-1 border-b border-surface-border">
@@ -1066,15 +1184,24 @@ export default function DuoTournamentAdmin() {
                   ))}
                 </div>
               )}
-              {activeTab === "fixtures" && <FixturesByRound fixtures={groupFixtures} onSave={(id, scores) => scoreMut.mutate({ id, scores })} saving={scoreMut.isPending} season={season} />}
+              {activeTab === "fixtures" && (
+                <FixturesByRound
+                  fixtures={groupFixtures}
+                  onSave={(id, scores) => scoreMut.mutate({ id, scores })}
+                  onPlayerSetup={(id, hp, ap) => playerSetupMut.mutate({ id, set1HomePlayerId: hp, set1AwayPlayerId: ap })}
+                  playerSetupPending={playerSetupMut.isPending}
+                  saving={scoreMut.isPending}
+                  season={season}
+                />
+              )}
               {activeTab === "knockout" && (
                 <KnockoutTab
                   fixtures={knockoutFixtures}
                   rounds={knockoutRounds}
                   season={season}
                   scoreMut={scoreMut}
-                  deciderSetupMut={deciderSetupMut}
-                  deciderResultMut={deciderResultMut}
+                  playerSetupMut={playerSetupMut}
+                  knockoutDeciderMut={knockoutDeciderMut}
                 />
               )}
             </>
