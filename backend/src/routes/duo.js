@@ -170,35 +170,40 @@ function shuffle(arr) {
   return a
 }
 
-// Generate round-robin fixtures with proper round numbers using circle method.
-// With n teams, there are n-1 rounds (n even) or n rounds (n odd).
-// Each round has floor(n/2) matches.
+// Generate double round-robin fixtures (home & away legs) using circle method.
+// With n teams: (n-1) first-leg rounds + (n-1) return-leg rounds = 2*(n-1) rounds total.
+// E.g. 4 teams → 6 rounds; 3 teams → 6 rounds (padded to 4).
 function roundRobinFixtures(pairIds) {
   const n = pairIds.length
-  const fixtures = []
-
-  if (n < 2) return fixtures
+  if (n < 2) return []
 
   // Pad to even number with a "bye" (null)
   const teams = n % 2 === 0 ? [...pairIds] : [...pairIds, null]
-  const rounds = teams.length - 1
-  const half   = teams.length / 2
+  const legsRounds = teams.length - 1   // rounds per leg
+  const half       = teams.length / 2
+  const firstLeg   = []
 
-  for (let round = 0; round < rounds; round++) {
+  for (let round = 0; round < legsRounds; round++) {
     for (let i = 0; i < half; i++) {
       const home = teams[i]
       const away = teams[teams.length - 1 - i]
-      // Skip if either is the bye slot
       if (home !== null && away !== null) {
-        fixtures.push({ home, away, roundNumber: round + 1 })
+        firstLeg.push({ home, away, roundNumber: round + 1 })
       }
     }
-    // Rotate all except first element
+    // Rotate all except first element (circle method)
     const last = teams.pop()
     teams.splice(1, 0, last)
   }
 
-  return fixtures
+  // Return legs: swap home/away, offset round numbers by legsRounds
+  const returnLeg = firstLeg.map(f => ({
+    home: f.away,
+    away: f.home,
+    roundNumber: f.roundNumber + legsRounds,
+  }))
+
+  return [...firstLeg, ...returnLeg]
 }
 
 // ── GET /api/duo/current — public: current season data ────────────────────────
