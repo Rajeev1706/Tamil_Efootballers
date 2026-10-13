@@ -500,6 +500,18 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       )
       const gradeMap = Object.fromEntries(gradesRes.rows.map(p => [p.id, p.grade]))
 
+      // Resolve which player from each pair played Set 1 vs Set 2 for THIS fixture.
+      // Admin assigns set1_home_player_id / set1_away_player_id during fixture setup.
+      // Set 2 is whichever player in the pair did NOT play Set 1.
+      const set1HomePlayerId = fix.set1_home_player_id || homePair.set1_player_id
+      const set1AwayPlayerId = fix.set1_away_player_id || awayPair.set1_player_id
+      const set2HomePlayerId = (set1HomePlayerId === homePair.set1_player_id)
+        ? homePair.set2_player_id
+        : homePair.set1_player_id
+      const set2AwayPlayerId = (set1AwayPlayerId === awayPair.set1_player_id)
+        ? awayPair.set2_player_id
+        : awayPair.set1_player_id
+
       // Create/update match records for Set1 players
       let set1RecordId = fix.set1_match_record_id
       if (set1RecordId) {
@@ -509,8 +521,8 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       const s1r = await q(`
         INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
         VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
-        [homePair.set1_player_id, awayPair.set1_player_id, result1, set1HomeScore, set1AwayScore,
-         homePair.season_number, gradeMap[awayPair.set1_player_id] || "C"]
+        [set1HomePlayerId, set1AwayPlayerId, result1, set1HomeScore, set1AwayScore,
+         homePair.season_number, gradeMap[set1AwayPlayerId] || "C"]
       )
       set1RecordId = s1r.rows[0].id
 
@@ -523,8 +535,8 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       const s2r = await q(`
         INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
         VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
-        [homePair.set2_player_id, awayPair.set2_player_id, result2, set2HomeScore, set2AwayScore,
-         homePair.season_number, gradeMap[awayPair.set2_player_id] || "C"]
+        [set2HomePlayerId, set2AwayPlayerId, result2, set2HomeScore, set2AwayScore,
+         homePair.season_number, gradeMap[set2AwayPlayerId] || "C"]
       )
       set2RecordId = s2r.rows[0].id
 
