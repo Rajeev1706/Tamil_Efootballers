@@ -100,14 +100,14 @@ async function getTeamSeasonStats(teamId, season) {
 }
 
 // ── Helper: generate + save player summary ────────────────────────────────────
-async function generatePlayerSummary(playerId, season) {
+async function generatePlayerSummary(playerId, season, useAI = false) {
   const stats = await getPlayerSeasonStats(playerId, season)
   if (!stats) return null
 
   const winRate = stats.total > 0 ? (stats.wins / stats.total) * 100 : 0
   let summaryText, generatedBy
 
-  if (winRate >= 50 && stats.total >= 5) {
+  if (useAI && stats.total >= 3) {
     const goalDiff = stats.goals_scored - stats.goals_conceded
     const goalDiffStr = goalDiff >= 0 ? `+${goalDiff}` : `${goalDiff}`
     const prompt = `You are a sports journalist writing the official season review for a Tamil online eFootball esports league called "Dshann League" (Pes Park platform).
@@ -266,6 +266,18 @@ router.post("/regenerate/team/:id", authenticate, adminOnly, async (req, res, ne
   } catch (err) { next(err) }
 })
 
+// ── POST /trigger (admin) — manually kick off generation for a season ─────────
+router.post("/trigger", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const season = parseInt(req.body.season)
+    if (!season) return res.status(400).json({ error: "season is required" })
+    triggerSeasonSummaryGeneration(season).catch(err =>
+      console.error("[season-summary] trigger error:", err.message)
+    )
+    res.json({ success: true, message: `Generation queued for S${season}` })
+  } catch (err) { next(err) }
+})
+
 // ── GET /status (admin) ───────────────────────────────────────────────────────
 router.get("/status", authenticate, adminOnly, async (req, res, next) => {
   try {
@@ -291,29 +303,50 @@ router.get("/status", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// ── Exported queue trigger (called by teams.js season-reset) ──────────────────
+// ── Exported queue trigger (called by teams.js season-reset or admin panel) ───
 export async function triggerSeasonSummaryGeneration(season) {
   console.log(`[season-summary] Starting queue generation for Season ${season}`)
 
-  // Fetch all player IDs and team IDs
-  const [playersRes, teamsRes] = await Promise.all([
-    query("SELECT id FROM players ORDER BY id"),
-    query("SELECT id FROM teams ORDER BY id"),
-  ])
+  // Rank ALL players by win rate for this season (top 50 get Gemini AI)
+  const rankedRes = await query(`
+    SELECT
+      p.id,
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE
+        (mr.player_id = p.id AND mr.result = 'win') OR
+        (mr.opponent_id = p.id AND mr.result = 'loss')
+      )::int AS wins
+    FROM players p
+    JOIN match_records mr
+      ON (mr.player_id = p.id OR mr.opponent_id = p.id)
+      AND mr.season_number = $1
+    GROUP BY p.id
+    ORDER BY
+      CASE WHEN COUNT(*) > 0 THEN
+        COUNT(*) FILTER (WHERE
+          (mr.player_id = p.id AND mr.result = 'win') OR
+          (mr.opponent_id = p.id AND mr.result = 'loss')
+        )::float / COUNT(*)
+      ELSE 0 END DESC,
+      COUNT(*) DESC
+  `, [season])
 
-  const playerIds = playersRes.rows.map(r => r.id)
-  const teamIds   = teamsRes.rows.map(r => r.id)
+  const allPlayers = rankedRes.rows  // already sorted best → worst
+  const top50Ids   = new Set(allPlayers.slice(0, 50).map(r => r.id))
 
-  // Queue: process one by one with 1.5s delay to avoid RPM limits
+  const teamsRes = await query("SELECT id FROM teams ORDER BY id")
+  const teamIds  = teamsRes.rows.map(r => r.id)
+
   ;(async () => {
-    console.log(`[season-summary] Processing ${playerIds.length} players, ${teamIds.length} teams for S${season}`)
+    console.log(`[season-summary] ${allPlayers.length} players (top ${Math.min(50, allPlayers.length)} → AI, rest → template), ${teamIds.length} teams for S${season}`)
 
-    for (const playerId of playerIds) {
+    for (const row of allPlayers) {
+      const useAI = top50Ids.has(row.id)
       try {
-        await generatePlayerSummary(playerId, season)
-        console.log(`[season-summary] ✓ player ${playerId}`)
+        await generatePlayerSummary(row.id, season, useAI)
+        console.log(`[season-summary] ✓ player ${row.id} [${useAI ? "AI" : "template"}]`)
       } catch (err) {
-        console.error(`[season-summary] ✗ player ${playerId}: ${err.message}`)
+        console.error(`[season-summary] ✗ player ${row.id}: ${err.message}`)
       }
       await new Promise(r => setTimeout(r, 1500))
     }

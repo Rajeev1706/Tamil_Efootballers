@@ -413,7 +413,7 @@ export default function PlayerProfile() {
 
       {/* ── AI Season Summary ── */}
       <div className="mt-6">
-        <AISeasonSummary player={player} isAdmin={isAdmin} />
+        <AISeasonSummary player={player} />
       </div>
 
       {/* ── Season Performance graph ── */}
