@@ -440,7 +440,6 @@ export default function TeamTrophyDetail() {
           <AITeamSeasonSummary
             teamId={id}
             seasons={history.map(h => h.season_number).sort((a, b) => b - a)}
-            isAdmin={isAdmin}
           />
         </div>
       )}
