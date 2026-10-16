@@ -517,7 +517,15 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       if (set1RecordId) {
         await q("DELETE FROM match_records WHERE id = $1", [set1RecordId])
       }
-      const result1 = set1HomeScore > set1AwayScore ? "win" : set1HomeScore < set1AwayScore ? "loss" : "draw"
+      // BUG FIX: result is based on which PAIR won the overall match, NOT the
+      // individual set score. Both players on the winning pair get "win"; both
+      // on the losing pair get "loss". For a group-stage draw (1-1 sets) or a
+      // knockout fixture that still needs a decider, we store "draw" temporarily
+      // and update it once the decider result is known (see /decider/result).
+      const pairResult = winnerPairId === fix.home_pair_id ? "win"
+                       : winnerPairId === fix.away_pair_id ? "loss"
+                       : "draw" // group draw (1-1) or knockout pending decider
+      const result1 = pairResult
       const s1r = await q(`
         INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
         VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
@@ -531,7 +539,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       if (set2RecordId) {
         await q("DELETE FROM match_records WHERE id = $1", [set2RecordId])
       }
-      const result2 = set2HomeScore > set2AwayScore ? "win" : set2HomeScore < set2AwayScore ? "loss" : "draw"
+      const result2 = pairResult // same pair result — both home pair players win/lose together
       const s2r = await q(`
         INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
         VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
@@ -1580,6 +1588,26 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       await recalcMarketValue(fix.decider_away_player_id)
       await recalcForm(fix.decider_home_player_id)
       await recalcForm(fix.decider_away_player_id)
+
+      // BUG FIX: The set1 and set2 match records were stored as "draw" when the
+      // fixture went to a decider (needsDecider=true at score-entry time). Now
+      // that we know the actual pair winner, update them to the real pair result
+      // so all four players' win rates are correctly reflected.
+      const homePairFinalResult = winnerPairId === fix.home_pair_id ? "win" : "loss"
+      if (fix.set1_match_record_id) {
+        await q("UPDATE match_records SET result = $1 WHERE id = $2",
+          [homePairFinalResult, fix.set1_match_record_id])
+      }
+      if (fix.set2_match_record_id) {
+        await q("UPDATE match_records SET result = $1 WHERE id = $2",
+          [homePairFinalResult, fix.set2_match_record_id])
+      }
+      // Recalc MV + form for all set players — their records changed draw → win/loss
+      for (const pid of [homePair.set1_player_id, homePair.set2_player_id,
+                         awayPair.set1_player_id, awayPair.set2_player_id].filter(Boolean)) {
+        await recalcMarketValue(pid)
+        await recalcForm(pid)
+      }
 
       // BDR awards — claimAward ensures exactly once per fixture regardless of re-saves
       const winnerPair = winnerPairId === fix.home_pair_id ? homePair : awayPair
