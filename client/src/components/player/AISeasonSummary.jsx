@@ -3,8 +3,8 @@
  * Shows above the Season Performance graph in PlayerProfile.
  */
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Sparkles, RefreshCw, ChevronDown, Bot, FileText, Lock } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { Sparkles, ChevronDown, Bot, FileText, Lock } from "lucide-react"
 import api from "../../lib/api"
 import { cn } from "../../lib/utils"
 
@@ -30,7 +30,7 @@ function SeasonPicker({ seasons, value, onChange, currentSeason }) {
   )
 }
 
-export default function AISeasonSummary({ player, isAdmin = false }) {
+export default function AISeasonSummary({ player }) {
   const allHistory    = player?.matchHistory || []
   const currentSeason = player?.currentSeason ?? player?.seasonNumber ?? null
 
@@ -43,8 +43,6 @@ export default function AISeasonSummary({ player, isAdmin = false }) {
   const defaultSeason = availableSeasons.find(s => s !== currentSeason) ?? availableSeasons[0] ?? currentSeason
   const [selectedSeason, setSelectedSeason] = useState(defaultSeason ? String(defaultSeason) : null)
 
-  const qc = useQueryClient()
-
   const { data: summary, isLoading } = useQuery({
     queryKey: ["ai-season-summary", "player", player?.id, selectedSeason],
     queryFn: () =>
@@ -52,15 +50,6 @@ export default function AISeasonSummary({ player, isAdmin = false }) {
          .then(r => r.data),
     enabled: !!player?.id && !!selectedSeason,
     staleTime: 1000 * 60 * 10,
-  })
-
-  const regenerate = useMutation({
-    mutationFn: () =>
-      api.post(`/season-summaries/regenerate/player/${player.id}?season=${selectedSeason}`)
-         .then(r => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ai-season-summary", "player", player?.id, selectedSeason] })
-    },
   })
 
   if (!availableSeasons.length || !selectedSeason) return null
@@ -84,22 +73,6 @@ export default function AISeasonSummary({ player, isAdmin = false }) {
               currentSeason={currentSeason}
             />
           )}
-
-          {isAdmin && summary && (
-            <button
-              onClick={() => regenerate.mutate()}
-              disabled={regenerate.isPending}
-              title="Regenerate summary"
-              className={cn(
-                "w-7 h-7 rounded-lg border flex items-center justify-center transition-colors",
-                regenerate.isPending
-                  ? "border-surface-border text-slate-600 cursor-not-allowed"
-                  : "border-surface-border text-slate-400 hover:text-violet-400 hover:border-violet-400/40"
-              )}
-            >
-              <RefreshCw className={cn("w-3.5 h-3.5", regenerate.isPending && "animate-spin")} />
-            </button>
-          )}
         </div>
       </div>
 
@@ -120,15 +93,9 @@ export default function AISeasonSummary({ player, isAdmin = false }) {
             <p className="text-sm text-slate-500">
               Season summary hasn't been generated yet.
             </p>
-            {isAdmin && (
-              <button
-                onClick={() => regenerate.mutate()}
-                disabled={regenerate.isPending}
-                className="mt-2 px-4 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-colors disabled:opacity-50"
-              >
-                {regenerate.isPending ? "Generating…" : "Generate Now"}
-              </button>
-            )}
+            <p className="text-xs text-slate-600">
+              Generate summaries from the Admin → Setup panel.
+            </p>
           </div>
         )}
 
@@ -185,17 +152,6 @@ export default function AISeasonSummary({ player, isAdmin = false }) {
           </div>
         )}
 
-        {/* Regenerating overlay message */}
-        {regenerate.isPending && (
-          <div className="mt-3 text-xs text-violet-400 text-center">
-            Generating new summary…
-          </div>
-        )}
-        {regenerate.isError && (
-          <div className="mt-3 text-xs text-rose-400 text-center">
-            Failed to generate. Try again.
-          </div>
-        )}
       </div>
     </div>
   )

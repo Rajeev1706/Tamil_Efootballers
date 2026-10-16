@@ -40,6 +40,7 @@ import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
 import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 import AdminTeamsTab from "../components/admin/AdminTeamsTab"
+import SeasonSummaryAdmin from "../components/admin/SeasonSummaryAdmin"
 
 function RecalcTournamentHistoryCard() {
   const [loading, setLoading] = useState(false)
@@ -831,6 +832,7 @@ export default function AdminPage() {
   const { data: records  = [], isLoading: rLoading } = useRecords()
   const { data: fixtures = [], isLoading: fLoading } = useFixtures()
   const { data: trades   = [] }                      = useTrades()
+  const { data: settings = {} }                      = useSettings()
 
   const pendingTrades = trades.filter(t => t.status === "pending_admin")
   const isLoading     = pLoading || rLoading || fLoading
@@ -948,6 +950,12 @@ export default function AdminPage() {
       <TriggerWeeklyHonoursCard />
       <RecalcTournamentHistoryCard />
       <FinalizeUclGroupsCard />
+    </div>
+
+    {/* Season Summaries */}
+    <div>
+      <p className="section-label mb-3">AI Season Summaries</p>
+      <SeasonSummaryAdmin currentSeason={parseInt(settings.current_season) || 1} />
     </div>
 
     {/* Season Reset */}
