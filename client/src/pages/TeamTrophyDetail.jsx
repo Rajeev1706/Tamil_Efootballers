@@ -6,6 +6,8 @@ import Layout from "../components/layout/Layout"
 import { useCachedImage } from "../hooks/useCachedImage"
 import api from "../lib/api"
 import { cn } from "../lib/utils"
+import AITeamSeasonSummary from "../components/team/AITeamSeasonSummary"
+import { useAuthStore } from "../store/authStore"
 
 import teamLeagueTrophy  from "../../images/Team League.png"
 import uclTrophy         from "../../images/ucl.png"
@@ -236,6 +238,8 @@ function SeasonRow({ season, trophySeasons, teamName }) {
 export default function TeamTrophyDetail() {
   const { id }   = useParams()
   const navigate = useNavigate()
+  const authUser = useAuthStore(s => s.user)
+  const isAdmin  = authUser?.role === "admin"
   const [showAllHistory, setShowAllHistory] = useState(false)
 
   const { data, isLoading } = useQuery({
@@ -429,6 +433,17 @@ export default function TeamTrophyDetail() {
           </div>
         )}
       </div>
+
+      {/* ── AI Season Summary ── */}
+      {history.length > 0 && (
+        <div className="mb-6">
+          <AITeamSeasonSummary
+            teamId={id}
+            seasons={history.map(h => h.season_number).sort((a, b) => b - a)}
+            isAdmin={isAdmin}
+          />
+        </div>
+      )}
 
       {/* ── Season-by-season history ── */}
       <div>

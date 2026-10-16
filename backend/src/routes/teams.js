@@ -9,6 +9,7 @@ import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophy
 import { recalcMarketValue } from "../services/marketValue.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
+import { triggerSeasonSummaryGeneration } from "../routes/seasonSummaries.js"
 
 const router = Router()
 
@@ -1577,9 +1578,15 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       }
     }
 
+    // ── Trigger Season Summary AI generation (non-blocking queue) ──────────
+    // Generate for the ENDING season (before endingSeason was incremented)
+    triggerSeasonSummaryGeneration(endingSeason).catch(err =>
+      console.error("[season-reset] summary generation error:", err.message)
+    )
+
     res.json({
       success: true,
-      message: "Season reset complete. Team stats, fixtures, trades, the entire UCL competition, and everyone's BDR points were cleared. Match history and trophies are preserved.",
+      message: "Season reset complete. Team stats, fixtures, trades, the entire UCL competition, and everyone's BDR points were cleared. Match history and trophies are preserved. Season summaries are being generated in the background.",
       gradeUpdates: {
         eligible: eligible.length,
         changed: gradeUpdateLog.length,

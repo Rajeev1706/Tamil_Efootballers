@@ -105,6 +105,8 @@ function recordProfileView(playerId) {
 }
 import PerformanceZones from "../components/dashboard/PerformanceZones"
 import PercentileDashboard from "../components/player/PercentileDashboard"
+import AISeasonSummary from "../components/player/AISeasonSummary"
+import { useAuthStore } from "../store/authStore"
 
 function TrophyCase({ player }) {
   const trophies = [
@@ -152,6 +154,8 @@ export default function PlayerProfile() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const showAuctionDelta = ["team", "admin"].includes(searchParams.get("ctx"))
+  const authUser = useAuthStore(s => s.user)
+  const isAdmin  = authUser?.role === "admin"
   const { data: player, isLoading, isError } = usePlayer(id)
   const teamColor = useTeamColor(player?.teamLogo)
   const teamTextColor = readableTeamColor(teamColor)
@@ -405,6 +409,11 @@ export default function PlayerProfile() {
       {/* ── Percentile Rankings ── */}
       <div className="mt-6">
         <PercentileDashboard playerId={player.id} />
+      </div>
+
+      {/* ── AI Season Summary ── */}
+      <div className="mt-6">
+        <AISeasonSummary player={player} isAdmin={isAdmin} />
       </div>
 
       {/* ── Season Performance graph ── */}
