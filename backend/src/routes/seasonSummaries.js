@@ -108,16 +108,19 @@ async function generatePlayerSummary(playerId, season) {
   let summaryText, generatedBy
 
   if (winRate >= 50 && stats.total >= 5) {
-    const prompt = `You are writing an exciting, punchy eFootball season summary for a Tamil online esports league called "Dshann League" (Pes Park platform).
+    const goalDiff = stats.goals_scored - stats.goals_conceded
+    const goalDiffStr = goalDiff >= 0 ? `+${goalDiff}` : `${goalDiff}`
+    const prompt = `You are a sports journalist writing the official season review for a Tamil online eFootball esports league called "Dshann League" (Pes Park platform).
 
 Player: ${stats.name}
 Season: S${season}
 Grade: ${stats.grade || "N/A"}
-Stats: ${stats.wins}W / ${stats.draws}D / ${stats.losses}L | ${stats.total} matches | ${winRate.toFixed(1)}% win rate
-Goals scored: ${stats.goals_scored} | Goals conceded: ${stats.goals_conceded}
+Record: ${stats.wins}W / ${stats.draws}D / ${stats.losses}L across ${stats.total} matches
+Win rate: ${winRate.toFixed(1)}%
+Goals scored: ${stats.goals_scored} | Goals conceded: ${stats.goals_conceded} | Goal difference: ${goalDiffStr}
 BDR Points: ${stats.bdr_points || 0}
 
-Write a short, exciting 2-3 sentence season narrative (like a sports commentator's season review). Make it feel thrilling, personal and proud. Use words like "dominated", "clutch", "iron will", "relentless", "unstoppable" where fitting. DO NOT use asterisks or markdown. Plain text only. Keep it under 80 words.`
+Write a detailed, engaging 4-6 sentence season overview for ${stats.name}'s S${season} campaign. Cover: how dominant or consistent the season was based on the win rate, what the goal numbers say about their attacking and defensive style, whether their BDR points reflect a top-tier performer, and end with a forward-looking or defining statement about their season legacy. Write like a real sports commentator doing a season wrap-up — specific, vivid, personal. Use strong esports/football language. DO NOT use asterisks, bullet points, or markdown. Plain text only. Do not exceed 160 words.`
 
     const result = await generateWithFallback(prompt)
     if (result.text) {
@@ -151,13 +154,14 @@ async function generateTeamSummary(teamId, season) {
   let summaryText, generatedBy
 
   if (winRate >= 50 && stats.total >= 5) {
-    const prompt = `You are writing an exciting, punchy eFootball season summary for a Tamil online esports league called "Dshann League" (Pes Park platform).
+    const prompt = `You are a sports journalist writing the official season review for a Tamil online eFootball esports league called "Dshann League" (Pes Park platform).
 
 Team: ${stats.name}
 Season: S${season}
-Stats: ${stats.wins}W / ${stats.draws}D / ${stats.losses}L | ${stats.total} combined matches | ${winRate.toFixed(1)}% win rate
+Record: ${stats.wins}W / ${stats.draws}D / ${stats.losses}L across ${stats.total} combined matches
+Win rate: ${winRate.toFixed(1)}%
 
-Write a short, exciting 2-3 sentence team season narrative (like a sports commentator's season review). Make it feel thrilling and proud. Use strong sports language. DO NOT use asterisks or markdown. Plain text only. Keep it under 80 words.`
+Write a detailed, engaging 4-6 sentence season overview for ${stats.name}'s S${season} campaign as a team. Cover: how dominant or consistent the squad was based on the win rate, what the record says about their collective strength, how the draws and losses factor into their overall story, and close with a defining statement about what this season meant for the franchise. Write like a real sports commentator doing a season wrap-up — specific, vivid, team-focused. Use strong esports/football language. DO NOT use asterisks, bullet points, or markdown. Plain text only. Do not exceed 160 words.`
 
     const result = await generateWithFallback(prompt)
     if (result.text) {
