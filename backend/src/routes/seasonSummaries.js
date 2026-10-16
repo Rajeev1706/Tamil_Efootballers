@@ -120,7 +120,7 @@ Win rate: ${winRate.toFixed(1)}%
 Goals scored: ${stats.goals_scored} | Goals conceded: ${stats.goals_conceded} | Goal difference: ${goalDiffStr}
 BDR Points: ${stats.bdr_points || 0}
 
-Write a detailed, engaging 4-6 sentence season overview for ${stats.name}'s S${season} campaign. Cover: how dominant or consistent the season was based on the win rate, what the goal numbers say about their attacking and defensive style, whether their BDR points reflect a top-tier performer, and end with a forward-looking or defining statement about their season legacy. Write like a real sports commentator doing a season wrap-up — specific, vivid, personal. Use strong esports/football language. DO NOT use asterisks, bullet points, or markdown. Plain text only. Do not exceed 160 words.`
+Write a detailed, engaging 4-6 sentence season overview for ${stats.name}'s S${season} campaign. Cover: how dominant or consistent the season was based on the win rate, what the goal numbers say about their attacking and defensive style, whether their BDR points reflect a top-tier performer, and end with a forward-looking or defining statement about their season legacy. Write like a real sports commentator doing a season wrap-up — specific, vivid, personal. Use strong esports/football language. DO NOT start with a title or heading. DO NOT use asterisks, bullet points, or markdown. Start directly with the narrative text. Plain text only. Do not exceed 160 words.`
 
     const result = await generateWithFallback(prompt)
     if (result.text) {
@@ -161,7 +161,7 @@ Season: S${season}
 Record: ${stats.wins}W / ${stats.draws}D / ${stats.losses}L across ${stats.total} combined matches
 Win rate: ${winRate.toFixed(1)}%
 
-Write a detailed, engaging 4-6 sentence season overview for ${stats.name}'s S${season} campaign as a team. Cover: how dominant or consistent the squad was based on the win rate, what the record says about their collective strength, how the draws and losses factor into their overall story, and close with a defining statement about what this season meant for the franchise. Write like a real sports commentator doing a season wrap-up — specific, vivid, team-focused. Use strong esports/football language. DO NOT use asterisks, bullet points, or markdown. Plain text only. Do not exceed 160 words.`
+Write a detailed, engaging 4-6 sentence season overview for ${stats.name}'s S${season} campaign as a team. Cover: how dominant or consistent the squad was based on the win rate, what the record says about their collective strength, how the draws and losses factor into their overall story, and close with a defining statement about what this season meant for the franchise. Write like a real sports commentator doing a season wrap-up — specific, vivid, team-focused. Use strong esports/football language. DO NOT start with a title or heading. DO NOT use asterisks, bullet points, or markdown. Start directly with the narrative text. Plain text only. Do not exceed 160 words.`
 
     const result = await generateWithFallback(prompt)
     if (result.text) {
