@@ -32,6 +32,7 @@ import uploadRoutes         from "./routes/upload.js"
 import tlgRoutes            from "./routes/tlg.js"
 import trendingRoutes      from "./routes/trending.js"
 import powerRankingRoutes  from "./routes/powerRankings.js"
+import seasonSummaryRoutes from "./routes/seasonSummaries.js"
 import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 import powerRankingsRouter from "./routes/powerRankings.js"
@@ -87,6 +88,7 @@ app.use("/api/upload", uploadRoutes)
 app.use("/api/tlg",    tlgRoutes)
 app.use("/api/trending",       trendingRoutes)
 app.use("/api/power-rankings", powerRankingRoutes)
+app.use("/api/season-summaries", seasonSummaryRoutes)
 
 // GET /api/settings
 app.get("/api/settings", async (_req, res) => {
@@ -170,6 +172,38 @@ try {
   await query(`ALTER TABLE match_records ADD COLUMN IF NOT EXISTS is_walkover BOOLEAN DEFAULT FALSE`)
   await query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS championship_pts INT DEFAULT 0`)
 } catch (e) { console.error("[missing columns] migration:", e.message) }
+
+// ── Season Summary tables ─────────────────────────────────────────────────────
+try {
+  await query(`
+    CREATE TABLE IF NOT EXISTS season_player_summaries (
+      id             SERIAL PRIMARY KEY,
+      player_id      INT  NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      season_number  INT  NOT NULL,
+      summary_text   TEXT NOT NULL,
+      win_rate       NUMERIC(5,2) DEFAULT 0,
+      generated_by   TEXT DEFAULT 'template',
+      generated_at   TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(player_id, season_number)
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS idx_sps_player ON season_player_summaries(player_id)`)
+  await query(`CREATE INDEX IF NOT EXISTS idx_sps_season ON season_player_summaries(season_number)`)
+  await query(`
+    CREATE TABLE IF NOT EXISTS season_team_summaries (
+      id             SERIAL PRIMARY KEY,
+      team_id        INT  NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      season_number  INT  NOT NULL,
+      summary_text   TEXT NOT NULL,
+      win_rate       NUMERIC(5,2) DEFAULT 0,
+      generated_by   TEXT DEFAULT 'template',
+      generated_at   TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(team_id, season_number)
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS idx_sts_team   ON season_team_summaries(team_id)`)
+  await query(`CREATE INDEX IF NOT EXISTS idx_sts_season ON season_team_summaries(season_number)`)
+} catch (e) { console.error("[season-summaries] migration:", e.message) }
 
 // ── New feature tables ────────────────────────────────────────────────────────
 try {
