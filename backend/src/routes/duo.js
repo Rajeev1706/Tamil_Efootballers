@@ -467,60 +467,82 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
     const fix = fixRes.rows[0]
     if (!fix) return res.status(404).json({ error: "Fixture not found" })
 
-    // ── KNOCKOUT: single randomly-assigned match ─────────────────────────────
+    // ── KNOCKOUT: two randomly-assigned matches (Set 1 + Set 2), same logic as group stage ──
+    // Set 1: randomly assigned player from each pair (stored at fixture creation)
+    // Set 2: the other player from each pair (also stored at fixture creation)
+    // If one team wins both → winner; if 1-1 → needs_decider (admin picks decider players)
     if (fix.knockout_round) {
-      const { homeScore, awayScore } = z.object({
-        homeScore: z.number().int().min(0),
-        awayScore: z.number().int().min(0),
+      const { set1HomeScore, set1AwayScore, set2HomeScore, set2AwayScore } = z.object({
+        set1HomeScore: z.number().int().min(0),
+        set1AwayScore: z.number().int().min(0),
+        set2HomeScore: z.number().int().min(0),
+        set2AwayScore: z.number().int().min(0),
       }).parse(rawBody)
+
+      const homeSets = (set1HomeScore > set1AwayScore ? 1 : 0) + (set2HomeScore > set2AwayScore ? 1 : 0)
+      const awaySets = (set1AwayScore > set1HomeScore ? 1 : 0) + (set2AwayScore > set2HomeScore ? 1 : 0)
 
       let winnerPairId = null
       let needsDecider = false
-      if (homeScore > awayScore)      winnerPairId = fix.home_pair_id
-      else if (awayScore > homeScore) winnerPairId = fix.away_pair_id
-      else                            needsDecider = true  // draw → decider
+      if (homeSets > awaySets)      winnerPairId = fix.home_pair_id
+      else if (awaySets > homeSets) winnerPairId = fix.away_pair_id
+      else                          needsDecider = true  // 1-1 → admin picks decider
 
       await withTransaction(async ({ query: q }) => {
         const homePair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.home_pair_id])).rows[0]
         const awayPair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.away_pair_id])).rows[0]
 
-        // Use randomly-assigned players (set at fixture creation); fall back to pair defaults
-        const homePlayerId = fix.set1_home_player_id || homePair.set1_player_id
-        const awayPlayerId = fix.set1_away_player_id || awayPair.set1_player_id
+        // Use randomly-assigned players stored at fixture creation
+        const set1HomePlayerId = fix.set1_home_player_id || homePair.set1_player_id
+        const set1AwayPlayerId = fix.set1_away_player_id || awayPair.set1_player_id
+        const set2HomePlayerId = fix.set2_home_player_id ||
+          (set1HomePlayerId === homePair.set1_player_id ? homePair.set2_player_id : homePair.set1_player_id)
+        const set2AwayPlayerId = fix.set2_away_player_id ||
+          (set1AwayPlayerId === awayPair.set1_player_id ? awayPair.set2_player_id : awayPair.set1_player_id)
 
-        const homeGrade = (await q("SELECT grade FROM players WHERE id = $1", [homePlayerId])).rows[0]?.grade || "C"
-        const awayGrade = (await q("SELECT grade FROM players WHERE id = $1", [awayPlayerId])).rows[0]?.grade || "C"
+        const allPlayerIds = [set1HomePlayerId, set1AwayPlayerId, set2HomePlayerId, set2AwayPlayerId].filter(Boolean)
+        const gradesRes = await q("SELECT id, grade FROM players WHERE id = ANY($1::int[])", [allPlayerIds])
+        const gradeMap = Object.fromEntries(gradesRes.rows.map(p => [p.id, p.grade]))
 
-        // Delete old match record if re-saving
-        if (fix.set1_match_record_id) {
-          await q("DELETE FROM match_records WHERE id = $1", [fix.set1_match_record_id])
-        }
-
-        const matchResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
-        const mrRes = await q(`
+        // Set 1 match record
+        if (fix.set1_match_record_id) await q("DELETE FROM match_records WHERE id = $1", [fix.set1_match_record_id])
+        const result1 = set1HomeScore > set1AwayScore ? "win" : set1HomeScore < set1AwayScore ? "loss" : "draw"
+        const s1r = await q(`
           INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
           VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
-          [homePlayerId, awayPlayerId, matchResult, homeScore, awayScore, homePair.season_number, awayGrade]
+          [set1HomePlayerId, set1AwayPlayerId, result1, set1HomeScore, set1AwayScore,
+           homePair.season_number, gradeMap[set1AwayPlayerId] || "C"]
         )
-        const matchRecordId = mrRes.rows[0].id
+
+        // Set 2 match record
+        if (fix.set2_match_record_id) await q("DELETE FROM match_records WHERE id = $1", [fix.set2_match_record_id])
+        const result2 = set2HomeScore > set2AwayScore ? "win" : set2HomeScore < set2AwayScore ? "loss" : "draw"
+        const s2r = await q(`
+          INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
+          VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
+          [set2HomePlayerId, set2AwayPlayerId, result2, set2HomeScore, set2AwayScore,
+           homePair.season_number, gradeMap[set2AwayPlayerId] || "C"]
+        )
 
         await q(`
           UPDATE duo_fixtures SET
             set1_home_score = $1, set1_away_score = $2,
-            set1_match_record_id = $3,
-            winner_pair_id = $4, status = $5
-          WHERE id = $6`,
-          [homeScore, awayScore, matchRecordId,
+            set2_home_score = $3, set2_away_score = $4,
+            set1_match_record_id = $5, set2_match_record_id = $6,
+            winner_pair_id = $7, status = $8
+          WHERE id = $9`,
+          [set1HomeScore, set1AwayScore, set2HomeScore, set2AwayScore,
+           s1r.rows[0].id, s2r.rows[0].id,
            winnerPairId,
            needsDecider ? 'needs_decider' : 'completed',
            fix.id]
         )
 
-        // Recalc MV + form for assigned players
-        await recalcMarketValue(homePlayerId)
-        await recalcMarketValue(awayPlayerId)
-        await recalcForm(homePlayerId)
-        await recalcForm(awayPlayerId)
+        // Recalc MV + form for all four assigned players
+        for (const pid of [set1HomePlayerId, set1AwayPlayerId, set2HomePlayerId, set2AwayPlayerId].filter(Boolean)) {
+          await recalcMarketValue(pid)
+          await recalcForm(pid)
+        }
 
         // ── Bracket auto-advance (same logic as knockout-decider endpoint) ───
         if (winnerPairId && fix.knockout_round !== "final") {
@@ -832,15 +854,18 @@ router.post("/knockout/generate", authenticate, adminOnly, async (req, res, next
         "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending') RETURNING id",
         [homePairId, awayPairId, round, i+1]
       )
-      // Randomly assign one player from each pair — shown on dashboards before the match
+      // Randomly assign players — set1 = match player, set2 = decider/other player
+      // Both are shown on dashboards before the match so everyone knows the draw upfront
       const homePair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [homePairId])).rows[0]
       const awayPair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [awayPairId])).rows[0]
       if (homePair && awayPair) {
-        const homePlayerId = Math.random() < 0.5 ? homePair.set1_player_id : homePair.set2_player_id
-        const awayPlayerId = Math.random() < 0.5 ? awayPair.set1_player_id : awayPair.set2_player_id
+        const homePlayerId      = Math.random() < 0.5 ? homePair.set1_player_id : homePair.set2_player_id
+        const homeOtherPlayerId = homePlayerId === homePair.set1_player_id ? homePair.set2_player_id : homePair.set1_player_id
+        const awayPlayerId      = Math.random() < 0.5 ? awayPair.set1_player_id : awayPair.set2_player_id
+        const awayOtherPlayerId = awayPlayerId === awayPair.set1_player_id ? awayPair.set2_player_id : awayPair.set1_player_id
         await query(
-          "UPDATE duo_fixtures SET set1_home_player_id = $1, set1_away_player_id = $2 WHERE id = $3",
-          [homePlayerId, awayPlayerId, fixRes.rows[0].id]
+          "UPDATE duo_fixtures SET set1_home_player_id = $1, set1_away_player_id = $2, set2_home_player_id = $3, set2_away_player_id = $4 WHERE id = $5",
+          [homePlayerId, awayPlayerId, homeOtherPlayerId, awayOtherPlayerId, fixRes.rows[0].id]
         )
       }
     }
@@ -909,15 +934,17 @@ router.post("/knockout/advance", authenticate, adminOnly, async (req, res, next)
         "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending') RETURNING id",
         [homePairId, awayPairId, nextRound, i+1]
       )
-      // Randomly assign one player from each pair — shown on dashboards before the match
+      // Randomly assign players — set1 = match player, set2 = decider/other player
       const homePair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [homePairId])).rows[0]
       const awayPair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [awayPairId])).rows[0]
       if (homePair && awayPair) {
-        const homePlayerId = Math.random() < 0.5 ? homePair.set1_player_id : homePair.set2_player_id
-        const awayPlayerId = Math.random() < 0.5 ? awayPair.set1_player_id : awayPair.set2_player_id
+        const homePlayerId      = Math.random() < 0.5 ? homePair.set1_player_id : homePair.set2_player_id
+        const homeOtherPlayerId = homePlayerId === homePair.set1_player_id ? homePair.set2_player_id : homePair.set1_player_id
+        const awayPlayerId      = Math.random() < 0.5 ? awayPair.set1_player_id : awayPair.set2_player_id
+        const awayOtherPlayerId = awayPlayerId === awayPair.set1_player_id ? awayPair.set2_player_id : awayPair.set1_player_id
         await query(
-          "UPDATE duo_fixtures SET set1_home_player_id = $1, set1_away_player_id = $2 WHERE id = $3",
-          [homePlayerId, awayPlayerId, fixRes.rows[0].id]
+          "UPDATE duo_fixtures SET set1_home_player_id = $1, set1_away_player_id = $2, set2_home_player_id = $3, set2_away_player_id = $4 WHERE id = $5",
+          [homePlayerId, awayPlayerId, homeOtherPlayerId, awayOtherPlayerId, fixRes.rows[0].id]
         )
       }
     }

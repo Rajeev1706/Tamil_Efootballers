@@ -89,24 +89,13 @@ function FixtureCard({ fixture }) {
         </div>
         {isCompleted ? (
           <div className="flex items-center gap-1.5 flex-shrink-0 text-center">
-            {isKnockout ? (
-              // Knockout: show single match score (set1 scores)
-              <>
-                <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>{fixture.set1_home_score ?? 0}</span>
-                <span className="text-slate-600">–</span>
-                <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>{fixture.set1_away_score ?? 0}</span>
-              </>
-            ) : (
-              <>
-                <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>
-                  {(fixture.set1_home_score ?? 0) + (fixture.set2_home_score ?? 0)}
-                </span>
-                <span className="text-slate-600">–</span>
-                <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>
-                  {(fixture.set1_away_score ?? 0) + (fixture.set2_away_score ?? 0)}
-                </span>
-              </>
-            )}
+            <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>
+              {(fixture.set1_home_score ?? 0) + (fixture.set2_home_score ?? 0)}
+            </span>
+            <span className="text-slate-600">–</span>
+            <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>
+              {(fixture.set1_away_score ?? 0) + (fixture.set2_away_score ?? 0)}
+            </span>
           </div>
         ) : needsDecider ? (
           <span className="text-xs text-orange-400 px-2 font-semibold">DRAW</span>
@@ -123,15 +112,23 @@ function FixtureCard({ fixture }) {
       {(isCompleted || needsDecider) && (
         <div className="mt-2 pt-2 border-t border-surface-border/50 space-y-1 text-xs text-slate-500">
           {isKnockout ? (
-            // Knockout: show the single assigned player matchup
+            // Knockout: show both assigned player matchups (Match 1 + Match 2)
             <>
-              <div className="text-center">
-                <span className="text-slate-400">{set1HomeName}</span>
-                {isCompleted && !hasDeciderResult && (
-                  <span className="text-slate-500 mx-1">{fixture.set1_home_score}–{fixture.set1_away_score}</span>
-                )}
-                {needsDecider && <span className="text-orange-400/70 mx-1">draw</span>}
-                <span className="text-slate-400"> vs {set1AwayName}</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[9px] text-slate-600 uppercase tracking-widest">Match 1</span>{" "}
+                  <span className="text-slate-400">{set1HomeName}</span>
+                  {isCompleted && <span className="text-slate-500 mx-1">{fixture.set1_home_score}–{fixture.set1_away_score}</span>}
+                  {needsDecider && <span className="text-orange-400/70 mx-1">–</span>}
+                  <span className="text-slate-400">{set1AwayName}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] text-slate-600 uppercase tracking-widest">Match 2</span>{" "}
+                  <span className="text-slate-400">{set2HomeName}</span>
+                  {isCompleted && <span className="text-slate-500 mx-1">{fixture.set2_home_score}–{fixture.set2_away_score}</span>}
+                  {needsDecider && <span className="text-orange-400/70 mx-1">–</span>}
+                  <span className="text-slate-400">{set2AwayName}</span>
+                </div>
               </div>
               {hasDeciderResult && (
                 <div className="text-center text-amber-400/80 font-semibold pt-0.5">
@@ -151,10 +148,23 @@ function FixtureCard({ fixture }) {
         </div>
       )}
 
-      {/* Pending knockout: show assigned matchup as a preview */}
+      {/* Pending knockout: show both assigned player rows as a preview */}
       {isKnockout && !isCompleted && !needsDecider && set1HomeName && set1AwayName && (
-        <div className="mt-2 pt-2 border-t border-surface-border/50 text-xs text-center text-slate-500">
-          🎲 <span className="text-violet-400">{set1HomeName}</span> vs <span className="text-violet-400">{set1AwayName}</span>
+        <div className="mt-2 pt-2 border-t border-surface-border/50 text-xs text-center space-y-1">
+          <div className="text-slate-500">
+            <span className="text-[9px] text-slate-600 uppercase tracking-widest mr-1">Match 1</span>
+            🎲 <span className="text-violet-400">{set1HomeName}</span>
+            <span className="text-slate-600 mx-1">vs</span>
+            <span className="text-violet-400">{set1AwayName}</span>
+          </div>
+          {set2HomeName && set2AwayName && (
+            <div className="text-slate-500">
+              <span className="text-[9px] text-slate-600 uppercase tracking-widest mr-1">Match 2</span>
+              <span className="text-violet-300/70">{set2HomeName}</span>
+              <span className="text-slate-600 mx-1">vs</span>
+              <span className="text-violet-300/70">{set2AwayName}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
