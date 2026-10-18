@@ -276,6 +276,10 @@ export default function DuoDashboard() {
                   const fHasDecider = isCompleted && fHomeSets === fAwaySets && f.decider_home_score != null
                   const homeWon = isCompleted && f.winner_pair_id === f.home_pair_id
                   const awayWon = isCompleted && f.winner_pair_id === f.away_pair_id
+                  const set1HomeName = f.set1HomePlayerName
+                  const set1AwayName = f.set1AwayPlayerName
+                  const set2HomeName = f.set2HomePlayerName
+                  const set2AwayName = f.set2AwayPlayerName
                   return (
                     <div key={f.id} className="border-b border-surface-border/50">
                       <div className="flex items-center px-5 py-3.5">
@@ -295,6 +299,25 @@ export default function DuoDashboard() {
                           {f.awayDuoName ?? "TBD"}
                         </span>
                       </div>
+                      {/* Pending: show assigned player matchups (Match 1 & Match 2) */}
+                      {!isCompleted && set1HomeName && set1AwayName && (
+                        <div className="px-5 pb-3 space-y-1">
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span className="text-[9px] text-slate-600 uppercase tracking-widest w-9 flex-shrink-0">M1</span>
+                            <span className="flex-1 text-right text-violet-400/80">{set1HomeName}</span>
+                            <span className="px-2 text-slate-600">🎲</span>
+                            <span className="flex-1 text-violet-400/80">{set1AwayName}</span>
+                          </div>
+                          {set2HomeName && set2AwayName && (
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <span className="text-[9px] text-slate-600 uppercase tracking-widest w-9 flex-shrink-0">M2</span>
+                              <span className="flex-1 text-right text-violet-400/60">{set2HomeName}</span>
+                              <span className="px-2 text-slate-600">🎲</span>
+                              <span className="flex-1 text-violet-400/60">{set2AwayName}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {isCompleted && (
                         <div className="px-5 pb-3 space-y-1">
                           <div className="flex items-center justify-between text-xs text-slate-500">
