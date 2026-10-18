@@ -453,20 +453,13 @@ function ScoreEntry({ fixture, onSave, onPlayerSetup, playerSetupPending, saving
     : fixture.status === "completed" && fixture.decider_home_score != null
   const playersSet = !!(fixture.set1_home_player_id && fixture.set1_away_player_id)
 
-  // Knockout uses a single homeScore/awayScore; group stage uses 4 set scores
-  const [scores, setScores] = useState(
-    isKnockout
-      ? {
-          homeScore: fixture.set1_home_score ?? "",
-          awayScore: fixture.set1_away_score ?? "",
-        }
-      : {
-          set1HomeScore: fixture.set1_home_score ?? "",
-          set1AwayScore: fixture.set1_away_score ?? "",
-          set2HomeScore: fixture.set2_home_score ?? "",
-          set2AwayScore: fixture.set2_away_score ?? "",
-        }
-  )
+  // Both knockout and group stage use 4 set scores (same format, different player assignment method)
+  const [scores, setScores] = useState({
+    set1HomeScore: fixture.set1_home_score ?? "",
+    set1AwayScore: fixture.set1_away_score ?? "",
+    set2HomeScore: fixture.set2_home_score ?? "",
+    set2AwayScore: fixture.set2_away_score ?? "",
+  })
   const set = (k, v) => setScores(s => ({ ...s, [k]: v }))
 
   // Resolved player names
@@ -490,44 +483,65 @@ function ScoreEntry({ fixture, onSave, onPlayerSetup, playerSetupPending, saving
 
   return (
     <div className="mt-3 p-3 bg-pitch-900 rounded-xl border border-surface-border space-y-3">
-      {/* ── Knockout: random draw banner + single score input ── */}
+      {/* ── Knockout: random draw banner + two score inputs (Match 1 & Match 2) ── */}
       {isKnockout ? (
         <>
-          <div className="text-[10px] text-violet-400 bg-violet-400/5 border border-violet-400/15 rounded-lg px-3 py-2 space-y-1">
+          <div className="text-[10px] text-violet-400 bg-violet-400/5 border border-violet-400/15 rounded-lg px-3 py-2 space-y-1.5">
             <div className="flex items-center gap-1.5 mb-1">
               <Shuffle className="w-3 h-3" />
               <span className="font-semibold">🎲 Random Draw — Assigned Matchup</span>
             </div>
             <div className="text-slate-300 font-medium">
+              <span className="text-[9px] text-slate-500 uppercase tracking-widest mr-1.5">Match 1</span>
               <span className="text-white">{set1HomeName}</span>
               <span className="text-slate-500 mx-1.5">vs</span>
               <span className="text-white">{set1AwayName}</span>
             </div>
+            {set2HomeName && set2AwayName && (
+              <div className="text-slate-300 font-medium">
+                <span className="text-[9px] text-slate-500 uppercase tracking-widest mr-1.5">Match 2</span>
+                <span className="text-white">{set2HomeName}</span>
+                <span className="text-slate-500 mx-1.5">vs</span>
+                <span className="text-white">{set2AwayName}</span>
+              </div>
+            )}
           </div>
 
-          <div>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Match Score</p>
-            <p className="text-xs text-slate-400 mb-1.5">{set1HomeName} vs {set1AwayName}</p>
-            <div className="flex items-center gap-2">
-              <input type="number" min="0" value={scores.homeScore} onChange={e => set("homeScore", e.target.value)}
-                disabled={deciderCompleted}
-                className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed" />
-              <span className="text-slate-500">–</span>
-              <input type="number" min="0" value={scores.awayScore} onChange={e => set("awayScore", e.target.value)}
-                disabled={deciderCompleted}
-                className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed" />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Match 1", homeK: "set1HomeScore", awayK: "set1AwayScore", homeName: set1HomeName, awayName: set1AwayName },
+              { label: "Match 2", homeK: "set2HomeScore", awayK: "set2AwayScore", homeName: set2HomeName, awayName: set2AwayName },
+            ].map(({ label, homeK, awayK, homeName, awayName }) => (
+              <div key={label}>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+                <p className="text-xs text-slate-400 mb-1">{homeName} vs {awayName}</p>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="0" value={scores[homeK]} onChange={e => set(homeK, e.target.value)}
+                    disabled={deciderCompleted}
+                    className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed" />
+                  <span className="text-slate-500">–</span>
+                  <input type="number" min="0" value={scores[awayK]} onChange={e => set(awayK, e.target.value)}
+                    disabled={deciderCompleted}
+                    className="w-12 text-center bg-pitch-800 border border-surface-border rounded-lg py-1 text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed" />
+                </div>
+              </div>
+            ))}
           </div>
 
           {(() => {
-            const hs = Number(scores.homeScore) || 0
-            const as_ = Number(scores.awayScore) || 0
+            const s1h = Number(scores.set1HomeScore) || 0
+            const s1a = Number(scores.set1AwayScore) || 0
+            const s2h = Number(scores.set2HomeScore) || 0
+            const s2a = Number(scores.set2AwayScore) || 0
+            const homeSets = (s1h > s1a ? 1 : 0) + (s2h > s2a ? 1 : 0)
+            const awaySets = (s1a > s1h ? 1 : 0) + (s2a > s2h ? 1 : 0)
             let label = "", color = "text-slate-400"
-            if (hs > as_)       { label = `${fixture.homeDuoName} wins`; color = "text-emerald-400" }
-            else if (as_ > hs)  { label = `${fixture.awayDuoName} wins`; color = "text-emerald-400" }
-            else if (hs + as_ > 0) { label = "Draw — Decider match required"; color = "text-orange-400" }
+            if (homeSets > awaySets)          { label = `${fixture.homeDuoName} wins 2–0`; color = "text-emerald-400" }
+            else if (awaySets > homeSets)     { label = `${fixture.awayDuoName} wins 2–0`; color = "text-emerald-400" }
+            else if (homeSets + awaySets > 0) { label = "1–1 Draw — Decider required"; color = "text-orange-400" }
             return label ? (
-              <div className="flex items-center justify-end px-3 py-2 bg-pitch-800 rounded-lg">
+              <div className="flex items-center justify-between px-3 py-2 bg-pitch-800 rounded-lg">
+                <span className="text-xs text-slate-400">Matches: {homeSets} – {awaySets}</span>
                 <span className={`text-sm font-bold ${color}`}>{label}</span>
               </div>
             ) : null
@@ -910,9 +924,11 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px" }}>
         {roundFixtures.map(f => {
-          // Knockout: single randomly-assigned matchup (set1 player names)
-          const assignedHomeName = f.set1HomePlayerName || f.homeSet1Name
-          const assignedAwayName = f.set1AwayPlayerName || f.awaySet1Name
+          // Knockout: match player (set1) and decider/other player (set2) — both pre-assigned at draw time
+          const assignedHomeName  = f.set1HomePlayerName || f.homeSet1Name
+          const assignedAwayName  = f.set1AwayPlayerName || f.awaySet1Name
+          const deciderHomeName   = f.set2HomePlayerName || f.homeSet2Name
+          const deciderAwayName   = f.set2AwayPlayerName || f.awaySet2Name
           const homeWinsMatch = (f.set1_home_score ?? 0) > (f.set1_away_score ?? 0)
           const awayWinsMatch = (f.set1_away_score ?? 0) > (f.set1_home_score ?? 0)
           const done = f.status === "completed" || f.status === "needs_decider"
@@ -948,21 +964,26 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
                   </span>
                 </div>
               </div>
-              {/* Decider result if applicable */}
-              {deciderDone && (
+              {/* Decider player row — pre-assigned, shown even before the match is played */}
+              {(deciderHomeName || deciderAwayName) && (
                 <>
                   <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "6px 0" }} />
                   <div style={{ display: "flex", alignItems: "center" }}>
                     <div style={{ flex: 1, textAlign: "right" }}>
-                      <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 400 }}>{f.koDeciderHomePlayerName}</span>
+                      <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 400 }}>{deciderHomeName}</span>
                     </div>
                     <div style={{ padding: "0 12px", textAlign: "center", flexShrink: 0, minWidth: 52 }}>
-                      <span style={{ color: "#f59e0b", fontSize: 12, fontWeight: 800, fontFamily: "monospace" }}>
-                        ⚡ {f.koDeciderHomeScore} – {f.koDeciderAwayScore}
-                      </span>
+                      {deciderDone
+                        ? <span style={{ color: "#f59e0b", fontSize: 12, fontWeight: 800, fontFamily: "monospace" }}>
+                            ⚡ {f.koDeciderHomeScore} – {f.koDeciderAwayScore}
+                          </span>
+                        : <span style={{ color: "#6d28d9", fontSize: 10, fontWeight: 600 }}>decider</span>
+                      }
                     </div>
                     <div style={{ flex: 1 }}>
-                      <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 400 }}>{f.koDeciderAwayPlayerName}</span>
+                      <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 400 }}>
+                        {deciderDone ? f.koDeciderAwayPlayerName : deciderAwayName}
+                      </span>
                     </div>
                   </div>
                 </>
@@ -1104,7 +1125,7 @@ function KnockoutTab({ fixtures, rounds, season, scoreMut, playerSetupMut, knock
       <div className="space-y-2">
         {roundFixtures.map(f => (
           <FixtureRow key={f.id} fixture={f}
-            onSave={(id, scores) => scoreMut.mutate({ id, scores, isKnockout: true })}
+            onSave={(id, scores) => scoreMut.mutate({ id, scores })}
             saving={scoreMut.isPending}
             onPlayerSetup={(id, hp, ap) => playerSetupMut.mutate({ id, set1HomePlayerId: hp, set1AwayPlayerId: ap })}
             playerSetupPending={playerSetupMut.isPending}
@@ -1189,10 +1210,8 @@ export default function DuoTournamentAdmin() {
   })
 
   const scoreMut = useMutation({
-    mutationFn: ({ id, scores, isKnockout }) => api.post(`/duo/fixtures/${id}/score`,
-      isKnockout
-        ? { homeScore: Number(scores.homeScore), awayScore: Number(scores.awayScore) }
-        : {
+    mutationFn: ({ id, scores }) => api.post(`/duo/fixtures/${id}/score`,
+      {
             set1HomeScore: Number(scores.set1HomeScore), set1AwayScore: Number(scores.set1AwayScore),
             set2HomeScore: Number(scores.set2HomeScore), set2AwayScore: Number(scores.set2AwayScore),
           }
