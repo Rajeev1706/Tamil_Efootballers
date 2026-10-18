@@ -61,22 +61,15 @@ function GroupTable({ groupName, members }) {
 }
 
 function FixtureCard({ fixture }) {
-  const isCompleted = fixture.status === "completed"
-  const isKnockout  = !!fixture.knockout_round
+  const isCompleted  = fixture.status === "completed"
+  const needsDecider = fixture.status === "needs_decider"
+  const isKnockout   = !!fixture.knockout_round
 
-  // Use admin-selected player names (populated at fixture generation for KO, admin-set for groups)
+  // Randomly-assigned player names (stored at fixture creation for knockout; admin-set for groups)
   const set1HomeName = fixture.set1HomePlayerName || fixture.homeSet1Name
   const set1AwayName = fixture.set1AwayPlayerName || fixture.awaySet1Name
   const set2HomeName = fixture.set2HomePlayerName || fixture.homeSet2Name
   const set2AwayName = fixture.set2AwayPlayerName || fixture.awaySet2Name
-
-  // For knockout: winner determined by set wins or decider, not aggregate
-  const homeSets = isKnockout && fixture.set1_home_score != null
-    ? ((fixture.set1_home_score > fixture.set1_away_score ? 1 : 0) + (fixture.set2_home_score > fixture.set2_away_score ? 1 : 0))
-    : null
-  const awaySets = isKnockout && fixture.set1_home_score != null
-    ? ((fixture.set1_away_score > fixture.set1_home_score ? 1 : 0) + (fixture.set2_away_score > fixture.set2_home_score ? 1 : 0))
-    : null
 
   const homeWon = isKnockout
     ? fixture.winner_pair_id === fixture.home_pair_id
@@ -85,7 +78,7 @@ function FixtureCard({ fixture }) {
     ? fixture.winner_pair_id === fixture.away_pair_id
     : (fixture.set1_away_score ?? 0) + (fixture.set2_away_score ?? 0) > (fixture.set1_home_score ?? 0) + (fixture.set2_home_score ?? 0)
 
-  const hasDecider = !!fixture.koDeciderId
+  const hasDeciderResult = !!fixture.koDeciderId
 
   return (
     <div className="card p-4">
@@ -95,12 +88,13 @@ function FixtureCard({ fixture }) {
           <p className="text-xs text-slate-500 truncate">{fixture.homeSet1Name} & {fixture.homeSet2Name}</p>
         </div>
         {isCompleted ? (
-          <div className="flex items-center gap-2 flex-shrink-0 text-center">
+          <div className="flex items-center gap-1.5 flex-shrink-0 text-center">
             {isKnockout ? (
+              // Knockout: show single match score (set1 scores)
               <>
-                <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>{homeSets}</span>
-                <span className="text-slate-600 text-xs">sets</span>
-                <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>{awaySets}</span>
+                <span className={cn("text-xl font-black font-mono", homeWon ? "text-white" : "text-slate-500")}>{fixture.set1_home_score ?? 0}</span>
+                <span className="text-slate-600">–</span>
+                <span className={cn("text-xl font-black font-mono", awayWon ? "text-white" : "text-slate-500")}>{fixture.set1_away_score ?? 0}</span>
               </>
             ) : (
               <>
@@ -114,6 +108,8 @@ function FixtureCard({ fixture }) {
               </>
             )}
           </div>
+        ) : needsDecider ? (
+          <span className="text-xs text-orange-400 px-2 font-semibold">DRAW</span>
         ) : (
           <span className="text-xs text-slate-500 px-2">vs</span>
         )}
@@ -122,17 +118,43 @@ function FixtureCard({ fixture }) {
           <p className="text-xs text-slate-500 truncate">{fixture.awaySet1Name} & {fixture.awaySet2Name}</p>
         </div>
       </div>
-      {isCompleted && (
+
+      {/* Detail section */}
+      {(isCompleted || needsDecider) && (
         <div className="mt-2 pt-2 border-t border-surface-border/50 space-y-1 text-xs text-slate-500">
-          <div className="grid grid-cols-2 gap-2">
-            <div>Set 1: {set1HomeName} {fixture.set1_home_score}–{fixture.set1_away_score} {set1AwayName}</div>
-            <div className="text-right">Set 2: {set2HomeName} {fixture.set2_home_score}–{fixture.set2_away_score} {set2AwayName}</div>
-          </div>
-          {hasDecider && (
-            <div className="text-center text-amber-400/80 font-semibold pt-0.5">
-              Decider: {fixture.koDeciderHomePlayerName} {fixture.koDeciderHomeScore}–{fixture.koDeciderAwayScore} {fixture.koDeciderAwayPlayerName}
-            </div>
+          {isKnockout ? (
+            // Knockout: show the single assigned player matchup
+            <>
+              <div className="text-center">
+                <span className="text-slate-400">{set1HomeName}</span>
+                {isCompleted && !hasDeciderResult && (
+                  <span className="text-slate-500 mx-1">{fixture.set1_home_score}–{fixture.set1_away_score}</span>
+                )}
+                {needsDecider && <span className="text-orange-400/70 mx-1">draw</span>}
+                <span className="text-slate-400"> vs {set1AwayName}</span>
+              </div>
+              {hasDeciderResult && (
+                <div className="text-center text-amber-400/80 font-semibold pt-0.5">
+                  ⚡ Decider: {fixture.koDeciderHomePlayerName} {fixture.koDeciderHomeScore}–{fixture.koDeciderAwayScore} {fixture.koDeciderAwayPlayerName}
+                </div>
+              )}
+            </>
+          ) : (
+            // Group stage: show both set matchups
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>Set 1: {set1HomeName} {fixture.set1_home_score}–{fixture.set1_away_score} {set1AwayName}</div>
+                <div className="text-right">Set 2: {set2HomeName} {fixture.set2_home_score}–{fixture.set2_away_score} {set2AwayName}</div>
+              </div>
+            </>
           )}
+        </div>
+      )}
+
+      {/* Pending knockout: show assigned matchup as a preview */}
+      {isKnockout && !isCompleted && !needsDecider && set1HomeName && set1AwayName && (
+        <div className="mt-2 pt-2 border-t border-surface-border/50 text-xs text-center text-slate-500">
+          🎲 <span className="text-violet-400">{set1HomeName}</span> vs <span className="text-violet-400">{set1AwayName}</span>
         </div>
       )}
     </div>

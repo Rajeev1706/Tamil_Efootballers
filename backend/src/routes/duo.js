@@ -453,40 +453,205 @@ router.post("/generate", authenticate, adminOnly, async (req, res, next) => {
 // ── POST /api/duo/fixtures/:id/score — admin: enter scores ───────────────────
 router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { set1HomeScore, set1AwayScore, set2HomeScore, set2AwayScore } = z.object({
-      set1HomeScore: z.number().int().min(0),
-      set1AwayScore: z.number().int().min(0),
-      set2HomeScore: z.number().int().min(0),
-      set2AwayScore: z.number().int().min(0),
+    // Accept both knockout (homeScore/awayScore) and group-stage (4 set scores) payloads
+    const rawBody = z.object({
+      homeScore:     z.number().int().min(0).optional(),
+      awayScore:     z.number().int().min(0).optional(),
+      set1HomeScore: z.number().int().min(0).optional(),
+      set1AwayScore: z.number().int().min(0).optional(),
+      set2HomeScore: z.number().int().min(0).optional(),
+      set2AwayScore: z.number().int().min(0).optional(),
     }).parse(req.body)
 
     const fixRes = await query("SELECT * FROM duo_fixtures WHERE id = $1", [req.params.id])
     const fix = fixRes.rows[0]
     if (!fix) return res.status(404).json({ error: "Fixture not found" })
 
+    // ── KNOCKOUT: single randomly-assigned match ─────────────────────────────
+    if (fix.knockout_round) {
+      const { homeScore, awayScore } = z.object({
+        homeScore: z.number().int().min(0),
+        awayScore: z.number().int().min(0),
+      }).parse(rawBody)
+
+      let winnerPairId = null
+      let needsDecider = false
+      if (homeScore > awayScore)      winnerPairId = fix.home_pair_id
+      else if (awayScore > homeScore) winnerPairId = fix.away_pair_id
+      else                            needsDecider = true  // draw → decider
+
+      await withTransaction(async ({ query: q }) => {
+        const homePair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.home_pair_id])).rows[0]
+        const awayPair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.away_pair_id])).rows[0]
+
+        // Use randomly-assigned players (set at fixture creation); fall back to pair defaults
+        const homePlayerId = fix.set1_home_player_id || homePair.set1_player_id
+        const awayPlayerId = fix.set1_away_player_id || awayPair.set1_player_id
+
+        const homeGrade = (await q("SELECT grade FROM players WHERE id = $1", [homePlayerId])).rows[0]?.grade || "C"
+        const awayGrade = (await q("SELECT grade FROM players WHERE id = $1", [awayPlayerId])).rows[0]?.grade || "C"
+
+        // Delete old match record if re-saving
+        if (fix.set1_match_record_id) {
+          await q("DELETE FROM match_records WHERE id = $1", [fix.set1_match_record_id])
+        }
+
+        const matchResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
+        const mrRes = await q(`
+          INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
+          VALUES ($1,$2,$3,$4,$5,'duo',$6,$7) RETURNING id`,
+          [homePlayerId, awayPlayerId, matchResult, homeScore, awayScore, homePair.season_number, awayGrade]
+        )
+        const matchRecordId = mrRes.rows[0].id
+
+        await q(`
+          UPDATE duo_fixtures SET
+            set1_home_score = $1, set1_away_score = $2,
+            set1_match_record_id = $3,
+            winner_pair_id = $4, status = $5
+          WHERE id = $6`,
+          [homeScore, awayScore, matchRecordId,
+           winnerPairId,
+           needsDecider ? 'needs_decider' : 'completed',
+           fix.id]
+        )
+
+        // Recalc MV + form for assigned players
+        await recalcMarketValue(homePlayerId)
+        await recalcMarketValue(awayPlayerId)
+        await recalcForm(homePlayerId)
+        await recalcForm(awayPlayerId)
+
+        // ── Bracket auto-advance (same logic as knockout-decider endpoint) ───
+        if (winnerPairId && fix.knockout_round !== "final") {
+          const NEXT_ROUND = { r16: "qf", qf: "sf", sf: "final" }
+          const nextRound  = NEXT_ROUND[fix.knockout_round]
+          if (nextRound) {
+            const col         = fix.match_number % 2 !== 0 ? "home_pair_id" : "away_pair_id"
+            const targetMatch = Math.ceil(fix.match_number / 2)
+            await q(`
+              UPDATE duo_fixtures SET ${col} = $1
+              WHERE knockout_round = $2 AND match_number = $3
+              AND (
+                home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $4)
+                OR away_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $4)
+                OR (home_pair_id IS NULL AND away_pair_id IS NULL)
+              )`,
+              [winnerPairId, nextRound, targetMatch, homePair.season_number]
+            )
+          }
+        }
+
+        if (winnerPairId) {
+          // ── Tournament history ─────────────────────────────────────────────
+          try {
+            const loserKoPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
+            const loserKoPair   = await q("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [loserKoPairId])
+            const lp = loserKoPair.rows[0]
+            if (lp) {
+              for (const pid of [lp.set1_player_id, lp.set2_player_id].filter(Boolean)) {
+                await incrementHistory(pid, "duo", "knockout", fix.knockout_round).catch(() => {})
+              }
+            }
+            if (fix.knockout_round === "final") {
+              const winnerKoPair = await q("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [winnerPairId])
+              const wp = winnerKoPair.rows[0]
+              if (wp) {
+                for (const pid of [wp.set1_player_id, wp.set2_player_id].filter(Boolean)) {
+                  await incrementHistory(pid, "duo", "knockout", "winner").catch(() => {})
+                }
+                const p1 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`, [wp.set1_player_id])).rows[0]
+                const p2 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`, [wp.set2_player_id])).rows[0]
+                await saveActiveCelebration("duo", {
+                  p1Name: p1?.name, p1Avatar: p1?.avatarUrl,
+                  p2Name: p2?.name, p2Avatar: p2?.avatarUrl,
+                })
+              }
+            }
+          } catch (e) { console.error("[duo] ko history:", e.message) }
+
+          // ── BDR awards ────────────────────────────────────────────────────
+          const loserPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
+          const loserPair   = winnerPairId === fix.home_pair_id ? awayPair : homePair
+          const winnerPair  = winnerPairId === fix.home_pair_id ? homePair : awayPair
+
+          const LOSER_BDR  = { qf: 4, sf: 6, final: 8 }
+          const WINNER_BDR = { final: 10 }
+          const loserBdr   = LOSER_BDR[fix.knockout_round]
+          const winnerBdr  = WINNER_BDR[fix.knockout_round]
+          const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
+
+          if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
+            await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+            await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+          }
+          if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
+            await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+            await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+          }
+
+          // ── Final extras ──────────────────────────────────────────────────
+          if (fix.knockout_round === "final") {
+            const seasonNum = homePair.season_number
+            await reconcileTrophyRoster({
+              sourceKey:    `duo_champion_s${seasonNum}`,
+              trophyColumn: "trophy10_count",
+              playerIds:    [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean),
+              seasonNumber: seasonNum,
+            })
+            const duoWinnerNamesRes = await query(
+              "SELECT name FROM players WHERE id = ANY($1::int[])",
+              [[winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)]
+            )
+            const duoWinnerLabel = duoWinnerNamesRes.rows.map(r => r.name).join(" & ")
+            await updateSeasonRecord(seasonNum, { duo_winner: duoWinnerLabel })
+            await query(`
+              INSERT INTO app_settings (key, value) VALUES ($1, $2)
+              ON CONFLICT (key) DO UPDATE SET value = $2
+            `, [`duo_champion_completed_at_${seasonNum}`, new Date().toISOString()])
+
+            const gbRes = await q(`
+              SELECT mr.player_id, SUM(mr.player_score) AS goals
+              FROM match_records mr
+              WHERE mr.match_type = 'duo' AND mr.season_number = $1
+              GROUP BY mr.player_id ORDER BY goals DESC LIMIT 1
+            `, [seasonNum])
+            const topScorer = gbRes.rows[0]
+            if (topScorer?.goals > 0) {
+              await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
+              await awardOrReassignTrophy({
+                sourceKey:    `duo_golden_boot_s${seasonNum}`,
+                trophyColumn: "trophy11_count",
+                playerId:     topScorer.player_id,
+                seasonNumber: seasonNum,
+              })
+            }
+          }
+        }
+      })
+
+      return res.json({ success: true })
+    }
+
+    // ── GROUP STAGE: two-set format ──────────────────────────────────────────
+    const { set1HomeScore, set1AwayScore, set2HomeScore, set2AwayScore } = z.object({
+      set1HomeScore: z.number().int().min(0),
+      set1AwayScore: z.number().int().min(0),
+      set2HomeScore: z.number().int().min(0),
+      set2AwayScore: z.number().int().min(0),
+    }).parse(rawBody)
+
     const homeAgg = set1HomeScore + set2HomeScore
     const awayAgg = set1AwayScore + set2AwayScore
 
-    // Set wins: who won each set individually
     const homeSets = (set1HomeScore > set1AwayScore ? 1 : 0) + (set2HomeScore > set2AwayScore ? 1 : 0)
     const awaySets = (set1AwayScore > set1HomeScore ? 1 : 0) + (set2AwayScore > set2HomeScore ? 1 : 0)
 
-    let winnerPairId = null
-    let needsDecider = false
-
-    if (fix.knockout_round) {
-      // Knockout tiebreaker chain: sets → aggregate → decider
-      if (homeSets > awaySets)       winnerPairId = fix.home_pair_id
-      else if (awaySets > homeSets)  winnerPairId = fix.away_pair_id
-      else                           needsDecider = true  // 1-1 → always go to decider
-    } else {
-      // Group stage: set wins determine result; draw (1-1) is allowed
-      if (homeSets > awaySets)      winnerPairId = fix.home_pair_id
-      else if (awaySets > homeSets) winnerPairId = fix.away_pair_id
-    }
+    let groupWinnerPairId = null
+    if (homeSets > awaySets)      groupWinnerPairId = fix.home_pair_id
+    else if (awaySets > homeSets) groupWinnerPairId = fix.away_pair_id
 
     await withTransaction(async ({ query: q }) => {
-      // Get pair players + their grades
       const homePair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.home_pair_id])).rows[0]
       const awayPair = (await q("SELECT * FROM duo_pairs WHERE id = $1", [fix.away_pair_id])).rows[0]
 
@@ -500,25 +665,15 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       )
       const gradeMap = Object.fromEntries(gradesRes.rows.map(p => [p.id, p.grade]))
 
-      // Resolve which player from each pair played Set 1 vs Set 2 for THIS fixture.
-      // Admin assigns set1_home_player_id / set1_away_player_id during fixture setup.
-      // Set 2 is whichever player in the pair did NOT play Set 1.
       const set1HomePlayerId = fix.set1_home_player_id || homePair.set1_player_id
       const set1AwayPlayerId = fix.set1_away_player_id || awayPair.set1_player_id
       const set2HomePlayerId = (set1HomePlayerId === homePair.set1_player_id)
-        ? homePair.set2_player_id
-        : homePair.set1_player_id
+        ? homePair.set2_player_id : homePair.set1_player_id
       const set2AwayPlayerId = (set1AwayPlayerId === awayPair.set1_player_id)
-        ? awayPair.set2_player_id
-        : awayPair.set1_player_id
+        ? awayPair.set2_player_id : awayPair.set1_player_id
 
-      // Create/update match records for Set1 players
       let set1RecordId = fix.set1_match_record_id
-      if (set1RecordId) {
-        await q("DELETE FROM match_records WHERE id = $1", [set1RecordId])
-      }
-      // Individual set result: did THIS player win THEIR set?
-      // Win rate and match history are both based on personal set performance.
+      if (set1RecordId) await q("DELETE FROM match_records WHERE id = $1", [set1RecordId])
       const result1 = set1HomeScore > set1AwayScore ? "win" : set1HomeScore < set1AwayScore ? "loss" : "draw"
       const s1r = await q(`
         INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
@@ -528,11 +683,8 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       )
       set1RecordId = s1r.rows[0].id
 
-      // Create/update match records for Set2 players
       let set2RecordId = fix.set2_match_record_id
-      if (set2RecordId) {
-        await q("DELETE FROM match_records WHERE id = $1", [set2RecordId])
-      }
+      if (set2RecordId) await q("DELETE FROM match_records WHERE id = $1", [set2RecordId])
       const result2 = set2HomeScore > set2AwayScore ? "win" : set2HomeScore < set2AwayScore ? "loss" : "draw"
       const s2r = await q(`
         INSERT INTO match_records (player_id, opponent_id, result, player_score, opponent_score, match_type, season_number, opponent_grade)
@@ -542,26 +694,22 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
       )
       set2RecordId = s2r.rows[0].id
 
-      // Update fixture scores
       await q(`
         UPDATE duo_fixtures SET
           set1_home_score = $1, set1_away_score = $2,
           set2_home_score = $3, set2_away_score = $4,
           set1_match_record_id = $5, set2_match_record_id = $6,
-          winner_pair_id = $7, status = $8
-        WHERE id = $9`,
+          winner_pair_id = $7, status = 'completed'
+        WHERE id = $8`,
         [set1HomeScore, set1AwayScore, set2HomeScore, set2AwayScore,
-         set1RecordId, set2RecordId, winnerPairId,
-         needsDecider ? 'needs_decider' : 'completed',
-         fix.id]
+         set1RecordId, set2RecordId, groupWinnerPairId, fix.id]
       )
 
-      // Update group standings if group fixture (result based on set wins)
+      // Update group standings
       if (fix.group_id) {
         const homeResult = homeSets > awaySets ? "win" : homeSets < awaySets ? "loss" : "draw"
         const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
-        // If fixture was already completed, REVERSE the old standings first to prevent double-counting
         if (fix.status === 'completed' || fix.status === 'needs_decider') {
           const oldHomeSets = ((fix.set1_home_score > fix.set1_away_score ? 1 : 0) +
                                (fix.set2_home_score > fix.set2_away_score ? 1 : 0))
@@ -589,11 +737,9 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
                result === "loss" ? 1 : 0,
                gf, ga,
                result === "win" ? 3 : result === "draw" ? 1 : 0,
-               fix.group_id
-              ]
+               fix.group_id]
             )
           }
-
           await reverseStandings(fix.home_pair_id, oldHomeResult, oldHomeAgg, oldAwayAgg)
           await reverseStandings(fix.away_pair_id, oldAwayResult, oldAwayAgg, oldHomeAgg)
         }
@@ -614,126 +760,17 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
              result === "loss" ? 1 : 0,
              gf, ga,
              result === "win" ? 3 : result === "draw" ? 1 : 0,
-             fix.group_id
-            ]
+             fix.group_id]
           )
         }
-
         await updateStandings(fix.home_pair_id, homeResult, homeAgg, awayAgg)
         await updateStandings(fix.away_pair_id, awayResult, awayAgg, homeAgg)
       }
 
-      // Recalc market values + form
       const playerIds = [homePair.set1_player_id, homePair.set2_player_id, awayPair.set1_player_id, awayPair.set2_player_id]
       for (const pid of playerIds) {
         await recalcMarketValue(pid)
         await recalcForm(pid)
-      }
-
-      // ── Duo knockout tournament history ──────────────────────────────────────
-      if (fix.knockout_round && winnerPairId && !needsDecider) {
-        try {
-          const loserKoPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
-          const loserKoPair   = await q("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [loserKoPairId])
-          const lp = loserKoPair.rows[0]
-          if (lp) {
-            for (const pid of [lp.set1_player_id, lp.set2_player_id].filter(Boolean)) {
-              await incrementHistory(pid, "duo", "knockout", fix.knockout_round).catch(() => {})
-            }
-          }
-          if (fix.knockout_round === "final") {
-            const winnerKoPair = await q("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [winnerPairId])
-            const wp = winnerKoPair.rows[0]
-            if (wp) {
-              for (const pid of [wp.set1_player_id, wp.set2_player_id].filter(Boolean)) {
-                await incrementHistory(pid, "duo", "knockout", "winner").catch(() => {})
-              }
-              // Save for admin card download
-              const p1 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`,[wp.set1_player_id])).rows[0]
-              const p2 = (await q(`SELECT name, avatar_url AS "avatarUrl" FROM players WHERE id=$1`,[wp.set2_player_id])).rows[0]
-              await saveActiveCelebration("duo", {
-                p1Name: p1?.name, p1Avatar: p1?.avatarUrl,
-                p2Name: p2?.name, p2Avatar: p2?.avatarUrl,
-              })
-            }
-          }
-        } catch (e) { console.error("[duo] ko history:", e.message) }
-      }
-
-      // ── BDR for knockout rounds ───────────────────────────────────────────
-      // claimAward ensures BDR is awarded exactly ONCE per fixture, no matter
-      // how many times the result is edited and re-saved.
-      if (fix.knockout_round && winnerPairId && !needsDecider) {
-        const loserPairId = winnerPairId === fix.home_pair_id ? fix.away_pair_id : fix.home_pair_id
-        const loserPair   = winnerPairId === fix.home_pair_id ? awayPair : homePair
-        const winnerPair  = winnerPairId === fix.home_pair_id ? homePair : awayPair
-
-        const LOSER_BDR  = { qf: 4, sf: 6, final: 8 }
-        const WINNER_BDR = { final: 10 }
-        const loserBdr   = LOSER_BDR[fix.knockout_round]
-        const winnerBdr  = WINNER_BDR[fix.knockout_round]
-        const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
-
-        if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
-          await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
-          await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
-        }
-
-        if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
-          await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
-          await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
-        }
-
-        // Runner-up (Final loser) gets 8 already above.
-        // SF losers get 6, QF losers get 4 — handled above.
-
-        // ── Golden Boot — top individual scorer in this tournament ───────────
-        if (fix.knockout_round === "final") {
-          const seasonNum = homePair.season_number
-
-          // ── Duo champion trophy (trophy10) — both players of the winning pair ──
-          await reconcileTrophyRoster({
-            sourceKey:    `duo_champion_s${seasonNum}`,
-            trophyColumn: "trophy10_count",
-            playerIds:    [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean),
-            seasonNumber: seasonNum,
-          })
-
-          // ── Auto-fill season record — duo winner ───────────────────────────
-          const duoWinnerNamesRes = await query(
-            "SELECT name FROM players WHERE id = ANY($1::int[])",
-            [[winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)]
-          )
-          const duoWinnerLabel = duoWinnerNamesRes.rows.map(r => r.name).join(" & ")
-          await updateSeasonRecord(seasonNum, { duo_winner: duoWinnerLabel })
-
-          // Store completion timestamp in app_settings for celebration window
-          await query(`
-            INSERT INTO app_settings (key, value) VALUES ($1, $2)
-            ON CONFLICT (key) DO UPDATE SET value = $2
-          `, [`duo_champion_completed_at_${seasonNum}`, new Date().toISOString()])
-
-          const gbRes = await q(`
-            SELECT mr.player_id,
-              SUM(mr.player_score) AS goals
-            FROM match_records mr
-            WHERE mr.match_type = 'duo'
-              AND mr.season_number = $1
-            GROUP BY mr.player_id
-            ORDER BY goals DESC LIMIT 1
-          `, [seasonNum])
-          const topScorer = gbRes.rows[0]
-          if (topScorer?.goals > 0) {
-            await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
-            // ── Duo Golden Boot trophy (trophy11) ─────────────────────────────
-            await awardOrReassignTrophy({
-              sourceKey:    `duo_golden_boot_s${seasonNum}`,
-              trophyColumn: "trophy11_count",
-              playerId:     topScorer.player_id,
-              seasonNumber: seasonNum,
-            })
-          }
-        }
       }
     })
 
@@ -761,9 +798,24 @@ router.post("/knockout/generate", authenticate, adminOnly, async (req, res, next
 
     if (qualifiers.length < 4) return res.status(400).json({ error: "Not enough qualifiers" })
 
-    // Shuffle qualifiers for R16 draw
-    const shuffled = shuffle(qualifiers)
-    const matchCount = Math.floor(shuffled.length / 2)
+    // Separate into group winners (rank 1) and runners-up (rank 2)
+    const winners    = shuffle(qualifiers.filter(r => r.rnk == 1))
+    const runnersUp  = qualifiers.filter(r => r.rnk == 2)
+
+    // Cross-group draw: each winner is paired with a runner-up from a DIFFERENT group.
+    // We pick randomly from eligible (different-group) runners-up for each winner.
+    const remainingRU = [...runnersUp]
+    const pairs = []
+    for (const winner of winners) {
+      const eligible = remainingRU.filter(r => r.groupId !== winner.groupId)
+      // Fallback (shouldn't happen in a normal 8-group tournament)
+      const pool = eligible.length > 0 ? eligible : remainingRU
+      const pick  = pool[Math.floor(Math.random() * pool.length)]
+      remainingRU.splice(remainingRU.indexOf(pick), 1)
+      pairs.push([winner, pick])
+    }
+
+    const matchCount = pairs.length
 
     // Delete existing knockout fixtures for this season
     await query(`
@@ -771,13 +823,26 @@ router.post("/knockout/generate", authenticate, adminOnly, async (req, res, next
       AND home_pair_id IN (SELECT id FROM duo_pairs WHERE season_number = $1)
     `, [seasonNumber])
 
-    const round = shuffled.length >= 16 ? "r16" : shuffled.length >= 8 ? "qf" : "sf"
+    const round = matchCount >= 8 ? "r16" : matchCount >= 4 ? "qf" : "sf"
 
     for (let i = 0; i < matchCount; i++) {
-      await query(
-        "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending')",
-        [shuffled[i*2].duoPairId, shuffled[i*2+1].duoPairId, round, i+1]
+      const homePairId = pairs[i][0].duoPairId   // group winner
+      const awayPairId = pairs[i][1].duoPairId   // runner-up from different group
+      const fixRes = await query(
+        "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending') RETURNING id",
+        [homePairId, awayPairId, round, i+1]
       )
+      // Randomly assign one player from each pair — shown on dashboards before the match
+      const homePair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [homePairId])).rows[0]
+      const awayPair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [awayPairId])).rows[0]
+      if (homePair && awayPair) {
+        const homePlayerId = Math.random() < 0.5 ? homePair.set1_player_id : homePair.set2_player_id
+        const awayPlayerId = Math.random() < 0.5 ? awayPair.set1_player_id : awayPair.set2_player_id
+        await query(
+          "UPDATE duo_fixtures SET set1_home_player_id = $1, set1_away_player_id = $2 WHERE id = $3",
+          [homePlayerId, awayPlayerId, fixRes.rows[0].id]
+        )
+      }
     }
 
     // ── Record group stage positions in tournament history ───────────────────
@@ -838,13 +903,26 @@ router.post("/knockout/advance", authenticate, adminOnly, async (req, res, next)
     `, [nextRound, seasonNumber])
 
     for (let i = 0; i < Math.floor(ordered.length / 2); i++) {
-      await query(
-        "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending')",
-        [ordered[i*2], ordered[i*2+1], nextRound, i+1]
+      const homePairId = ordered[i*2]
+      const awayPairId = ordered[i*2+1]
+      const fixRes = await query(
+        "INSERT INTO duo_fixtures (home_pair_id, away_pair_id, knockout_round, match_number, status) VALUES ($1,$2,$3,$4,'pending') RETURNING id",
+        [homePairId, awayPairId, nextRound, i+1]
       )
+      // Randomly assign one player from each pair — shown on dashboards before the match
+      const homePair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [homePairId])).rows[0]
+      const awayPair = (await query("SELECT set1_player_id, set2_player_id FROM duo_pairs WHERE id = $1", [awayPairId])).rows[0]
+      if (homePair && awayPair) {
+        const homePlayerId = Math.random() < 0.5 ? homePair.set1_player_id : homePair.set2_player_id
+        const awayPlayerId = Math.random() < 0.5 ? awayPair.set1_player_id : awayPair.set2_player_id
+        await query(
+          "UPDATE duo_fixtures SET set1_home_player_id = $1, set1_away_player_id = $2 WHERE id = $3",
+          [homePlayerId, awayPlayerId, fixRes.rows[0].id]
+        )
+      }
     }
 
-    res.json({ success: true, nextRound, matches: Math.floor(shuffled.length / 2) })
+    res.json({ success: true, nextRound, matches: Math.floor(ordered.length / 2) })
   } catch (err) { next(err) }
 })
 
