@@ -78,26 +78,15 @@ function BreakdownRow({ playerId }) {
   )
 }
 
-// Fetch current-season BDR totals for all players from breakdown table
-function useSeasonBdrTotals() {
-  return useQuery({
-    queryKey: ["bdr-season-totals"],
-    queryFn: () => api.get("/players/bdr-season-totals").then(r => r.data),
-    staleTime: 1000 * 60 * 5,
-  })
-}
-
 export default function BDRRanking({ players, onPlayerClick }) {
   const [expandedId, setExpandedId] = useState(null)
-  const { data: seasonTotals = {} } = useSeasonBdrTotals()
 
-  // Use current-season BDR if available, fall back to all-time bdrPoints
-  const withSeasonPts = players.map(p => ({
-    ...p,
-    displayBdr: seasonTotals[p.id] ?? p.bdrPoints,
-  }))
+  // Use bdr_points directly — it is the authoritative current-season total
+  // maintained by the admin. player_bdr_breakdown is only for the detail
+  // drill-down, not for ranking totals (it only has partial entries).
+  const withBdr = players.map(p => ({ ...p, displayBdr: p.bdrPoints ?? 0 }))
 
-  const sorted = [...withSeasonPts].sort((a, b) =>
+  const sorted = [...withBdr].sort((a, b) =>
     (b.displayBdr - a.displayBdr) || a.name.localeCompare(b.name)
   )
   const maxPts = sorted[0]?.displayBdr || 1
