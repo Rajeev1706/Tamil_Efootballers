@@ -33,13 +33,14 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
   const [trophy13, setTrophy13] = useState(player.trophy13Count ?? 0)
   const [trophy10, setTrophy10] = useState(player.trophy10Count ?? 0)
   const [trophy11, setTrophy11] = useState(player.trophy11Count ?? 0)
+  const [trophy12, setTrophy12] = useState(player.trophy12Count ?? 0)
   const [trophyBase, setTrophyBase] = useState({
     t1: player.trophy1Count ?? 0, t2: player.trophy2Count ?? 0,
     t3: player.trophy3Count ?? 0, t4: player.trophy4Count ?? 0,
     t5: player.trophy5Count ?? 0, t6: player.trophy6Count ?? 0,
     t7: player.trophy7Count ?? 0, t8: player.trophy8Count ?? 0,
     t10: player.trophy10Count ?? 0, t11: player.trophy11Count ?? 0,
-    t13: player.trophy13Count ?? 0,
+    t12: player.trophy12Count ?? 0, t13: player.trophy13Count ?? 0,
   })
 
   const applyTrophyData = (p) => {
@@ -49,12 +50,12 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
       t5: p?.trophy5Count ?? 0, t6: p?.trophy6Count ?? 0,
       t7: p?.trophy7Count ?? 0, t8: p?.trophy8Count ?? 0,
       t10: p?.trophy10Count ?? 0, t11: p?.trophy11Count ?? 0,
-      t13: p?.trophy13Count ?? 0,
+      t12: p?.trophy12Count ?? 0, t13: p?.trophy13Count ?? 0,
     }
     setTrophy1(vals.t1); setTrophy2(vals.t2); setTrophy3(vals.t3)
     setTrophy4(vals.t4); setTrophy5(vals.t5); setTrophy6(vals.t6)
     setTrophy7(vals.t7); setTrophy8(vals.t8); setTrophy13(vals.t13)
-    setTrophy10(vals.t10); setTrophy11(vals.t11)
+    setTrophy10(vals.t10); setTrophy11(vals.t11); setTrophy12(vals.t12)
     setTrophyBase(vals)
   }
 
@@ -115,6 +116,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
       trophy5 !== trophyBase.t5 || trophy6 !== trophyBase.t6 ||
       trophy7 !== trophyBase.t7 || trophy8 !== trophyBase.t8 ||
       trophy10 !== (trophyBase.t10 ?? 0) || trophy11 !== (trophyBase.t11 ?? 0) ||
+      trophy12 !== (trophyBase.t12 ?? 0) ||
       trophy13 !== (trophyBase.t13 ?? 0)
     )
 
@@ -130,9 +132,10 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
       setTrophyBase(prev => ({ ...prev, t1:trophy1, t2:trophy2, t3:trophy3, t4:trophy4, t5:trophy5, t6:trophy6, t7:trophy7, t8:trophy8 }))
     }
 
-    // trophy10/11/13 are cumulative (not year-scoped) — saved directly via updatePlayer
+    // trophy10/11/12/13 are cumulative (not year-scoped) — saved directly via updatePlayer
     if (trophy10 !== (trophyBase.t10 ?? 0)) body.trophy10Count = trophy10
     if (trophy11 !== (trophyBase.t11 ?? 0)) body.trophy11Count = trophy11
+    if (trophy12 !== (trophyBase.t12 ?? 0)) body.trophy12Count = trophy12
     if (trophy13 !== (trophyBase.t13 ?? 0)) body.trophy13Count = trophy13
     // Other trophy counts are saved via updateTrophyYear above (year-scoped)
     if (!Object.keys(body).length && !trophyChanged) return setEditing(false)
@@ -163,12 +166,12 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
       t5: player.trophy5Count ?? 0, t6: player.trophy6Count ?? 0,
       t7: player.trophy7Count ?? 0, t8: player.trophy8Count ?? 0,
       t10: player.trophy10Count ?? 0, t11: player.trophy11Count ?? 0,
-      t13: player.trophy13Count ?? 0,
+      t12: player.trophy12Count ?? 0, t13: player.trophy13Count ?? 0,
     }
     setTrophy1(base.t1); setTrophy2(base.t2); setTrophy3(base.t3)
     setTrophy4(base.t4); setTrophy5(base.t5); setTrophy6(base.t6)
     setTrophy7(base.t7); setTrophy8(base.t8); setTrophy13(base.t13)
-    setTrophy10(base.t10); setTrophy11(base.t11)
+    setTrophy10(base.t10); setTrophy11(base.t11); setTrophy12(base.t12)
     setTrophyBase(base)
   }
 
@@ -463,6 +466,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
                 { label: "Week Best Player",           value: trophy13, onChange: setTrophy13 },
                 { label: "Duo Tournament",             value: trophy10, onChange: setTrophy10 },
                 { label: "Duo Golden Boot",            value: trophy11, onChange: setTrophy11 },
+                { label: "Championship",               value: trophy12, onChange: setTrophy12 },
               ].map(t => (
                 <div key={t.label} className="flex items-center gap-2">
                   <span className="text-xs text-slate-500">{t.label}</span>

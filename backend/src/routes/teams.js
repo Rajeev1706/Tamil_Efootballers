@@ -422,6 +422,7 @@ router.get("/trophy-history", async (req, res, next) => {
         (p.trophy9_count  + COALESCE(h.trophy9_total,  0))::int AS "trophy9Count",
         (p.trophy10_count + COALESCE(h.trophy10_total, 0))::int AS "trophy10Count",
         (p.trophy11_count + COALESCE(h.trophy11_total, 0))::int AS "trophy11Count",
+        COALESCE(p.trophy12_count, 0)::int AS "trophy12Count",
         COALESCE(p.trophy13_count, 0)::int AS "trophy13Count"
       FROM players p
       LEFT JOIN teams t ON t.id = p.team_id
@@ -455,6 +456,7 @@ router.get("/trophy-history", async (req, res, next) => {
           COALESCE(p.trophy9_count,  0) AS "trophy9Count",
           COALESCE(p.trophy10_count, 0) AS "trophy10Count",
           COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+          COALESCE(p.trophy12_count, 0) AS "trophy12Count",
           COALESCE(p.trophy13_count, 0) AS "trophy13Count"
         FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
       `)
@@ -566,6 +568,7 @@ router.get("/trophy-history/:year", async (req, res, next) => {
           COALESCE(p.trophy9_count,  0) AS "trophy9Count",
           COALESCE(p.trophy10_count, 0) AS "trophy10Count",
           COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+          COALESCE(p.trophy12_count, 0) AS "trophy12Count",
           COALESCE(p.trophy13_count, 0) AS "trophy13Count"
         FROM players p
         LEFT JOIN teams t ON t.id = p.team_id
@@ -672,6 +675,7 @@ router.get("/trophy-current", async (req, res, next) => {
           COALESCE(p.trophy9_count,  0) AS "trophy9Count",
           COALESCE(p.trophy10_count, 0) AS "trophy10Count",
           COALESCE(p.trophy11_count, 0) AS "trophy11Count",
+          COALESCE(p.trophy12_count, 0) AS "trophy12Count",
           COALESCE(p.trophy13_count, 0) AS "trophy13Count"
         FROM players p LEFT JOIN teams t ON t.id = p.team_id ORDER BY p.name
       `)
@@ -797,16 +801,10 @@ router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) =
       GROUP BY p.id, p.name ORDER BY longest DESC LIMIT 1
     `, [season]))
 
-    // Ballon d'Or — highest BDR this season (matches BDR Rankings list)
-    const ballondorRes = await safe(() => query(`
-      SELECT p.name, COALESCE(SUM(b.amount), 0)::int AS total
-      FROM player_bdr_breakdown b
-      JOIN players p ON p.id = b.player_id
-      WHERE b.season_number = $1
-      GROUP BY p.id, p.name
-      ORDER BY total DESC
-      LIMIT 1
-    `, [season]))
+    // Ballon d'Or — highest BDR
+    const ballondorRes = await safe(() => query(
+      `SELECT name FROM players ORDER BY bdr_points DESC LIMIT 1`
+    ))
 
     // Team League winner (group_knockout format: champions_final)
     const champFinalRes = await safe(() => query(`
@@ -1521,6 +1519,18 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
 
     const champMap = {}
     for (const row of champRes.rows) champMap[row.team_id] = row.champ_pos
+
+    // ── Auto-award Championship trophy to players on the winning team ────────
+    // The team ranked #1 by total BDR wins the Championship.
+    // Increment trophy12_count for every player currently on that team.
+    const champWinnerTeamId = champRes.rows.find(r => r.champ_pos === 1)?.team_id
+    if (champWinnerTeamId) {
+      await query(
+        `UPDATE players SET trophy12_count = trophy12_count + 1 WHERE team_id = $1`,
+        [champWinnerTeamId]
+      )
+      console.log(`[season-reset] Championship trophy awarded to all players of team ${champWinnerTeamId}`)
+    }
 
     // Determine relegated team — use the result of the seventh_place TLG
     // knockout match (stored in app_settings) rather than blindly relegating

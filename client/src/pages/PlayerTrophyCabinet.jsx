@@ -19,6 +19,7 @@ import duoBootTrophy      from "../../images/duoboot.png"
 import revolutionTrophy   from "../../images/revolution.png"
 import europaTrophy       from "../../images/europa.png"
 import weekBestTrophy     from "../../images/weektrophy.png"
+import championshipTrophy from "../../images/championship.png"
 
 const TROPHY_TYPES = [
   { key: "trophy1Count",  image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b", glow: "rgba(245,158,11,0.45)"  },
@@ -33,6 +34,7 @@ const TROPHY_TYPES = [
   { key: "trophy9Count",  image: europaTrophy,       label: "Europa",             color: "#8b5cf6", glow: "rgba(139,92,246,0.45)"  },
   { key: "trophy10Count", image: duoTrophy,          label: "Duo Tournament",     color: "#fb923c", glow: "rgba(251,146,60,0.45)"  },
   { key: "trophy11Count", image: duoBootTrophy,      label: "Duo Golden Boot",    color: "#f97316", glow: "rgba(249,115,22,0.45)"  },
+  { key: "trophy12Count", image: championshipTrophy, label: "Championship",        color: "#eab308", glow: "rgba(234,179,8,0.45)"   },
 ]
 
 const TROPHIES_PER_SHELF = 5  // keeps 5 per shelf - better mobile fit
@@ -143,19 +145,20 @@ export default function PlayerTrophyCabinet() {
   const yearPlayer    = yearData.find(p => p.id === player.id)
   const trophySource  = yearFilter === "overall"
     ? (allTimePlayer || player)
-    : (yearPlayer || { trophy1Count: 0, trophy2Count: 0, trophy3Count: 0, trophy4Count: 0, trophy5Count: 0, trophy6Count: 0, trophy7Count: 0, trophy8Count: 0, trophy9Count: 0, trophy10Count: 0, trophy11Count: 0, trophy13Count: 0 })
+    : (yearPlayer || { trophy1Count: 0, trophy2Count: 0, trophy3Count: 0, trophy4Count: 0, trophy5Count: 0, trophy6Count: 0, trophy7Count: 0, trophy8Count: 0, trophy9Count: 0, trophy10Count: 0, trophy11Count: 0, trophy12Count: 0, trophy13Count: 0 })
 
 
   // Trophy category groups
   const TROPHY_GROUPS = {
-    all:        ["trophy1Count","trophy2Count","trophy3Count","trophy4Count","trophy5Count","trophy6Count","trophy7Count","trophy8Count","trophy9Count","trophy10Count","trophy11Count","trophy13Count"],
+    all:        ["trophy1Count","trophy2Count","trophy3Count","trophy4Count","trophy5Count","trophy6Count","trophy7Count","trophy8Count","trophy9Count","trophy10Count","trophy11Count","trophy12Count","trophy13Count"],
     bdr:        ["trophy1Count"],
     league:     ["trophy2Count","trophy6Count"],
     ucl:        ["trophy4Count","trophy7Count"],
     weekly:     ["trophy3Count","trophy5Count"],
     weekbest:   ["trophy13Count"],
-    revolution: ["trophy8Count"],
-    duo:        ["trophy10Count","trophy11Count"],
+    revolution:     ["trophy8Count"],
+    duo:            ["trophy10Count","trophy11Count"],
+    championship:   ["trophy12Count"],
   }
 
   const activeTrophyKeys = new Set(TROPHY_GROUPS[trophyFilter] || TROPHY_GROUPS.all)
@@ -234,7 +237,8 @@ export default function PlayerTrophyCabinet() {
           { id: "weekly",     label: "Weekly" },
           { id: "weekbest",   label: "Week Best" },
           { id: "revolution", label: "Revolution" },
-          { id: "duo",        label: "Duo" },
+          { id: "duo",          label: "Duo" },
+          { id: "championship", label: "Championship" },
         ].map(f => (
           <button
             key={f.id}
