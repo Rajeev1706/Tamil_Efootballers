@@ -236,6 +236,7 @@ const updateSchema = z.object({
   trophy7Count:  z.number().int().min(0).optional(),
   trophy10Count: z.number().int().min(0).optional(),
   trophy11Count: z.number().int().min(0).optional(),
+  trophy12Count: z.number().int().min(0).optional(),
   trophy13Count: z.number().int().min(0).optional(),
 }).refine(d => Object.values(d).some(v => v !== undefined), {
   message: "Provide at least one field to update",
@@ -294,7 +295,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
     const {
       name, alias, grade, gradeFloor, gradeCeiling, bdrDelta, isCaptain, auctionPrice, baseValue, teamId, imageUrl,
       trophy1Count, trophy2Count, trophy3Count, trophy4Count, trophy5Count, trophy6Count, trophy7Count,
-      trophy10Count, trophy11Count, trophy13Count,
+      trophy10Count, trophy11Count, trophy12Count, trophy13Count,
     } = updateSchema.parse(req.body)
 
     // teamId needs special handling: undefined = don't change, null = remove team
@@ -325,8 +326,9 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
         trophy7_count  = COALESCE($15, trophy7_count),
         trophy10_count = COALESCE($18, trophy10_count),
         trophy11_count = COALESCE($19, trophy11_count),
-        trophy13_count = COALESCE($20, trophy13_count),
-        base_value     = COALESCE($21, base_value)
+        trophy12_count = COALESCE($20, trophy12_count),
+        trophy13_count = COALESCE($21, trophy13_count),
+        base_value     = COALESCE($22, base_value)
       WHERE id = $16
       RETURNING id, name, alias, grade, grade_floor AS "gradeFloor", grade_ceiling AS "gradeCeiling",
                 image_url     AS "imageUrl",
@@ -344,6 +346,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
                 trophy7_count  AS "trophy7Count",
                 trophy10_count AS "trophy10Count",
                 trophy11_count AS "trophy11Count",
+                trophy12_count AS "trophy12Count",
                 trophy13_count AS "trophy13Count",
                 base_value     AS "baseValue"
     `, [
@@ -355,7 +358,7 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       trophy6Count ?? null, trophy7Count ?? null,
       req.params.id, teamIdProvided,
       trophy10Count ?? null, trophy11Count ?? null,
-      trophy13Count ?? null, baseValue ?? null,
+      trophy12Count ?? null, trophy13Count ?? null, baseValue ?? null,
 
     ])
 
