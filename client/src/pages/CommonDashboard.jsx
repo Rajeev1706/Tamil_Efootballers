@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react"
+
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { ChevronDown, Trophy, Users, TrendingUp, Activity, Star, Gavel } from "lucide-react"
 import { cn } from "../lib/utils"
@@ -713,9 +714,9 @@ export default function CommonDashboard() {
   const isCurrent  = selectedSeason === null
   const pastRecord = selectedSeason ? seasonRecords.find(r => r.season_number === selectedSeason) : null
 
-  const leader = [...players].sort((a, b) =>
-    (b.bdrPoints - a.bdrPoints) || a.name.localeCompare(b.name)
-  )[0]
+  // BDR leader — use bdr_points directly (authoritative admin-maintained total)
+  const leader = [...players]
+    .sort((a, b) => ((b.bdrPoints ?? 0) - (a.bdrPoints ?? 0)) || a.name.localeCompare(b.name))[0]
   const topMV = [...players].sort((a, b) =>
     (b.marketValue - a.marketValue) || a.name.localeCompare(b.name)
   )[0]

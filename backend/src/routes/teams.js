@@ -797,10 +797,16 @@ router.get("/season-autofill", authenticate, adminOnly, async (req, res, next) =
       GROUP BY p.id, p.name ORDER BY longest DESC LIMIT 1
     `, [season]))
 
-    // Ballon d'Or — highest BDR
-    const ballondorRes = await safe(() => query(
-      `SELECT name FROM players ORDER BY bdr_points DESC LIMIT 1`
-    ))
+    // Ballon d'Or — highest BDR this season (matches BDR Rankings list)
+    const ballondorRes = await safe(() => query(`
+      SELECT p.name, COALESCE(SUM(b.amount), 0)::int AS total
+      FROM player_bdr_breakdown b
+      JOIN players p ON p.id = b.player_id
+      WHERE b.season_number = $1
+      GROUP BY p.id, p.name
+      ORDER BY total DESC
+      LIMIT 1
+    `, [season]))
 
     // Team League winner (group_knockout format: champions_final)
     const champFinalRes = await safe(() => query(`
