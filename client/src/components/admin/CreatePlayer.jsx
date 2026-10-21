@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { User, CheckCircle, Camera, Crown, Trophy } from "lucide-react"
-import { useCreatePlayer, useTeams, useUpdatePlayer } from "../../lib/queries"
+import { useCreatePlayer, useUpdatePlayer } from "../../lib/queries"
 import { uploadPlayerImage } from "../../lib/supabase"
+import { useQuery } from "@tanstack/react-query"
+import { teamsApi } from "../../lib/api"
 import GradeBadge from "../common/GradeBadge"
 import { cn } from "../../lib/utils"
 
@@ -22,7 +24,7 @@ export default function CreatePlayer({ onSuccess }) {
   const [imagePreview, setImagePreview] = useState(null)
   const [done, setDone]                 = useState(null)
 
-  const { data: teams = [] } = useTeams()
+  const { data: teams = [] } = useQuery({ queryKey: ["teams-all"], queryFn: teamsApi.listAll })
   const createPlayer         = useCreatePlayer()
   const updatePlayer         = useUpdatePlayer()
   const [submitError, setSubmitError] = useState(null)

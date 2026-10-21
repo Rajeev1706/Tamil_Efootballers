@@ -3,8 +3,9 @@ import { Pencil, Check, X, Trash2, Camera, Trophy, Search, Crown } from "lucide-
 import GradeBadge from "../common/GradeBadge"
 import PlayerAvatar from "../common/PlayerAvatar"
 import ImageUpload from "./ImageUpload"
-import { useUpdatePlayer, useDeletePlayer, useTeams, useTrophyYears } from "../../lib/queries"
+import { useUpdatePlayer, useDeletePlayer, useTrophyYears } from "../../lib/queries"
 import { teamsApi } from "../../lib/api"
+import { useQuery } from "@tanstack/react-query"
 import { getMVTier, cn } from "../../lib/utils"
 
 const GRADES = ["S","A","B","C"]
@@ -82,7 +83,7 @@ function EditableRow({ player, onPlayerClick, trophyYearOptions = [] }) {
   const [confirmDel, setConfirmDel]   = useState(false)
   const updatePlayer                  = useUpdatePlayer()
   const deletePlayer                  = useDeletePlayer()
-  const { data: teams = [] }          = useTeams()
+  const { data: teams = [] }          = useQuery({ queryKey: ["teams-all"], queryFn: teamsApi.listAll })
   const tier                          = getMVTier(player.marketValue)
   const deltaNum                      = parseInt(bdrDelta) || 0
 
@@ -489,7 +490,7 @@ export default function PlayerManagement({ players, onPlayerClick }) {
   const [search, setSearch]   = useState("")
   const [gradeFilter, setGradeFilter] = useState("All")
   const [teamFilter, setTeamFilter]   = useState("All")
-  const { data: teams = [] }  = useTeams()
+  const { data: teams = [] }  = useQuery({ queryKey: ["teams-all"], queryFn: teamsApi.listAll })
   const { data: trophyYearsData } = useTrophyYears()
   const trophyCurrentYear = trophyYearsData?.currentYear || new Date().getFullYear()
   const trophyPastYears   = trophyYearsData?.pastYears   || []
