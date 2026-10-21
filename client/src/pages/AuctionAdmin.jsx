@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Gavel, Trophy, Sparkles } from "lucide-react"
-import { useTeams, usePlayers } from "../lib/queries"
+import { usePlayers } from "../lib/queries"
+import { useQuery } from "@tanstack/react-query"
+import { teamsApi } from "../lib/api"
 import {
   useAuctionCurrent, useStartAuction, useRetainPlayer, useRemoveRetention,
   useAddToPool, useRemoveFromPool, useBuildAuctionPool, useNextAuctionPlayer, usePlaceBid, useSellPlayer,
@@ -87,7 +89,7 @@ function SuccessionLinker({ teams }) {
 
 // ── Screen 0: no session yet ────────────────────────────────────────────
 function StartScreen() {
-  const { data: teams = [] } = useTeams()
+  const { data: teams = [] } = useQuery({ queryKey: ["teams-all"], queryFn: teamsApi.listAll })
   const startAuction = useStartAuction()
 
   // Budget is editable — don't read from teams[0].budget which is 0 after
@@ -878,7 +880,7 @@ function AuctionOverview({ session, pool = [], teams = [], onEnter, enterError, 
 export default function AuctionAdmin() {
   const navigate = useNavigate()
   const { data } = useAuctionCurrent()
-  const { data: teams = [] } = useTeams()
+  const { data: teams = [] } = useQuery({ queryKey: ["teams-all"], queryFn: teamsApi.listAll })
   const { data: allPlayers = [] } = usePlayers()
   const [entered, setEntered] = useState(false)
   const enterAuction = useEnterAuction()
