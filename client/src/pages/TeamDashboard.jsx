@@ -67,6 +67,7 @@ export default function TeamDashboard() {
   const myChampionshipBdr   = myChampionshipEntry?.totalBdr ?? 0
 
   if (teamLoading) return <Layout><Loading /></Layout>
+  if (!teamData) return <Layout><div className="text-slate-400 text-sm p-8">Team data not found.</div></Layout>
 
   const myTeam = { ...teamData, position: teamData?.position ?? 1 }
 
