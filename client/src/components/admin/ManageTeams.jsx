@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { Pencil, Trash2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react"
-import { useTeams, useDeleteTeam, useUpdateTeam, useUnassignPlayer, useChangeTeamPassword } from "../../lib/queries"
+import { useDeleteTeam, useUpdateTeam, useUnassignPlayer, useChangeTeamPassword } from "../../lib/queries"
+import { useQuery } from "@tanstack/react-query"
+import { teamsApi } from "../../lib/api"
 import PlayerAvatar from "../common/PlayerAvatar"
 import GradeBadge from "../common/GradeBadge"
 import { TeamAvatar } from "../common/TeamLogo"
@@ -283,7 +285,7 @@ function TeamRow({ team, players }) {
 }
 
 export default function ManageTeams({ players = [] }) {
-  const { data: teams = [], isLoading } = useTeams()
+  const { data: teams = [], isLoading } = useQuery({ queryKey: ["teams-all"], queryFn: teamsApi.listAll })
 
   if (isLoading) return <div className="text-slate-500 text-sm py-4">Loading teams…</div>
 
