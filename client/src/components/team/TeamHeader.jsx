@@ -69,7 +69,7 @@ export default function TeamHeader({ team, myPlayers, teamColor }) {
                   <span className="text-3xl font-extrabold"
                     style={{ color: rgb ? `rgb(${rgb})` : "#10b981" }}
                   >
-                    {team.name.charAt(0)}
+                    {team?.name?.charAt(0) ?? "?"}
                   </span>
                 </div>
               )}
