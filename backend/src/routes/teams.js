@@ -1507,14 +1507,17 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       WHERE t.points > 0 OR t.won > 0 OR t.drawn > 0 OR t.lost > 0
     `)
 
-    // Get championship positions — ranked by total team BDR points
+    // Get championship positions — ranked by the same formula as the /championship page:
+    // championship_pts (league) + revolution_pts + sum of non-league player BDR
     const champRes = await query(`
       SELECT
         t.id AS team_id,
-        ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(p.bdr_points), 0) DESC) AS champ_pos
+        ROW_NUMBER() OVER (
+          ORDER BY (t.championship_pts + COALESCE(t.revolution_pts, 0) + COALESCE(SUM(p.bdr_points - p.league_bdr), 0)) DESC
+        ) AS champ_pos
       FROM teams t
       LEFT JOIN players p ON p.team_id = t.id
-      GROUP BY t.id
+      GROUP BY t.id, t.championship_pts, t.revolution_pts
     `).catch(() => ({ rows: [] }))
 
     const champMap = {}
