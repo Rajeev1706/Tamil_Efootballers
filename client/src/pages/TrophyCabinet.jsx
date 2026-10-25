@@ -17,7 +17,8 @@ import revolutionTrophy   from "../../images/revolution.png"
 import europaTrophy       from "../../images/europa.png"
 import duoTrophy          from "../../images/duo.png"
 import duoBootTrophy      from "../../images/duoboot.png"
-import weekBestTrophy     from "../../images/weektrophy.png"
+import weekBestTrophy       from "../../images/weektrophy.png"
+import championshipTrophy   from "../../images/championship.png"
 
 const TROPHIES = [
   { key: "trophy1Count",  image: ballondorTrophy,    label: "Ballon d'Or",        color: "#f59e0b" },
@@ -32,6 +33,7 @@ const TROPHIES = [
   { key: "trophy9Count",  image: europaTrophy,       label: "Europa",             color: "#8b5cf6" },
   { key: "trophy10Count", image: duoTrophy,          label: "Duo Tournament",     color: "#fb923c" },
   { key: "trophy11Count", image: duoBootTrophy,      label: "Duo Golden Boot",    color: "#f97316" },
+  { key: "trophy12Count", image: championshipTrophy, label: "Championship",       color: "#eab308" },
 ]
 
 export default function TrophyCabinet() {
