@@ -1201,6 +1201,9 @@ async function clearCurrentSeasonData(q) {
   await q(`UPDATE players SET ucl_group_id = NULL`) // before deleting ucl_groups, since players reference it
   await q(`DELETE FROM ucl_fixtures`)
   await q(`DELETE FROM ucl_groups`)
+
+  // Clear revolution BDR log entries so REV badges don't carry over to the new season
+  await q(`DELETE FROM bdr_awards_log WHERE award_type LIKE 'rev_%'`)
 }
 
 
