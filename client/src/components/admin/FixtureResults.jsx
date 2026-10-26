@@ -792,6 +792,7 @@ export default function FixtureResults({ fixtures }) {
   const [activeRound, setActiveRound]     = useState("all")
   const [exporting, setExporting]         = useState(false)
   const [showExportCard, setShowExportCard] = useState(false)
+  const [exportingRound, setExportingRound] = useState(null)
   const exportRef = useRef(null)
 
   const format = leagueFormat?.format || "league_knockout"
@@ -899,8 +900,10 @@ export default function FixtureResults({ fixtures }) {
   const filteredCompleted = activeRound === "all" ? completed : completed.filter(f => f.round === Number(activeRound))
   const roundFixtures     = fixtures.filter(f => f.round === Number(activeRound))
 
-  async function handleExport() {
-    if (!exportRef.current || activeRound === "all") return
+  async function handleExport(round) {
+    const targetRound = round ?? activeRound
+    if (!exportRef.current || targetRound === "all") return
+    setExportingRound(targetRound)
     setShowExportCard(true)
     setExporting(true)
     await new Promise(r => setTimeout(r, 500))
@@ -912,10 +915,6 @@ export default function FixtureResults({ fixtures }) {
         backgroundColor: "#050810",
         width: el.scrollWidth,
         height: el.scrollHeight,
-        // If any external image (e.g. a team logo) fails to load, skip it
-        // rather than crashing the whole export. This happens when Supabase
-        // storage is temporarily unavailable — the PNG still exports cleanly,
-        // just without those images.
         filter: (node) => {
           if (node?.tagName === "IMG" && node?.src?.startsWith("http")) {
             return node.complete && node.naturalWidth > 0
@@ -924,7 +923,7 @@ export default function FixtureResults({ fixtures }) {
         },
       })
       const link = document.createElement("a")
-      link.download = `Round-${activeRound}-Fixtures.png`
+      link.download = `Round-${targetRound}-Fixtures.png`
       link.href = dataUrl
       link.click()
     } catch (err) {
@@ -932,13 +931,22 @@ export default function FixtureResults({ fixtures }) {
     } finally {
       setExporting(false)
       setShowExportCard(false)
+      setExportingRound(null)
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Hidden export card */}
-      {activeRound !== "all" && (
+      {/* Hidden export card — used for both tab-level and per-round exports */}
+      {exportingRound !== null && (
+        <FixtureExportCard
+          round={exportingRound}
+          fixtures={fixtures.filter(f => f.round === Number(exportingRound))}
+          exportRef={exportRef}
+          visible={showExportCard}
+        />
+      )}
+      {activeRound !== "all" && exportingRound === null && (
         <FixtureExportCard
           round={activeRound}
           fixtures={roundFixtures}
@@ -970,7 +978,7 @@ export default function FixtureResults({ fixtures }) {
             ))}
           </div>
           {activeRound !== "all" && (
-            <button onClick={handleExport} disabled={exporting}
+            <button onClick={() => handleExport(activeRound)} disabled={exporting}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
               <Download className="w-3.5 h-3.5" />
               {exporting ? "Exporting…" : "Export PNG"}
@@ -983,28 +991,69 @@ export default function FixtureResults({ fixtures }) {
         <RoundDateEditor round={activeRound} roundFixtures={roundFixtures} />
       )}
 
-      {filteredUpcoming.length > 0 && (
-        <div>
-          <p className="section-label mb-4">Upcoming fixtures</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredUpcoming.map(f => <FixtureCard key={f.id} fixture={f} />)}
-          </div>
-        </div>
-      )}
-
-      {filteredCompleted.length > 0 && (
-        <div>
-          <p className="section-label mb-4">Completed fixtures</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredCompleted.map(f => <FixtureCard key={f.id} fixture={f} />)}
-          </div>
-        </div>
-      )}
-
-      {filteredUpcoming.length === 0 && filteredCompleted.length === 0 && (
-        <div className="card py-16 text-center text-slate-500 text-sm">
-          {activeRound === "all" ? "No fixtures yet — create one above." : `No fixtures for Round ${activeRound}.`}
-        </div>
+      {activeRound === "all" ? (
+        // ── "All" view: group by round with per-round export button ───────────
+        rounds.length === 0 ? (
+          <div className="card py-16 text-center text-slate-500 text-sm">No fixtures yet — create one above.</div>
+        ) : (
+          rounds.map(r => {
+            const rFixtures = fixtures.filter(f => f.round === r)
+            const rUpcoming  = rFixtures.filter(f => f.status === "upcoming")
+            const rCompleted = rFixtures.filter(f => f.status === "completed")
+            const isExportingThis = exportingRound === r && exporting
+            return (
+              <div key={r} className="space-y-3">
+                {/* Round header with export button */}
+                <div className="flex items-center justify-between">
+                  <p className="section-label">Round {r}</p>
+                  <button
+                    onClick={() => handleExport(r)}
+                    disabled={exporting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {isExportingThis ? "Exporting…" : "Export PNG"}
+                  </button>
+                </div>
+                {rUpcoming.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {rUpcoming.map(f => <FixtureCard key={f.id} fixture={f} />)}
+                  </div>
+                )}
+                {rCompleted.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {rCompleted.map(f => <FixtureCard key={f.id} fixture={f} />)}
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )
+      ) : (
+        // ── Single round view ─────────────────────────────────────────────────
+        <>
+          {filteredUpcoming.length > 0 && (
+            <div>
+              <p className="section-label mb-4">Upcoming fixtures</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredUpcoming.map(f => <FixtureCard key={f.id} fixture={f} />)}
+              </div>
+            </div>
+          )}
+          {filteredCompleted.length > 0 && (
+            <div>
+              <p className="section-label mb-4">Completed fixtures</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredCompleted.map(f => <FixtureCard key={f.id} fixture={f} />)}
+              </div>
+            </div>
+          )}
+          {filteredUpcoming.length === 0 && filteredCompleted.length === 0 && (
+            <div className="card py-16 text-center text-slate-500 text-sm">
+              No fixtures for Round {activeRound}.
+            </div>
+          )}
+        </>
       )}
     </div>
   )
