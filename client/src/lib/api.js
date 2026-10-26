@@ -37,7 +37,7 @@ export const authApi = {
 
 export const teamsApi = {
   list:           ()       => api.get("/teams").then(r => r.data),
-  listAll:        ()       => api.get("/teams?all=true").then(r => r.data),
+  listAll:        ()       => api.get("/teams/all").then(r => r.data),
   get:            (id)     => api.get(`/teams/${id}`).then(r => r.data),
   playoffsCurrent: ()      => api.get("/teams/playoffs/current").then(r => r.data),
   create:         (body)   => api.post("/teams", body).then(r => r.data),

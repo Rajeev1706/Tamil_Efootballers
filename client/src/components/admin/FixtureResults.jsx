@@ -2,7 +2,7 @@ import { useState, useRef } from "react"
 import { Check, CheckCircle, Lock, Pencil, Trash2, X, Save, Plus, Calendar, Download, RefreshCw } from "lucide-react"
 import {
   useSaveFixtureResult, useUpdateFixture, useDeleteFixture,
-  useCreateFixture, useTeams, useUpdateRoundDate, useCloseFixture, useReopenFixture,
+  useCreateFixture, useTeams, useAllTeams, useUpdateRoundDate, useCloseFixture, useReopenFixture,
   useGenerateSeasonFixtures, useChangeLeagueFormat, useLeagueFormat,
   useTlgCurrent,
 } from "../../lib/queries"
@@ -16,7 +16,7 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
   const [format, setFormat]     = useState(null)
   const [result, setResult]     = useState(null)
   const [selectedTeams, setSelectedTeams] = useState([])
-  const { data: allTeams = [] } = useTeams()
+  const { data: allTeams = [] } = useAllTeams()
   const generate = useGenerateSeasonFixtures()
 
   const toggleTeam = (id) => setSelectedTeams(prev =>
