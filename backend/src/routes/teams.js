@@ -313,57 +313,36 @@ router.get("/", async (req, res, next) => {
     // fixture "completed" (which is what triggers the playoff bracket), but
     // no longer gates whether the table itself reflects a result.
     const result = await query(`
-      WITH fixture_scores AS (
+      WITH fixture_outcomes AS (
+        -- Only completed non-knockout fixtures count toward standings.
+        -- Outcome is decided by stored aggregate scores (matchday win concept).
         SELECT
-          f.id,
-          f.home_team_id,
-          f.away_team_id,
+          f.home_team_id, f.away_team_id,
+          COALESCE(f.home_goals, 0) AS home_goals,
+          COALESCE(f.away_goals, 0) AS away_goals,
           CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.home_score, 0)
-            ELSE SUM(CASE
-              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              ELSE 0 END)
-          END AS home_pts,
-          CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.away_score, 0)
-            ELSE SUM(CASE
-              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              ELSE 0 END)
-          END AS away_pts,
-          CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.home_goals, 0)
-            ELSE COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0)
-          END AS home_goals,
-          CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.away_goals, 0)
-            ELSE COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0)
-          END AS away_goals,
-          CASE WHEN f.status = 'completed' THEN 1 ELSE COUNT(mr.id) END AS results_logged
-        FROM fixtures f
-        LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type = 'league' AND mr.season_number = $1
-        LEFT JOIN players p ON p.id = mr.player_id
-        GROUP BY f.id, f.home_team_id, f.away_team_id, f.status, f.home_score, f.away_score, f.home_goals, f.away_goals
-      ),
-      fixture_outcomes AS (
-        SELECT *,
-          CASE
-            WHEN results_logged = 0 THEN NULL
-            WHEN home_pts > away_pts THEN 'home'
-            WHEN away_pts > home_pts THEN 'away'
+            WHEN COALESCE(f.home_score, 0) > COALESCE(f.away_score, 0) THEN 'home'
+            WHEN COALESCE(f.home_score, 0) < COALESCE(f.away_score, 0) THEN 'away'
             ELSE 'draw'
           END AS outcome
-        FROM fixture_scores
+        FROM fixtures f
+        WHERE f.status = 'completed'
+          AND NOT COALESCE(f.is_knockout_leg, false)
       ),
       per_team AS (
-        SELECT home_team_id AS team_id, home_goals AS gf, away_goals AS ga, home_pts AS pts, outcome,
+        SELECT
+          home_team_id AS team_id,
+          home_goals AS gf, away_goals AS ga,
+          CASE WHEN outcome = 'home' THEN 3 WHEN outcome = 'draw' THEN 1 ELSE 0 END AS pts,
           (outcome = 'home') AS won, (outcome = 'draw') AS drawn, (outcome = 'away') AS lost
-        FROM fixture_outcomes WHERE outcome IS NOT NULL
+        FROM fixture_outcomes
         UNION ALL
-        SELECT away_team_id AS team_id, away_goals AS gf, home_goals AS ga, away_pts AS pts, outcome,
+        SELECT
+          away_team_id AS team_id,
+          away_goals AS gf, home_goals AS ga,
+          CASE WHEN outcome = 'away' THEN 3 WHEN outcome = 'draw' THEN 1 ELSE 0 END AS pts,
           (outcome = 'away') AS won, (outcome = 'draw') AS drawn, (outcome = 'home') AS lost
-        FROM fixture_outcomes WHERE outcome IS NOT NULL
+        FROM fixture_outcomes
       ),
       team_stats AS (
         SELECT team_id,
@@ -911,57 +890,34 @@ router.get("/:id", authenticate, async (req, res, next) => {
     // just filtered down to this one team, so this page can never again
     // drift out of sync with what the dashboard shows for the same team.
     const teamRes = await query(`
-      WITH fixture_scores AS (
+      WITH fixture_outcomes AS (
         SELECT
-          f.id,
-          f.home_team_id,
-          f.away_team_id,
+          f.home_team_id, f.away_team_id,
+          COALESCE(f.home_goals, 0) AS home_goals,
+          COALESCE(f.away_goals, 0) AS away_goals,
           CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.home_score, 0)
-            ELSE SUM(CASE
-              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              ELSE 0 END)
-          END AS home_pts,
-          CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.away_score, 0)
-            ELSE SUM(CASE
-              WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN CASE mr.result WHEN 'loss' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END
-              ELSE 0 END)
-          END AS away_pts,
-          CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.home_goals, 0)
-            ELSE COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.opponent_score ELSE 0 END), 0)
-          END AS home_goals,
-          CASE
-            WHEN f.status = 'completed' THEN COALESCE(f.away_goals, 0)
-            ELSE COALESCE(SUM(CASE WHEN COALESCE(mr.team_id, p.team_id) = f.away_team_id THEN mr.player_score WHEN COALESCE(mr.team_id, p.team_id) = f.home_team_id THEN mr.opponent_score ELSE 0 END), 0)
-          END AS away_goals,
-          CASE WHEN f.status = 'completed' THEN 1 ELSE COUNT(mr.id) END AS results_logged
-        FROM fixtures f
-        LEFT JOIN match_records mr ON mr.fixture_id = f.id AND mr.match_type = 'league' AND mr.season_number = $1
-        LEFT JOIN players p ON p.id = mr.player_id
-        GROUP BY f.id, f.home_team_id, f.away_team_id, f.status, f.home_score, f.away_score, f.home_goals, f.away_goals
-      ),
-      fixture_outcomes AS (
-        SELECT *,
-          CASE
-            WHEN results_logged = 0 THEN NULL
-            WHEN home_pts > away_pts THEN 'home'
-            WHEN away_pts > home_pts THEN 'away'
+            WHEN COALESCE(f.home_score, 0) > COALESCE(f.away_score, 0) THEN 'home'
+            WHEN COALESCE(f.home_score, 0) < COALESCE(f.away_score, 0) THEN 'away'
             ELSE 'draw'
           END AS outcome
-        FROM fixture_scores
+        FROM fixtures f
+        WHERE f.status = 'completed'
+          AND NOT COALESCE(f.is_knockout_leg, false)
       ),
       per_team AS (
-        SELECT home_team_id AS team_id, home_goals AS gf, away_goals AS ga, home_pts AS pts, outcome,
+        SELECT
+          home_team_id AS team_id,
+          home_goals AS gf, away_goals AS ga,
+          CASE WHEN outcome = 'home' THEN 3 WHEN outcome = 'draw' THEN 1 ELSE 0 END AS pts,
           (outcome = 'home') AS won, (outcome = 'draw') AS drawn, (outcome = 'away') AS lost
-        FROM fixture_outcomes WHERE outcome IS NOT NULL
+        FROM fixture_outcomes
         UNION ALL
-        SELECT away_team_id AS team_id, away_goals AS gf, home_goals AS ga, away_pts AS pts, outcome,
+        SELECT
+          away_team_id AS team_id,
+          away_goals AS gf, home_goals AS ga,
+          CASE WHEN outcome = 'away' THEN 3 WHEN outcome = 'draw' THEN 1 ELSE 0 END AS pts,
           (outcome = 'away') AS won, (outcome = 'draw') AS drawn, (outcome = 'home') AS lost
-        FROM fixture_outcomes WHERE outcome IS NOT NULL
+        FROM fixture_outcomes
       ),
       team_stats AS (
         SELECT team_id,
