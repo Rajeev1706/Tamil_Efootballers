@@ -289,6 +289,16 @@ router.get("/:id/best-league-performer", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /api/teams/all — all teams regardless of fixtures (for admin team picker)
+router.get("/all", async (req, res, next) => {
+  try {
+    const result = await query(
+      `SELECT id, name, logo_url AS "logoUrl" FROM teams ORDER BY name ASC`
+    )
+    res.json(result.rows)
+  } catch (err) { next(err) }
+})
+
 // GET /api/teams — public
 router.get("/", async (req, res, next) => {
   try {

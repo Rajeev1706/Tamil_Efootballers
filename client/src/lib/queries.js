@@ -307,6 +307,9 @@ export const useSeasonMatchRecords = (season) =>
 export const useTeams = () =>
   useQuery({ queryKey: QK.teams, queryFn: teamsApi.list, staleTime: 1000 * 60 * 2 })
 
+export const useAllTeams = () =>
+  useQuery({ queryKey: ["all-teams"], queryFn: teamsApi.listAll, staleTime: 1000 * 60 * 5 })
+
 export const useTopScorers = () =>
   useQuery({ queryKey: ["top-scorers"], queryFn: teamsApi.topScorers })
 
