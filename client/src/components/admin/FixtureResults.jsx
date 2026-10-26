@@ -64,9 +64,9 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
             : `${selectedTeams.length} of ${allTeams.length} teams selected`}
         </p>
         <div className="flex gap-2">
-          <button onClick={reset} className="flex-1 py-2 rounded-xl border border-surface-border text-slate-400 text-sm">Cancel</button>
-          <button onClick={() => setStep("pick-format")} className="flex-1 py-2 rounded-xl bg-accent text-white font-semibold text-sm">
-            Next → Choose Format
+          <button onClick={() => setStep("pick-format")} className="flex-1 py-2 rounded-xl border border-surface-border text-slate-400 text-sm">Back</button>
+          <button onClick={() => setStep("confirm")} className="flex-1 py-2 rounded-xl bg-accent text-white font-semibold text-sm">
+            Next → Confirm
           </button>
         </div>
       </div>
@@ -97,9 +97,9 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
         </div>
         <div className="flex gap-2">
           <button onClick={reset} className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Cancel</button>
-          <button onClick={() => format && setStep("confirm")} disabled={!format}
+          <button onClick={() => format && setStep("pick-teams")} disabled={!format}
             className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-40">
-            Next
+            Next → Choose Teams
           </button>
         </div>
       </div>
@@ -111,9 +111,10 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
       <div className="card px-5 py-4">
         <p className="text-sm font-semibold text-white mb-1">Confirm generation</p>
         <p className="text-xs text-slate-400 mb-1">Format: <span className="text-white font-semibold">{format === "league" ? "League Only" : format === "group_knockout" ? "Group + Knockout" : "League + Knockout"}</span></p>
+        <p className="text-xs text-slate-400 mb-1">Teams: <span className="text-white font-semibold">{selectedTeams.length === 0 ? `All ${allTeams.length} teams` : `${selectedTeams.length} selected`}</span></p>
         <p className="text-xs text-slate-500 mb-4">Every team plays every other team twice. Cannot be undone without deleting all fixtures.</p>
         <div className="flex gap-2">
-          <button onClick={() => setStep("pick-format")} className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Back</button>
+          <button onClick={() => setStep("pick-teams")} className="text-xs px-3 py-1.5 rounded-lg border border-surface-border text-slate-400">Back</button>
           <button onClick={handleGenerate} disabled={generate.isPending}
             className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-semibold disabled:opacity-50">
             {generate.isPending ? "Generating..." : "Generate Fixtures"}
@@ -136,7 +137,7 @@ function GenerateSeasonCard({ hasExistingFixtures }) {
           </p>
         )}
       </div>
-      <button onClick={() => setStep("pick-teams")} className="btn-primary text-sm px-4 py-2">
+      <button onClick={() => setStep("pick-format")} className="btn-primary text-sm px-4 py-2">
         + Auto-generate schedule
       </button>
     </div>
