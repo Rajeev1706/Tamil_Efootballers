@@ -184,21 +184,14 @@ router.post("/team", authenticate, async (req, res, next) => {
       isWalkover ?? false,
     ])
 
-    // Live team points/goals — added immediately as each player result comes
-    // in, not waiting for the fixture to be closed. Player's own team gets
-    // 3/1/0 based on their result; the opponent's team gets the mirrored
-    // 3/1/0. Goals for/against accumulate the same way. This runs BEFORE
-    // the market-value/form recalc below deliberately — those are
-    // supplementary and shouldn't be able to block the team stats update
-    // (a league-table-facing change) if something's wrong with them.
-    const playerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
-    const oppPts    = result === "win" ? 0 : result === "draw" ? 1 : 3
+    // Live GF/GA only — score_points (league table Pts) are awarded in bulk
+    // (3/1/0 per fixture) only when admin closes the fixture, not per slot.
     const pScore = playerScore ?? 0
     const oScore = opponentScore ?? 0
-    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
-      [playerPts, pScore, oScore, playerCheck.rows[0].team_id])
-    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
-      [oppPts, oScore, pScore, oppTeamId])
+    await query(`UPDATE teams SET gf = gf + $1, ga = ga + $2 WHERE id = $3`,
+      [pScore, oScore, playerCheck.rows[0].team_id])
+    await query(`UPDATE teams SET gf = gf + $1, ga = ga + $2 WHERE id = $3`,
+      [oScore, pScore, oppTeamId])
 
     let recalcError = null
     try {
@@ -250,30 +243,26 @@ router.patch("/team/:id", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "You can only edit your own team's logged results" })
     }
 
-    // Reverse this record's OLD contribution to both teams' live totals
-    const oldPlayerPts = record.result === "win" ? 3 : record.result === "draw" ? 1 : 0
-    const oldOppPts    = record.result === "win" ? 0 : record.result === "loss" ? 3 : 1
+    // Reverse OLD GF/GA contribution only (score_points moved to close-fixture)
     const oldPScore = record.player_score ?? 0
     const oldOScore = record.opponent_score ?? 0
-    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
-      [oldPlayerPts, oldPScore, oldOScore, record.player_team_id])
-    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
-      [oldOppPts, oldOScore, oldPScore, record.opponent_team_id])
+    await query(`UPDATE teams SET gf = gf - $1, ga = ga - $2 WHERE id = $3`,
+      [oldPScore, oldOScore, record.player_team_id])
+    await query(`UPDATE teams SET gf = gf - $1, ga = ga - $2 WHERE id = $3`,
+      [oldOScore, oldPScore, record.opponent_team_id])
 
     await query(
       `UPDATE match_records SET result = $1, player_score = $2, opponent_score = $3 WHERE id = $4`,
       [result, playerScore ?? null, opponentScore ?? null, req.params.id]
     )
 
-    // Apply the NEW contribution
-    const newPlayerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
-    const newOppPts    = result === "win" ? 0 : result === "loss" ? 3 : 1
+    // Apply NEW GF/GA contribution
     const newPScore = playerScore ?? 0
     const newOScore = opponentScore ?? 0
-    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
-      [newPlayerPts, newPScore, newOScore, record.player_team_id])
-    await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
-      [newOppPts, newOScore, newPScore, record.opponent_team_id])
+    await query(`UPDATE teams SET gf = gf + $1, ga = ga + $2 WHERE id = $3`,
+      [newPScore, newOScore, record.player_team_id])
+    await query(`UPDATE teams SET gf = gf + $1, ga = ga + $2 WHERE id = $3`,
+      [newOScore, newPScore, record.opponent_team_id])
 
     await recalcMarketValue(record.player_id)
     await recalcMarketValue(record.opponent_id)
@@ -306,17 +295,16 @@ router.delete("/team/:id", authenticate, async (req, res, next) => {
       return res.status(403).json({ error: "You can only delete your own team's logged results" })
     }
 
-    const playerPts = record.result === "win" ? 3 : record.result === "draw" ? 1 : 0
-    const oppPts    = record.result === "win" ? 0 : record.result === "loss" ? 3 : 1
     const pScore = record.player_score ?? 0
     const oScore = record.opponent_score ?? 0
 
     await query("DELETE FROM match_records WHERE id = $1", [req.params.id])
 
-    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
-      [playerPts, pScore, oScore, record.player_team_id])
-    await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
-      [oppPts, oScore, pScore, record.opponent_team_id])
+    // Reverse GF/GA only (score_points managed by close/reopen fixture)
+    await query(`UPDATE teams SET gf = gf - $1, ga = ga - $2 WHERE id = $3`,
+      [pScore, oScore, record.player_team_id])
+    await query(`UPDATE teams SET gf = gf - $1, ga = ga - $2 WHERE id = $3`,
+      [oScore, pScore, record.opponent_team_id])
 
     await recalcMarketValue(record.player_id)
     await recalcMarketValue(record.opponent_id)
@@ -405,17 +393,15 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
     const record = existing.rows[0]
     const { player_id: playerId, opponent_id: opponentId } = record
 
-    // For league matches: reverse old team scores, then apply new ones
+    // For league matches: reverse old GF/GA, apply new GF/GA only
+    // (score_points are managed by close/reopen fixture, not per record)
     if (record.match_type === "league" && record.player_team_id && record.opponent_team_id) {
-      // Reverse OLD contribution
-      const oldPlayerPts = record.result === "win" ? 3 : record.result === "draw" ? 1 : 0
-      const oldOppPts    = record.result === "win" ? 0 : record.result === "loss" ? 3 : 1
       const oldPScore = record.player_score ?? 0
       const oldOScore = record.opponent_score ?? 0
-      await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
-        [oldPlayerPts, oldPScore, oldOScore, record.player_team_id])
-      await query(`UPDATE teams SET score_points = score_points - $1, gf = gf - $2, ga = ga - $3 WHERE id = $4`,
-        [oldOppPts, oldOScore, oldPScore, record.opponent_team_id])
+      await query(`UPDATE teams SET gf = gf - $1, ga = ga - $2 WHERE id = $3`,
+        [oldPScore, oldOScore, record.player_team_id])
+      await query(`UPDATE teams SET gf = gf - $1, ga = ga - $2 WHERE id = $3`,
+        [oldOScore, oldPScore, record.opponent_team_id])
     }
 
     await query(`
@@ -424,16 +410,13 @@ router.patch("/:id", authenticate, adminOnly, async (req, res, next) => {
       WHERE id = $4
     `, [result, playerScore ?? null, opponentScore ?? null, req.params.id])
 
-    // Apply NEW contribution for league matches
     if (record.match_type === "league" && record.player_team_id && record.opponent_team_id) {
-      const newPlayerPts = result === "win" ? 3 : result === "draw" ? 1 : 0
-      const newOppPts    = result === "win" ? 0 : result === "loss" ? 3 : 1
       const newPScore = playerScore ?? 0
       const newOScore = opponentScore ?? 0
-      await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
-        [newPlayerPts, newPScore, newOScore, record.player_team_id])
-      await query(`UPDATE teams SET score_points = score_points + $1, gf = gf + $2, ga = ga + $3 WHERE id = $4`,
-        [newOppPts, newOScore, newPScore, record.opponent_team_id])
+      await query(`UPDATE teams SET gf = gf + $1, ga = ga + $2 WHERE id = $3`,
+        [newPScore, newOScore, record.player_team_id])
+      await query(`UPDATE teams SET gf = gf + $1, ga = ga + $2 WHERE id = $3`,
+        [newOScore, newPScore, record.opponent_team_id])
     }
 
     // Rebuild form and MV for both players since result may have changed
