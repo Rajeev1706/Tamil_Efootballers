@@ -380,7 +380,7 @@ router.get("/", async (req, res, next) => {
         SELECT DISTINCT away_team_id FROM fixtures
       )`}
       ORDER BY position
-    `, [season])
+    `)
     res.json(result.rows)
   } catch (err) { next(err) }
 })
@@ -956,8 +956,8 @@ router.get("/:id", authenticate, async (req, res, next) => {
       FROM teams t
       LEFT JOIN team_stats ts ON ts.team_id = t.id
       LEFT JOIN all_positions ap ON ap.id = t.id
-      WHERE t.id = $2
-    `, [season, req.params.id])
+      WHERE t.id = $1
+    `, [req.params.id])
     if (!teamRes.rows[0]) return res.status(404).json({ error: "Team not found" })
     const playersRes = await query(
       `SELECT * FROM players_full WHERE "teamId" = $1 ORDER BY "bdrPoints" DESC`,
