@@ -467,18 +467,19 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
         WHERE id = $5
       `, [homePts, awayPts, homeGoals, awayGoals, req.params.id])
 
-      // Only update played/won/drawn/lost for GROUP STAGE fixtures.
-      // Knockout leg fixtures don't count toward league standings.
+      // Only update league standings for non-knockout-leg fixtures.
       if (!fix.is_knockout_leg) {
         for (const [teamId, r] of [[fix.home_team_id, homeResult], [fix.away_team_id, awayResult]]) {
+          const pts = r === "win" ? 3 : r === "draw" ? 1 : 0
           await q(`
             UPDATE teams SET
-              played = played + 1,
-              won    = won   + $1,
-              drawn  = drawn + $2,
-              lost   = lost  + $3
-            WHERE id = $4
-          `, [r === "win" ? 1 : 0, r === "draw" ? 1 : 0, r === "loss" ? 1 : 0, teamId])
+              played       = played + 1,
+              won          = won    + $1,
+              drawn        = drawn  + $2,
+              lost         = lost   + $3,
+              score_points = score_points + $4
+            WHERE id = $5
+          `, [r === "win" ? 1 : 0, r === "draw" ? 1 : 0, r === "loss" ? 1 : 0, pts, teamId])
         }
       }
     })
@@ -896,19 +897,21 @@ router.post("/:id/reopen", authenticate, adminOnly, async (req, res, next) => {
     const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
     await withTransaction(async ({ query: q }) => {
-      // Reverse the played/won/drawn/lost that were applied on close
+      // Reverse the played/won/drawn/lost/score_points applied on close
       for (const [teamId, result] of [
         [fix.home_team_id, homeResult],
         [fix.away_team_id, awayResult],
       ]) {
+        const pts = result === "win" ? 3 : result === "draw" ? 1 : 0
         await q(`
           UPDATE teams SET
-            played = GREATEST(played - 1, 0),
-            won    = GREATEST(won    - $1, 0),
-            drawn  = GREATEST(drawn  - $2, 0),
-            lost   = GREATEST(lost   - $3, 0)
-          WHERE id = $4
-        `, [result === "win" ? 1 : 0, result === "draw" ? 1 : 0, result === "loss" ? 1 : 0, teamId])
+            played       = GREATEST(played       - 1,    0),
+            won          = GREATEST(won          - $1,   0),
+            drawn        = GREATEST(drawn        - $2,   0),
+            lost         = GREATEST(lost         - $3,   0),
+            score_points = GREATEST(score_points - $4,   0)
+          WHERE id = $5
+        `, [result === "win" ? 1 : 0, result === "draw" ? 1 : 0, result === "loss" ? 1 : 0, pts, teamId])
       }
 
       // Reset fixture back to upcoming, clear stored scores
