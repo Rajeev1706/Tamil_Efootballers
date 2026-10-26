@@ -434,26 +434,29 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
     // on the other team of this same fixture. (A previous version of this
     // fix checked player and opponent independently, which double-counted
     // every goal since both checks fired for every normal record.)
-    let homePts = 0, awayPts = 0, homeGoals = 0, awayGoals = 0
+    // ── Matchday Win concept ──────────────────────────────────────────────────
+    // The team with the HIGHER aggregate player score wins the tie (3 pts).
+    // Individual slot win/draw/loss (playerPts) is no longer used to decide
+    // the fixture outcome — only the raw score totals are compared.
+    let homeGoals = 0, awayGoals = 0
+    let homeScore = 0, awayScore = 0   // aggregate player scores for tie-decider
     for (const r of recordsRes.rows) {
-      const playerPts = r.result === "win" ? 3 : r.result === "draw" ? 1 : 0
-      const oppPts    = r.result === "win" ? 0 : r.result === "loss" ? 3 : 1
       const pScore = r.player_score ?? 0
       const oScore = r.opponent_score ?? 0
 
       if (r.player_team_id === fix.home_team_id) {
-        // player is home, opponent is away
-        homePts += playerPts; awayPts += oppPts
         homeGoals += pScore;  awayGoals += oScore
+        homeScore += pScore;  awayScore += oScore
       } else if (r.player_team_id === fix.away_team_id) {
-        // player is away, opponent is home
-        awayPts += playerPts; homePts += oppPts
         awayGoals += pScore;  homeGoals += oScore
+        awayScore += pScore;  homeScore += oScore
       }
-      // If player_team_id matches neither side, this record doesn't
-      // belong to this fixture's two teams — skip it rather than guess.
+      // Records not belonging to either team in this fixture are skipped.
     }
 
+    // Tie decided by aggregate score (matchday win); store aggregate as home/away pts
+    const homePts    = homeScore
+    const awayPts    = awayScore
     const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
     const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
