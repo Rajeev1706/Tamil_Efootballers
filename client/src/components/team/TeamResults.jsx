@@ -293,7 +293,8 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
                   )}>
                     <div className="text-center">
                       <p className="text-xs text-slate-400 truncate max-w-[90px]">{myTeam?.name ?? "My Team"}</p>
-                      <p className="text-2xl font-black text-white">{myTotal}</p>
+                      <p className="text-2xl font-black text-white">{myPoints}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{myTotal} goals</p>
                     </div>
                     <div className="text-center px-3">
                       <p className={cn(
@@ -308,7 +309,8 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
                     </div>
                     <div className="text-center">
                       <p className="text-xs text-slate-400 truncate max-w-[90px]">{oppName}</p>
-                      <p className="text-2xl font-black text-white">{oppTotal}</p>
+                      <p className="text-2xl font-black text-white">{oppPoints}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{oppTotal} goals</p>
                     </div>
                   </div>
                 )}
