@@ -400,8 +400,10 @@ function FixtureCard({ fixture }) {
 
   const isCompleted = fixture.status === "completed"
 
-  const [hs, setHs]       = useState(isCompleted ? (fixture.homeGoals ?? "") : "")
-  const [as_, setAs]      = useState(isCompleted ? (fixture.awayGoals ?? "") : "")
+  // hs/as_ = slot points (win=3/draw=1/loss=0 sum) — used for winner determination & "MATCH PTS" display
+  // hg/ag  = actual goals scored — used for "Goals (GD)" display
+  const [hs, setHs]       = useState(isCompleted ? (fixture.homeScore ?? "") : "")
+  const [as_, setAs]      = useState(isCompleted ? (fixture.awayScore ?? "") : "")
   const [hg, setHg]       = useState(isCompleted ? (fixture.homeGoals ?? "") : "")
   const [ag, setAg]       = useState(isCompleted ? (fixture.awayGoals ?? "") : "")
   const [saved, setSaved] = useState(isCompleted)
@@ -412,18 +414,18 @@ function FixtureCard({ fixture }) {
   const [editAway, setEditAway]   = useState(fixture.awayTeamId)
   const [confirmDel, setConfirmDel] = useState(false)
 
-  // When fixture data refetches after close, sync local state from goals
+  // When fixture data refetches after close, sync local state.
+  // hs/as_ come from homeScore/awayScore (slot pts — the correct winner signal).
+  // hg/ag  come from homeGoals/awayGoals (actual goals for GD).
   useEffect(() => {
     if (fixture.status === "completed") {
-      const hg_ = fixture.homeGoals ?? 0
-      const ag_ = fixture.awayGoals ?? 0
-      setHs(hg_)
-      setAs(ag_)
-      setHg(hg_)
-      setAg(ag_)
+      setHs(fixture.homeScore ?? 0)
+      setAs(fixture.awayScore ?? 0)
+      setHg(fixture.homeGoals ?? 0)
+      setAg(fixture.awayGoals ?? 0)
       setSaved(true)
     }
-  }, [fixture.status, fixture.homeGoals, fixture.awayGoals])
+  }, [fixture.status, fixture.homeScore, fixture.awayScore, fixture.homeGoals, fixture.awayGoals])
 
   const winner  = saved ? (hs > as_ ? "home" : hs < as_ ? "away" : "draw") : null
   const canSave = hs !== "" && as_ !== "" && hg !== "" && ag !== ""
@@ -431,12 +433,12 @@ function FixtureCard({ fixture }) {
   const handleClose = () => {
     closeFixture.mutate(fixture.id, {
       onSuccess: (data) => {
-        const hGoals = data?.homeGoals ?? fixture.homeGoals ?? 0
-        const aGoals = data?.awayGoals ?? fixture.awayGoals ?? 0
-        setHs(hGoals)
-        setAs(aGoals)
-        setHg(hGoals)
-        setAg(aGoals)
+        // homeScore/awayScore = slot pts (determines winner badge)
+        // homeGoals/awayGoals = actual goals (GD)
+        setHs(data?.homeScore ?? fixture.homeScore ?? 0)
+        setAs(data?.awayScore ?? fixture.awayScore ?? 0)
+        setHg(data?.homeGoals ?? fixture.homeGoals ?? 0)
+        setAg(data?.awayGoals ?? fixture.awayGoals ?? 0)
         setSaved(true)
       },
       onError: (err) => alert(err.response?.data?.error || "Failed to close fixture"),
