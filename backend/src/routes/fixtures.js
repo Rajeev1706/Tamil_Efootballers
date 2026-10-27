@@ -22,6 +22,23 @@ const router = Router()
   } catch (e) { console.error("[fixtures] migration:", e.message) }
 })()
 
+// ── Create team_career_stats table if not present ────────────────────────────
+;(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS team_career_stats (
+        team_id  INT PRIMARY KEY REFERENCES teams(id) ON DELETE CASCADE,
+        played   INT NOT NULL DEFAULT 0,
+        won      INT NOT NULL DEFAULT 0,
+        drawn    INT NOT NULL DEFAULT 0,
+        lost     INT NOT NULL DEFAULT 0,
+        gf       INT NOT NULL DEFAULT 0,
+        ga       INT NOT NULL DEFAULT 0
+      )
+    `)
+  } catch (e) { console.error("[fixtures] team_career_stats migration:", e.message) }
+})()
+
 // Classic "circle method" round-robin: fix one team, rotate the rest each
 // round. Produces N-1 rounds (N/2 matches each) covering every pairing
 // exactly once — the first half of the season. The second half is derived
@@ -482,6 +499,30 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
           `, [r === "win" ? 1 : 0, r === "draw" ? 1 : 0, r === "loss" ? 1 : 0, pts, teamId])
         }
       }
+
+      // Always update career stats (all fixtures including knockouts, all seasons)
+      for (const [teamId, r, goalsFor, goalsAgainst] of [
+        [fix.home_team_id, homeResult, homeGoals, awayGoals],
+        [fix.away_team_id, awayResult, awayGoals, homeGoals],
+      ]) {
+        await q(`
+          INSERT INTO team_career_stats (team_id, played, won, drawn, lost, gf, ga)
+          VALUES ($1, 1, $2, $3, $4, $5, $6)
+          ON CONFLICT (team_id) DO UPDATE SET
+            played = team_career_stats.played + 1,
+            won    = team_career_stats.won    + $2,
+            drawn  = team_career_stats.drawn  + $3,
+            lost   = team_career_stats.lost   + $4,
+            gf     = team_career_stats.gf     + $5,
+            ga     = team_career_stats.ga     + $6
+        `, [
+          teamId,
+          r === "win"  ? 1 : 0,
+          r === "draw" ? 1 : 0,
+          r === "loss" ? 1 : 0,
+          goalsFor, goalsAgainst,
+        ])
+      }
     })
 
     // Recalculate form for all players in the fixture after close
@@ -896,6 +937,9 @@ router.post("/:id/reopen", authenticate, adminOnly, async (req, res, next) => {
     const homeResult = homeScore > awayScore ? "win" : homeScore < awayScore ? "loss" : "draw"
     const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
+    const homeGoalsStored = fix.home_goals ?? 0
+    const awayGoalsStored = fix.away_goals ?? 0
+
     await withTransaction(async ({ query: q }) => {
       // Reverse the played/won/drawn/lost/score_points applied on close
       for (const [teamId, result] of [
@@ -912,6 +956,23 @@ router.post("/:id/reopen", authenticate, adminOnly, async (req, res, next) => {
             score_points = GREATEST(score_points - $4,   0)
           WHERE id = $5
         `, [result === "win" ? 1 : 0, result === "draw" ? 1 : 0, result === "loss" ? 1 : 0, pts, teamId])
+      }
+
+      // Reverse career stats too
+      for (const [teamId, result, gf, ga] of [
+        [fix.home_team_id, homeResult, homeGoalsStored, awayGoalsStored],
+        [fix.away_team_id, awayResult, awayGoalsStored, homeGoalsStored],
+      ]) {
+        await q(`
+          UPDATE team_career_stats SET
+            played = GREATEST(played - 1,    0),
+            won    = GREATEST(won    - $1,   0),
+            drawn  = GREATEST(drawn  - $2,   0),
+            lost   = GREATEST(lost   - $3,   0),
+            gf     = GREATEST(gf     - $4,   0),
+            ga     = GREATEST(ga     - $5,   0)
+          WHERE team_id = $6
+        `, [result === "win" ? 1 : 0, result === "draw" ? 1 : 0, result === "loss" ? 1 : 0, gf, ga, teamId])
       }
 
       // Reset fixture back to upcoming, clear stored scores

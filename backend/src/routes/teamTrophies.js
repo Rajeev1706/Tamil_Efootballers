@@ -209,14 +209,17 @@ router.get("/:teamId", async (req, res, next) => {
       return { ...h, squad: squadRes.rows, seasonStats: statsRes.rows[0] || {} }
     }))
 
-    // Overall win rate — aggregate seasonStats from S8 onwards (S6/S7 had no
-    // team_id on match_records and fixtures are deleted, so those seasons
-    // can't be recovered). S8 is the baseline; every future season adds to it.
-    const WIN_RATE_FROM_SEASON = 8
-    const totalMatches = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.matches || 0) : s, 0)
-    const totalWins    = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.wins    || 0) : s, 0)
-    const totalDraws   = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.draws   || 0) : s, 0)
-    const totalLosses  = historyWithSquad.reduce((s, h) => h.season_number >= WIN_RATE_FROM_SEASON ? s + (h.seasonStats.losses  || 0) : s, 0)
+    // Overall win rate — read directly from team_career_stats (persisted across
+    // all seasons, including knockouts, never reset on new season)
+    const careerRes = await query(
+      "SELECT played, won, drawn, lost FROM team_career_stats WHERE team_id = $1",
+      [req.params.teamId]
+    )
+    const career      = careerRes.rows[0] || { played: 0, won: 0, drawn: 0, lost: 0 }
+    const totalMatches = career.played
+    const totalWins    = career.won
+    const totalDraws   = career.drawn
+    const totalLosses  = career.lost
     const overallRate  = totalMatches > 0
       ? Math.round((totalWins / totalMatches) * 1000) / 10
       : null
