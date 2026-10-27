@@ -59,9 +59,27 @@ export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId,
   )
 }
 
+// Convert an image URL to a base64 data URL (bypasses CORS issues in html-to-image)
+async function toDataUrl(url) {
+  if (!url) return null
+  try {
+    const res  = await fetch(url)
+    const blob = await res.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
 function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam }) {
   const [expanded, setExpanded] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [myLogoB64,  setMyLogoB64]  = useState(null)
+  const [oppLogoB64, setOppLogoB64] = useState(null)
   const exportRef = useRef(null)
 
   const isHome    = fixture.homeTeamId === myTeamId
@@ -85,10 +103,6 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
     return sum + (isMine ? (r.opponentScore ?? 0) : (r.playerScore ?? 0))
   }, 0)
 
-  const matchOutcome = existingRecords.length === 0
-    ? null
-    : myTotal > oppTotal ? "win" : myTotal < oppTotal ? "loss" : "draw"
-
   // League points: win=3, draw=1, loss=0 (per individual match)
   const myPoints  = existingRecords.reduce((sum, r) => {
     const isMine  = myPlayers.some(p => p.id === r.playerId)
@@ -101,9 +115,21 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
     return sum + (result === "loss" ? 3 : result === "draw" ? 1 : 0)
   }, 0)
 
+  // Outcome is determined by POINTS, not goals
+  const matchOutcome = existingRecords.length === 0
+    ? null
+    : myPoints > oppPoints ? "win" : myPoints < oppPoints ? "loss" : "draw"
+
   async function handleExport() {
     if (!exportRef.current || existingRecords.length === 0) return
     setExporting(true)
+    // Pre-fetch logos as base64 so html-to-image can embed them (avoids CORS blank circles)
+    const [mb64, ob64] = await Promise.all([
+      toDataUrl(myTeam?.logoUrl),
+      toDataUrl(oppLogoUrl),
+    ])
+    setMyLogoB64(mb64)
+    setOppLogoB64(ob64)
     await new Promise(r => setTimeout(r, 300))
     try {
       const dataUrl = await toPng(exportRef.current, { cacheBust: true, pixelRatio: 2 })
@@ -115,6 +141,8 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
       console.error(e)
     } finally {
       setExporting(false)
+      setMyLogoB64(null)
+      setOppLogoB64(null)
     }
   }
 
@@ -224,8 +252,9 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
         <MatchExportCard
           ref={exportRef}
           myTeam={myTeam}
+          myLogoOverride={myLogoB64}
           oppName={oppName}
-          oppLogoUrl={oppLogoUrl}
+          oppLogoUrl={oppLogoB64 ?? oppLogoUrl}
           round={fixture.round}
           date={fixture.date}
           records={existingRecords}
@@ -356,11 +385,11 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
 import { forwardRef } from "react"
 
 const MatchExportCard = forwardRef(function MatchExportCard(
-  { myTeam, oppName, oppLogoUrl, round, date, records, myPlayers, myTotal, oppTotal, myPoints, oppPoints, outcome },
+  { myTeam, myLogoOverride, oppName, oppLogoUrl, round, date, records, myPlayers, myTotal, oppTotal, myPoints, oppPoints, outcome },
   ref
 ) {
   const myName   = myTeam?.name ?? "My Team"
-  const myLogo   = myTeam?.logoUrl
+  const myLogo   = myLogoOverride ?? myTeam?.logoUrl
   const myColor  = outcome === "win"  ? "#34d399" : outcome === "loss" ? "#f87171" : "#60a5fa"
   const oppColor = outcome === "loss" ? "#34d399" : outcome === "win"  ? "#f87171" : "#60a5fa"
 
