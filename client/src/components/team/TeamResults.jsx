@@ -343,100 +343,161 @@ const MatchExportCard = forwardRef(function MatchExportCard(
   { myTeam, oppName, oppLogoUrl, round, date, records, myPlayers, myTotal, oppTotal, outcome },
   ref
 ) {
-  const myName = myTeam?.name ?? "My Team"
-  const myLogo = myTeam?.logoUrl
+  const myName   = myTeam?.name ?? "My Team"
+  const myLogo   = myTeam?.logoUrl
+  const myColor  = outcome === "win"  ? "#34d399" : outcome === "loss" ? "#f87171" : "#60a5fa"
+  const oppColor = outcome === "loss" ? "#34d399" : outcome === "win"  ? "#f87171" : "#60a5fa"
 
-  const outcomeBg    = outcome === "win"  ? "#065f46" : outcome === "loss" ? "#4c0519" : outcome === "draw" ? "#78350f" : "#1e293b"
-  const outcomeText  = outcome === "win"  ? "#34d399" : outcome === "loss" ? "#fb7185" : outcome === "draw" ? "#fbbf24" : "#94a3b8"
+  const winnerName  = outcome === "win" ? myName : outcome === "loss" ? oppName : null
   const outcomeLabel = outcome === "win"  ? `🏆 ${myName} WINS!`
                      : outcome === "loss" ? `🏆 ${oppName} WINS!`
-                     : outcome === "draw" ? "DRAW" : "—"
+                     : outcome === "draw" ? "⚖️ DRAW" : "—"
+  const outcomeBg   = outcome === "win"  ? "linear-gradient(90deg,#064e3b,#065f46)"
+                    : outcome === "loss" ? "linear-gradient(90deg,#450a0a,#4c0519)"
+                    : outcome === "draw" ? "linear-gradient(90deg,#431407,#78350f)"
+                    : "linear-gradient(90deg,#1e293b,#1e293b)"
+  const outcomeText = outcome === "win"  ? "#34d399" : outcome === "loss" ? "#fb7185" : outcome === "draw" ? "#fbbf24" : "#94a3b8"
 
   return (
     <div
       ref={ref}
       style={{
-        width: 480,
-        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        width: 700,
+        background: "linear-gradient(160deg, #060d1a 0%, #0c1526 50%, #0f1e38 100%)",
         borderRadius: 20,
         overflow: "hidden",
-        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
         color: "#f8fafc",
       }}
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{
-        background: "#0f172a", padding: "16px 24px", borderBottom: "1px solid #1e293b",
-        display: "flex", alignItems: "center", gap: 12
+        background: "linear-gradient(90deg, #0f1e38 0%, #060d1a 100%)",
+        padding: "18px 28px",
+        borderBottom: "2px solid #1e3a5f",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <img src={tefLogo} alt="TEF"
-          style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
-        <div>
-          <p style={{ fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase", margin: 0 }}>
-            Round {round} · Tamil eFootball League
-          </p>
-          <p style={{ fontSize: 12, color: "#475569", margin: "3px 0 0" }}>
-            {date?.slice(0, 10) ?? ""}
-          </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <img src={tefLogo} alt="TEF"
+            style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 10 }} />
+          <div>
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "#f1f5f9", letterSpacing: 1 }}>
+              MATCH RESULT
+            </p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#64748b", letterSpacing: 3, textTransform: "uppercase" }}>
+              Tamil eFootball League
+            </p>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#94a3b8" }}>Round {round}</p>
+          <p style={{ margin: "3px 0 0", fontSize: 11, color: "#475569" }}>{date?.slice(0, 10) ?? ""}</p>
         </div>
       </div>
 
-      {/* Teams + Score */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 24px 20px" }}>
-        {/* My Team */}
-        <div style={{ flex: 1, textAlign: "center" }}>
+      {/* ── Team banner ── */}
+      <div style={{
+        display: "flex", alignItems: "stretch",
+        borderBottom: "1px solid #1e293b",
+      }}>
+        {/* My team */}
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "28px 20px 20px",
+          background: `linear-gradient(160deg, ${myColor}18 0%, transparent 100%)`,
+          borderRight: "1px solid #1e293b",
+        }}>
           {myLogo ? (
-            <img src={myLogo} alt={myName}
-              style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", margin: "0 auto 10px", display: "block", border: "2px solid #334155" }} />
+            <img src={myLogo} alt={myName} style={{
+              width: 80, height: 80, borderRadius: "50%", objectFit: "cover",
+              border: `3px solid ${myColor}99`, marginBottom: 12,
+              boxShadow: `0 0 20px ${myColor}44`,
+            }} />
           ) : (
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1e3a5f", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 900 }}>
-              {myName.charAt(0)}
-            </div>
+            <div style={{
+              width: 80, height: 80, borderRadius: "50%", background: "#1e3a5f",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 28, fontWeight: 900, marginBottom: 12,
+              border: `3px solid ${myColor}88`,
+            }}>{myName.charAt(0)}</div>
           )}
-          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: "#f1f5f9" }}>{myName}</p>
-          <p style={{ fontSize: 42, fontWeight: 900, margin: "4px 0 0", lineHeight: 1,
-            color: outcome === "win" ? "#34d399" : outcome === "loss" ? "#fb7185" : "#f8fafc"
-          }}>{myTotal}</p>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 900, color: myColor, letterSpacing: 0.5, textAlign: "center" }}>
+            {myName.toUpperCase()}
+          </p>
+          <p style={{ margin: "12px 0 0", fontSize: 64, fontWeight: 900, lineHeight: 1, color: myColor,
+            textShadow: `0 0 30px ${myColor}88` }}>
+            {myTotal}
+          </p>
         </div>
 
-        {/* VS + outcome */}
-        <div style={{ textAlign: "center", padding: "0 12px" }}>
+        {/* Centre VS + outcome */}
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "0 20px", minWidth: 160,
+          background: "linear-gradient(180deg, #0c1526 0%, #060d1a 100%)",
+        }}>
           <div style={{
-            background: outcomeBg, borderRadius: 12, padding: "8px 14px",
-            border: `1px solid ${outcomeText}44`
+            background: outcomeBg, borderRadius: 14, padding: "10px 18px",
+            border: `1px solid ${outcomeText}55`,
+            boxShadow: `0 4px 24px ${outcomeText}22`,
+            textAlign: "center", marginBottom: 14,
           }}>
-            <p style={{ fontSize: 13, fontWeight: 900, color: outcomeText, margin: 0, letterSpacing: 0.5 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 900, color: outcomeText, letterSpacing: 0.5 }}>
               {outcomeLabel}
             </p>
           </div>
-          <p style={{ fontSize: 11, color: "#475569", margin: "8px 0 0" }}>vs</p>
+          <p style={{ margin: 0, fontSize: 11, color: "#334155", letterSpacing: 3, textTransform: "uppercase" }}>vs</p>
         </div>
 
         {/* Opponent */}
-        <div style={{ flex: 1, textAlign: "center" }}>
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          padding: "28px 20px 20px",
+          background: `linear-gradient(160deg, ${oppColor}18 0%, transparent 100%)`,
+          borderLeft: "1px solid #1e293b",
+        }}>
           {oppLogoUrl ? (
-            <img src={oppLogoUrl} alt={oppName}
-              style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", margin: "0 auto 10px", display: "block", border: "2px solid #334155" }} />
+            <img src={oppLogoUrl} alt={oppName} style={{
+              width: 80, height: 80, borderRadius: "50%", objectFit: "cover",
+              border: `3px solid ${oppColor}99`, marginBottom: 12,
+              boxShadow: `0 0 20px ${oppColor}44`,
+            }} />
           ) : (
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#2d1b3d", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 900, border: "2px solid #334155" }}>
-              {oppName?.charAt(0)}
-            </div>
+            <div style={{
+              width: 80, height: 80, borderRadius: "50%", background: "#2d1b3d",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 28, fontWeight: 900, marginBottom: 12,
+              border: `3px solid ${oppColor}88`,
+            }}>{oppName?.charAt(0)}</div>
           )}
-          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: "#f1f5f9" }}>{oppName}</p>
-          <p style={{ fontSize: 42, fontWeight: 900, margin: "4px 0 0", lineHeight: 1,
-            color: outcome === "loss" ? "#34d399" : outcome === "win" ? "#fb7185" : "#f8fafc"
-          }}>{oppTotal}</p>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 900, color: oppColor, letterSpacing: 0.5, textAlign: "center" }}>
+            {oppName?.toUpperCase()}
+          </p>
+          <p style={{ margin: "12px 0 0", fontSize: 64, fontWeight: 900, lineHeight: 1, color: oppColor,
+            textShadow: `0 0 30px ${oppColor}88` }}>
+            {oppTotal}
+          </p>
         </div>
       </div>
 
-      {/* Divider */}
-      <div style={{ height: 1, background: "#1e293b", margin: "0 24px" }} />
+      {/* ── Player results table ── */}
+      <div style={{ padding: "0 0 8px" }}>
+        {/* Table header */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 90px 1fr 60px",
+          padding: "10px 24px",
+          background: "#0a1122",
+          borderBottom: "1px solid #1e293b",
+        }}>
+          {[myName.toUpperCase(), "SCORE", oppName?.toUpperCase(), ""].map((h, i) => (
+            <div key={i} style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 2, color: "#475569",
+              textAlign: i === 0 ? "left" : i === 1 ? "center" : i === 2 ? "right" : "center",
+            }}>{h}</div>
+          ))}
+        </div>
 
-      {/* Player rows */}
-      <div style={{ padding: "16px 24px 20px" }}>
-        <p style={{ fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase", margin: "0 0 12px" }}>
-          Player Results
-        </p>
         {records.map((r, i) => {
           const isMine    = myPlayers.some(p => p.id === r.playerId)
           const myPName   = isMine ? r.playerName  : r.opponentName
@@ -445,33 +506,53 @@ const MatchExportCard = forwardRef(function MatchExportCard(
           const myS       = isMine ? r.playerScore  : r.opponentScore
           const oppS      = isMine ? r.opponentScore : r.playerScore
 
-          const chipBg    = result === "win" ? "#065f46" : result === "loss" ? "#4c0519" : "#78350f"
+          const chipBg    = result === "win" ? "#064e3b" : result === "loss" ? "#450a0a" : "#431407"
           const chipColor = result === "win" ? "#34d399" : result === "loss" ? "#fb7185" : "#fbbf24"
+          const chipBorder = result === "win" ? "#34d39944" : result === "loss" ? "#fb718544" : "#fbbf2444"
           const chipLabel = result === "win" ? "WIN" : result === "loss" ? "LOSS" : "DRAW"
 
           return (
             <div key={r.id} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              background: i % 2 === 0 ? "#ffffff08" : "transparent",
-              borderRadius: 10, padding: "10px 12px", marginBottom: 6
+              display: "grid",
+              gridTemplateColumns: "1fr 90px 1fr 60px",
+              alignItems: "center",
+              padding: "11px 24px",
+              background: i % 2 === 0 ? "#ffffff06" : "transparent",
+              borderBottom: i < records.length - 1 ? "1px solid #ffffff08" : "none",
             }}>
-              <span style={{ fontSize: 13, color: "#e2e8f0", flex: 1, textAlign: "left" }}>{myPName}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", margin: "0 8px", fontVariantNumeric: "tabular-nums" }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}>{myPName}</span>
+              <span style={{
+                fontSize: 14, fontWeight: 800, color: "#94a3b8", textAlign: "center",
+                fontVariantNumeric: "tabular-nums", letterSpacing: 1,
+              }}>
                 {r.isWalkover ? "WO" : `${myS ?? 0} – ${oppS ?? 0}`}
               </span>
-              <span style={{ fontSize: 13, color: "#e2e8f0", flex: 1, textAlign: "right" }}>{oppPName}</span>
-              <span style={{
-                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                background: chipBg, color: chipColor, marginLeft: 10, minWidth: 38, textAlign: "center"
-              }}>{chipLabel}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#e2e8f0", textAlign: "right" }}>{oppPName}</span>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, padding: "4px 10px", borderRadius: 7,
+                  background: chipBg, color: chipColor,
+                  border: `1px solid ${chipBorder}`,
+                  letterSpacing: 1,
+                }}>{chipLabel}</span>
+              </div>
             </div>
           )
         })}
       </div>
 
-      {/* Footer */}
-      <div style={{ background: "#0f172a", padding: "12px 24px", borderTop: "1px solid #1e293b", textAlign: "center" }}>
-        <p style={{ fontSize: 11, color: "#334155", margin: 0 }}>Tamil eFootball League · tamilefootballers.com</p>
+      {/* ── Footer ── */}
+      <div style={{
+        background: "#060d1a", padding: "12px 28px",
+        borderTop: "2px solid #1e3a5f",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <p style={{ margin: 0, fontSize: 11, color: "#334155" }}>tamilefootballers.com</p>
+        <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399" }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#60a5fa" }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24" }} />
+        </div>
       </div>
     </div>
   )
