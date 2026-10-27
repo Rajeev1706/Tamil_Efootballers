@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
-import { CheckCircle, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Save } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { CheckCircle, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Save, Download } from "lucide-react"
+import { toPng } from "html-to-image"
 import { cn } from "../../lib/utils"
 import { useLogTeamRecord, useFixtureRecords, useEditTeamRecord, useDeleteTeamRecord, useLineup } from "../../lib/queries"
 
@@ -18,14 +19,13 @@ const KO_LABELS = {
   europa_final: "Europa Final", europa_7th: "7th / 8th Place",
 }
 
-export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId }) {
+export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId, myTeam }) {
   const upcomingFixtures = fixtures.filter(f => f.status === "upcoming")
   const currentRound = upcomingFixtures.length > 0
     ? Math.min(...upcomingFixtures.map(f => f.round))
     : null
   const currentFixtures = upcomingFixtures.filter(f => f.round === currentRound)
 
-  // Build matchday label — knockout legs get a descriptive label
   const firstFix = currentFixtures[0]
   const matchdayLabel = firstFix?.isKnockoutLeg && firstFix?.knockoutMatchType
     ? `${KO_LABELS[firstFix.knockoutMatchType] ?? "Knockout"} · Leg ${firstFix.knockoutLeg}`
@@ -51,14 +51,17 @@ export default function TeamResults({ fixtures, myPlayers, allPlayers, myTeamId 
           myPlayers={myPlayers}
           allPlayers={allPlayers}
           myTeamId={myTeamId}
+          myTeam={myTeam}
         />
       ))}
     </div>
   )
 }
 
-function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
+function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam }) {
   const [expanded, setExpanded] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const exportRef = useRef(null)
 
   const isHome    = fixture.homeTeamId === myTeamId
   const oppTeamId = isHome ? fixture.awayTeamId : fixture.homeTeamId
@@ -69,6 +72,37 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
   const { data: existingRecords = [], refetch } = useFixtureRecords(fixture.id)
   const { data: lineup = [] } = useLineup(fixture.id)
   const logRecord = useLogTeamRecord()
+
+  // Compute aggregate totals from logged records
+  const myTotal  = existingRecords.reduce((sum, r) => {
+    const isMine = myPlayers.some(p => p.id === r.playerId)
+    return sum + (isMine ? (r.playerScore ?? 0) : (r.opponentScore ?? 0))
+  }, 0)
+  const oppTotal = existingRecords.reduce((sum, r) => {
+    const isMine = myPlayers.some(p => p.id === r.playerId)
+    return sum + (isMine ? (r.opponentScore ?? 0) : (r.playerScore ?? 0))
+  }, 0)
+
+  const matchOutcome = existingRecords.length === 0
+    ? null
+    : myTotal > oppTotal ? "win" : myTotal < oppTotal ? "loss" : "draw"
+
+  async function handleExport() {
+    if (!exportRef.current || existingRecords.length === 0) return
+    setExporting(true)
+    await new Promise(r => setTimeout(r, 300))
+    try {
+      const dataUrl = await toPng(exportRef.current, { cacheBust: true, pixelRatio: 2 })
+      const link = document.createElement("a")
+      link.download = `${myTeam?.name ?? "My Team"}-vs-${oppName}-R${fixture.round}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   // Pre-fill entries from saved lineup if available
   const buildInitialEntries = () => {
@@ -87,14 +121,12 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
 
   const [entries, setEntries] = useState(buildInitialEntries)
 
-  // Re-fill when lineup loads (async)
   useEffect(() => {
     if (lineup.length > 0 && entries.every(e => !e.myPlayerId && !e.oppPlayerId)) {
       setEntries(buildInitialEntries())
     }
   }, [lineup.length])
 
-  // When existing records arrive, remove entry rows for players already logged
   useEffect(() => {
     if (existingRecords.length === 0) return
     const loggedMyIds = existingRecords.flatMap(r => [
@@ -105,12 +137,12 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
       const filtered = prev.filter(e =>
         !e.myPlayerId || !loggedMyIds.includes(Number(e.myPlayerId))
       )
-      // Always keep at least one empty row
       return filtered.length > 0
         ? filtered
         : [{ id: Date.now(), myPlayerId: "", oppPlayerId: "", result: "", playerScore: "", oppScore: "" }]
     })
   }, [existingRecords.length])
+
   const usedMyIds  = existingRecords.flatMap(r => [
     myPlayers.find(p => p.id === r.playerId)?.id,
     myPlayers.find(p => p.id === r.opponentId)?.id,
@@ -172,71 +204,265 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId }) {
   }
 
   return (
-    <div className="card overflow-hidden">
-      {/* Fixture header */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <span className={cn(
-            "w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center",
-            isHome ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
-          )}>
-            {isHome ? "H" : "A"}
-          </span>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-white">vs {oppName}</p>
-            <p className="text-xs text-slate-500">Round {fixture.round} · {fixture.date?.slice(0, 10) ?? ""}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">{existingRecords.length} results logged</span>
-          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
-        </div>
-      </button>
+    <>
+      {/* Hidden export card — rendered off-screen for PNG capture */}
+      <div className="fixed -left-[9999px] -top-[9999px] pointer-events-none" aria-hidden>
+        <MatchExportCard
+          ref={exportRef}
+          myTeam={myTeam}
+          oppName={oppName}
+          round={fixture.round}
+          date={fixture.date}
+          records={existingRecords}
+          myPlayers={myPlayers}
+          myTotal={myTotal}
+          oppTotal={oppTotal}
+          outcome={matchOutcome}
+        />
+      </div>
 
-      {expanded && (
-        <div className="border-t border-surface-border px-5 py-4 space-y-4">
-
-          {/* Already logged records */}
-          {existingRecords.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Logged results</p>
-              {existingRecords.map(r => {
-                const isMine = myPlayers.some(p => p.id === r.playerId)
-                return (
-                  <LoggedResultRow key={r.id} record={r} isMine={isMine} onChanged={refetch} />
-                )
-              })}
+      <div className="card overflow-hidden">
+        {/* Fixture header */}
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className={cn(
+              "w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center",
+              isHome ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
+            )}>
+              {isHome ? "H" : "A"}
+            </span>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">vs {oppName}</p>
+              <p className="text-xs text-slate-500">Round {fixture.round} · {fixture.date?.slice(0, 10) ?? ""}</p>
             </div>
-          )}
-
-          {/* New entries */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add results</p>
-            {entries.map(entry => (
-              <EntryRow
-                key={entry.id}
-                entry={entry}
-                myPlayers={availableMyPlayers(entry.id)}
-                oppPlayers={availableOppPlayers(entry.id)}
-                onChange={(field, value) => updateEntry(entry.id, field, value)}
-                onSubmit={() => submitEntry(entry)}
-                onRemove={() => removeEntry(entry.id)}
-                submitting={logRecord.isPending}
-              />
-            ))}
-            <button onClick={addEntry} className="text-sm text-accent hover:text-accent/80 transition-colors">
-              + Add another result
-            </button>
           </div>
-        </div>
-      )}
-    </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500">{existingRecords.length} results logged</span>
+            {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+          </div>
+        </button>
+
+        {expanded && (
+          <div className="border-t border-surface-border px-5 py-4 space-y-4">
+
+            {/* Logged records */}
+            {existingRecords.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Logged results</p>
+                  <button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 border border-accent/25 text-accent text-xs font-semibold hover:bg-accent/20 transition-colors disabled:opacity-50"
+                  >
+                    {exporting
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <Download className="w-3 h-3" />}
+                    {exporting ? "Exporting…" : "Export PNG"}
+                  </button>
+                </div>
+
+                {/* Score summary bar */}
+                {existingRecords.length > 0 && (
+                  <div className={cn(
+                    "rounded-xl px-4 py-3 flex items-center justify-between border",
+                    matchOutcome === "win"  ? "bg-emerald-500/10 border-emerald-500/25" :
+                    matchOutcome === "loss" ? "bg-rose-500/10 border-rose-500/25" :
+                    matchOutcome === "draw" ? "bg-amber-400/10 border-amber-400/25" :
+                    "bg-surface border-surface-border"
+                  )}>
+                    <div className="text-center">
+                      <p className="text-xs text-slate-400 truncate max-w-[90px]">{myTeam?.name ?? "My Team"}</p>
+                      <p className="text-2xl font-black text-white">{myTotal}</p>
+                    </div>
+                    <div className="text-center px-3">
+                      <p className={cn(
+                        "text-xs font-bold uppercase tracking-widest",
+                        matchOutcome === "win"  ? "text-emerald-400" :
+                        matchOutcome === "loss" ? "text-rose-400" :
+                        matchOutcome === "draw" ? "text-amber-400" : "text-slate-500"
+                      )}>
+                        {matchOutcome === "win" ? "WIN" : matchOutcome === "loss" ? "LOSS" : matchOutcome === "draw" ? "DRAW" : "—"}
+                      </p>
+                      <p className="text-slate-600 text-xs mt-0.5">pts</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-slate-400 truncate max-w-[90px]">{oppName}</p>
+                      <p className="text-2xl font-black text-white">{oppTotal}</p>
+                    </div>
+                  </div>
+                )}
+
+                {existingRecords.map(r => {
+                  const isMine = myPlayers.some(p => p.id === r.playerId)
+                  return (
+                    <LoggedResultRow key={r.id} record={r} isMine={isMine} onChanged={refetch} />
+                  )
+                })}
+              </div>
+            )}
+
+            {/* New entries */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add results</p>
+              {entries.map(entry => (
+                <EntryRow
+                  key={entry.id}
+                  entry={entry}
+                  myPlayers={availableMyPlayers(entry.id)}
+                  oppPlayers={availableOppPlayers(entry.id)}
+                  onChange={(field, value) => updateEntry(entry.id, field, value)}
+                  onSubmit={() => submitEntry(entry)}
+                  onRemove={() => removeEntry(entry.id)}
+                  submitting={logRecord.isPending}
+                />
+              ))}
+              <button onClick={addEntry} className="text-sm text-accent hover:text-accent/80 transition-colors">
+                + Add another result
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
+// ---------------------------------------------------------------------------
+// Hidden export card — captured as PNG
+// ---------------------------------------------------------------------------
+import { forwardRef } from "react"
+
+const MatchExportCard = forwardRef(function MatchExportCard(
+  { myTeam, oppName, round, date, records, myPlayers, myTotal, oppTotal, outcome },
+  ref
+) {
+  const myName = myTeam?.name ?? "My Team"
+  const myLogo = myTeam?.logoUrl
+
+  const outcomeBg    = outcome === "win"  ? "#065f46" : outcome === "loss" ? "#4c0519" : outcome === "draw" ? "#78350f" : "#1e293b"
+  const outcomeText  = outcome === "win"  ? "#34d399" : outcome === "loss" ? "#fb7185" : outcome === "draw" ? "#fbbf24" : "#94a3b8"
+  const outcomeLabel = outcome === "win"  ? "🏆 WINNER!" : outcome === "loss" ? "DEFEAT" : outcome === "draw" ? "DRAW" : "—"
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        width: 480,
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        borderRadius: 20,
+        overflow: "hidden",
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        color: "#f8fafc",
+      }}
+    >
+      {/* Header */}
+      <div style={{ background: "#0f172a", padding: "20px 24px 16px", borderBottom: "1px solid #1e293b" }}>
+        <p style={{ fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase", margin: 0 }}>
+          Round {round} · Tamil eFootball League
+        </p>
+        <p style={{ fontSize: 12, color: "#475569", margin: "4px 0 0" }}>
+          {date?.slice(0, 10) ?? ""}
+        </p>
+      </div>
+
+      {/* Teams + Score */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 24px 20px" }}>
+        {/* My Team */}
+        <div style={{ flex: 1, textAlign: "center" }}>
+          {myLogo ? (
+            <img src={myLogo} alt={myName}
+              style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", margin: "0 auto 10px", display: "block", border: "2px solid #334155" }} />
+          ) : (
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1e3a5f", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 900 }}>
+              {myName.charAt(0)}
+            </div>
+          )}
+          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: "#f1f5f9" }}>{myName}</p>
+          <p style={{ fontSize: 42, fontWeight: 900, margin: "4px 0 0", lineHeight: 1,
+            color: outcome === "win" ? "#34d399" : outcome === "loss" ? "#fb7185" : "#f8fafc"
+          }}>{myTotal}</p>
+        </div>
+
+        {/* VS + outcome */}
+        <div style={{ textAlign: "center", padding: "0 16px" }}>
+          <div style={{
+            background: outcomeBg, borderRadius: 12, padding: "8px 16px",
+            border: `1px solid ${outcomeText}44`
+          }}>
+            <p style={{ fontSize: 14, fontWeight: 900, color: outcomeText, margin: 0, letterSpacing: 1 }}>
+              {outcomeLabel}
+            </p>
+          </div>
+          <p style={{ fontSize: 11, color: "#475569", margin: "8px 0 0" }}>vs</p>
+        </div>
+
+        {/* Opponent */}
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#2d1b3d", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 900, border: "2px solid #334155" }}>
+            {oppName?.charAt(0)}
+          </div>
+          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: "#f1f5f9" }}>{oppName}</p>
+          <p style={{ fontSize: 42, fontWeight: 900, margin: "4px 0 0", lineHeight: 1,
+            color: outcome === "loss" ? "#34d399" : outcome === "win" ? "#fb7185" : "#f8fafc"
+          }}>{oppTotal}</p>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: "#1e293b", margin: "0 24px" }} />
+
+      {/* Player rows */}
+      <div style={{ padding: "16px 24px 20px" }}>
+        <p style={{ fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase", margin: "0 0 12px" }}>
+          Player Results
+        </p>
+        {records.map((r, i) => {
+          const isMine    = myPlayers.some(p => p.id === r.playerId)
+          const myPName   = isMine ? r.playerName  : r.opponentName
+          const oppPName  = isMine ? r.opponentName : r.playerName
+          const result    = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw")
+          const myS       = isMine ? r.playerScore  : r.opponentScore
+          const oppS      = isMine ? r.opponentScore : r.playerScore
+
+          const chipBg    = result === "win" ? "#065f46" : result === "loss" ? "#4c0519" : "#78350f"
+          const chipColor = result === "win" ? "#34d399" : result === "loss" ? "#fb7185" : "#fbbf24"
+          const chipLabel = result === "win" ? "WIN" : result === "loss" ? "LOSS" : "DRAW"
+
+          return (
+            <div key={r.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: i % 2 === 0 ? "#ffffff08" : "transparent",
+              borderRadius: 10, padding: "10px 12px", marginBottom: 6
+            }}>
+              <span style={{ fontSize: 13, color: "#e2e8f0", flex: 1, textAlign: "left" }}>{myPName}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", margin: "0 8px", fontVariantNumeric: "tabular-nums" }}>
+                {r.isWalkover ? "WO" : `${myS ?? 0} – ${oppS ?? 0}`}
+              </span>
+              <span style={{ fontSize: 13, color: "#e2e8f0", flex: 1, textAlign: "right" }}>{oppPName}</span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+                background: chipBg, color: chipColor, marginLeft: 10, minWidth: 38, textAlign: "center"
+              }}>{chipLabel}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{ background: "#0f172a", padding: "12px 24px", borderTop: "1px solid #1e293b", textAlign: "center" }}>
+        <p style={{ fontSize: 11, color: "#334155", margin: 0 }}>Tamil eFootball League · tamilefootballers.com</p>
+      </div>
+    </div>
+  )
+})
+
+// ---------------------------------------------------------------------------
+// LoggedResultRow
+// ---------------------------------------------------------------------------
 function LoggedResultRow({ record: r, isMine, onChanged }) {
   const editRecord   = useEditTeamRecord()
   const deleteRecord = useDeleteTeamRecord()
@@ -248,7 +474,6 @@ function LoggedResultRow({ record: r, isMine, onChanged }) {
   const result    = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw")
   const myScore   = isMine ? r.playerScore : r.opponentScore
   const oppScore_ = isMine ? r.opponentScore : r.playerScore
-  // A walkover is when this player gave it — result is 'loss' and is_walkover=true from their perspective
   const isWalkoverGiven = r.isWalkover && result === "loss"
   const chip = isWalkoverGiven
     ? { value: "walkover", label: "WO", color: "bg-orange-400/15 text-orange-400 border-orange-400/30" }
@@ -355,6 +580,9 @@ function LoggedResultRow({ record: r, isMine, onChanged }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// EntryRow
+// ---------------------------------------------------------------------------
 function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, submitting }) {
   const isWalkover = entry.result === "walkover"
   const canSubmit = entry.myPlayerId && entry.oppPlayerId && entry.result &&
@@ -362,7 +590,6 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
 
   return (
     <div className="space-y-2 border border-surface-border rounded-xl p-3">
-      {/* Row 1: Your player vs Opp player - stacked on mobile */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <select
           value={entry.myPlayerId}
@@ -372,9 +599,7 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
           <option value="">— Your player —</option>
           {myPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-
         <span className="text-slate-600 text-xs font-bold flex-shrink-0 text-center">vs</span>
-
         <select
           value={entry.oppPlayerId}
           onChange={e => onChange("oppPlayerId", e.target.value)}
@@ -385,7 +610,6 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
         </select>
       </div>
 
-      {/* Row 2: Result */}
       <select
         value={entry.result}
         onChange={e => onChange("result", e.target.value)}
@@ -399,7 +623,6 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
         <option value="walkover_opp">Walkover (Opp gave WO)</option>
       </select>
 
-      {/* Row 3: Score */}
       {!isWalkover ? (
         <div className="flex items-center gap-2">
           <input
@@ -427,7 +650,6 @@ function EntryRow({ entry, myPlayers, oppPlayers, onChange, onSubmit, onRemove, 
         </div>
       )}
 
-      {/* Row 3: Log + Remove buttons */}
       <div className="flex gap-2">
         <button
           onClick={onSubmit}

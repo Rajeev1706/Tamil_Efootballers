@@ -199,6 +199,7 @@ export default function TeamDashboard() {
               myPlayers={myPlayers}
               allPlayers={allPlayers}
               myTeamId={user?.teamId}
+              myTeam={myTeam}
             />
           )}
           {activeTab === "replacement" && (
