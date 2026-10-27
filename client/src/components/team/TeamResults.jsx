@@ -89,6 +89,18 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
     ? null
     : myTotal > oppTotal ? "win" : myTotal < oppTotal ? "loss" : "draw"
 
+  // League points: win=3, draw=1, loss=0 (per individual match)
+  const myPoints  = existingRecords.reduce((sum, r) => {
+    const isMine  = myPlayers.some(p => p.id === r.playerId)
+    const result  = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : r.result)
+    return sum + (result === "win" ? 3 : result === "draw" ? 1 : 0)
+  }, 0)
+  const oppPoints = existingRecords.reduce((sum, r) => {
+    const isMine  = myPlayers.some(p => p.id === r.playerId)
+    const result  = isMine ? r.result : (r.result === "win" ? "loss" : r.result === "loss" ? "win" : r.result)
+    return sum + (result === "loss" ? 3 : result === "draw" ? 1 : 0)
+  }, 0)
+
   async function handleExport() {
     if (!exportRef.current || existingRecords.length === 0) return
     setExporting(true)
@@ -220,6 +232,8 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
           myPlayers={myPlayers}
           myTotal={myTotal}
           oppTotal={oppTotal}
+          myPoints={myPoints}
+          oppPoints={oppPoints}
           outcome={matchOutcome}
         />
       </div>
@@ -340,7 +354,7 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
 import { forwardRef } from "react"
 
 const MatchExportCard = forwardRef(function MatchExportCard(
-  { myTeam, oppName, oppLogoUrl, round, date, records, myPlayers, myTotal, oppTotal, outcome },
+  { myTeam, oppName, oppLogoUrl, round, date, records, myPlayers, myTotal, oppTotal, myPoints, oppPoints, outcome },
   ref
 ) {
   const myName   = myTeam?.name ?? "My Team"
@@ -426,7 +440,13 @@ const MatchExportCard = forwardRef(function MatchExportCard(
           </p>
           <p style={{ margin: "12px 0 0", fontSize: 64, fontWeight: 900, lineHeight: 1, color: myColor,
             textShadow: `0 0 30px ${myColor}88` }}>
-            {myTotal}
+            {myPoints}
+          </p>
+          <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 600, color: `${myColor}99`, letterSpacing: 2, textTransform: "uppercase" }}>
+            PTS
+          </p>
+          <p style={{ margin: "8px 0 0", fontSize: 20, fontWeight: 800, color: `${myColor}cc` }}>
+            {myTotal} <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, opacity: 0.7 }}>GOALS</span>
           </p>
         </div>
 
@@ -475,7 +495,13 @@ const MatchExportCard = forwardRef(function MatchExportCard(
           </p>
           <p style={{ margin: "12px 0 0", fontSize: 64, fontWeight: 900, lineHeight: 1, color: oppColor,
             textShadow: `0 0 30px ${oppColor}88` }}>
-            {oppTotal}
+            {oppPoints}
+          </p>
+          <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: 600, color: `${oppColor}99`, letterSpacing: 2, textTransform: "uppercase" }}>
+            PTS
+          </p>
+          <p style={{ margin: "8px 0 0", fontSize: 20, fontWeight: 800, color: `${oppColor}cc` }}>
+            {oppTotal} <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, opacity: 0.7 }}>GOALS</span>
           </p>
         </div>
       </div>
