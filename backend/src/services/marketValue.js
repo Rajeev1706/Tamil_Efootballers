@@ -61,7 +61,7 @@ const LOSS_MATRIX = {
 }
 
 const BDR_SWING_RATE      = 18 / 120 // halved from the previous 36/120 rate, still uncapped
-// MATCH_VALUE_CEILING removed — match-performance is now uncapped
+const WIN_RATE_CEILING    = 300      // win-rate + BDR combined is capped here; trophies add on top
 
 // One-time bonus per trophy a player has won IN THE CURRENT SEASON ONLY,
 // added after everything else. Reads from player_trophies (season-scoped),
@@ -141,7 +141,9 @@ export async function calculateMarketValue(playerId) {
   const bdrSwing  = ewRaw > 0 ? bdrPoints * BDR_SWING_RATE : 0 // uncapped, added after the ceiling
 
   const mvRaw = matchValue + bdrSwing
-  const baseValue = Math.max(50, Math.round(mvRaw / 5) * 5)
+  // Win-rate performance is capped at 300. Trophy bonuses are added on top
+  // of this ceiling, so a title winner can exceed 300.
+  const baseValue = Math.min(WIN_RATE_CEILING, Math.max(50, Math.round(mvRaw / 5) * 5))
 
   const seasonTrophiesRes = await query(
     `SELECT trophy_column, COUNT(*)::int AS count
