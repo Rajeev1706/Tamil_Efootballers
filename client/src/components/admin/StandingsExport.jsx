@@ -119,136 +119,173 @@ import { forwardRef } from "react"
 const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
   const now = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 
+  const posColors = ["#34d399", "#60a5fa", "#fbbf24", "#c084fc"]
+  const rowBgs    = ["linear-gradient(90deg,#052e16,#064e3b22)", "linear-gradient(90deg,#0c1e3d,#1e3a5f22)", "linear-gradient(90deg,#2a1800,#78350f22)", "linear-gradient(90deg,#1a0a2e,#4c1d9522)"]
+
   return (
     <div
       ref={ref}
       style={{
-        width: 600,
-        background: "linear-gradient(160deg, #0a0f1e 0%, #0f172a 60%, #111827 100%)",
+        width: 700,
+        background: "linear-gradient(160deg, #060d1a 0%, #0c1526 50%, #0f1e38 100%)",
         borderRadius: 20,
         overflow: "hidden",
         fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
         color: "#f8fafc",
       }}
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{
-        background: "linear-gradient(90deg, #1a2744 0%, #0f172a 100%)",
-        padding: "20px 28px 18px",
-        borderBottom: "1px solid #1e293b",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        background: "linear-gradient(90deg, #0f1e38 0%, #060d1a 100%)",
+        padding: "20px 28px",
+        borderBottom: "2px solid #1e3a5f",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {/* TEF App Logo */}
-          <img
-            src={tefLogo}
-            alt="TEF"
-            style={{
-              width: 52,
-              height: 52,
-              objectFit: "contain",
-              borderRadius: 10,
-              flexShrink: 0,
-            }}
-          />
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <img src={tefLogo} alt="TEF"
+            style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 12, flexShrink: 0 }} />
           <div>
             <p style={{ margin: 0, fontSize: 11, color: "#64748b", letterSpacing: 3, textTransform: "uppercase" }}>
               Tamil eFootball League
             </p>
-            <p style={{ margin: "4px 0 0", fontSize: 20, fontWeight: 900, color: "#f1f5f9", letterSpacing: 0.5 }}>
-              Dshann League
+            <p style={{ margin: "5px 0 0", fontSize: 24, fontWeight: 900, color: "#f1f5f9", letterSpacing: 0.5 }}>
+              DSHANN LEAGUE
             </p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#475569" }}>Season Standings</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#60a5fa", fontWeight: 600, letterSpacing: 1 }}>
+              SEASON STANDINGS
+            </p>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <p style={{ margin: 0, fontSize: 11, color: "#475569" }}>{now}</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#475569", fontWeight: 500 }}>{now}</p>
         </div>
       </div>
 
-      {/* Column headers */}
+      {/* ── Column header bar ── */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "28px 1fr 36px 36px 36px 36px 36px 36px 36px 44px",
+        gridTemplateColumns: "40px 1fr 38px 38px 38px 38px 42px 42px 46px 54px",
         padding: "10px 24px",
-        background: "#0d1626",
+        background: "#0a1122",
         borderBottom: "1px solid #1e293b",
       }}>
-        {["#", "Team", "P", "W", "D", "L", "GF", "GA", "GD", "Pts"].map((h, i) => (
+        {["#", "TEAM", "P", "W", "D", "L", "GF", "GA", "GD", "PTS"].map((h, i) => (
           <div key={h} style={{
-            fontSize: 11, fontWeight: 700, color: h === "Pts" ? "#7c3aed" : "#475569",
-            textAlign: i === 1 ? "left" : "center",
-            letterSpacing: 1, textTransform: "uppercase"
+            fontSize: 10, fontWeight: 800,
+            color: h === "PTS" ? "#a78bfa" : "#334155",
+            textAlign: i <= 1 ? (i === 0 ? "center" : "left") : "center",
+            letterSpacing: 1.5,
           }}>{h}</div>
         ))}
       </div>
 
-      {/* Rows */}
-      <div style={{ padding: "8px 0 16px" }}>
+      {/* ── Rows ── */}
+      <div>
         {teams.map((t, i) => {
-          const gd  = (t.gf ?? 0) - (t.ga ?? 0)
-          const isTop4 = i < 4
-          const rowBg = i === 0 ? "#0d2b1a" : i === 1 ? "#0c1e2d" : i === 2 ? "#1a1506" : i === 3 ? "#0f1a2e" : "transparent"
-          const posColor = i === 0 ? "#34d399" : i === 1 ? "#60a5fa" : i === 2 ? "#fbbf24" : i === 3 ? "#c084fc" : "#475569"
+          const gd      = (t.gf ?? 0) - (t.ga ?? 0)
+          const isTop4  = i < 4
+          const posColor = isTop4 ? posColors[i] : "#334155"
+          const rowBg   = isTop4 ? rowBgs[i] : "transparent"
 
           return (
             <div key={t.id} style={{
               display: "grid",
-              gridTemplateColumns: "28px 1fr 36px 36px 36px 36px 36px 36px 36px 44px",
+              gridTemplateColumns: "40px 1fr 38px 38px 38px 38px 42px 42px 46px 54px",
               alignItems: "center",
-              padding: "10px 24px",
+              padding: "11px 24px",
               background: rowBg,
-              borderBottom: i < teams.length - 1 ? "1px solid #ffffff08" : "none",
+              borderBottom: i < teams.length - 1 ? "1px solid #ffffff07" : "none",
             }}>
-              {/* Position */}
-              <div style={{ fontSize: 12, fontWeight: 700, color: posColor, textAlign: "center" }}>
-                {i + 1}
+              {/* Position badge */}
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                {isTop4 ? (
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 6,
+                    background: `${posColor}22`,
+                    border: `1px solid ${posColor}55`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 900, color: posColor,
+                  }}>{i + 1}</div>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>{i + 1}</span>
+                )}
               </div>
 
-              {/* Team name + logo */}
+              {/* Team logo + name */}
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {t.logoUrl ? (
                   <img src={t.logoUrl} alt=""
-                    style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover",
-                      border: isTop4 ? `2px solid ${posColor}44` : "2px solid #1e293b" }} />
+                    style={{
+                      width: 32, height: 32, borderRadius: "50%", objectFit: "cover",
+                      border: isTop4 ? `2px solid ${posColor}66` : "2px solid #1e293b",
+                      boxShadow: isTop4 ? `0 0 8px ${posColor}44` : "none",
+                    }} />
                 ) : (
-                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#1e3a5f",
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%", background: "#1e3a5f",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 900, border: "2px solid #1e293b" }}>
-                    {t.name?.charAt(0)}
-                  </div>
+                    fontSize: 13, fontWeight: 900,
+                    border: isTop4 ? `2px solid ${posColor}55` : "2px solid #1e293b",
+                  }}>{t.name?.charAt(0)}</div>
                 )}
-                <span style={{ fontSize: 13, fontWeight: isTop4 ? 700 : 500, color: isTop4 ? "#f1f5f9" : "#cbd5e1" }}>
-                  {t.name}
-                </span>
+                <span style={{
+                  fontSize: 14, fontWeight: isTop4 ? 800 : 500,
+                  color: isTop4 ? "#f1f5f9" : "#94a3b8",
+                  letterSpacing: isTop4 ? 0.3 : 0,
+                }}>{t.name}</span>
               </div>
 
-              {/* Stats */}
+              {/* Stats: P W D L GF GA */}
               {[t.played ?? 0, t.won ?? 0, t.drawn ?? 0, t.lost ?? 0, t.gf ?? 0, t.ga ?? 0].map((val, vi) => (
-                <div key={vi} style={{ fontSize: 13, textAlign: "center", color: "#94a3b8" }}>{val}</div>
+                <div key={vi} style={{
+                  fontSize: 13, textAlign: "center",
+                  color: vi === 1 && val > 0 ? "#34d399" : vi === 3 && val > 0 ? "#fb7185" : "#64748b",
+                  fontWeight: vi === 1 || vi === 3 ? 700 : 400,
+                }}>{val}</div>
               ))}
 
               {/* GD */}
-              <div style={{ fontSize: 13, textAlign: "center", color: gd > 0 ? "#34d399" : gd < 0 ? "#fb7185" : "#94a3b8" }}>
+              <div style={{
+                fontSize: 13, textAlign: "center", fontWeight: 700,
+                color: gd > 0 ? "#34d399" : gd < 0 ? "#fb7185" : "#475569",
+              }}>
                 {gd > 0 ? `+${gd}` : gd}
               </div>
 
               {/* Points */}
-              <div style={{
-                fontSize: 14, fontWeight: 900, textAlign: "center",
-                color: isTop4 ? posColor : "#e2e8f0",
-                background: isTop4 ? `${posColor}18` : "transparent",
-                borderRadius: 8, padding: "3px 0",
-              }}>{t.points ?? 0}</div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <div style={{
+                  fontSize: 15, fontWeight: 900, minWidth: 36, textAlign: "center",
+                  color: isTop4 ? posColor : "#e2e8f0",
+                  background: isTop4 ? `${posColor}20` : "#ffffff08",
+                  border: isTop4 ? `1px solid ${posColor}44` : "1px solid #1e293b",
+                  borderRadius: 8, padding: "3px 6px",
+                }}>{t.points ?? 0}</div>
+              </div>
             </div>
           )
         })}
       </div>
 
-      {/* Footer */}
-      <div style={{ background: "#080d18", padding: "12px 28px", borderTop: "1px solid #1e293b", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* ── Legend bar ── */}
+      <div style={{
+        display: "flex", gap: 20, padding: "10px 24px",
+        background: "#0a1122", borderTop: "1px solid #1e293b",
+      }}>
+        {[["#34d399","Champions League"], ["#60a5fa","UCL Playoff"], ["#fbbf24","Europa League"], ["#c084fc","Promotion"]].map(([col, lbl]) => (
+          <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: col }} />
+            <span style={{ fontSize: 10, color: "#475569", fontWeight: 500 }}>{lbl}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Footer ── */}
+      <div style={{
+        background: "#060d1a", padding: "12px 28px",
+        borderTop: "2px solid #1e3a5f",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
         <p style={{ margin: 0, fontSize: 11, color: "#334155" }}>tamilefootballers.com</p>
         <div style={{ display: "flex", gap: 6 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399" }} />
