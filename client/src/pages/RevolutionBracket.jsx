@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useState, useRef, forwardRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2 } from "lucide-react"
+import { ArrowLeft, Trophy, CheckCircle, Clock, Trash2, Download, Loader2 } from "lucide-react"
 import { useRevolutionTournament, useSaveRevolutionResult, useResetRevolutionTournament, useUpdateRevolutionMatchPlayers, usePlayers } from "../lib/queries"
 import { cn } from "../lib/utils"
+import { toPng } from "html-to-image"
 import Confetti from "../components/common/Confetti"
 import { TeamLogoIcon } from "../components/common/TeamLogo"
 import PlayerAvatarIcon from "../components/common/PlayerAvatarIcon"
@@ -274,6 +275,8 @@ export default function RevolutionBracket() {
   const resetTournament = useResetRevolutionTournament()
   const [confirmReset, setConfirmReset] = useState(false)
   const [activeRound, setActiveRound] = useState(1)
+  const exportRef  = useRef(null)
+  const [exporting, setExporting] = useState(false)
 
   if (!tournament) return (
     <div className="min-h-screen bg-pitch-900 flex items-center justify-center">
@@ -286,6 +289,24 @@ export default function RevolutionBracket() {
   const currentRound = rounds.includes(activeRound) ? activeRound : rounds[0]
   const roundMatches = matches.filter(m => m.round === currentRound)
   const champion = matches.find(m => m.round === totalRounds && m.status === "completed")?.winnerName
+
+  async function handleExport() {
+    if (!exportRef.current) return
+    setExporting(true)
+    await new Promise(r => setTimeout(r, 300))
+    try {
+      const dataUrl = await toPng(exportRef.current, { cacheBust: true, pixelRatio: 2 })
+      const link = document.createElement("a")
+      const roundLabel = getRoundLabel(currentRound, totalRounds).replace(/\s+/g, "-")
+      link.download = `${tournament.name}-${roundLabel}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-pitch-900 p-4 md:p-6">
@@ -335,9 +356,19 @@ export default function RevolutionBracket() {
         )}
       </div>
 
+      {/* Hidden export card */}
+      <div className="fixed -left-[9999px] -top-[9999px] pointer-events-none" aria-hidden>
+        <BracketRoundCard
+          ref={exportRef}
+          tournamentName={tournament.name}
+          roundLabel={getRoundLabel(currentRound, totalRounds)}
+          matches={roundMatches}
+        />
+      </div>
+
       <div className="card overflow-hidden">
         {rounds.length > 1 && (
-          <div className="flex gap-1.5 px-5 py-3 overflow-x-auto border-b border-surface-border/60">
+          <div className="flex items-center gap-1.5 px-5 py-3 overflow-x-auto border-b border-surface-border/60">
             {rounds.map(r => (
               <button key={r} onClick={() => setActiveRound(r)}
                 className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
@@ -346,6 +377,27 @@ export default function RevolutionBracket() {
                 {getRoundLabel(r, totalRounds)}
               </button>
             ))}
+            <div className="ml-auto flex-shrink-0">
+              <button
+                onClick={handleExport}
+                disabled={exporting || roundMatches.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/25 text-accent text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {exporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</> : <><Download className="w-3.5 h-3.5" /> Export PNG</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {rounds.length === 1 && (
+          <div className="flex justify-end px-5 py-2 border-b border-surface-border/60">
+            <button
+              onClick={handleExport}
+              disabled={exporting || roundMatches.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/25 text-accent text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {exporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</> : <><Download className="w-3.5 h-3.5" /> Export PNG</>}
+            </button>
           </div>
         )}
 
@@ -384,3 +436,73 @@ export default function RevolutionBracket() {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Hidden export card — captured as PNG
+// ---------------------------------------------------------------------------
+const BracketRoundCard = forwardRef(function BracketRoundCard({ tournamentName, roundLabel, matches }, ref) {
+  return (
+    <div
+      ref={ref}
+      style={{
+        width: 520,
+        background: "linear-gradient(160deg, #0a0f1e 0%, #0f172a 60%, #111827 100%)",
+        borderRadius: 20,
+        overflow: "hidden",
+        fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
+        color: "#f8fafc",
+      }}
+    >
+      <div style={{
+        background: "linear-gradient(90deg, #1a2744 0%, #0f172a 100%)",
+        padding: "18px 24px 14px",
+        borderBottom: "1px solid #1e293b",
+      }}>
+        <p style={{ margin: 0, fontSize: 10, color: "#64748b", letterSpacing: 3, textTransform: "uppercase" }}>Tamil eFootball League</p>
+        <p style={{ margin: "3px 0 0", fontSize: 18, fontWeight: 900, color: "#f1f5f9" }}>{tournamentName}</p>
+        <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 700, color: "#7c3aed" }}>{roundLabel}</p>
+      </div>
+      <div style={{ padding: "8px 0 12px" }}>
+        {matches.map((match, i) => {
+          const isCompleted = match.status === "completed" || match.status === "bye"
+          const p1Wins = match.winner_id === match.player1_id
+          const p2Wins = match.winner_id === match.player2_id
+          return (
+            <div key={match.id} style={{ display: "flex", alignItems: "center", padding: "10px 24px", borderBottom: i < matches.length - 1 ? "1px solid #ffffff08" : "none", gap: 12 }}>
+              <span style={{ fontSize: 10, color: "#475569", fontFamily: "monospace", width: 28, flexShrink: 0 }}>#{match.match_number}</span>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: p1Wins ? 800 : 500, color: p1Wins ? "#34d399" : isCompleted && !p1Wins ? "#64748b" : "#f1f5f9", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {match.player1Name ?? "TBD"}
+              </span>
+              <div style={{ flexShrink: 0, textAlign: "center", minWidth: 60 }}>
+                {match.status === "bye" ? (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#f59e0b", background: "#f59e0b18", padding: "2px 8px", borderRadius: 20 }}>BYE</span>
+                ) : isCompleted ? (
+                  match.isWalkover ? (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#fb923c", background: "#fb923c18", padding: "2px 8px", borderRadius: 20 }}>WO</span>
+                  ) : (
+                    <span style={{ fontSize: 14, fontWeight: 900, color: "#fff", background: "#1e293b", padding: "3px 12px", borderRadius: 8, fontFamily: "monospace" }}>
+                      {match.player1_score} – {match.player2_score}
+                    </span>
+                  )
+                ) : (
+                  <span style={{ fontSize: 11, color: "#334155" }}>vs</span>
+                )}
+              </div>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: p2Wins ? 800 : 500, color: p2Wins ? "#34d399" : isCompleted && !p2Wins ? "#64748b" : "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {match.player2Name ?? "TBD"}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ background: "#080d18", padding: "10px 24px", borderTop: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <p style={{ margin: 0, fontSize: 10, color: "#334155" }}>tamilefootballers.com</p>
+        <div style={{ display: "flex", gap: 5 }}>
+          <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#34d399" }} />
+          <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#60a5fa" }} />
+          <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fbbf24" }} />
+        </div>
+      </div>
+    </div>
+  )
+})
