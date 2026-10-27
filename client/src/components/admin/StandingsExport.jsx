@@ -267,19 +267,6 @@ const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
         })}
       </div>
 
-      {/* ── Legend bar ── */}
-      <div style={{
-        display: "flex", gap: 20, padding: "10px 24px",
-        background: "#0a1122", borderTop: "1px solid #1e293b",
-      }}>
-        {[["#34d399","Champions League"], ["#60a5fa","UCL Playoff"], ["#fbbf24","Europa League"], ["#c084fc","Promotion"]].map(([col, lbl]) => (
-          <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: col }} />
-            <span style={{ fontSize: 10, color: "#475569", fontWeight: 500 }}>{lbl}</span>
-          </div>
-        ))}
-      </div>
-
       {/* ── Footer ── */}
       <div style={{
         background: "#060d1a", padding: "12px 28px",
