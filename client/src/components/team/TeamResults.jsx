@@ -349,9 +349,9 @@ const MatchExportCard = forwardRef(function MatchExportCard(
   const oppColor = outcome === "loss" ? "#34d399" : outcome === "win"  ? "#f87171" : "#60a5fa"
 
   const winnerName  = outcome === "win" ? myName : outcome === "loss" ? oppName : null
-  const outcomeLabel = outcome === "win"  ? `🏆 ${myName} WINS!`
-                     : outcome === "loss" ? `🏆 ${oppName} WINS!`
-                     : outcome === "draw" ? "⚖️ DRAW" : "—"
+  const outcomeLabel = outcome === "win"  ? `${myName} WINS!`
+                     : outcome === "loss" ? `${oppName} WINS!`
+                     : outcome === "draw" ? "DRAW" : "—"
   const outcomeBg   = outcome === "win"  ? "linear-gradient(90deg,#064e3b,#065f46)"
                     : outcome === "loss" ? "linear-gradient(90deg,#450a0a,#4c0519)"
                     : outcome === "draw" ? "linear-gradient(90deg,#431407,#78350f)"
