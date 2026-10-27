@@ -436,28 +436,52 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       return res.status(400).json({ error: "Fixture is already closed" })
     }
 
-    // Compute pts and goals per team in SQL using COALESCE(mr.team_id, p.team_id)
-    // so S8+ records (which set mr.team_id) are attributed correctly.
-    // Points = sum of win=3 / draw=1 / loss=0 per slot (matches the live banner).
-    // Goals  = sum of player_score for that team's records.
+    // Fetch all match records for this fixture, tagging each with the player's team.
+    // Uses COALESCE(mr.team_id, p.team_id) so S8+ records (which set mr.team_id directly)
+    // are attributed correctly regardless of the player's current team assignment.
     const statsRes = await query(`
       SELECT
-        COALESCE(mr.team_id, p.team_id) AS team_id,
-        COALESCE(SUM(CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END), 0)::int AS pts,
-        COALESCE(SUM(mr.player_score), 0)::int AS goals
+        COALESCE(mr.team_id, p.team_id) AS player_team_id,
+        mr.result,
+        mr.player_score,
+        mr.opponent_score
       FROM match_records mr
       JOIN players p ON p.id = mr.player_id
       WHERE mr.fixture_id = $1 AND mr.match_type = 'league'
-      GROUP BY COALESCE(mr.team_id, p.team_id)
     `, [req.params.id])
 
-    const homeRow = statsRes.rows.find(r => Number(r.team_id) === fix.home_team_id) || { pts: 0, goals: 0 }
-    const awayRow = statsRes.rows.find(r => Number(r.team_id) === fix.away_team_id) || { pts: 0, goals: 0 }
+    const slotPts = (r) => r === "win" ? 3 : r === "draw" ? 1 : 0
+    const inverse = (r) => r === "win" ? "loss" : r === "loss" ? "win" : "draw"
 
-    const homePts   = homeRow.pts
-    const awayPts   = awayRow.pts
-    const homeGoals = homeRow.goals
-    const awayGoals = awayRow.goals
+    // Split records by which team the player belongs to
+    const homeRecs = statsRes.rows.filter(r => Number(r.player_team_id) === fix.home_team_id)
+    const awayRecs = statsRes.rows.filter(r => Number(r.player_team_id) === fix.away_team_id)
+
+    // --- Points ---
+    // Each team sums slot pts from their own records (no double-counting).
+    // If one side never logged, derive their pts from the opponent's records using
+    // the inverse result (home win → away loss, etc.).
+    let homePts = homeRecs.reduce((s, r) => s + slotPts(r.result), 0)
+    let awayPts = awayRecs.reduce((s, r) => s + slotPts(r.result), 0)
+
+    if (homeRecs.length === 0 && awayRecs.length > 0) {
+      homePts = awayRecs.reduce((s, r) => s + slotPts(inverse(r.result)), 0)
+    } else if (awayRecs.length === 0 && homeRecs.length > 0) {
+      awayPts = homeRecs.reduce((s, r) => s + slotPts(inverse(r.result)), 0)
+    }
+
+    // --- Goals ---
+    // Use home records as primary: player_score = home goals, opponent_score = away goals.
+    // This avoids double-counting when both sides logged the same slots.
+    // If no home records exist, fall back to away records with roles swapped.
+    let homeGoals = 0, awayGoals = 0
+    if (homeRecs.length > 0) {
+      homeGoals = homeRecs.reduce((s, r) => s + (r.player_score   ?? 0), 0)
+      awayGoals = homeRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
+    } else {
+      awayGoals = awayRecs.reduce((s, r) => s + (r.player_score   ?? 0), 0)
+      homeGoals = awayRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
+    }
 
     // Winner = team with more slot points (matches live banner display)
     const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
