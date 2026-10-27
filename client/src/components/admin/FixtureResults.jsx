@@ -400,17 +400,8 @@ function FixtureCard({ fixture }) {
 
   const isCompleted = fixture.status === "completed"
 
-  // Derive league pts from stored goals (win=3, draw=1, loss=0) for the locked display.
-  // fixture.homeScore/awayScore stores total player-score points (raw sum), NOT league pts.
-  const derivedHomePts = isCompleted
-    ? (fixture.homeGoals > fixture.awayGoals ? 3 : fixture.homeGoals < fixture.awayGoals ? 0 : 1)
-    : ""
-  const derivedAwayPts = isCompleted
-    ? (fixture.awayGoals > fixture.homeGoals ? 3 : fixture.awayGoals < fixture.homeGoals ? 0 : 1)
-    : ""
-
-  const [hs, setHs]       = useState(isCompleted ? derivedHomePts : "")
-  const [as_, setAs]      = useState(isCompleted ? derivedAwayPts : "")
+  const [hs, setHs]       = useState(isCompleted ? (fixture.homeGoals ?? "") : "")
+  const [as_, setAs]      = useState(isCompleted ? (fixture.awayGoals ?? "") : "")
   const [hg, setHg]       = useState(isCompleted ? (fixture.homeGoals ?? "") : "")
   const [ag, setAg]       = useState(isCompleted ? (fixture.awayGoals ?? "") : "")
   const [saved, setSaved] = useState(isCompleted)
@@ -421,15 +412,15 @@ function FixtureCard({ fixture }) {
   const [editAway, setEditAway]   = useState(fixture.awayTeamId)
   const [confirmDel, setConfirmDel] = useState(false)
 
-  // When fixture data refetches after close (react-query), sync local state
+  // When fixture data refetches after close, sync local state from goals
   useEffect(() => {
     if (fixture.status === "completed") {
       const hg_ = fixture.homeGoals ?? 0
       const ag_ = fixture.awayGoals ?? 0
+      setHs(hg_)
+      setAs(ag_)
       setHg(hg_)
       setAg(ag_)
-      setHs(hg_ > ag_ ? 3 : hg_ < ag_ ? 0 : 1)
-      setAs(ag_ > hg_ ? 3 : ag_ < hg_ ? 0 : 1)
       setSaved(true)
     }
   }, [fixture.status, fixture.homeGoals, fixture.awayGoals])
@@ -440,13 +431,12 @@ function FixtureCard({ fixture }) {
   const handleClose = () => {
     closeFixture.mutate(fixture.id, {
       onSuccess: (data) => {
-        // After close, update local state with league pts derived from the returned goals
         const hGoals = data?.homeGoals ?? fixture.homeGoals ?? 0
         const aGoals = data?.awayGoals ?? fixture.awayGoals ?? 0
+        setHs(hGoals)
+        setAs(aGoals)
         setHg(hGoals)
         setAg(aGoals)
-        setHs(hGoals > aGoals ? 3 : hGoals < aGoals ? 0 : 1)
-        setAs(aGoals > hGoals ? 3 : aGoals < hGoals ? 0 : 1)
         setSaved(true)
       },
       onError: (err) => alert(err.response?.data?.error || "Failed to close fixture"),
@@ -638,14 +628,15 @@ function FixtureCard({ fixture }) {
         </p>
       )}
 
-      {/* Match score (points) row */}
+      {/* Match score row */}
       <div className="flex items-center gap-3">
         <div className={cn("flex-1 text-right", winner === "home" && "text-white", winner === "away" && "text-slate-500")}>
           <p className="text-sm font-semibold">{fixture.home}</p>
           <p className="text-xs text-accent mt-0.5">Home</p>
+          {saved && <p className="text-xs font-bold mt-0.5">{winner === "home" ? "3 pts" : winner === "draw" ? "1 pt" : "0 pts"}</p>}
         </div>
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-          <span className="text-xs text-slate-500 uppercase tracking-wide">Match pts</span>
+          <span className="text-xs text-slate-500 uppercase tracking-wide">Match Pts</span>
           <div className="flex items-center gap-2">
             <ScoreInput value={hs} onChange={setHs} disabled={saved} />
             <span className="text-slate-600 font-bold text-lg">–</span>
@@ -655,10 +646,12 @@ function FixtureCard({ fixture }) {
         <div className={cn("flex-1", winner === "away" && "text-white", winner === "home" && "text-slate-500")}>
           <p className="text-sm font-semibold">{fixture.away}</p>
           <p className="text-xs text-slate-500 mt-0.5">Away</p>
+          {saved && <p className="text-xs font-bold mt-0.5">{winner === "away" ? "3 pts" : winner === "draw" ? "1 pt" : "0 pts"}</p>}
         </div>
       </div>
 
-      {/* Goals row */}
+      {/* Goals row — only show when not saved (editing), since goals = score after close */}
+      {!saved && (
       <div className="flex items-center gap-3">
         <div className="flex-1" />
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -671,6 +664,7 @@ function FixtureCard({ fixture }) {
         </div>
         <div className="flex-1" />
       </div>
+      )}
 
       {!saved ? (
         <button onClick={handleSaveResult} disabled={!canSave || saveResult.isPending}
