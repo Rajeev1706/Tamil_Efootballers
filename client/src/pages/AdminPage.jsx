@@ -42,6 +42,7 @@ import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 import AdminTeamsTab from "../components/admin/AdminTeamsTab"
 import SeasonSummaryAdmin from "../components/admin/SeasonSummaryAdmin"
 import StandingsExport from "../components/admin/StandingsExport"
+import GoldenBootExport from "../components/admin/GoldenBootExport"
 
 function RecalcTournamentHistoryCard() {
   const [loading, setLoading] = useState(false)
@@ -907,6 +908,12 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Standings</p>
       <StandingsExport />
+    </div>
+
+    {/* Golden Boot Export */}
+    <div>
+      <p className="section-label mb-3">Golden Boot</p>
+      <GoldenBootExport />
     </div>
 
     {/* Teams */}
