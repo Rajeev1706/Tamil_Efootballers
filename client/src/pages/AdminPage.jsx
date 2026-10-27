@@ -41,6 +41,7 @@ import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 import AdminTeamsTab from "../components/admin/AdminTeamsTab"
 import SeasonSummaryAdmin from "../components/admin/SeasonSummaryAdmin"
+import StandingsExport from "../components/admin/StandingsExport"
 
 function RecalcTournamentHistoryCard() {
   const [loading, setLoading] = useState(false)
@@ -900,6 +901,12 @@ export default function AdminPage() {
     <div>
       <p className="section-label mb-3">Dashboard Featured View</p>
       <FeaturedPanelCard />
+    </div>
+
+    {/* Standings Export */}
+    <div>
+      <p className="section-label mb-3">Standings</p>
+      <StandingsExport />
     </div>
 
     {/* Teams */}
