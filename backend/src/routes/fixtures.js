@@ -436,40 +436,28 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       return res.status(400).json({ error: "Fixture is already closed" })
     }
 
-    const recordsRes = await query(`
-      SELECT mr.result, mr.player_score, mr.opponent_score,
-             p.team_id AS player_team_id, opp.team_id AS opponent_team_id
+    // Compute pts and goals per team in SQL using COALESCE(mr.team_id, p.team_id)
+    // so S8+ records (which set mr.team_id) are attributed correctly.
+    // Points = sum of win=3 / draw=1 / loss=0 per slot (matches the live banner).
+    // Goals  = sum of player_score for that team's records.
+    const statsRes = await query(`
+      SELECT
+        COALESCE(mr.team_id, p.team_id) AS team_id,
+        COALESCE(SUM(CASE mr.result WHEN 'win' THEN 3 WHEN 'draw' THEN 1 ELSE 0 END), 0)::int AS pts,
+        COALESCE(SUM(mr.player_score), 0)::int AS goals
       FROM match_records mr
-      JOIN players p   ON mr.player_id   = p.id
-      JOIN players opp ON mr.opponent_id = opp.id
+      JOIN players p ON p.id = mr.player_id
       WHERE mr.fixture_id = $1 AND mr.match_type = 'league'
+      GROUP BY COALESCE(mr.team_id, p.team_id)
     `, [req.params.id])
 
-    // Each record represents one slot result from one player's perspective.
-    // Winner is the team with MORE cumulative slot points (win=3, draw=1, loss=0).
-    // Goals are tracked separately for GD purposes.
-    let homeGoals = 0, awayGoals = 0
-    let homePts   = 0, awayPts   = 0   // slot-points (3/1/0) per record
+    const homeRow = statsRes.rows.find(r => Number(r.team_id) === fix.home_team_id) || { pts: 0, goals: 0 }
+    const awayRow = statsRes.rows.find(r => Number(r.team_id) === fix.away_team_id) || { pts: 0, goals: 0 }
 
-    const slotPts = (result) => result === "win" ? 3 : result === "draw" ? 1 : 0
-
-    for (const r of recordsRes.rows) {
-      const pScore = r.player_score   ?? 0
-      const oScore = r.opponent_score ?? 0
-      const pts    = slotPts(r.result)
-      // Inverse result from opponent's perspective
-      const oppResult = r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw"
-      const oppPts = slotPts(oppResult)
-
-      if (r.player_team_id === fix.home_team_id) {
-        homeGoals += pScore;  awayGoals += oScore
-        homePts   += pts;     awayPts   += oppPts
-      } else if (r.player_team_id === fix.away_team_id) {
-        awayGoals += pScore;  homeGoals += oScore
-        awayPts   += pts;     homePts   += oppPts
-      }
-      // Records not belonging to either team in this fixture are skipped.
-    }
+    const homePts   = homeRow.pts
+    const awayPts   = awayRow.pts
+    const homeGoals = homeRow.goals
+    const awayGoals = awayRow.goals
 
     // Winner = team with more slot points (matches live banner display)
     const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
