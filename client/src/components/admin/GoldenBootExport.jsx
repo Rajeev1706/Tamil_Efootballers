@@ -3,6 +3,7 @@ import { toPng } from "html-to-image"
 import { Download, Loader2, Trophy } from "lucide-react"
 import { useTopScorers } from "../../lib/queries"
 import tefLogo from "../../../images/logo.png"
+import goldenBootTrophy from "../../../images/Golden Boot.png"
 
 export default function GoldenBootExport() {
   const { data: scorers = [], isLoading } = useTopScorers()
@@ -137,12 +138,13 @@ const GoldenBootCard = forwardRef(function GoldenBootCard({ scorers }, ref) {
             </p>
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{
-            fontSize: 32, lineHeight: 1,
-            filter: "drop-shadow(0 0 12px #f59e0b88)",
-          }}>⚽</div>
-          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#475569", fontWeight: 500 }}>{now}</p>
+        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <img src={goldenBootTrophy} alt="Golden Boot"
+            style={{
+              width: 56, height: 56, objectFit: "contain",
+              filter: "drop-shadow(0 0 10px #f59e0baa)",
+            }} />
+          <p style={{ margin: 0, fontSize: 12, color: "#475569", fontWeight: 500 }}>{now}</p>
         </div>
       </div>
 
