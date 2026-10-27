@@ -3,6 +3,7 @@ import { CheckCircle, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Save, 
 import { toPng } from "html-to-image"
 import { cn } from "../../lib/utils"
 import { useLogTeamRecord, useFixtureRecords, useEditTeamRecord, useDeleteTeamRecord, useLineup } from "../../lib/queries"
+import tefLogo from "../../../images/logo.png"
 
 const RESULTS = [
   { value: "win",  label: "Win",  color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -66,6 +67,7 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
   const isHome    = fixture.homeTeamId === myTeamId
   const oppTeamId = isHome ? fixture.awayTeamId : fixture.homeTeamId
   const oppName   = isHome ? fixture.away : fixture.home
+  const oppLogoUrl = isHome ? fixture.awayLogo : fixture.homeLogo
 
   const oppPlayers = allPlayers.filter(p => p.teamId === oppTeamId)
 
@@ -211,6 +213,7 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
           ref={exportRef}
           myTeam={myTeam}
           oppName={oppName}
+          oppLogoUrl={oppLogoUrl}
           round={fixture.round}
           date={fixture.date}
           records={existingRecords}
@@ -337,7 +340,7 @@ function FixtureResultCard({ fixture, myPlayers, allPlayers, myTeamId, myTeam })
 import { forwardRef } from "react"
 
 const MatchExportCard = forwardRef(function MatchExportCard(
-  { myTeam, oppName, round, date, records, myPlayers, myTotal, oppTotal, outcome },
+  { myTeam, oppName, oppLogoUrl, round, date, records, myPlayers, myTotal, oppTotal, outcome },
   ref
 ) {
   const myName = myTeam?.name ?? "My Team"
@@ -345,7 +348,9 @@ const MatchExportCard = forwardRef(function MatchExportCard(
 
   const outcomeBg    = outcome === "win"  ? "#065f46" : outcome === "loss" ? "#4c0519" : outcome === "draw" ? "#78350f" : "#1e293b"
   const outcomeText  = outcome === "win"  ? "#34d399" : outcome === "loss" ? "#fb7185" : outcome === "draw" ? "#fbbf24" : "#94a3b8"
-  const outcomeLabel = outcome === "win"  ? "🏆 WINNER!" : outcome === "loss" ? "DEFEAT" : outcome === "draw" ? "DRAW" : "—"
+  const outcomeLabel = outcome === "win"  ? `🏆 ${myName} WINS!`
+                     : outcome === "loss" ? `🏆 ${oppName} WINS!`
+                     : outcome === "draw" ? "DRAW" : "—"
 
   return (
     <div
@@ -360,13 +365,20 @@ const MatchExportCard = forwardRef(function MatchExportCard(
       }}
     >
       {/* Header */}
-      <div style={{ background: "#0f172a", padding: "20px 24px 16px", borderBottom: "1px solid #1e293b" }}>
-        <p style={{ fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase", margin: 0 }}>
-          Round {round} · Tamil eFootball League
-        </p>
-        <p style={{ fontSize: 12, color: "#475569", margin: "4px 0 0" }}>
-          {date?.slice(0, 10) ?? ""}
-        </p>
+      <div style={{
+        background: "#0f172a", padding: "16px 24px", borderBottom: "1px solid #1e293b",
+        display: "flex", alignItems: "center", gap: 12
+      }}>
+        <img src={tefLogo} alt="TEF"
+          style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
+        <div>
+          <p style={{ fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase", margin: 0 }}>
+            Round {round} · Tamil eFootball League
+          </p>
+          <p style={{ fontSize: 12, color: "#475569", margin: "3px 0 0" }}>
+            {date?.slice(0, 10) ?? ""}
+          </p>
+        </div>
       </div>
 
       {/* Teams + Score */}
@@ -388,12 +400,12 @@ const MatchExportCard = forwardRef(function MatchExportCard(
         </div>
 
         {/* VS + outcome */}
-        <div style={{ textAlign: "center", padding: "0 16px" }}>
+        <div style={{ textAlign: "center", padding: "0 12px" }}>
           <div style={{
-            background: outcomeBg, borderRadius: 12, padding: "8px 16px",
+            background: outcomeBg, borderRadius: 12, padding: "8px 14px",
             border: `1px solid ${outcomeText}44`
           }}>
-            <p style={{ fontSize: 14, fontWeight: 900, color: outcomeText, margin: 0, letterSpacing: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 900, color: outcomeText, margin: 0, letterSpacing: 0.5 }}>
               {outcomeLabel}
             </p>
           </div>
@@ -402,9 +414,14 @@ const MatchExportCard = forwardRef(function MatchExportCard(
 
         {/* Opponent */}
         <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#2d1b3d", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 900, border: "2px solid #334155" }}>
-            {oppName?.charAt(0)}
-          </div>
+          {oppLogoUrl ? (
+            <img src={oppLogoUrl} alt={oppName}
+              style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", margin: "0 auto 10px", display: "block", border: "2px solid #334155" }} />
+          ) : (
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#2d1b3d", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 900, border: "2px solid #334155" }}>
+              {oppName?.charAt(0)}
+            </div>
+          )}
           <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: "#f1f5f9" }}>{oppName}</p>
           <p style={{ fontSize: 42, fontWeight: 900, margin: "4px 0 0", lineHeight: 1,
             color: outcome === "loss" ? "#34d399" : outcome === "win" ? "#fb7185" : "#f8fafc"
