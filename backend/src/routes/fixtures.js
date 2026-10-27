@@ -445,35 +445,33 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       WHERE mr.fixture_id = $1 AND mr.match_type = 'league'
     `, [req.params.id])
 
-    // Each record represents one match between whichever side is "player"
-    // and whichever side is "opponent" — checking player_team_id ALONE is
-    // enough to fully determine both sides, since the opponent is always
-    // on the other team of this same fixture. (A previous version of this
-    // fix checked player and opponent independently, which double-counted
-    // every goal since both checks fired for every normal record.)
-    // ── Matchday Win concept ──────────────────────────────────────────────────
-    // The team with the HIGHER aggregate player score wins the tie (3 pts).
-    // Individual slot win/draw/loss (playerPts) is no longer used to decide
-    // the fixture outcome — only the raw score totals are compared.
+    // Each record represents one slot result from one player's perspective.
+    // Winner is the team with MORE cumulative slot points (win=3, draw=1, loss=0).
+    // Goals are tracked separately for GD purposes.
     let homeGoals = 0, awayGoals = 0
-    let homeScore = 0, awayScore = 0   // aggregate player scores for tie-decider
+    let homePts   = 0, awayPts   = 0   // slot-points (3/1/0) per record
+
+    const slotPts = (result) => result === "win" ? 3 : result === "draw" ? 1 : 0
+
     for (const r of recordsRes.rows) {
-      const pScore = r.player_score ?? 0
+      const pScore = r.player_score   ?? 0
       const oScore = r.opponent_score ?? 0
+      const pts    = slotPts(r.result)
+      // Inverse result from opponent's perspective
+      const oppResult = r.result === "win" ? "loss" : r.result === "loss" ? "win" : "draw"
+      const oppPts = slotPts(oppResult)
 
       if (r.player_team_id === fix.home_team_id) {
         homeGoals += pScore;  awayGoals += oScore
-        homeScore += pScore;  awayScore += oScore
+        homePts   += pts;     awayPts   += oppPts
       } else if (r.player_team_id === fix.away_team_id) {
         awayGoals += pScore;  homeGoals += oScore
-        awayScore += pScore;  homeScore += oScore
+        awayPts   += pts;     homePts   += oppPts
       }
       // Records not belonging to either team in this fixture are skipped.
     }
 
-    // Tie decided by aggregate score (matchday win); store aggregate as home/away pts
-    const homePts    = homeScore
-    const awayPts    = awayScore
+    // Winner = team with more slot points (matches live banner display)
     const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
     const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
