@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import { toPng } from "html-to-image"
 import { Download, Loader2, TableProperties } from "lucide-react"
 import { useTeams } from "../../lib/queries"
+import tefLogo from "../../../images/logo.png"
 
 export default function StandingsExport() {
   const { data: teams = [], isLoading } = useTeams()
@@ -139,14 +140,28 @@ const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
         alignItems: "center",
         justifyContent: "space-between",
       }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 11, color: "#64748b", letterSpacing: 3, textTransform: "uppercase" }}>
-            Tamil eFootball League
-          </p>
-          <p style={{ margin: "4px 0 0", fontSize: 20, fontWeight: 900, color: "#f1f5f9", letterSpacing: 0.5 }}>
-            Dshann League
-          </p>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#475569" }}>Season Standings</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* TEF App Logo */}
+          <img
+            src={tefLogo}
+            alt="TEF"
+            style={{
+              width: 52,
+              height: 52,
+              objectFit: "contain",
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+          />
+          <div>
+            <p style={{ margin: 0, fontSize: 11, color: "#64748b", letterSpacing: 3, textTransform: "uppercase" }}>
+              Tamil eFootball League
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: 20, fontWeight: 900, color: "#f1f5f9", letterSpacing: 0.5 }}>
+              Dshann League
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#475569" }}>Season Standings</p>
+          </div>
         </div>
         <div style={{ textAlign: "right" }}>
           <p style={{ margin: 0, fontSize: 11, color: "#475569" }}>{now}</p>
@@ -174,9 +189,9 @@ const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
       <div style={{ padding: "8px 0 16px" }}>
         {teams.map((t, i) => {
           const gd  = (t.gf ?? 0) - (t.ga ?? 0)
-          const isTop3 = i < 3
-          const rowBg = i === 0 ? "#0d2b1a" : i === 1 ? "#0c1e2d" : i === 2 ? "#1a1506" : "transparent"
-          const posColor = i === 0 ? "#34d399" : i === 1 ? "#60a5fa" : i === 2 ? "#fbbf24" : "#475569"
+          const isTop4 = i < 4
+          const rowBg = i === 0 ? "#0d2b1a" : i === 1 ? "#0c1e2d" : i === 2 ? "#1a1506" : i === 3 ? "#0f1a2e" : "transparent"
+          const posColor = i === 0 ? "#34d399" : i === 1 ? "#60a5fa" : i === 2 ? "#fbbf24" : i === 3 ? "#c084fc" : "#475569"
 
           return (
             <div key={t.id} style={{
@@ -197,7 +212,7 @@ const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
                 {t.logoUrl ? (
                   <img src={t.logoUrl} alt=""
                     style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover",
-                      border: isTop3 ? `2px solid ${posColor}44` : "2px solid #1e293b" }} />
+                      border: isTop4 ? `2px solid ${posColor}44` : "2px solid #1e293b" }} />
                 ) : (
                   <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#1e3a5f",
                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -205,7 +220,7 @@ const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
                     {t.name?.charAt(0)}
                   </div>
                 )}
-                <span style={{ fontSize: 13, fontWeight: isTop3 ? 700 : 500, color: isTop3 ? "#f1f5f9" : "#cbd5e1" }}>
+                <span style={{ fontSize: 13, fontWeight: isTop4 ? 700 : 500, color: isTop4 ? "#f1f5f9" : "#cbd5e1" }}>
                   {t.name}
                 </span>
               </div>
@@ -223,8 +238,8 @@ const StandingsCard = forwardRef(function StandingsCard({ teams }, ref) {
               {/* Points */}
               <div style={{
                 fontSize: 14, fontWeight: 900, textAlign: "center",
-                color: isTop3 ? posColor : "#e2e8f0",
-                background: isTop3 ? `${posColor}18` : "transparent",
+                color: isTop4 ? posColor : "#e2e8f0",
+                background: isTop4 ? `${posColor}18` : "transparent",
                 borderRadius: 8, padding: "3px 0",
               }}>{t.points ?? 0}</div>
             </div>
