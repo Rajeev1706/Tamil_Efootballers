@@ -4,6 +4,7 @@ import { ArrowLeft, Trophy, ImageIcon, Crown, UserRound, Pencil } from "lucide-r
 import Layout from "../components/layout/Layout"
 import Loading from "../components/common/Loading"
 import AvatarPicker from "../components/player/AvatarPicker"
+import ImageUpload from "../components/admin/ImageUpload"
 import { usePlayer, usePlayerPerformanceZones } from "../lib/queries"
 import { useTeamColor, readableTeamColor } from "../lib/teamColor"
 import { getAvatarById } from "../lib/avatars"
@@ -37,7 +38,7 @@ const FormDot = ({ result }) => {
 }
 
 
-function PlayerSquadCard({ player }) {
+function PlayerSquadCard({ player, canUpload }) {
   const cachedImage = useCachedImage(player.imageUrl)
 
   return (
@@ -79,6 +80,16 @@ function PlayerSquadCard({ player }) {
           <p className="text-sm font-semibold text-white">{player.name}</p>
           {player.alias && <p className="text-xs text-slate-500">"{player.alias}"</p>}
         </div>
+
+        {/* Upload section — visible to admin or the player's own team */}
+        {canUpload && (
+          <div className="mt-4 pt-4 border-t border-surface-border flex flex-col items-center">
+            <ImageUpload
+              player={{ id: player.id, imageUrl: player.imageUrl || null }}
+              onSuccess={() => {}}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -390,7 +401,10 @@ export default function PlayerProfile() {
         {/* Right — Player squad, Season summary */}
         <div className="space-y-6">
 
-          <PlayerSquadCard player={player} />
+          <PlayerSquadCard
+            player={player}
+            canUpload={isAdmin || authUser?.teamId === player.teamId}
+          />
 
           {/* Season summary */}
           <SeasonSummary player={player} />
