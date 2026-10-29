@@ -471,21 +471,29 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
     }
 
     // --- Goals ---
-    // Use home records as primary: player_score = home goals, opponent_score = away goals.
-    // This avoids double-counting when both sides logged the same slots.
-    // If no home records exist, fall back to away records with roles swapped.
-    let homeGoals = 0, awayGoals = 0
-    if (homeRecs.length > 0) {
-      homeGoals = homeRecs.reduce((s, r) => s + (r.player_score   ?? 0), 0)
-      awayGoals = homeRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
-    } else {
-      awayGoals = awayRecs.reduce((s, r) => s + (r.player_score   ?? 0), 0)
-      homeGoals = awayRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
-    }
+    // Each team's goals = sum of their OWN logged player_scores (matches the live display
+    // which uses p.team_id attribution). This avoids double-counting when both sides log
+    // the same slot — each team only gets credit for goals they themselves recorded.
+    // Fallback: if one side didn't log at all, derive from the other side's opponent_score.
+    let homeGoals = homeRecs.reduce((s, r) => s + (r.player_score ?? 0), 0)
+    let awayGoals = awayRecs.reduce((s, r) => s + (r.player_score ?? 0), 0)
+    if (homeRecs.length === 0) homeGoals = awayRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
+    if (awayRecs.length === 0) awayGoals = homeRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
 
-    // Winner = team with more slot points (matches live banner display)
-    const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
-    const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
+    // --- Winner ---
+    // Primary: team with more total goals wins (reliable, matches what's shown live and
+    // what users expect — the team that scored more should win the fixture).
+    // Tiebreaker: if goals are equal, fall back to slot points (individual 1v1 results).
+    // Final fallback: draw.
+    let homeResult, awayResult
+    if (homeGoals !== awayGoals) {
+      homeResult = homeGoals > awayGoals ? "win" : "loss"
+    } else if (homePts !== awayPts) {
+      homeResult = homePts > awayPts ? "win" : "loss"
+    } else {
+      homeResult = "draw"
+    }
+    awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
     await withTransaction(async ({ query: q }) => {
       await q(`
