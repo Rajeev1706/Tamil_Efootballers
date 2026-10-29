@@ -457,43 +457,40 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
     const homeRecs = statsRes.rows.filter(r => Number(r.player_team_id) === fix.home_team_id)
     const awayRecs = statsRes.rows.filter(r => Number(r.player_team_id) === fix.away_team_id)
 
-    // --- Points ---
-    // Each team sums slot pts from their own records (no double-counting).
-    // If one side never logged, derive their pts from the opponent's records using
-    // the inverse result (home win → away loss, etc.).
-    let homePts = homeRecs.reduce((s, r) => s + slotPts(r.result), 0)
-    let awayPts = awayRecs.reduce((s, r) => s + slotPts(r.result), 0)
+    // --- Points + Goals ---
+    // Use the EXACT same formula as the live display in FIXTURE_SELECT so that
+    // "Close Fixture" always locks in what the live banner already shows.
+    //
+    // The live SQL gives EVERY record a dual contribution:
+    //   • the logging player's team gets direct pts / goals from player_score
+    //   • the opponent's team gets the inverse pts + opponent_score
+    //
+    // This means Rangers logging a win also adds 0 pts (loss inverse) to Night Owls,
+    // and Night Owls logging a win also adds 0 pts (loss inverse) to Rangers — so
+    // the totals here will match liveHomePts / liveAwayPts exactly.
+    let homePts = 0, awayPts = 0
+    let homeGoals = 0, awayGoals = 0
 
-    if (homeRecs.length === 0 && awayRecs.length > 0) {
-      homePts = awayRecs.reduce((s, r) => s + slotPts(inverse(r.result)), 0)
-    } else if (awayRecs.length === 0 && homeRecs.length > 0) {
-      awayPts = homeRecs.reduce((s, r) => s + slotPts(inverse(r.result)), 0)
+    for (const r of statsRes.rows) {
+      const tid = Number(r.player_team_id)
+      if (tid === fix.home_team_id) {
+        // Home player logged → direct for home, inverse for away
+        homePts   += slotPts(r.result)
+        awayPts   += slotPts(inverse(r.result))
+        homeGoals += r.player_score   ?? 0
+        awayGoals += r.opponent_score ?? 0
+      } else if (tid === fix.away_team_id) {
+        // Away player logged → direct for away, inverse for home
+        awayPts   += slotPts(r.result)
+        homePts   += slotPts(inverse(r.result))
+        awayGoals += r.player_score   ?? 0
+        homeGoals += r.opponent_score ?? 0
+      }
     }
 
-    // --- Goals ---
-    // Each team's goals = sum of their OWN logged player_scores (matches the live display
-    // which uses p.team_id attribution). This avoids double-counting when both sides log
-    // the same slot — each team only gets credit for goals they themselves recorded.
-    // Fallback: if one side didn't log at all, derive from the other side's opponent_score.
-    let homeGoals = homeRecs.reduce((s, r) => s + (r.player_score ?? 0), 0)
-    let awayGoals = awayRecs.reduce((s, r) => s + (r.player_score ?? 0), 0)
-    if (homeRecs.length === 0) homeGoals = awayRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
-    if (awayRecs.length === 0) awayGoals = homeRecs.reduce((s, r) => s + (r.opponent_score ?? 0), 0)
-
-    // --- Winner ---
-    // Primary: team with more total goals wins (reliable, matches what's shown live and
-    // what users expect — the team that scored more should win the fixture).
-    // Tiebreaker: if goals are equal, fall back to slot points (individual 1v1 results).
-    // Final fallback: draw.
-    let homeResult, awayResult
-    if (homeGoals !== awayGoals) {
-      homeResult = homeGoals > awayGoals ? "win" : "loss"
-    } else if (homePts !== awayPts) {
-      homeResult = homePts > awayPts ? "win" : "loss"
-    } else {
-      homeResult = "draw"
-    }
-    awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
+    // Winner = team with more pts, exactly as the live banner shows
+    const homeResult = homePts > awayPts ? "win" : homePts < awayPts ? "loss" : "draw"
+    const awayResult = homeResult === "win" ? "loss" : homeResult === "loss" ? "win" : "draw"
 
     await withTransaction(async ({ query: q }) => {
       await q(`
