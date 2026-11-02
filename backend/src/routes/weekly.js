@@ -419,6 +419,11 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
     //
     // On edit: reverse the diff that was awarded to the old winner, give it
     // to the new winner instead.
+    //
+    // IMPORTANT: every auxiliary step (BDR, MV, history) is wrapped in its own
+    // try-catch so that an intermittent failure never prevents the tournament
+    // completion check below from running. The match result is already saved at
+    // this point; the completion check MUST always execute.
 
     const totalRounds = match.total_rounds
     const finalRound  = totalRounds
@@ -451,18 +456,21 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
     // If this is an edit, reverse the old winner's diff
     if (oldMatchRecordId && match.winner_id && winnerDiff > 0) {
-      await addBdr(match.winner_id, -winnerDiff)
+      try { await addBdr(match.winner_id, -winnerDiff) }
+      catch (e) { console.error("[weekly] BDR reversal error:", e) }
     }
 
     // Award new winner's diff
     if (winnerId && winnerDiff > 0) {
-      const weeklyLabel = match.round === finalRound ? "Weekly Champion" : `Weekly Tournament Round ${match.round}`
-      await addBdrWithLabel(winnerId, winnerDiff, weeklyLabel, season)
+      try {
+        const weeklyLabel = match.round === finalRound ? "Weekly Champion" : `Weekly Tournament Round ${match.round}`
+        await addBdrWithLabel(winnerId, winnerDiff, weeklyLabel, season)
+      } catch (e) { console.error("[weekly] BDR award error:", e) }
     }
 
     // Recalc MV for both (BDR affects MV)
-    await recalcMarketValue(match.player1_id)
-    await recalcMarketValue(match.player2_id)
+    try { await recalcMarketValue(match.player1_id) } catch (e) { console.error("[weekly] MV recalc p1 error:", e) }
+    try { await recalcMarketValue(match.player2_id) } catch (e) { console.error("[weekly] MV recalc p2 error:", e) }
 
     // ── Tournament history tracking ───────────────────────────────────────────
     if (winnerId && totalRounds) {
@@ -474,8 +482,10 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       if (match.round === totalRounds) {
         await incrementHistory(winnerId, "weekly", "knockout", "winner").catch(() => {})
         // Save for admin card download
-        const wPlayer = (await query(`SELECT name, avatar_url AS "avatarUrl", avatar_id AS "avatarId" FROM players WHERE id=$1`,[winnerId])).rows[0]
-        if (wPlayer) await saveActiveCelebration("weekly", { name: wPlayer.name, avatarUrl: wPlayer.avatarUrl, avatarId: wPlayer.avatarId })
+        try {
+          const wPlayer = (await query(`SELECT name, avatar_url AS "avatarUrl", avatar_id AS "avatarId" FROM players WHERE id=$1`,[winnerId])).rows[0]
+          if (wPlayer) await saveActiveCelebration("weekly", { name: wPlayer.name, avatarUrl: wPlayer.avatarUrl, avatarId: wPlayer.avatarId })
+        } catch (e) { console.error("[weekly] saveActiveCelebration error:", e) }
       }
     }
 
@@ -523,13 +533,15 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       const newGbHolder = goldenBootRes.rows[0]?.goals > 0 ? goldenBootRes.rows[0] : null
 
       if (oldGbHolderId !== (newGbHolder?.id ?? null)) {
-        if (oldGbHolderId) await addBdr(oldGbHolderId, -4)
-        if (newGbHolder)   await addBdrWithLabel(newGbHolder.id, 4, "Weekly Golden Boot", season)
-        await query(
-          `INSERT INTO app_settings (key, value) VALUES ($1, $2)
-           ON CONFLICT (key) DO UPDATE SET value = $2`,
-          [gbHolderKey, newGbHolder?.id?.toString() ?? ""]
-        )
+        try {
+          if (oldGbHolderId) await addBdr(oldGbHolderId, -4)
+          if (newGbHolder)   await addBdrWithLabel(newGbHolder.id, 4, "Weekly Golden Boot", season)
+          await query(
+            `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+             ON CONFLICT (key) DO UPDATE SET value = $2`,
+            [gbHolderKey, newGbHolder?.id?.toString() ?? ""]
+          )
+        } catch (e) { console.error("[weekly] Golden Boot BDR error:", e) }
       }
 
       // Trophy awards — runs EVERY time completion is detected (unlike the
@@ -538,56 +550,58 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       // now actually correct. Champion trophy always looks at the Final
       // (the tournament's own last round) specifically, not whichever
       // match was just saved.
-      const finalMatchRes = await query(
-        "SELECT winner_id FROM weekly_tournament_matches WHERE tournament_id = $1 AND round = $2 AND status = 'completed'",
-        [match.tournament_id, totalRounds]
-      )
-      await awardOrReassignTrophy({
-        sourceKey: `weekly_champion_tournament_${match.tournament_id}`,
-        trophyColumn: "trophy3_count",
-        playerId: finalMatchRes.rows[0]?.winner_id ?? null,
-        seasonNumber: season,
-      })
-
-      // Store completion timestamp for 48-hour celebration window
-      if (finalMatchRes.rows[0]?.winner_id) {
-        await query(`
-          INSERT INTO app_settings (key, value) VALUES ($1, $2)
-          ON CONFLICT (key) DO UPDATE SET value = $2
-        `, [`weekly_champion_completed_at_${match.tournament_id}`, new Date().toISOString()])
-      }
-
-      const trophyGoldenBootRes = await query(`
-        SELECT p.id,
-          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
-          COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
-        FROM players p
-        JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='weekly'
-        JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
-        WHERE wtm.tournament_id = $1
-        GROUP BY p.id
-        ORDER BY goals DESC, conceded ASC
-        LIMIT 1
-      `, [match.tournament_id])
-      const weeklyTopScorer = trophyGoldenBootRes.rows[0]
-      await awardOrReassignTrophy({
-        sourceKey: `weekly_golden_boot_tournament_${match.tournament_id}`,
-        trophyColumn: "trophy5_count",
-        playerId: weeklyTopScorer?.goals > 0 ? weeklyTopScorer.id : null,
-        seasonNumber: season,
-      })
-
-      // ── Auto-fill season record — weekly winner field ──────────────────────
-      if (finalMatchRes.rows[0]?.winner_id) {
-        const winnerNameRes = await query(
-          "SELECT name FROM players WHERE id = $1",
-          [finalMatchRes.rows[0].winner_id]
+      try {
+        const finalMatchRes = await query(
+          "SELECT winner_id FROM weekly_tournament_matches WHERE tournament_id = $1 AND round = $2 AND status = 'completed'",
+          [match.tournament_id, totalRounds]
         )
-        const winnerName = winnerNameRes.rows[0]?.name
-        if (winnerName) {
-          await updateSeasonRecord(season, { weekly_winner: winnerName })
+        await awardOrReassignTrophy({
+          sourceKey: `weekly_champion_tournament_${match.tournament_id}`,
+          trophyColumn: "trophy3_count",
+          playerId: finalMatchRes.rows[0]?.winner_id ?? null,
+          seasonNumber: season,
+        })
+
+        // Store completion timestamp for 48-hour celebration window
+        if (finalMatchRes.rows[0]?.winner_id) {
+          await query(`
+            INSERT INTO app_settings (key, value) VALUES ($1, $2)
+            ON CONFLICT (key) DO UPDATE SET value = $2
+          `, [`weekly_champion_completed_at_${match.tournament_id}`, new Date().toISOString()])
         }
-      }
+
+        const trophyGoldenBootRes = await query(`
+          SELECT p.id,
+            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals,
+            COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.opponent_score WHEN mr.opponent_id=p.id THEN mr.player_score ELSE 0 END),0) AS conceded
+          FROM players p
+          JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='weekly'
+          JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
+          WHERE wtm.tournament_id = $1
+          GROUP BY p.id
+          ORDER BY goals DESC, conceded ASC
+          LIMIT 1
+        `, [match.tournament_id])
+        const weeklyTopScorer = trophyGoldenBootRes.rows[0]
+        await awardOrReassignTrophy({
+          sourceKey: `weekly_golden_boot_tournament_${match.tournament_id}`,
+          trophyColumn: "trophy5_count",
+          playerId: weeklyTopScorer?.goals > 0 ? weeklyTopScorer.id : null,
+          seasonNumber: season,
+        })
+
+        // ── Auto-fill season record — weekly winner field ────────────────────
+        if (finalMatchRes.rows[0]?.winner_id) {
+          const winnerNameRes = await query(
+            "SELECT name FROM players WHERE id = $1",
+            [finalMatchRes.rows[0].winner_id]
+          )
+          const winnerName = winnerNameRes.rows[0]?.name
+          if (winnerName) {
+            await updateSeasonRecord(season, { weekly_winner: winnerName })
+          }
+        }
+      } catch (e) { console.error("[weekly] Trophy/completion awards error:", e) }
     }
 
     res.json({ updated: true, winnerId, nextRound: match.round + 1 })
