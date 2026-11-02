@@ -502,13 +502,16 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       `, [winnerId, match.tournament_id, nextRound, nextMatchNum])
     }
 
-    // Mark tournament complete if no more pending matches with both players
-    const remaining = await query(`
+    // Mark tournament complete when the Final match has been played.
+    // Checking "no pending matches" is fragile — any earlier match that was
+    // edited via "Edit players" gets reset to 'pending' and would block
+    // completion even though the Final is done.  Checking the Final directly
+    // is the only condition that really matters.
+    const finalDoneRes = await query(`
       SELECT COUNT(*) FROM weekly_tournament_matches
-      WHERE tournament_id = $1 AND status = 'pending'
-        AND player1_id IS NOT NULL AND player2_id IS NOT NULL
-    `, [match.tournament_id])
-    if (parseInt(remaining.rows[0].count) === 0) {
+      WHERE tournament_id = $1 AND round = $2 AND status = 'completed'
+    `, [match.tournament_id, totalRounds])
+    if (parseInt(finalDoneRes.rows[0].count) > 0) {
       await query("UPDATE weekly_tournaments SET status = 'completed', completed_at = NOW() WHERE id = $1", [match.tournament_id])
 
       // Golden Boot BDR — edit-safe: tracks current holder in app_settings
