@@ -1,12 +1,15 @@
 // components/admin/LeaguePlayoffAdmin.jsx
 // Admin panel for the league_knockout format playoffs (Q1 → Eliminator → Q2 → Final)
+// 2-leg coin toss flow — mirrors TeamKnockoutAdmin.jsx
 import { useState } from "react"
-import { Trophy, Trash2, RefreshCw, CheckCircle } from "lucide-react"
+import { Trophy, Trash2, RefreshCw, CheckCircle, Coins } from "lucide-react"
 import {
   useTeamLeaguePlayoffs,
   useGenerateLeaguePlayoffs,
   useResetLeaguePlayoffs,
-  useLeaguePlayoffResult,
+  useTossLeaguePlayoffMatch,
+  useTossChoiceLeaguePlayoffMatch,
+  useForceLeaguePlayoffWinner,
 } from "../../lib/queries"
 import { TeamAvatar } from "../common/TeamLogo"
 import { cn } from "../../lib/utils"
@@ -25,22 +28,65 @@ const MATCH_COLORS = {
   final:      "border-emerald-500/40 bg-emerald-500/5",
 }
 
-// ── Single match card with inline score entry ──────────────────────────────
+// ── Coin flip animation ────────────────────────────────────────────────────────
+function CoinFlip({ onDone }) {
+  const [phase, setPhase] = useState("idle")
+
+  const handleFlip = () => {
+    setPhase("flipping")
+    setTimeout(() => { setPhase("done"); onDone() }, 2200)
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-3">
+      <style>{`
+        @keyframes coinFlip {
+          0%   { transform: rotateY(0deg); }
+          25%  { transform: rotateY(720deg) scaleX(0.05); }
+          50%  { transform: rotateY(1440deg) scaleX(1); }
+          75%  { transform: rotateY(2160deg) scaleX(0.05); }
+          100% { transform: rotateY(2880deg) scaleX(1); }
+        }
+        .coin-spin { animation: coinFlip 2.2s cubic-bezier(0.4,0,0.2,1) forwards; }
+      `}</style>
+
+      <div className={cn(
+        "w-20 h-20 rounded-full flex items-center justify-center text-3xl shadow-lg",
+        "bg-gradient-to-br from-yellow-400 to-amber-600 border-4 border-amber-300",
+        phase === "flipping" && "coin-spin"
+      )}>
+        🪙
+      </div>
+
+      {phase === "idle" && (
+        <button onClick={handleFlip}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-accent text-pitch-900 font-bold text-sm hover:bg-accent/90">
+          <Coins className="w-4 h-4" /> Flip Coin
+        </button>
+      )}
+      {phase === "flipping" && <p className="text-sm text-slate-400 animate-pulse">Flipping…</p>}
+    </div>
+  )
+}
+
+// ── Single playoff match card ──────────────────────────────────────────────────
 function PlayoffMatchCard({ match }) {
-  const saveResult  = useLeaguePlayoffResult()
-  const [t1, setT1] = useState("")
-  const [t2, setT2] = useState("")
+  const toss        = useTossLeaguePlayoffMatch()
+  const tossChoice  = useTossChoiceLeaguePlayoffMatch()
+  const forceWinner = useForceLeaguePlayoffWinner()
+  const [showToss, setShowToss]   = useState(false)
+  const [isRedoing, setIsRedoing] = useState(false)
 
-  const noTeams   = !match.team1Id || !match.team2Id
-  const completed = match.status === "completed"
+  const noTeams       = !match.team1Id || !match.team2Id
+  const completed     = match.status === "completed"
+  const needsDecision = match.status === "needs_decision"
+  const tossDone      = match.tossDone
+  const choiceDone    = !!match.homeChoice
 
-  const handleSave = () => {
-    const s1 = parseInt(t1), s2 = parseInt(t2)
-    if (isNaN(s1) || isNaN(s2) || s1 === s2) {
-      alert("Enter two different whole-number scores (draws not allowed in playoffs).")
-      return
-    }
-    saveResult.mutate({ id: match.id, team1Score: s1, team2Score: s2 })
+  const handleToss = async () => {
+    await toss.mutateAsync(match.id)
+    setShowToss(false)
+    setIsRedoing(false)
   }
 
   return (
@@ -55,62 +101,119 @@ function PlayoffMatchCard({ match }) {
             <CheckCircle className="w-3 h-3" /> Done
           </span>
         )}
+        {needsDecision && (
+          <span className="text-xs text-rose-400 font-semibold animate-pulse">⚠ Tie — Pick Winner</span>
+        )}
       </div>
 
       {noTeams ? (
         <p className="text-xs text-slate-600 italic">Waiting for earlier result…</p>
       ) : (
         <>
-          {/* Teams */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+          {/* Teams row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <TeamAvatar logoUrl={match.team1Logo} name={match.team1Name} size="w-8 h-8" />
-              <span className="font-semibold text-sm text-white truncate">{match.team1Name}</span>
+              <span className="font-semibold text-sm text-white">{match.team1Name}</span>
             </div>
-            <span className="text-slate-600 text-xs font-mono shrink-0">vs</span>
-            <div className="flex items-center gap-2 min-w-0 justify-end">
-              <span className="font-semibold text-sm text-white truncate">{match.team2Name}</span>
+            <span className="text-slate-600 text-xs font-mono">vs</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm text-white">{match.team2Name}</span>
               <TeamAvatar logoUrl={match.team2Logo} name={match.team2Name} size="w-8 h-8" />
             </div>
           </div>
 
-          {/* Result banner */}
+          {/* Winner banner */}
           {completed && (
             <div className="text-center text-xs text-gold font-semibold bg-gold/10 border border-gold/20 rounded-lg py-2">
-              🏆 {match.team1Score} – {match.team2Score}
-              {" · "}
-              {match.winnerTeamId === match.team1Id ? match.team1Name : match.team2Name} advances
+              🏆 {match.winnerTeamId === match.team1Id ? match.team1Name : match.team2Name} advances
             </div>
           )}
 
-          {/* Score entry (only if not yet done) */}
-          {!completed && (
-            <div className="flex items-center gap-2">
-              <input
-                type="number" min="0"
-                value={t1} onChange={e => setT1(e.target.value)}
-                placeholder={match.team1Name?.split(" ")[0]}
-                className="flex-1 bg-pitch-900 border border-surface-border/40 rounded-lg px-2 py-1.5 text-sm text-center text-white focus:outline-none focus:border-accent/60"
-              />
-              <span className="text-slate-600 text-xs">–</span>
-              <input
-                type="number" min="0"
-                value={t2} onChange={e => setT2(e.target.value)}
-                placeholder={match.team2Name?.split(" ")[0]}
-                className="flex-1 bg-pitch-900 border border-surface-border/40 rounded-lg px-2 py-1.5 text-sm text-center text-white focus:outline-none focus:border-accent/60"
-              />
-              <button
-                onClick={handleSave}
-                disabled={saveResult.isPending || !t1 || !t2}
-                className="px-3 py-1.5 rounded-lg bg-accent text-pitch-900 text-xs font-bold hover:bg-accent/90 disabled:opacity-50 shrink-0"
-              >
-                {saveResult.isPending ? "…" : "Save"}
-              </button>
+          {/* Leg scores */}
+          {(completed || needsDecision || (choiceDone && (match.team1Leg1 !== null || match.team1Leg2 !== null))) && (
+            <div className="flex gap-4 justify-center text-xs text-slate-500">
+              <span>Leg 1: {match.team1Leg1 ?? "—"} – {match.team2Leg1 ?? "—"}</span>
+              <span>Leg 2: {match.team1Leg2 ?? "—"} – {match.team2Leg2 ?? "—"}</span>
             </div>
           )}
 
-          {saveResult.isError && (
-            <p className="text-rose-400 text-xs">{saveResult.error?.response?.data?.error || "Save failed"}</p>
+          {/* Tie-breaker */}
+          {needsDecision && (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-400 text-center">Teams level on aggregate. Admin picks the winner:</p>
+              <div className="flex gap-2">
+                {[{ id: match.team1Id, name: match.team1Name }, { id: match.team2Id, name: match.team2Name }].map(t => (
+                  <button key={t.id}
+                    onClick={() => { if (confirm(`Confirm ${t.name} advances?`)) forceWinner.mutate({ matchId: match.id, winnerId: t.id }) }}
+                    disabled={forceWinner.isPending}
+                    className="flex-1 py-2 rounded-lg bg-accent/15 border border-accent/30 text-accent text-xs font-semibold hover:bg-accent/25 disabled:opacity-50">
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Toss flow */}
+          {!completed && !needsDecision && !choiceDone && (
+            <div className="border border-surface-border/40 rounded-xl p-3 bg-pitch-900/40 space-y-3">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide text-center">🪙 Coin Toss</p>
+
+              {(!tossDone || isRedoing) && !choiceDone ? (
+                (showToss || isRedoing)
+                  ? <CoinFlip onDone={handleToss} />
+                  : <button onClick={() => setShowToss(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-pitch-900 font-bold text-sm hover:bg-accent/90">
+                      <Coins className="w-4 h-4" /> Start Toss
+                    </button>
+              ) : choiceDone ? null : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2 py-2 rounded-lg bg-gold/10 border border-gold/20">
+                    <span className="text-lg">🥇</span>
+                    <span className="text-sm font-bold text-gold">{match.tossWinnerName} wins the toss!</span>
+                  </div>
+                  <p className="text-xs text-slate-400 text-center">{match.tossWinnerName}, choose when to play home:</p>
+                  <div className="flex gap-2">
+                    {[{ val: "leg1", label: "🏠 Home in Leg 1" }, { val: "leg2", label: "✈ Home in Leg 2" }].map(({ val, label }) => (
+                      <button key={val}
+                        onClick={() => tossChoice.mutate({ matchId: match.id, homeChoice: val })}
+                        disabled={tossChoice.isPending}
+                        className="flex-1 py-2.5 rounded-xl border border-accent/30 bg-accent/10 text-accent text-xs font-bold hover:bg-accent/20 disabled:opacity-50">
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Redo toss before home choice is locked */}
+                  <button
+                    onClick={() => { if (confirm("Redo the coin toss? The current result will be replaced.")) setIsRedoing(true) }}
+                    disabled={toss.isPending}
+                    className="w-full text-[10px] text-slate-600 hover:text-slate-400 transition-colors pt-1 underline underline-offset-2">
+                    Redo toss
+                  </button>
+                </div>
+              )}
+
+              {toss.isError && (
+                <p className="text-rose-400 text-xs text-center">{toss.error?.response?.data?.error || "Toss failed"}</p>
+              )}
+            </div>
+          )}
+
+          {/* Fixtures created */}
+          {!completed && !needsDecision && choiceDone && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span className="font-semibold">
+                  {match.tossWinnerName} plays home in Leg {match.homeChoice === "leg1" ? "1" : "2"}
+                </span>
+              </div>
+              <div className="rounded-lg bg-pitch-800/60 border border-surface-border/30 px-3 py-2 text-xs text-slate-500 text-center">
+                Fixtures are live in Team Dashboards. Team owners log player results,
+                admin closes each leg from the Fixtures tab.
+              </div>
+            </div>
           )}
         </>
       )}
@@ -129,8 +232,7 @@ export default function LeaguePlayoffAdmin() {
   const matches    = data?.matches || []
   const hasMatches = matches.length > 0
 
-  // Order: qualifier1 → eliminator → qualifier2 → final
-  const ORDER = ["qualifier1", "eliminator", "qualifier2", "final"]
+  const ORDER  = ["qualifier1", "eliminator", "qualifier2", "final"]
   const sorted = [...matches].sort((a, b) => ORDER.indexOf(a.matchType) - ORDER.indexOf(b.matchType))
 
   return (
@@ -141,17 +243,14 @@ export default function LeaguePlayoffAdmin() {
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Trophy className="w-5 h-5 text-gold" /> League Playoffs
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Qualifier 1 · Eliminator · Qualifier 2 · Final
-          </p>
+          <p className="text-xs text-slate-500 mt-0.5">2-leg ties · coin toss for home advantage</p>
         </div>
         <div className="flex gap-2">
           {hasMatches && (
             <button
               onClick={() => { if (confirm("Reset all playoff results for this season? This cannot be undone.")) reset.mutate() }}
               disabled={reset.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-400 text-xs hover:bg-rose-500/10 disabled:opacity-50"
-            >
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-400 text-xs hover:bg-rose-500/10 disabled:opacity-50">
               <Trash2 className="w-3.5 h-3.5" /> Reset
             </button>
           )}
@@ -159,8 +258,7 @@ export default function LeaguePlayoffAdmin() {
             <button
               onClick={() => generate.mutate()}
               disabled={generate.isPending}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-pitch-900 text-sm font-bold hover:bg-accent/90 disabled:opacity-50"
-            >
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-pitch-900 text-sm font-bold hover:bg-accent/90 disabled:opacity-50">
               <RefreshCw className={cn("w-4 h-4", generate.isPending && "animate-spin")} />
               {generate.isPending ? "Generating…" : "Generate Playoff Bracket"}
             </button>

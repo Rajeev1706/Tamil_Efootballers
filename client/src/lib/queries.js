@@ -340,6 +340,33 @@ export const useLeaguePlayoffResult = () => {
   })
 }
 
+export const useTossLeaguePlayoffMatch = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (matchId) => teamsApi.playoffsToss(matchId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-league-playoffs"] }),
+  })
+}
+
+export const useTossChoiceLeaguePlayoffMatch = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, homeChoice }) => teamsApi.playoffsTossChoice(matchId, homeChoice),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-league-playoffs"] })
+      qc.invalidateQueries({ queryKey: ["fixtures"] })
+    },
+  })
+}
+
+export const useForceLeaguePlayoffWinner = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, winnerId }) => teamsApi.playoffsForceWinner(matchId, winnerId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-league-playoffs"] }),
+  })
+}
+
 export const useBestLeaguePerformer = (teamId) =>
   useQuery({
     queryKey: ["best-league-performer", teamId],

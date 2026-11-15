@@ -19,6 +19,7 @@ const router = Router()
     await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS is_knockout_leg BOOLEAN DEFAULT FALSE")
     await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS knockout_match_id INT")
     await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS knockout_leg INT")
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS league_playoff_match_id INT")
   } catch (e) { console.error("[fixtures] migration:", e.message) }
 })()
 
@@ -575,6 +576,40 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
           } else {
             // Tied on GD — admin must pick manually
             await query("UPDATE team_knockout_matches SET status = 'needs_decision' WHERE id = $1", [km.id])
+          }
+        }
+      }
+    }
+
+    // ── Auto-update league playoff match when a playoff leg fixture is closed ──
+    if (fix.league_playoff_match_id) {
+      const pm = (await query("SELECT * FROM team_league_playoffs WHERE id = $1", [fix.league_playoff_match_id])).rows[0]
+      if (pm) {
+        const t1IsHome  = fix.home_team_id === pm.team1_id
+        const t1Goals   = t1IsHome ? homeGoals : awayGoals
+        const t2Goals   = t1IsHome ? awayGoals : homeGoals
+        const legCol    = fix.knockout_leg === 1
+          ? "team1_leg1 = $1, team2_leg1 = $2"
+          : "team1_leg2 = $1, team2_leg2 = $2"
+        await query(`UPDATE team_league_playoffs SET ${legCol} WHERE id = $3`, [t1Goals, t2Goals, pm.id])
+
+        const fresh = (await query("SELECT * FROM team_league_playoffs WHERE id = $1", [pm.id])).rows[0]
+        if (fresh.team1_leg1 !== null && fresh.team1_leg2 !== null) {
+          const t1Total = (fresh.team1_leg1 || 0) + (fresh.team1_leg2 || 0)
+          const t2Total = (fresh.team2_leg1 || 0) + (fresh.team2_leg2 || 0)
+          let winnerId = null
+          if (t1Total > t2Total) winnerId = fresh.team1_id
+          else if (t2Total > t1Total) winnerId = fresh.team2_id
+
+          if (winnerId) {
+            await query(
+              "UPDATE team_league_playoffs SET winner_team_id = $1, status = 'completed' WHERE id = $2",
+              [winnerId, fresh.id]
+            )
+            const { advanceLeaguePlayoffWinner } = await import("../services/leaguePlayoffLogic.js")
+            await advanceLeaguePlayoffWinner(fresh, winnerId)
+          } else {
+            await query("UPDATE team_league_playoffs SET status = 'needs_decision' WHERE id = $1", [fresh.id])
           }
         }
       }

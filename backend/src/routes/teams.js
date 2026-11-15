@@ -1620,16 +1620,38 @@ router.post("/season-delete", authenticate, adminOnly, async (req, res, next) =>
 // awards now use.
 // ============================================================================
 
+// ── Migrate team_league_playoffs and fixtures for toss/leg system ────────────
+;(async () => {
+  try {
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS toss_done BOOLEAN DEFAULT false")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS toss_winner_id INT REFERENCES teams(id) ON DELETE SET NULL")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS home_choice TEXT CHECK (home_choice IN ('leg1','leg2'))")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS leg1_fixture_id INT")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS leg2_fixture_id INT")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS team1_leg1 INT")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS team2_leg1 INT")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS team1_leg2 INT")
+    await query("ALTER TABLE team_league_playoffs ADD COLUMN IF NOT EXISTS team2_leg2 INT")
+    await query("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS league_playoff_match_id INT")
+  } catch (e) { console.error("[teams] playoff migration:", e.message) }
+})()
+
 const PLAYOFF_SELECT = `
   SELECT
     p.id, p.season_number AS "seasonNumber", p.match_type AS "matchType",
     p.team1_score AS "team1Score", p.team2_score AS "team2Score", p.status,
     p.winner_team_id AS "winnerTeamId",
+    p.toss_done AS "tossDone", p.home_choice AS "homeChoice",
+    p.team1_leg1 AS "team1Leg1", p.team2_leg1 AS "team2Leg1",
+    p.team1_leg2 AS "team1Leg2", p.team2_leg2 AS "team2Leg2",
+    p.leg1_fixture_id AS "leg1FixtureId", p.leg2_fixture_id AS "leg2FixtureId",
     t1.id AS "team1Id", t1.name AS "team1Name", t1.logo_url AS "team1Logo",
-    t2.id AS "team2Id", t2.name AS "team2Name", t2.logo_url AS "team2Logo"
+    t2.id AS "team2Id", t2.name AS "team2Name", t2.logo_url AS "team2Logo",
+    tw.name AS "tossWinnerName", tw.id AS "tossWinnerId"
   FROM team_league_playoffs p
   LEFT JOIN teams t1 ON p.team1_id = t1.id
   LEFT JOIN teams t2 ON p.team2_id = t2.id
+  LEFT JOIN teams tw ON p.toss_winner_id = tw.id
 `
 
 async function getCurrentSeason(q = query) {
@@ -1805,6 +1827,90 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
 
     const fresh = await query(PLAYOFF_SELECT + " WHERE p.id = $1", [match.id])
     res.json(fresh.rows[0])
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/playoffs/:id/toss ───────────────────────────────────────────
+router.post("/playoffs/:id/toss", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const matchRes = await query("SELECT * FROM team_league_playoffs WHERE id = $1", [parseInt(req.params.id)])
+    const match = matchRes.rows[0]
+    if (!match) return res.status(404).json({ error: "Playoff match not found" })
+    if (!match.team1_id || !match.team2_id) return res.status(400).json({ error: "Both teams must be set before tossing" })
+    if (match.toss_done && match.home_choice) return res.status(400).json({ error: "Toss already complete — home choice locked" })
+
+    const winnerId = Math.random() < 0.5 ? match.team1_id : match.team2_id
+    await query("UPDATE team_league_playoffs SET toss_done = true, toss_winner_id = $1 WHERE id = $2", [winnerId, match.id])
+
+    const fresh = (await query(PLAYOFF_SELECT + " WHERE p.id = $1", [match.id])).rows[0]
+    res.json({ success: true, match: fresh })
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/playoffs/:id/toss/choice ────────────────────────────────────
+// Admin picks home leg for toss winner. Creates 2 fixture rows.
+router.post("/playoffs/:id/toss/choice", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { homeChoice } = z.object({ homeChoice: z.enum(["leg1", "leg2"]) }).parse(req.body)
+    const matchRes = await query("SELECT * FROM team_league_playoffs WHERE id = $1", [parseInt(req.params.id)])
+    const match = matchRes.rows[0]
+    if (!match) return res.status(404).json({ error: "Playoff match not found" })
+    if (!match.toss_done) return res.status(400).json({ error: "Run the toss first" })
+    if (match.home_choice) return res.status(400).json({ error: "Home choice already set" })
+
+    const tossWinner = match.toss_winner_id
+    const otherTeam  = tossWinner === match.team1_id ? match.team2_id : match.team1_id
+
+    const leg1Home = homeChoice === "leg1" ? tossWinner : otherTeam
+    const leg1Away = homeChoice === "leg1" ? otherTeam  : tossWinner
+    const leg2Home = homeChoice === "leg1" ? otherTeam  : tossWinner
+    const leg2Away = homeChoice === "leg1" ? tossWinner : otherTeam
+
+    // Use rounds 15-22 for playoff legs (after league's round 14)
+    const ROUND_MAP = { qualifier1: [15,16], eliminator: [17,18], qualifier2: [19,20], final: [21,22] }
+    const [leg1Round, leg2Round] = ROUND_MAP[match.match_type] || [15, 16]
+    const today = new Date().toISOString().split("T")[0]
+
+    const { withTransaction } = await import("../db/pool.js")
+    await withTransaction(async ({ query: q }) => {
+      const leg1 = await q(`
+        INSERT INTO fixtures (home_team_id, away_team_id, round, status, scheduled_date,
+          group_stage, is_knockout_leg, knockout_leg, league_playoff_match_id)
+        VALUES ($1, $2, $3, 'upcoming', $4, false, true, 1, $5) RETURNING id
+      `, [leg1Home, leg1Away, leg1Round, today, match.id])
+
+      const leg2 = await q(`
+        INSERT INTO fixtures (home_team_id, away_team_id, round, status, scheduled_date,
+          group_stage, is_knockout_leg, knockout_leg, league_playoff_match_id)
+        VALUES ($1, $2, $3, 'upcoming', $4, false, true, 2, $5) RETURNING id
+      `, [leg2Home, leg2Away, leg2Round, today, match.id])
+
+      await q(`
+        UPDATE team_league_playoffs
+        SET home_choice = $1, leg1_fixture_id = $2, leg2_fixture_id = $3
+        WHERE id = $4
+      `, [homeChoice, leg1.rows[0].id, leg2.rows[0].id, match.id])
+    })
+
+    const fresh = (await query(PLAYOFF_SELECT + " WHERE p.id = $1", [match.id])).rows[0]
+    res.json({ success: true, match: fresh })
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/playoffs/:id/force-winner — admin picks winner when match is tied (needs_decision)
+router.post("/playoffs/:id/force-winner", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { winnerId } = z.object({ winnerId: z.number().int().positive() }).parse(req.body)
+    const matchRes = await query("SELECT * FROM team_league_playoffs WHERE id = $1", [parseInt(req.params.id)])
+    const match = matchRes.rows[0]
+    if (!match) return res.status(404).json({ error: "Playoff match not found" })
+    if (match.status !== "needs_decision") return res.status(400).json({ error: "Match is not awaiting a decision" })
+    if (winnerId !== match.team1_id && winnerId !== match.team2_id) return res.status(400).json({ error: "Winner must be one of the two teams in this match" })
+    await query("UPDATE team_league_playoffs SET winner_team_id = $1, status = 'completed' WHERE id = $2", [winnerId, match.id])
+    const { advanceLeaguePlayoffWinner } = await import("../services/leaguePlayoffLogic.js")
+    await advanceLeaguePlayoffWinner(match, winnerId)
+    const fresh = (await query(PLAYOFF_SELECT + " WHERE p.id = $1", [match.id])).rows[0]
+    res.json({ success: true, match: fresh })
   } catch (err) { next(err) }
 })
 
