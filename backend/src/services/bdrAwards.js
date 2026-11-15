@@ -29,6 +29,15 @@ import { query } from "../db/pool.js"
     await query(`CREATE INDEX IF NOT EXISTS idx_bdr_breakdown_player ON player_bdr_breakdown(player_id)`)
     // Add season_number column if upgrading from older schema
     await query(`ALTER TABLE player_bdr_breakdown ADD COLUMN IF NOT EXISTS season_number INT`)
+    // source_key: unique token that identifies the award source (e.g. weekly_bdr_26_15).
+    // Allows upsert-accumulation so that all BDR earned within the same tournament
+    // is stored as a SINGLE breakdown row rather than one row per round.
+    await query(`ALTER TABLE player_bdr_breakdown ADD COLUMN IF NOT EXISTS source_key TEXT`)
+    await query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_bdr_breakdown_source_key
+      ON player_bdr_breakdown(source_key)
+      WHERE source_key IS NOT NULL
+    `)
   } catch (e) { console.error("[bdrAwards] breakdown migration:", e.message) }
 })()
 
@@ -74,5 +83,38 @@ export async function addBdrWithLabel(playerId, delta, label, seasonNumber) {
       `INSERT INTO player_bdr_breakdown (player_id, amount, label, season_number) VALUES ($1, $2, $3, $4)`,
       [playerId, delta, label, seasonNumber ?? null]
     )
+  }
+}
+
+// Upsert-accumulate — used when multiple incremental awards belong to the same
+// source (e.g. all BDR earned within one weekly tournament).  Instead of
+// inserting a new row per round, a single row is kept per (player, sourceKey)
+// and the amount field grows with each advancement.  Reversals (negative delta)
+// are also handled so edit-safety is preserved.
+//
+// sourceKey must be a stable identifier such as "weekly_bdr_26_15"
+// (tournament_id + player_id).  Rows with no source_key are unaffected.
+export async function upsertBdrForSource(playerId, delta, label, seasonNumber, sourceKey) {
+  if (!playerId || !delta || !label || !sourceKey) return
+  // Always update the player's running total
+  await query(
+    `UPDATE players SET bdr_points = GREATEST(0, bdr_points + $1) WHERE id = $2`,
+    [delta, playerId]
+  )
+  if (delta > 0) {
+    // Add to existing row for this source, or create it
+    await query(`
+      INSERT INTO player_bdr_breakdown (player_id, amount, label, season_number, source_key)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (source_key) WHERE source_key IS NOT NULL
+      DO UPDATE SET amount = GREATEST(0, player_bdr_breakdown.amount + $2)
+    `, [playerId, delta, label, seasonNumber ?? null, sourceKey])
+  } else {
+    // Reversal: subtract from the existing row (clamp to 0)
+    await query(`
+      UPDATE player_bdr_breakdown
+      SET amount = GREATEST(0, amount + $1)
+      WHERE source_key = $2
+    `, [delta, sourceKey])
   }
 }

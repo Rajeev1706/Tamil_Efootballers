@@ -17,6 +17,7 @@ import WeeklyAdmin from "../components/admin/WeeklyTournament"
 import RevolutionAdmin from "../components/admin/RevolutionTournament"
 import TlgAdmin from "../components/admin/TlgAdmin"
 import TeamKnockoutAdmin from "../components/admin/TeamKnockoutAdmin"
+import LeaguePlayoffAdmin from "../components/admin/LeaguePlayoffAdmin"
 import DuoTournamentAdmin from "../components/admin/DuoTournamentAdmin"
 import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
@@ -1010,7 +1011,11 @@ export default function AdminPage() {
           <RevolutionAdmin />
         )}
         {activeTab === "tlg" && <TlgAdmin />}
-        {activeTab === "teamknockout" && <TeamKnockoutAdmin />}
+        {activeTab === "teamknockout" && (
+          settings?.team_league_format === "league_knockout"
+            ? <LeaguePlayoffAdmin />
+            : <TeamKnockoutAdmin />
+        )}
         {activeTab === "duo" && <DuoTournamentAdmin />}
         {activeTab === "replacement" && (
           <ReplacementModule players={players} />

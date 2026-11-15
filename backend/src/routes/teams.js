@@ -1654,15 +1654,31 @@ router.get("/playoffs/current", async (req, res, next) => {
 // exists as a fallback/retry in case that ever needs re-running.
 router.post("/playoffs/generate", authenticate, adminOnly, async (req, res, next) => {
   try {
-    const remainingRes = await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
+    const season = await getCurrentSeason()
+
+    // If playoffs already exist, just return them (idempotent)
+    const existing = await query(PLAYOFF_SELECT + " WHERE p.season_number = $1 ORDER BY p.id", [season])
+    if (existing.rows.length > 0) {
+      return res.json({ seasonNumber: season, matches: existing.rows, alreadyGenerated: true })
+    }
+
+    // For league_knockout format, only group-stage fixtures need to be done.
+    // For other formats, all fixtures must be done.
+    const formatRes = await query("SELECT value FROM app_settings WHERE key = 'team_league_format'")
+    const format    = formatRes.rows[0]?.value || "league_knockout"
+
+    const remainingRes = format === "league_knockout"
+      ? await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed' AND group_stage = true`)
+      : await query(`SELECT COUNT(*) FROM fixtures WHERE status != 'completed'`)
+
     if (parseInt(remainingRes.rows[0].count) > 0) {
       return res.status(400).json({ error: "Group stage isn't fully complete yet — every fixture needs a result before playoffs can be generated." })
     }
 
-    const season = await getCurrentSeason()
     const generated = await generatePlayoffs(season)
     if (!generated) {
-      return res.status(400).json({ error: "Playoffs already generated for this season, or fewer than 4 teams exist." })
+      // generatePlayoffs returns false if fewer than 4 teams exist
+      return res.status(400).json({ error: "Fewer than 4 teams found in standings. Cannot generate playoffs." })
     }
 
     const result = await query(PLAYOFF_SELECT + " WHERE p.season_number = $1 ORDER BY p.id", [season])

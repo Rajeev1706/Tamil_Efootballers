@@ -4,7 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
-import { claimAward, addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
+import { claimAward, addBdr, addBdrWithLabel, upsertBdrForSource } from "../services/bdrAwards.js"
 import { awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 import { incrementHistory, roundLabel, saveActiveCelebration } from "../services/tournamentHistoryService.js"
@@ -454,17 +454,28 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
       ? championBonus
       : advancementDiff(match.round)
 
-    // If this is an edit, reverse the old winner's diff
+    // Fetch tournament name once — used as the breakdown label so all BDR earned
+    // within this tournament rolls up to a single line in the BDR breakdown.
+    let tournamentName = `Weekly Tournament ${match.tournament_id}`
+    try {
+      const tnRes = await query("SELECT name FROM weekly_tournaments WHERE id = $1", [match.tournament_id])
+      if (tnRes.rows[0]?.name) tournamentName = tnRes.rows[0].name
+    } catch (e) { console.error("[weekly] tournament name fetch error:", e) }
+
+    // source keys — one per player per tournament, stable across edits
+    const winnerSourceKey   = winnerId             ? `weekly_bdr_${match.tournament_id}_${winnerId}`         : null
+    const oldWinnerSourceKey = match.winner_id     ? `weekly_bdr_${match.tournament_id}_${match.winner_id}`  : null
+
+    // If this is an edit, reverse the old winner's diff (both total + breakdown row)
     if (oldMatchRecordId && match.winner_id && winnerDiff > 0) {
-      try { await addBdr(match.winner_id, -winnerDiff) }
+      try { await upsertBdrForSource(match.winner_id, -winnerDiff, tournamentName, season, oldWinnerSourceKey) }
       catch (e) { console.error("[weekly] BDR reversal error:", e) }
     }
 
-    // Award new winner's diff
+    // Award new winner's diff — accumulates into a single row for this tournament
     if (winnerId && winnerDiff > 0) {
       try {
-        const weeklyLabel = match.round === finalRound ? "Weekly Champion" : `Weekly Tournament Round ${match.round}`
-        await addBdrWithLabel(winnerId, winnerDiff, weeklyLabel, season)
+        await upsertBdrForSource(winnerId, winnerDiff, tournamentName, season, winnerSourceKey)
       } catch (e) { console.error("[weekly] BDR award error:", e) }
     }
 
@@ -537,8 +548,24 @@ router.patch("/matches/:matchId/result", authenticate, adminOnly, async (req, re
 
       if (oldGbHolderId !== (newGbHolder?.id ?? null)) {
         try {
-          if (oldGbHolderId) await addBdr(oldGbHolderId, -4)
-          if (newGbHolder)   await addBdrWithLabel(newGbHolder.id, 4, "Weekly Golden Boot", season)
+          // Reverse old holder's golden boot BDR (breakdown row + total)
+          if (oldGbHolderId) {
+            await upsertBdrForSource(
+              oldGbHolderId, -4,
+              `${tournamentName} · Golden Boot`,
+              season,
+              `weekly_gb_bdr_${match.tournament_id}_${oldGbHolderId}`
+            )
+          }
+          // Award new holder — single row per tournament for golden boot
+          if (newGbHolder) {
+            await upsertBdrForSource(
+              newGbHolder.id, 4,
+              `${tournamentName} · Golden Boot`,
+              season,
+              `weekly_gb_bdr_${match.tournament_id}_${newGbHolder.id}`
+            )
+          }
           await query(
             `INSERT INTO app_settings (key, value) VALUES ($1, $2)
              ON CONFLICT (key) DO UPDATE SET value = $2`,
@@ -628,6 +655,160 @@ router.delete("/:id", authenticate, adminOnly, async (req, res, next) => {
   try {
     await query("DELETE FROM weekly_tournaments WHERE id = $1", [req.params.id])
     res.json({ deleted: true })
+  } catch (err) { next(err) }
+})
+
+// POST /api/weekly/migrate-bdr — ONE-TIME migration for a specific tournament.
+// Deletes old-style individual-round BDR breakdown entries (Weekly Champion,
+// Weekly Tournament Round X, Weekly Golden Boot — labels with no source_key)
+// and re-awards BDR for that tournament using the new consolidated format where
+// all points from one tournament roll up into a single row per player.
+//
+// Call once per completed tournament that has old-style entries:
+//   POST /api/weekly/migrate-bdr  { "tournamentId": 26 }
+router.post("/migrate-bdr", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const { tournamentId } = z.object({ tournamentId: z.number().int().positive() }).parse(req.body)
+
+    const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
+    const season = parseInt(seasonRes.rows[0]?.value || "6")
+
+    // Fetch tournament
+    const tRes = await query("SELECT * FROM weekly_tournaments WHERE id = $1", [tournamentId])
+    const tournament = tRes.rows[0]
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" })
+    const tournamentName = tournament.name
+    const totalRounds = tournament.total_rounds
+
+    if (!totalRounds) return res.status(400).json({ error: "Tournament has no total_rounds — draw not generated yet" })
+
+    const finalRound = totalRounds
+    const sfRound    = totalRounds - 1
+    const qfRound    = totalRounds - 2
+
+    function bdrForReaching(round) {
+      if (round >= finalRound) return 8
+      if (round >= sfRound)    return 5
+      if (round >= qfRound)    return 3
+      return 0
+    }
+    function advancementDiff(currentRound) {
+      if (currentRound >= totalRounds) return 0
+      return bdrForReaching(currentRound + 1) - bdrForReaching(currentRound)
+    }
+
+    // ── 1. Find all players who have old-style weekly BDR entries (no source_key)
+    //       for the current season and appeared in this tournament ──────────────
+    const participantsRes = await query(
+      "SELECT DISTINCT player_id FROM weekly_tournament_players WHERE tournament_id = $1",
+      [tournamentId]
+    )
+    const participantIds = participantsRes.rows.map(r => r.player_id)
+    if (participantIds.length === 0) return res.json({ migrated: 0, message: "No players found" })
+
+    // ── 2. Delete old-style entries for these players ─────────────────────────
+    //    Old labels: 'Weekly Champion', 'Weekly Tournament Round N', 'Weekly Golden Boot'
+    //    We only delete rows that have NO source_key (the new system sets source_key).
+    const deleteRes = await query(`
+      DELETE FROM player_bdr_breakdown
+      WHERE player_id = ANY($1)
+        AND season_number = $2
+        AND source_key IS NULL
+        AND (
+          label = 'Weekly Champion'
+          OR label = 'Weekly Golden Boot'
+          OR label LIKE 'Weekly Tournament Round%'
+        )
+      RETURNING player_id, amount
+    `, [participantIds, season])
+
+    // ── 3. Reverse the deleted amounts from each player's bdr_points total ────
+    const refundMap = {}
+    for (const row of deleteRes.rows) {
+      refundMap[row.player_id] = (refundMap[row.player_id] || 0) + row.amount
+    }
+    for (const [pid, amt] of Object.entries(refundMap)) {
+      if (amt > 0) {
+        await query(
+          "UPDATE players SET bdr_points = GREATEST(0, bdr_points - $1) WHERE id = $2",
+          [amt, parseInt(pid)]
+        )
+      }
+    }
+
+    // ── 4. Re-award BDR from match results using the new consolidated format ──
+    const matchesRes = await query(`
+      SELECT round, winner_id, player1_id, player2_id, status
+      FROM weekly_tournament_matches
+      WHERE tournament_id = $1 AND status = 'completed' AND winner_id IS NOT NULL
+      ORDER BY round ASC
+    `, [tournamentId])
+
+    const bdrAccum = {}   // playerId → total advancement BDR earned this tournament
+    const championBonus = 10 - 8  // = 2
+
+    for (const m of matchesRes.rows) {
+      const diff = m.round === finalRound
+        ? championBonus
+        : advancementDiff(m.round)
+      if (diff > 0 && m.winner_id) {
+        bdrAccum[m.winner_id] = (bdrAccum[m.winner_id] || 0) + diff
+      }
+    }
+
+    // Insert consolidated advancement rows
+    for (const [pid, total] of Object.entries(bdrAccum)) {
+      await upsertBdrForSource(
+        parseInt(pid), total, tournamentName, season,
+        `weekly_bdr_${tournamentId}_${pid}`
+      )
+    }
+
+    // ── 5. Re-award Golden Boot ───────────────────────────────────────────────
+    const gbRes = await query(`
+      SELECT p.id,
+        COALESCE(SUM(CASE WHEN mr.player_id=p.id THEN mr.player_score WHEN mr.opponent_id=p.id THEN mr.opponent_score ELSE 0 END),0) AS goals
+      FROM players p
+      JOIN match_records mr ON (mr.player_id=p.id OR mr.opponent_id=p.id) AND mr.match_type='weekly'
+      JOIN weekly_tournament_matches wtm ON wtm.match_record_id = mr.id
+      WHERE wtm.tournament_id = $1
+      GROUP BY p.id
+      ORDER BY goals DESC
+      LIMIT 1
+    `, [tournamentId])
+    const gbWinner = gbRes.rows[0]?.goals > 0 ? gbRes.rows[0] : null
+
+    if (gbWinner) {
+      // Check if golden boot was previously tracked in app_settings
+      const gbKey = `weekly_gb_holder_${tournamentId}`
+      const oldGbRes = await query("SELECT value FROM app_settings WHERE key = $1", [gbKey])
+      const oldGbId = oldGbRes.rows[0]?.value ? parseInt(oldGbRes.rows[0].value) : null
+
+      // Only insert if no new-style row exists yet for this source
+      const gbSourceKey = `weekly_gb_bdr_${tournamentId}_${gbWinner.id}`
+      await upsertBdrForSource(
+        gbWinner.id, 4,
+        `${tournamentName} · Golden Boot`,
+        season,
+        gbSourceKey
+      )
+      // Update tracker so future edits know the current holder
+      if (oldGbId !== gbWinner.id) {
+        await query(
+          `INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`,
+          [gbKey, gbWinner.id.toString()]
+        )
+      }
+    }
+
+    res.json({
+      migrated: true,
+      tournament: tournamentName,
+      playersRefunded: Object.keys(refundMap).length,
+      oldRowsDeleted: deleteRes.rows.length,
+      playersRewarded: Object.keys(bdrAccum).length,
+      goldenBoot: gbWinner?.id ?? null,
+    })
   } catch (err) { next(err) }
 })
 

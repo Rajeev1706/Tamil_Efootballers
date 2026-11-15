@@ -316,6 +316,30 @@ export const useTopScorers = () =>
 export const useTeamLeaguePlayoffs = () =>
   useQuery({ queryKey: ["team-league-playoffs"], queryFn: teamsApi.playoffsCurrent, staleTime: 1000 * 60 })
 
+export const useGenerateLeaguePlayoffs = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: teamsApi.playoffsGenerate,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-league-playoffs"] }),
+  })
+}
+
+export const useResetLeaguePlayoffs = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: teamsApi.playoffsReset,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-league-playoffs"] }),
+  })
+}
+
+export const useLeaguePlayoffResult = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, team1Score, team2Score }) => teamsApi.playoffsResult(id, { team1Score, team2Score }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-league-playoffs"] }),
+  })
+}
+
 export const useBestLeaguePerformer = (teamId) =>
   useQuery({
     queryKey: ["best-league-performer", teamId],
