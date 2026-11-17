@@ -74,8 +74,9 @@ function TiebreakerPanel({ match }) {
 
   const { data: p1Data } = usePlayers({ teamId: match.team1Id })
   const { data: p2Data } = usePlayers({ teamId: match.team2Id })
-  const team1Players = p1Data?.players || []
-  const team2Players = p2Data?.players || []
+  // /players returns a plain array (not { players: [] })
+  const team1Players = Array.isArray(p1Data) ? p1Data : (p1Data?.players || [])
+  const team2Players = Array.isArray(p2Data) ? p2Data : (p2Data?.players || [])
 
   const [t1Sel, setT1Sel] = useState([null, null, null, null, null])
   const [t2Sel, setT2Sel] = useState([null, null, null, null, null])

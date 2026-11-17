@@ -441,7 +441,7 @@ export const useTeam = (id) =>
   useQuery({ queryKey: QK.team(id), queryFn: () => teamsApi.get(id), enabled: !!id })
 
 export const usePlayers = (params) =>
-  useQuery({ queryKey: QK.players(params), queryFn: () => playersApi.list(params), staleTime: 1000 * 60 * 2 })
+  useQuery({ queryKey: QK.players(params), queryFn: () => playersApi.list(params), staleTime: 1000 * 60 * 2, enabled: !params?.teamId || !!params.teamId })
 
 export const useMyPlayers = (teamId) =>
   useQuery({
