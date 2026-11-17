@@ -411,6 +411,37 @@ router.patch("/:id/result", authenticate, adminOnly, async (req, res, next) => {
     })
 
     const fresh = await query(FIXTURE_SELECT + " WHERE f.id = $1", [req.params.id])
+
+    // ── Sync league playoff leg score when admin edits a playoff fixture result ──
+    const rawFix = (await query("SELECT * FROM fixtures WHERE id = $1", [req.params.id])).rows[0]
+    if (rawFix?.league_playoff_match_id) {
+      const pm = (await query("SELECT * FROM team_league_playoffs WHERE id = $1", [rawFix.league_playoff_match_id])).rows[0]
+      if (pm) {
+        const t1IsHome = rawFix.home_team_id === pm.team1_id
+        const t1Pts    = t1IsHome ? homeScore : awayScore
+        const t2Pts    = t1IsHome ? awayScore : homeScore
+        const legCol   = rawFix.knockout_leg === 1
+          ? "team1_leg1 = $1, team2_leg1 = $2"
+          : "team1_leg2 = $1, team2_leg2 = $2"
+        await query(`UPDATE team_league_playoffs SET ${legCol} WHERE id = $3`, [t1Pts, t2Pts, pm.id])
+
+        // Re-evaluate winner if both legs are stored
+        const freshPm = (await query("SELECT * FROM team_league_playoffs WHERE id = $1", [pm.id])).rows[0]
+        if (freshPm.team1_leg1 !== null && freshPm.team1_leg2 !== null) {
+          const t1Total = (freshPm.team1_leg1 || 0) + (freshPm.team1_leg2 || 0)
+          const t2Total = (freshPm.team2_leg1 || 0) + (freshPm.team2_leg2 || 0)
+          if (t1Total === t2Total) {
+            await query("UPDATE team_league_playoffs SET status = 'needs_decision', winner_team_id = NULL WHERE id = $1", [pm.id])
+          } else {
+            const winnerId = t1Total > t2Total ? freshPm.team1_id : freshPm.team2_id
+            await query("UPDATE team_league_playoffs SET winner_team_id = $1, status = 'completed' WHERE id = $2", [winnerId, pm.id])
+            const { advanceLeaguePlayoffWinner } = await import("../services/leaguePlayoffLogic.js")
+            await advanceLeaguePlayoffWinner(freshPm, winnerId)
+          }
+        }
+      }
+    }
+
     res.json(fresh.rows[0])
   } catch (err) { next(err) }
 })
