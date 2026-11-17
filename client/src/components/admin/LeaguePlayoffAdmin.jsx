@@ -77,20 +77,20 @@ function TiebreakerPanel({ match }) {
   const team1Players = p1Data?.players || []
   const team2Players = p2Data?.players || []
 
-  const [t1Sel, setT1Sel] = useState([null, null, null])
-  const [t2Sel, setT2Sel] = useState([null, null, null])
+  const [t1Sel, setT1Sel] = useState([null, null, null, null, null])
+  const [t2Sel, setT2Sel] = useState([null, null, null, null, null])
   const [scores, setScores] = useState([
-    { p1: "", p2: "" }, { p1: "", p2: "" }, { p1: "", p2: "" }
+    { p1: "", p2: "" }, { p1: "", p2: "" }, { p1: "", p2: "" }, { p1: "", p2: "" }, { p1: "", p2: "" }
   ])
 
   const tb = tbData?.tiebreaker
 
   const handleSetup = () => {
     if (t1Sel.some(v => !v) || t2Sel.some(v => !v)) {
-      alert("Select 3 players from each team.")
+      alert("Select 5 players from each team.")
       return
     }
-    if (new Set(t1Sel).size < 3 || new Set(t2Sel).size < 3) {
+    if (new Set(t1Sel).size < 5 || new Set(t2Sel).size < 5) {
       alert("Each player can only be selected once.")
       return
     }
@@ -100,10 +100,10 @@ function TiebreakerPanel({ match }) {
   const handleResults = () => {
     const parsed = scores.map(s => ({ p1Pts: parseInt(s.p1), p2Pts: parseInt(s.p2) }))
     if (parsed.some(s => isNaN(s.p1Pts) || isNaN(s.p2Pts))) {
-      alert("Enter points for all 3 matchups.")
+      alert("Enter points for all 5 matchups.")
       return
     }
-    results.mutate({ matchId: match.id, m1: parsed[0], m2: parsed[1], m3: parsed[2] })
+    results.mutate({ matchId: match.id, m1: parsed[0], m2: parsed[1], m3: parsed[2], m4: parsed[3], m5: parsed[4] })
   }
 
   if (isLoading) return <p className="text-xs text-slate-500">Loading tiebreaker…</p>
@@ -113,7 +113,7 @@ function TiebreakerPanel({ match }) {
     const TeamPicker = ({ label, players, sel, setSel }) => (
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-slate-400">{label}</p>
-        {[0, 1, 2].map(i => (
+        {[0, 1, 2, 3, 4].map(i => (
           <select key={i} value={sel[i] || ""}
             onChange={e => { const n = [...sel]; n[i] = e.target.value; setSel(n) }}
             className="w-full bg-pitch-900 border border-surface-border/40 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/60">
@@ -132,7 +132,7 @@ function TiebreakerPanel({ match }) {
     return (
       <div className="space-y-3 border border-rose-500/20 rounded-xl p-3 bg-rose-500/5">
         <p className="text-xs font-bold uppercase tracking-wide text-rose-400 text-center">
-          ⚡ Tiebreaker — Select 3 Players Each
+          ⚡ Tiebreaker — Select 5 Players Each
         </p>
         <div className="grid grid-cols-2 gap-3">
           <TeamPicker label={match.team1Name} players={team1Players} sel={t1Sel} setSel={setT1Sel} />
@@ -154,11 +154,13 @@ function TiebreakerPanel({ match }) {
       { p1: tb.m1_p1_name, p2: tb.m1_p2_name, idx: 0 },
       { p1: tb.m2_p1_name, p2: tb.m2_p2_name, idx: 1 },
       { p1: tb.m3_p1_name, p2: tb.m3_p2_name, idx: 2 },
+      { p1: tb.m4_p1_name, p2: tb.m4_p2_name, idx: 3 },
+      { p1: tb.m5_p1_name, p2: tb.m5_p2_name, idx: 4 },
     ]
     return (
       <div className="space-y-3 border border-rose-500/20 rounded-xl p-3 bg-rose-500/5">
         <p className="text-xs font-bold uppercase tracking-wide text-rose-400 text-center">
-          ⚡ Tiebreaker — Enter Match Points
+          ⚡ Tiebreaker — Enter Match Points (5v5)
         </p>
         <p className="text-[10px] text-slate-500 text-center">
           {match.team1Name} players (left) vs {match.team2Name} players (right)
@@ -182,7 +184,7 @@ function TiebreakerPanel({ match }) {
           className="w-full py-2.5 rounded-xl bg-accent text-pitch-900 font-bold text-sm hover:bg-accent/90 disabled:opacity-50">
           {results.isPending ? "Saving…" : "Submit Results"}
         </button>
-        <button onClick={() => setup.mutate({ matchId: match.id, team1Players: [tb.team1_p1_id, tb.team1_p2_id, tb.team1_p3_id], team2Players: [tb.team2_p1_id, tb.team2_p2_id, tb.team2_p3_id] })}
+        <button onClick={() => setup.mutate({ matchId: match.id, team1Players: [tb.team1_p1_id, tb.team1_p2_id, tb.team1_p3_id, tb.team1_p4_id, tb.team1_p5_id], team2Players: [tb.team2_p1_id, tb.team2_p2_id, tb.team2_p3_id, tb.team2_p4_id, tb.team2_p5_id] })}
           className="w-full text-[10px] text-slate-600 hover:text-slate-400 underline underline-offset-2">
           Re-draw matchups
         </button>

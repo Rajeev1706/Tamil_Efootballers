@@ -48,7 +48,7 @@ export const teamsApi = {
   playoffsForceWinner:    (id, winnerId)              => api.post(`/teams/playoffs/${id}/force-winner`, { winnerId }).then(r => r.data),
   playoffsTiebreakerGet:  (id)                        => api.get(`/teams/playoffs/${id}/tiebreaker`).then(r => r.data),
   playoffsTiebreakerSetup:(id, team1Players, team2Players) => api.post(`/teams/playoffs/${id}/tiebreaker`, { team1Players, team2Players }).then(r => r.data),
-  playoffsTiebreakerResults:(id, m1, m2, m3)          => api.post(`/teams/playoffs/${id}/tiebreaker/results`, { m1, m2, m3 }).then(r => r.data),
+  playoffsTiebreakerResults:(id, m1, m2, m3, m4, m5)  => api.post(`/teams/playoffs/${id}/tiebreaker/results`, { m1, m2, m3, m4, m5 }).then(r => r.data),
   create:         (body)   => api.post("/teams", body).then(r => r.data),
   update:         (id, b)  => api.patch(`/teams/${id}`, b).then(r => r.data),
   updateSettings: (id, b)  => api.patch(`/teams/${id}/settings`, b).then(r => r.data),

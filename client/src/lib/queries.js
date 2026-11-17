@@ -388,8 +388,8 @@ export const useSetupLeaguePlayoffTiebreaker = () => {
 export const useSubmitLeaguePlayoffTiebreakerResults = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ matchId, m1, m2, m3 }) =>
-      teamsApi.playoffsTiebreakerResults(matchId, m1, m2, m3),
+    mutationFn: ({ matchId, m1, m2, m3, m4, m5 }) =>
+      teamsApi.playoffsTiebreakerResults(matchId, m1, m2, m3, m4, m5),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team-league-playoffs"] })
       qc.invalidateQueries({ queryKey: ["league-playoff-tiebreaker"] })
