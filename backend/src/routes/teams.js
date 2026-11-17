@@ -1636,6 +1636,25 @@ router.post("/season-delete", authenticate, adminOnly, async (req, res, next) =>
   } catch (e) { console.error("[teams] playoff migration:", e.message) }
 })()
 
+// ── Tiebreaker table migration ──────────────────────────────────────────────
+;(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS team_league_playoff_tiebreakers (
+        id                SERIAL PRIMARY KEY,
+        playoff_match_id  INT NOT NULL UNIQUE REFERENCES team_league_playoffs(id) ON DELETE CASCADE,
+        team1_p1_id INT REFERENCES players(id), team1_p2_id INT REFERENCES players(id), team1_p3_id INT REFERENCES players(id),
+        team2_p1_id INT REFERENCES players(id), team2_p2_id INT REFERENCES players(id), team2_p3_id INT REFERENCES players(id),
+        m1_p1_id INT REFERENCES players(id), m1_p2_id INT REFERENCES players(id), m1_p1_pts INT, m1_p2_pts INT,
+        m2_p1_id INT REFERENCES players(id), m2_p2_id INT REFERENCES players(id), m2_p1_pts INT, m2_p2_pts INT,
+        m3_p1_id INT REFERENCES players(id), m3_p2_id INT REFERENCES players(id), m3_p1_pts INT, m3_p2_pts INT,
+        status TEXT DEFAULT 'setup'
+      )
+    `)
+  } catch (e) { console.error("[teams] tiebreaker migration:", e.message) }
+})()
+
+
 const PLAYOFF_SELECT = `
   SELECT
     p.id, p.season_number AS "seasonNumber", p.match_type AS "matchType",
@@ -1894,6 +1913,129 @@ router.post("/playoffs/:id/toss/choice", authenticate, adminOnly, async (req, re
 
     const fresh = (await query(PLAYOFF_SELECT + " WHERE p.id = $1", [match.id])).rows[0]
     res.json({ success: true, match: fresh })
+  } catch (err) { next(err) }
+})
+
+// GET /api/teams/playoffs/:id/tiebreaker — fetch current tiebreaker for a match
+router.get("/playoffs/:id/tiebreaker", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const tb = await query(`
+      SELECT tb.*,
+        p1a.name AS m1_p1_name, p1b.name AS m1_p2_name,
+        p2a.name AS m2_p1_name, p2b.name AS m2_p2_name,
+        p3a.name AS m3_p1_name, p3b.name AS m3_p2_name
+      FROM team_league_playoff_tiebreakers tb
+      LEFT JOIN players p1a ON p1a.id = tb.m1_p1_id
+      LEFT JOIN players p1b ON p1b.id = tb.m1_p2_id
+      LEFT JOIN players p2a ON p2a.id = tb.m2_p1_id
+      LEFT JOIN players p2b ON p2b.id = tb.m2_p2_id
+      LEFT JOIN players p3a ON p3a.id = tb.m3_p1_id
+      LEFT JOIN players p3b ON p3b.id = tb.m3_p2_id
+      WHERE tb.playoff_match_id = $1
+    `, [parseInt(req.params.id)])
+    res.json({ tiebreaker: tb.rows[0] || null })
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/playoffs/:id/tiebreaker — admin submits 3 players from each team;
+// system randomly creates 3 × 1v1 matchups
+router.post("/playoffs/:id/tiebreaker", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const schema = z.object({
+      team1Players: z.array(z.number().int().positive()).length(3),
+      team2Players: z.array(z.number().int().positive()).length(3),
+    })
+    const { team1Players, team2Players } = schema.parse(req.body)
+    const matchId = parseInt(req.params.id)
+
+    const matchRes = await query("SELECT * FROM team_league_playoffs WHERE id = $1", [matchId])
+    const match = matchRes.rows[0]
+    if (!match) return res.status(404).json({ error: "Playoff match not found" })
+    if (match.status !== "needs_decision") return res.status(400).json({ error: "Match is not in needs_decision state" })
+
+    // Randomly shuffle team2 players to create matchups
+    const t2Shuffled = [...team2Players].sort(() => Math.random() - 0.5)
+
+    await query(`
+      INSERT INTO team_league_playoff_tiebreakers
+        (playoff_match_id,
+         team1_p1_id, team1_p2_id, team1_p3_id,
+         team2_p1_id, team2_p2_id, team2_p3_id,
+         m1_p1_id, m1_p2_id, m2_p1_id, m2_p2_id, m3_p1_id, m3_p2_id,
+         status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $2, $5, $3, $6, $4, $7, 'pending_results')
+      ON CONFLICT (playoff_match_id) DO UPDATE SET
+        team1_p1_id = $2, team1_p2_id = $3, team1_p3_id = $4,
+        team2_p1_id = $5, team2_p2_id = $6, team2_p3_id = $7,
+        m1_p1_id = $2, m1_p2_id = $5,
+        m2_p1_id = $3, m2_p2_id = $6,
+        m3_p1_id = $4, m3_p2_id = $7,
+        m1_p1_pts = NULL, m1_p2_pts = NULL,
+        m2_p1_pts = NULL, m2_p2_pts = NULL,
+        m3_p1_pts = NULL, m3_p2_pts = NULL,
+        status = 'pending_results'
+    `, [matchId,
+        team1Players[0], team1Players[1], team1Players[2],
+        t2Shuffled[0],   t2Shuffled[1],   t2Shuffled[2]])
+
+    const tb = await query(`
+      SELECT tb.*,
+        p1a.name AS m1_p1_name, p1b.name AS m1_p2_name,
+        p2a.name AS m2_p1_name, p2b.name AS m2_p2_name,
+        p3a.name AS m3_p1_name, p3b.name AS m3_p2_name
+      FROM team_league_playoff_tiebreakers tb
+      LEFT JOIN players p1a ON p1a.id = tb.m1_p1_id
+      LEFT JOIN players p1b ON p1b.id = tb.m1_p2_id
+      LEFT JOIN players p2a ON p2a.id = tb.m2_p1_id
+      LEFT JOIN players p2b ON p2b.id = tb.m2_p2_id
+      LEFT JOIN players p3a ON p3a.id = tb.m3_p1_id
+      LEFT JOIN players p3b ON p3b.id = tb.m3_p2_id
+      WHERE tb.playoff_match_id = $1
+    `, [matchId])
+    res.json({ success: true, tiebreaker: tb.rows[0] })
+  } catch (err) { next(err) }
+})
+
+// POST /api/teams/playoffs/:id/tiebreaker/results — admin submits 3 × pts pairs
+router.post("/playoffs/:id/tiebreaker/results", authenticate, adminOnly, async (req, res, next) => {
+  try {
+    const schema = z.object({
+      m1: z.object({ p1Pts: z.number().int().min(0), p2Pts: z.number().int().min(0) }),
+      m2: z.object({ p1Pts: z.number().int().min(0), p2Pts: z.number().int().min(0) }),
+      m3: z.object({ p1Pts: z.number().int().min(0), p2Pts: z.number().int().min(0) }),
+    })
+    const { m1, m2, m3 } = schema.parse(req.body)
+    const matchId = parseInt(req.params.id)
+
+    const tbRes = await query("SELECT * FROM team_league_playoff_tiebreakers WHERE playoff_match_id = $1", [matchId])
+    const tb = tbRes.rows[0]
+    if (!tb) return res.status(404).json({ error: "Tiebreaker not set up yet" })
+    if (tb.status === "completed") return res.status(400).json({ error: "Tiebreaker already completed" })
+
+    await query(`
+      UPDATE team_league_playoff_tiebreakers
+      SET m1_p1_pts=$1, m1_p2_pts=$2, m2_p1_pts=$3, m2_p2_pts=$4, m3_p1_pts=$5, m3_p2_pts=$6, status='completed'
+      WHERE playoff_match_id=$7
+    `, [m1.p1Pts, m1.p2Pts, m2.p1Pts, m2.p2Pts, m3.p1Pts, m3.p2Pts, matchId])
+
+    // Determine winner by team1 total pts vs team2 total pts
+    const team1Total = m1.p1Pts + m2.p1Pts + m3.p1Pts
+    const team2Total = m1.p2Pts + m2.p2Pts + m3.p2Pts
+
+    const matchRes = await query("SELECT * FROM team_league_playoffs WHERE id = $1", [matchId])
+    const match = matchRes.rows[0]
+
+    if (team1Total === team2Total) {
+      return res.status(400).json({ error: "Still tied after tiebreaker — reset and try again" })
+    }
+
+    const winnerId = team1Total > team2Total ? match.team1_id : match.team2_id
+    await query("UPDATE team_league_playoffs SET winner_team_id = $1, status = 'completed' WHERE id = $2", [winnerId, matchId])
+    const { advanceLeaguePlayoffWinner } = await import("../services/leaguePlayoffLogic.js")
+    await advanceLeaguePlayoffWinner(match, winnerId)
+
+    const fresh = (await query(PLAYOFF_SELECT + " WHERE p.id = $1", [matchId])).rows[0]
+    res.json({ success: true, match: fresh, team1Total, team2Total, winnerId })
   } catch (err) { next(err) }
 })
 

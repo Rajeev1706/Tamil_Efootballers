@@ -12,40 +12,87 @@ import goldenBoot from "../../../images/Golden Boot.png"
 
 const TeamKnockoutDashboard = lazy(() => import("./TeamKnockoutDashboard"))
 
-// One playoff match card — shows both teams, the score once played, and
+// One playoff match card — shows both teams, leg scores (match points), and
 // highlights the winner in green. `label` is the match name shown above it.
 function PlayoffMatchCard({ label, match }) {
-  const isCompleted = match?.status === "completed"
+  const isCompleted    = match?.status === "completed"
+  const needsDecision  = match?.status === "needs_decision"
+  const inProgress     = match?.team1Name && match?.team2Name && !isCompleted && !needsDecision
   const t1Won = isCompleted && match.winnerTeamId === match.team1Id
   const t2Won = isCompleted && match.winnerTeamId === match.team2Id
+
+  // Aggregate points across both legs
+  const t1Total = (match?.team1Leg1 ?? 0) + (match?.team1Leg2 ?? 0)
+  const t2Total = (match?.team2Leg1 ?? 0) + (match?.team2Leg2 ?? 0)
+  const hasLegData = match?.team1Leg1 !== null && match?.team1Leg1 !== undefined
+
   return (
-    <div className="bg-pitch-800 border border-surface-border rounded-xl px-4 py-3 w-full max-w-[15rem]">
+    <div className="bg-pitch-800 border border-surface-border rounded-xl px-4 py-3 w-full max-w-[17rem]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 text-center">{label}</p>
-      <div className="flex items-center justify-between">
-        <span className={cn("text-sm font-medium truncate flex-1 inline-flex items-center gap-1.5",
-          !match?.team1Name ? "text-slate-600 italic" : t1Won ? "text-emerald-400" : "text-white"
+
+      {/* Team 1 row */}
+      <div className="flex items-center gap-1.5">
+        <TeamLogoIcon logoUrl={match?.team1Logo} name={match?.team1Name} />
+        <span className={cn("text-sm font-medium truncate flex-1",
+          !match?.team1Name ? "text-slate-600 italic" : t1Won ? "text-emerald-400 font-bold" : "text-white"
         )}>
-          <TeamLogoIcon logoUrl={match?.team1Logo} name={match?.team1Name} />
           {match?.team1Name ?? "TBD"}
+          {t1Won && <span className="ml-1 text-[10px]">🏆</span>}
         </span>
-        <span className="text-xs font-mono text-slate-500 px-2 flex-shrink-0">
-          {isCompleted ? match.team1Score : ""}
-        </span>
+        {hasLegData && (
+          <span className={cn("text-xs font-mono font-bold flex-shrink-0 ml-1",
+            t1Won ? "text-emerald-400" : needsDecision ? "text-amber-400" : "text-slate-400"
+          )}>
+            {t1Total}
+          </span>
+        )}
       </div>
-      <div className="flex items-center justify-between mt-1">
-        <span className={cn("text-sm font-medium truncate flex-1 inline-flex items-center gap-1.5",
-          !match?.team2Name ? "text-slate-600 italic" : t2Won ? "text-emerald-400" : "text-white"
-        )}>
-          <TeamLogoIcon logoUrl={match?.team2Logo} name={match?.team2Name} />
-          {match?.team2Name ?? "TBD"}
-        </span>
-        <span className="text-xs font-mono text-slate-500 px-2 flex-shrink-0">
-          {isCompleted ? match.team2Score : ""}
-        </span>
-      </div>
-      {!isCompleted && (!match?.team1Name || !match?.team2Name) && (
-        <p className="text-[10px] text-slate-600 text-center mt-1.5">Awaiting</p>
+
+      {/* Leg score breakdown */}
+      {hasLegData && (
+        <div className="flex justify-end gap-3 text-[10px] text-slate-600 mt-0.5 mb-0.5 pr-0.5">
+          <span>L1: {match.team1Leg1 ?? "—"}</span>
+          <span>L2: {match.team1Leg2 ?? "—"}</span>
+        </div>
       )}
+
+      {/* Divider */}
+      <div className="border-t border-surface-border/40 my-1.5" />
+
+      {/* Team 2 row */}
+      <div className="flex items-center gap-1.5">
+        <TeamLogoIcon logoUrl={match?.team2Logo} name={match?.team2Name} />
+        <span className={cn("text-sm font-medium truncate flex-1",
+          !match?.team2Name ? "text-slate-600 italic" : t2Won ? "text-emerald-400 font-bold" : "text-white"
+        )}>
+          {match?.team2Name ?? "TBD"}
+          {t2Won && <span className="ml-1 text-[10px]">🏆</span>}
+        </span>
+        {hasLegData && (
+          <span className={cn("text-xs font-mono font-bold flex-shrink-0 ml-1",
+            t2Won ? "text-emerald-400" : needsDecision ? "text-amber-400" : "text-slate-400"
+          )}>
+            {t2Total}
+          </span>
+        )}
+      </div>
+
+      {/* Leg score breakdown for team 2 */}
+      {hasLegData && (
+        <div className="flex justify-end gap-3 text-[10px] text-slate-600 mt-0.5 pr-0.5">
+          <span>L1: {match.team2Leg1 ?? "—"}</span>
+          <span>L2: {match.team2Leg2 ?? "—"}</span>
+        </div>
+      )}
+
+      {/* Status line */}
+      {!match?.team1Name || !match?.team2Name ? (
+        <p className="text-[10px] text-slate-600 text-center mt-2">Awaiting</p>
+      ) : needsDecision ? (
+        <p className="text-[10px] text-amber-500 text-center mt-2 animate-pulse">⚡ Tiebreaker in progress</p>
+      ) : inProgress && !hasLegData ? (
+        <p className="text-[10px] text-slate-600 text-center mt-2">In progress</p>
+      ) : null}
     </div>
   )
 }

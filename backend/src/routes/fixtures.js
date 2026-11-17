@@ -586,12 +586,13 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
       const pm = (await query("SELECT * FROM team_league_playoffs WHERE id = $1", [fix.league_playoff_match_id])).rows[0]
       if (pm) {
         const t1IsHome  = fix.home_team_id === pm.team1_id
-        const t1Goals   = t1IsHome ? homeGoals : awayGoals
-        const t2Goals   = t1IsHome ? awayGoals : homeGoals
+        // Store MATCH POINTS (homePts/awayPts), not goals
+        const t1Pts     = t1IsHome ? homePts : awayPts
+        const t2Pts     = t1IsHome ? awayPts : homePts
         const legCol    = fix.knockout_leg === 1
           ? "team1_leg1 = $1, team2_leg1 = $2"
           : "team1_leg2 = $1, team2_leg2 = $2"
-        await query(`UPDATE team_league_playoffs SET ${legCol} WHERE id = $3`, [t1Goals, t2Goals, pm.id])
+        await query(`UPDATE team_league_playoffs SET ${legCol} WHERE id = $3`, [t1Pts, t2Pts, pm.id])
 
         const fresh = (await query("SELECT * FROM team_league_playoffs WHERE id = $1", [pm.id])).rows[0]
         if (fresh.team1_leg1 !== null && fresh.team1_leg2 !== null) {

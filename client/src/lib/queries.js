@@ -367,6 +367,36 @@ export const useForceLeaguePlayoffWinner = () => {
   })
 }
 
+export const useLeaguePlayoffTiebreaker = (matchId) =>
+  useQuery({
+    queryKey: ["league-playoff-tiebreaker", matchId],
+    queryFn: () => teamsApi.playoffsTiebreakerGet(matchId),
+    enabled: !!matchId,
+  })
+
+export const useSetupLeaguePlayoffTiebreaker = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, team1Players, team2Players }) =>
+      teamsApi.playoffsTiebreakerSetup(matchId, team1Players, team2Players),
+    onSuccess: (_, { matchId }) => {
+      qc.invalidateQueries({ queryKey: ["league-playoff-tiebreaker", matchId] })
+    },
+  })
+}
+
+export const useSubmitLeaguePlayoffTiebreakerResults = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ matchId, m1, m2, m3 }) =>
+      teamsApi.playoffsTiebreakerResults(matchId, m1, m2, m3),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-league-playoffs"] })
+      qc.invalidateQueries({ queryKey: ["league-playoff-tiebreaker"] })
+    },
+  })
+}
+
 export const useBestLeaguePerformer = (teamId) =>
   useQuery({
     queryKey: ["best-league-performer", teamId],
