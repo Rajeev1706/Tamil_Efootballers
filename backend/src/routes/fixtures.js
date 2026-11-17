@@ -3,7 +3,7 @@ import { z } from "zod"
 import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { generatePlayoffs } from "../services/playoffs.js"
-import { addBdr, addBdrWithLabel, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
+import { addBdr, addBdrWithLabel, upsertBdrForSource, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
@@ -755,14 +755,13 @@ router.post("/:id/close", authenticate, adminOnly, async (req, res, next) => {
           `)
 
           const bdrByPos = { 1: 12, 2: 9, 3: 7, 4: 5 }
-          const posLabel  = { 1: "Team League 1st", 2: "Team League 2nd", 3: "Team League 3rd", 4: "Team League 4th" }
           for (const row of standingsRes.rows) {
             const bdr = bdrByPos[row.pos] || 0
             if (bdr > 0) {
-              const label = posLabel[row.pos] || "Team League"
+              const dsLabel = `DS League S${season}`
               const teamPlayers = await query("SELECT id FROM players WHERE team_id = $1", [row.team_id])
               for (const p of teamPlayers.rows) {
-                await addBdrWithLabel(p.id, bdr, label)
+                await upsertBdrForSource(p.id, bdr, dsLabel, season, `ds_league_s${season}_player_${p.id}`)
                 await addLeagueBdr(p.id, bdr)
               }
               await addTeamChampionshipPts(row.team_id, bdr)

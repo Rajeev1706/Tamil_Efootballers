@@ -11,7 +11,7 @@ import { query } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { reconcileTeamTrophy } from "../services/teamTrophyAwards.js"
-import { addBdr, addBdrWithLabel, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
+import { addBdr, addBdrWithLabel, upsertBdrForSource, addLeagueBdr, addTeamChampionshipPts } from "../services/bdrAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 
 // BDR for final standings — same as regular Team League playoffs
@@ -29,12 +29,14 @@ const TLG_CHAMP_PTS = {
   seventh_place:   { winner: 0,  loser: 0 },
 }
 
-async function awardBdrToTeam(teamId, bdr, label) {
+async function awardBdrToTeam(teamId, bdr, label, season) {
   if (!bdr || !teamId) return
   const players = await query("SELECT id FROM players WHERE team_id = $1", [teamId])
   for (const p of players.rows) {
-    await addBdrWithLabel(p.id, bdr, label || "TLG")
-    await addLeagueBdr(p.id, bdr) // track league BDR separately
+    const sk = season ? `tlg_s${season}_player_${p.id}` : null
+    if (sk) await upsertBdrForSource(p.id, bdr, label || "TLG", season, sk)
+    else    await addBdrWithLabel(p.id, bdr, label || "TLG")
+    await addLeagueBdr(p.id, bdr)
   }
 }
 
@@ -330,8 +332,8 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
     // Trophies
     if (phase === "champions_final") {
       // BDR: Champion +12, Runner-up +9
-      await awardBdrToTeam(winnerId, TLG_BDR.champions_final.winner)
-      await awardBdrToTeam(loserId,  TLG_BDR.champions_final.loser)
+      await awardBdrToTeam(winnerId, TLG_BDR.champions_final.winner, `TLG S${season}`, season)
+      await awardBdrToTeam(loserId,  TLG_BDR.champions_final.loser,  `TLG S${season}`, season)
       await awardChampPtsToTeam(winnerId, TLG_CHAMP_PTS.champions_final.winner)
       await awardChampPtsToTeam(loserId,  TLG_CHAMP_PTS.champions_final.loser)
 
@@ -378,8 +380,8 @@ router.patch("/knockout/:phase", authenticate, adminOnly, async (req, res, next)
 
     if (phase === "third_place") {
       // BDR: 3rd place +7, 4th place +5
-      await awardBdrToTeam(winnerId, TLG_BDR.third_place.winner)
-      await awardBdrToTeam(loserId,  TLG_BDR.third_place.loser)
+      await awardBdrToTeam(winnerId, TLG_BDR.third_place.winner, `TLG S${season}`, season)
+      await awardBdrToTeam(loserId,  TLG_BDR.third_place.loser,  `TLG S${season}`, season)
       await awardChampPtsToTeam(winnerId, TLG_CHAMP_PTS.third_place.winner)
       await awardChampPtsToTeam(loserId,  TLG_CHAMP_PTS.third_place.loser)
     }

@@ -1034,10 +1034,10 @@ router.get("/:id/bdr-breakdown", async (req, res, next) => {
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
     const season = parseInt(seasonRes.rows[0]?.value || "6")
     const { rows } = await query(`
-      SELECT label, SUM(amount)::int AS total
+      SELECT label, season_number, source_key, SUM(amount)::int AS total
       FROM player_bdr_breakdown
       WHERE player_id = $1 AND amount > 0 AND season_number = $2
-      GROUP BY label
+      GROUP BY label, season_number, source_key
       ORDER BY total DESC
     `, [req.params.id, season])
     res.json(rows)

@@ -13,28 +13,44 @@ const FormDot = ({ result }) => {
   return <span className={cn("w-2 h-2 rounded-full", map[result] || "bg-slate-600")} title={result} />
 }
 
-// Label → accent colour mapping
-const LABEL_COLOR = {
-  "Team League Champion":    "text-yellow-400",
-  "Team League Runner-up":   "text-slate-300",
-  "Team League 3rd Place":   "text-amber-600",
-  "Team League 4th Place":   "text-slate-400",
-  "Team League 1st":         "text-yellow-400",
-  "Team League 2nd":         "text-slate-300",
-  "Team League 3rd":         "text-amber-600",
-  "Team League 4th":         "text-slate-400",
-  "UCL Champion":            "text-blue-400",
-  "UCL Group Stage Winner":  "text-blue-300",
-  "UCL Knockout Golden Boot":"text-yellow-300",
-  "Weekly Champion":         "text-purple-400",
-  "Weekly Golden Boot":      "text-yellow-300",
-  "Duo Champion":            "text-emerald-400",
-  "Duo Runner-up":           "text-slate-300",
-  "Duo QF Eliminated":       "text-slate-400",
-  "Duo SF Eliminated":       "text-slate-400",
-  "Duo Golden Boot":         "text-yellow-300",
-  "TLG Champion":            "text-orange-400",
-  "TLG Runner-up":           "text-slate-300",
+// Colour by keyword match (handles both old generic labels and new named labels)
+function getLabelColor(label) {
+  const l = label.toLowerCase()
+  if (l.includes("champion"))                                        return "text-yellow-400"
+  if (l.includes("golden boot"))                                     return "text-yellow-300"
+  if (l.includes("runner-up") || l.includes("2nd"))                 return "text-slate-300"
+  if (l.includes("3rd") || l.includes("3rd place"))                 return "text-amber-600"
+  if (l.includes("4th") || l.includes("4th place"))                 return "text-slate-400"
+  if (l.includes("ucl"))                                             return "text-blue-400"
+  if (l.includes("duo"))                                             return "text-emerald-400"
+  if (l.includes("tlg"))                                             return "text-orange-400"
+  if (l.includes("ds league") || l.includes("team league") || l.includes("league")) return "text-sky-400"
+  if (l.includes("weekly"))                                          return "text-purple-400"
+  // S10(Weekly N) style — contains season prefix
+  if (/s\d+\(weekly/i.test(l))                                      return "text-purple-400"
+  return "text-slate-400"
+}
+
+// Format label: if it's an old generic label, prepend season context
+function formatBdrLabel(label, seasonNumber) {
+  // New-style labels already contain season info (e.g. "S10(Weekly 3)", "S10 Duo Champion")
+  if (/^S\d+/.test(label)) return label
+  // Weekly named labels from upsertBdrForSource (e.g. "S10(Weekly 3)")
+  if (/\(Weekly \d+\)/.test(label)) return label
+
+  // Old generic labels — prefix with season where available
+  const s = seasonNumber ? `S${seasonNumber} — ` : ""
+
+  // Strip redundant generic prefixes to avoid "S10 — Weekly Tournament Round 3" being too long
+  const cleaned = label
+    .replace(/^Weekly Tournament /, "Weekly Round ")
+    .replace(/^Weekly /, "Weekly ")
+    .replace(/^Duo /, "Duo ")
+    .replace(/^UCL /, "UCL ")
+    .replace(/^TLG /, "TLG ")
+    .replace(/^Team League /, "DS League ")
+
+  return s + cleaned
 }
 
 function BreakdownRow({ playerId }) {
@@ -65,8 +81,8 @@ function BreakdownRow({ playerId }) {
       <p className="text-[10px] text-slate-600 font-semibold uppercase tracking-widest mb-2">BDR Breakdown</p>
       {_data.map((row, i) => (
         <div key={i} className="flex items-center justify-between gap-4">
-          <span className={cn("text-xs font-medium", LABEL_COLOR[row.label] || "text-slate-400")}>
-            {row.label}
+          <span className={cn("text-xs font-medium", getLabelColor(row.label))}>
+            {formatBdrLabel(row.label, row.season_number)}
           </span>
           <div className="flex items-center gap-1.5">
             <div className="h-px bg-surface-border/60 w-12 flex-shrink-0" />

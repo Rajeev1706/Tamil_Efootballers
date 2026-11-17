@@ -4,7 +4,7 @@ import { query, withTransaction } from "../db/pool.js"
 import { authenticate, adminOnly } from "../middleware/auth.js"
 import { recalcMarketValue } from "../services/marketValue.js"
 import { recalcForm } from "../services/form.js"
-import { addBdr, addBdrWithLabel } from "../services/bdrAwards.js"
+import { addBdr, addBdrWithLabel, upsertBdrForSource } from "../services/bdrAwards.js"
 import { reconcileTrophyRoster, awardOrReassignTrophy } from "../services/trophyAwards.js"
 import { updateSeasonRecord } from "../services/seasonRecord.js"
 import { incrementHistory, saveActiveCelebration } from "../services/tournamentHistoryService.js"
@@ -601,15 +601,20 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
           const WINNER_BDR = { final: 10 }
           const loserBdr   = LOSER_BDR[fix.knockout_round]
           const winnerBdr  = WINNER_BDR[fix.knockout_round]
-          const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
+          const duoSn1    = loserPair.season_number
+          const duoLabel1 = duoSn1 ? `S${duoSn1} Duo` : "Duo"
 
           if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
-            await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
-            await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+            for (const pid of [loserPair.set1_player_id, loserPair.set2_player_id].filter(Boolean)) {
+              await upsertBdrForSource(pid, loserBdr, duoLabel1, duoSn1, `duo_s${duoSn1}_player_${pid}`)
+            }
           }
           if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
-            await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
-            await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+            const duoSn1w   = winnerPair.season_number
+            const duoLabel1w = duoSn1w ? `S${duoSn1w} Duo` : "Duo"
+            for (const pid of [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)) {
+              await upsertBdrForSource(pid, winnerBdr, duoLabel1w, duoSn1w, `duo_s${duoSn1w}_player_${pid}`)
+            }
           }
 
           // ── Final extras ──────────────────────────────────────────────────
@@ -640,7 +645,7 @@ router.post("/fixtures/:id/score", authenticate, adminOnly, async (req, res, nex
             `, [seasonNum])
             const topScorer = gbRes.rows[0]
             if (topScorer?.goals > 0) {
-              await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
+              await upsertBdrForSource(topScorer.player_id, 4, `S${seasonNum} Duo Golden Boot`, seasonNum, `duo_golden_boot_s${seasonNum}_player_${topScorer.player_id}`)
               await awardOrReassignTrophy({
                 sourceKey:    `duo_golden_boot_s${seasonNum}`,
                 trophyColumn: "trophy11_count",
@@ -1499,15 +1504,20 @@ router.post("/fixtures/:id/knockout-decider", authenticate, adminOnly, async (re
       const WINNER_BDR = { final: 10 }
       const loserBdr   = LOSER_BDR[fix.knockout_round]
       const winnerBdr  = WINNER_BDR[fix.knockout_round]
-      const loserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
+      const duoSn2    = loserPair.season_number
+      const duoLabel2 = duoSn2 ? `S${duoSn2} Duo` : "Duo"
 
       if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
-        await addBdrWithLabel(loserPair.set1_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
-        await addBdrWithLabel(loserPair.set2_player_id, loserBdr, loserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+        for (const pid of [loserPair.set1_player_id, loserPair.set2_player_id].filter(Boolean)) {
+          await upsertBdrForSource(pid, loserBdr, duoLabel2, duoSn2, `duo_s${duoSn2}_player_${pid}`)
+        }
       }
       if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
-        await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
-        await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+        const duoSn2w   = winnerPair.season_number
+        const duoLabel2w = duoSn2w ? `S${duoSn2w} Duo` : "Duo"
+        for (const pid of [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)) {
+          await upsertBdrForSource(pid, winnerBdr, duoLabel2w, duoSn2w, `duo_s${duoSn2w}_player_${pid}`)
+        }
       }
 
       // Bracket advancement
@@ -1574,7 +1584,7 @@ router.post("/fixtures/:id/knockout-decider", authenticate, adminOnly, async (re
         `, [seasonNum])
         const topScorer = gbRes.rows[0]
         if (topScorer?.goals > 0) {
-          await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
+          await upsertBdrForSource(topScorer.player_id, 4, `S${seasonNum} Duo Golden Boot`, seasonNum, `duo_golden_boot_s${seasonNum}_player_${topScorer.player_id}`)
           await awardOrReassignTrophy({
             sourceKey:    `duo_golden_boot_s${seasonNum}`,
             trophyColumn: "trophy11_count",
@@ -1695,14 +1705,19 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
       const WINNER_BDR = { final: 10 }
       const loserBdr   = LOSER_BDR[fix.knockout_round]
       const winnerBdr  = WINNER_BDR[fix.knockout_round]
-      const deciderLoserLabel = { qf: "Duo QF Eliminated", sf: "Duo SF Eliminated", final: "Duo Runner-up" }
+      const duoSn3    = loserPair.season_number
+      const duoLabel3 = duoSn3 ? `S${duoSn3} Duo` : "Duo"
       if (loserBdr && await claimAward(`duo_${fix.knockout_round}_loser`, fix.id)) {
-        await addBdrWithLabel(loserPair.set1_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
-        await addBdrWithLabel(loserPair.set2_player_id, loserBdr, deciderLoserLabel[fix.knockout_round] || "Duo", loserPair.season_number)
+        for (const pid of [loserPair.set1_player_id, loserPair.set2_player_id].filter(Boolean)) {
+          await upsertBdrForSource(pid, loserBdr, duoLabel3, duoSn3, `duo_s${duoSn3}_player_${pid}`)
+        }
       }
       if (winnerBdr && await claimAward(`duo_${fix.knockout_round}_winner`, fix.id)) {
-        await addBdrWithLabel(winnerPair.set1_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
-        await addBdrWithLabel(winnerPair.set2_player_id, winnerBdr, "Duo Champion", winnerPair.season_number)
+        const duoSn3w   = winnerPair.season_number
+        const duoLabel3w = duoSn3w ? `S${duoSn3w} Duo` : "Duo"
+        for (const pid of [winnerPair.set1_player_id, winnerPair.set2_player_id].filter(Boolean)) {
+          await upsertBdrForSource(pid, winnerBdr, duoLabel3w, duoSn3w, `duo_s${duoSn3w}_player_${pid}`)
+        }
       }
 
       // Advance winner in bracket
@@ -1766,7 +1781,7 @@ router.post("/fixtures/:id/decider/result", authenticate, adminOnly, async (req,
         `, [seasonNum])
         const topScorer = gbRes.rows[0]
         if (topScorer?.goals > 0) {
-          await addBdrWithLabel(topScorer.player_id, 4, "Duo Golden Boot", seasonNum)
+          await upsertBdrForSource(topScorer.player_id, 4, `S${seasonNum} Duo Golden Boot`, seasonNum, `duo_golden_boot_s${seasonNum}_player_${topScorer.player_id}`)
           await awardOrReassignTrophy({
             sourceKey:    `duo_golden_boot_s${seasonNum}`,
             trophyColumn: "trophy11_count",
