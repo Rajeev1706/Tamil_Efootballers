@@ -51,7 +51,8 @@ async function getLivePowerRank1() {
         COUNT(*) FILTER (WHERE result = 'loss')::int AS losses,
         COUNT(*)::int AS matches,
         (COUNT(*) FILTER (WHERE result = 'win') * 3 +
-         COUNT(*) FILTER (WHERE result = 'draw') * 1)::int AS points
+         COUNT(*) FILTER (WHERE result = 'draw') * 1 -
+         COUNT(*) FILTER (WHERE result = 'loss') * 2)::int AS points
       FROM all_matches
       GROUP BY pid
       HAVING COUNT(*) >= 1

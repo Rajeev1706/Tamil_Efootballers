@@ -303,6 +303,7 @@ export default function WeeklyBracket() {
   const resetTournament = useResetWeeklyTournament()
   const [confirmReset, setConfirmReset] = useState(false)
   const [activeRound, setActiveRound] = useState(1)
+  const [showUnlogged, setShowUnlogged] = useState(false)
   const exportRef  = useRef(null)
   const [exporting, setExporting] = useState(false)
 
@@ -315,7 +316,10 @@ export default function WeeklyBracket() {
   const { matches = [], total_rounds: totalRounds = 1 } = tournament
   const rounds = Array.from({ length: totalRounds }, (_, i) => i + 1)
   const currentRound = rounds.includes(activeRound) ? activeRound : rounds[0]
-  const roundMatches = matches.filter(m => m.round === currentRound)
+  const allRoundMatches = matches.filter(m => m.round === currentRound)
+  const roundMatches = showUnlogged
+    ? allRoundMatches.filter(m => m.status !== "completed" && m.status !== "bye")
+    : allRoundMatches
   const champion = matches.find(m => m.round === totalRounds && m.status === "completed")?.winnerName
 
   async function handleExport() {
@@ -405,7 +409,14 @@ export default function WeeklyBracket() {
                 {getRoundLabel(r, totalRounds)}
               </button>
             ))}
-            <div className="ml-auto flex-shrink-0">
+            <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+              <button
+                onClick={() => setShowUnlogged(v => !v)}
+                className={cn("px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap",
+                  showUnlogged ? "bg-amber-400/15 border-amber-400/30 text-amber-400" : "border-surface-border text-slate-500 hover:text-white"
+                )}>
+                {showUnlogged ? "Unlogged only" : "All matches"}
+              </button>
               <button
                 onClick={handleExport}
                 disabled={exporting || roundMatches.length === 0}
@@ -418,7 +429,14 @@ export default function WeeklyBracket() {
         )}
 
         {rounds.length === 1 && (
-          <div className="flex justify-end px-5 py-2 border-b border-surface-border/60">
+          <div className="flex justify-end gap-2 px-5 py-2 border-b border-surface-border/60">
+            <button
+              onClick={() => setShowUnlogged(v => !v)}
+              className={cn("px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
+                showUnlogged ? "bg-amber-400/15 border-amber-400/30 text-amber-400" : "border-surface-border text-slate-500 hover:text-white"
+              )}>
+              {showUnlogged ? "Unlogged only" : "All matches"}
+            </button>
             <button
               onClick={handleExport}
               disabled={exporting || roundMatches.length === 0}

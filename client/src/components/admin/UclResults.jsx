@@ -294,9 +294,12 @@ export default function UclResults() {
   const maxRound = fixtures.length > 0 ? Math.max(...fixtures.map(f => f.roundNumber)) : 0
   const rounds   = Array.from({ length: maxRound }, (_, i) => i + 1)
 
-  const filtered = activeRound === "all"
+  const [showUnlogged, setShowUnlogged] = useState(false)
+
+  const filtered = (activeRound === "all"
     ? fixtures
     : fixtures.filter(f => f.roundNumber === Number(activeRound))
+  ).filter(f => !showUnlogged || f.status !== "completed")
 
   // Group fixtures by group name
   const byGroup = {}
@@ -372,13 +375,21 @@ export default function UclResults() {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm text-slate-400">{totalCompleted}/{fixtures.length} fixtures logged</p>
-          {activeRound !== "all" && (
-            <button onClick={handleExport} disabled={exporting}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
-              <Download className="w-3.5 h-3.5" />
-              {exporting ? "Exporting…" : "Export PNG"}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowUnlogged(v => !v)}
+              className={cn("px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors",
+                showUnlogged ? "bg-amber-400/15 border-amber-400/30 text-amber-400" : "border-surface-border text-slate-500 hover:text-white"
+              )}>
+              {showUnlogged ? "Unlogged only" : "All matches"}
             </button>
-          )}
+            {activeRound !== "all" && (
+              <button onClick={handleExport} disabled={exporting}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
+                <Download className="w-3.5 h-3.5" />
+                {exporting ? "Exporting…" : "Export PNG"}
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-1 bg-pitch-800 border border-surface-border rounded-xl p-1 overflow-x-auto">
           <button onClick={() => setActiveRound("all")}

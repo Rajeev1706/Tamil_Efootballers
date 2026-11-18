@@ -1000,14 +1000,17 @@ function KnockoutExportCard({ round, fixtures, exportRef, visible, season }) {
 function FixturesByRound({ fixtures, onSave, onPlayerSetup, playerSetupPending, saving, season }) {
   const rounds = [...new Set(fixtures.map(f => f.round_number).filter(Boolean))].sort((a,b) => a-b)
   const [activeRound, setActiveRound] = useState(rounds[0] || 1)
+  const [showUnlogged, setShowUnlogged] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [showExportCard, setShowExportCard] = useState(false)
   const exportRef = useRef(null)
 
   if (rounds.length === 0) return <p className="text-slate-500 text-sm text-center py-8">No fixtures yet — generate a draw first.</p>
-  const byGroup = fixtures.filter(f => f.round_number === activeRound).reduce((acc, f) => {
-    (acc[f.groupName] = acc[f.groupName]||[]).push(f); return acc
-  }, {})
+  const byGroup = fixtures
+    .filter(f => f.round_number === activeRound && (!showUnlogged || f.status !== "completed"))
+    .reduce((acc, f) => {
+      (acc[f.groupName] = acc[f.groupName]||[]).push(f); return acc
+    }, {})
 
   async function handleExport() {
     if (!exportRef.current) return
@@ -1045,6 +1048,12 @@ function FixturesByRound({ fixtures, onSave, onPlayerSetup, playerSetupPending, 
             </button>
           ))}
         </div>
+        <button onClick={() => setShowUnlogged(v => !v)}
+          className={cn("px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap",
+            showUnlogged ? "bg-amber-400/15 border-amber-400/30 text-amber-400" : "border-surface-border text-slate-500 hover:text-white"
+          )}>
+          {showUnlogged ? "Unlogged only" : "All matches"}
+        </button>
         <button onClick={handleExport} disabled={exporting}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
           <Download className="w-3.5 h-3.5" />
@@ -1077,6 +1086,7 @@ function FixturesByRound({ fixtures, onSave, onPlayerSetup, playerSetupPending, 
 // ── KnockoutTab ───────────────────────────────────────────────────────────────
 function KnockoutTab({ fixtures, rounds, season, scoreMut, playerSetupMut, knockoutDeciderMut }) {
   const [activeRound, setActiveRound] = useState(rounds[0] || "r16")
+  const [showUnlogged, setShowUnlogged] = useState(false)
   const [exporting, setExporting]     = useState(false)
   const [showExport, setShowExport]   = useState(false)
   const exportRef = useRef(null)
@@ -1101,7 +1111,7 @@ function KnockoutTab({ fixtures, rounds, season, scoreMut, playerSetupMut, knock
     finally { setExporting(false); setShowExport(false) }
   }
 
-  const roundFixtures = fixtures.filter(f => f.knockout_round === activeRound)
+  const roundFixtures = fixtures.filter(f => f.knockout_round === activeRound && (!showUnlogged || f.status !== "completed"))
 
   return (
     <div className="space-y-4">
@@ -1116,6 +1126,12 @@ function KnockoutTab({ fixtures, rounds, season, scoreMut, playerSetupMut, knock
             </button>
           ))}
         </div>
+        <button onClick={() => setShowUnlogged(v => !v)}
+          className={cn("px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap",
+            showUnlogged ? "bg-amber-400/15 border-amber-400/30 text-amber-400" : "border-surface-border text-slate-500 hover:text-white"
+          )}>
+          {showUnlogged ? "Unlogged only" : "All matches"}
+        </button>
         <button onClick={handleExport} disabled={exporting}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/15 text-accent border border-accent/25 text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50">
           <Download className="w-3.5 h-3.5" />
