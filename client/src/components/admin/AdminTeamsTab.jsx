@@ -128,7 +128,7 @@ async function downloadSquadImage(team) {
   ctx.fillText("PLAYER",    72, Y_HEAD)
   ctx.textAlign = "right"
   ctx.fillText("AUCTION ₹", W - 152, Y_HEAD)
-  ctx.fillText("MV ₹",      W - 36,  Y_HEAD)
+  ctx.fillText("BASE ₹",    W - 36,  Y_HEAD)
 
   // Divider
   ctx.strokeStyle = "#1e293b"
@@ -177,11 +177,11 @@ async function downloadSquadImage(team) {
     ctx.textAlign = "right"
     ctx.fillText(p.auctionPrice > 0 ? `₹${p.auctionPrice}` : "—", W - 152, y + ROW_H / 2 + 5)
 
-    // Market value
+    // Base price
     ctx.fillStyle = "#22d3ee"
     ctx.font      = "bold 13px monospace"
     ctx.textAlign = "right"
-    ctx.fillText(p.marketValue > 0 ? `₹${p.marketValue}` : "—", W - 36, y + ROW_H / 2 + 5)
+    ctx.fillText(p.basePrice > 0 ? `₹${p.basePrice}` : "—", W - 36, y + ROW_H / 2 + 5)
 
     // Row divider
     ctx.strokeStyle = "#1e293b"
