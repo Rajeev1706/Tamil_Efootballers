@@ -223,6 +223,7 @@ const updateSchema = z.object({
   bdrDelta:      z.number().int().optional(),
   isCaptain:     z.boolean().optional(),
   auctionPrice:  z.number().int().min(0).optional(),
+  baseValue:     z.number().int().min(0).optional(),
   teamId:        z.number().int().positive().optional().nullable(),
   imageUrl:      z.string().optional().nullable(),
   gradeFloor:    z.string().optional().nullable(),
