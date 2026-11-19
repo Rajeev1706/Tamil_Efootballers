@@ -341,6 +341,21 @@ async function generateRetentionImage(teams, configs) {
       ctx.roundRect(cardX, cardY, CARD_W, cardH, 12)
       ctx.stroke()
 
+      // Team logo (blurred bg strip)
+      if (team.logoUrl) {
+        try {
+          const logoImg = await loadImage(team.logoUrl)
+          ctx.save()
+          ctx.beginPath()
+          ctx.roundRect(cardX, cardY, CARD_W, 56, [12, 12, 0, 0])
+          ctx.clip()
+          ctx.filter = "blur(20px) brightness(0.3)"
+          ctx.drawImage(logoImg, cardX - 20, cardY - 20, CARD_W + 40, 96)
+          ctx.restore()
+          ctx.filter = "none"
+        } catch (_) {}
+      }
+
       // Team logo circle
       if (team.logoUrl) {
         try {
