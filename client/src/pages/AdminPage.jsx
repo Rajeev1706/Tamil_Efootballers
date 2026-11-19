@@ -41,6 +41,7 @@ import SeasonRecordsAdmin from "../components/admin/SeasonRecordsAdmin"
 import LeagueInfoAdmin from "../components/admin/LeagueInfoAdmin"
 import SpecialEditionAdmin from "../components/admin/SpecialEditionAdmin"
 import AdminTeamsTab from "../components/admin/AdminTeamsTab"
+import RetentionAdmin from "../components/admin/RetentionAdmin"
 import SeasonSummaryAdmin from "../components/admin/SeasonSummaryAdmin"
 import StandingsExport from "../components/admin/StandingsExport"
 import GoldenBootExport from "../components/admin/GoldenBootExport"
@@ -627,6 +628,7 @@ const TABS = [
   { id: "setup",      label: "Setup",        icon: Settings        },
   { id: "overview",   label: "Overview",     icon: LayoutDashboard },
   { id: "teams",      label: "Teams",        icon: Shield          },
+  { id: "retention",  label: "Retention",    icon: Download        },
   { id: "players",    label: "Players",      icon: Users           },
   { id: "records",    label: "Match records", icon: Activity       },
   { id: "uclgroups",    label: "UCL Groups",    icon: Trophy },
@@ -1023,6 +1025,7 @@ export default function AdminPage() {
         {activeTab === "fixtures" && !isLoading && (
           <FixtureResults fixtures={fixtures} />
         )}
+        {activeTab === "retention" && <RetentionAdmin />}
         {activeTab === "trades" && (
           <TradeApproval trades={pendingTrades} />
         )}
