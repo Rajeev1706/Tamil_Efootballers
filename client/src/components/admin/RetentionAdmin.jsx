@@ -437,11 +437,10 @@ async function generateRetentionImage(teams, configs) {
           ctx.fillStyle   = rowBg
           ctx.fillRect(cardX + CARD_PAD - 4, contentY - 10, CARD_W - CARD_PAD * 2 + 8, ROW_H - 4)
 
-          const gradeColor = GRADE_COLORS[ret.player.grade] || "#94a3b8"
-          ctx.fillStyle    = gradeColor
-          ctx.font         = "bold 10px sans-serif"
-          ctx.textAlign    = "left"
-          ctx.fillText(ret.player.grade, cardX + CARD_PAD, contentY + 8)
+          ctx.fillStyle = "#475569"
+          ctx.font      = "bold 10px monospace"
+          ctx.textAlign = "left"
+          ctx.fillText(String(ri + 1).padStart(2, "0"), cardX + CARD_PAD, contentY + 8)
 
           ctx.fillStyle = "#f1f5f9"
           ctx.font      = "13px sans-serif"
