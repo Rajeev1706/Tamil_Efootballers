@@ -232,20 +232,26 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 async function generateRetentionImage(teams, configs) {
-  const COLS       = 4
-  const ROWS       = Math.ceil(teams.length / COLS)
-  const CARD_W     = 320
-  const CARD_PAD   = 20
-  const HEADER_H   = 130
-  const FOOTER_H   = 40
-  const ROW_H      = 32
-  const CARD_MIN_H = 220
+  const COLS     = 4
+  const ROWS     = Math.ceil(teams.length / COLS)
+  const CARD_W   = 320
+  const CARD_PAD = 20
+  const HEADER_H = 130
+  const FOOTER_H = 40
+  const ROW_H    = 30
 
-  // Pre-measure card heights
+  // Tight card heights — only as tall as the content needs
   const cardHeights = teams.map((_, i) => {
-    const cfg = configs[i] || {}
+    const cfg      = configs[i] || {}
     const retCount = (cfg.retentions || []).length
-    return Math.max(CARD_MIN_H, 160 + retCount * ROW_H)
+    const hasPurse = Number(cfg.purse) > 0
+    // header strip (56) + captain line (38) + divider (10) + purse row (hasPurse ? 22 : 0)
+    // + retained header (retCount > 0 ? 32 : 0) + rows + no-ret line (retCount === 0 ? 30 : 0) + bottom pad (16)
+    const base = 56 + 38 + 10 + (hasPurse ? 22 : 0)
+    const retSection = retCount > 0
+      ? 32 + retCount * ROW_H
+      : 30
+    return base + retSection + 16
   })
 
   // Max height per row
