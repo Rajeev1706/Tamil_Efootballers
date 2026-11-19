@@ -277,22 +277,8 @@ async function generateRetentionImage(teams, configs) {
   const ctx = canvas.getContext("2d")
 
   // ── Background ──
-  const bg = ctx.createLinearGradient(0, 0, 0, totalH)
-  bg.addColorStop(0,   "#0a0e17")
-  bg.addColorStop(0.5, "#0d1220")
-  bg.addColorStop(1,   "#080c14")
-  ctx.fillStyle = bg
+  ctx.fillStyle = "#0a0e17"
   ctx.fillRect(0, 0, totalW, totalH)
-
-  // Subtle grid lines
-  ctx.strokeStyle = "rgba(255,255,255,0.03)"
-  ctx.lineWidth = 1
-  for (let x = 0; x < totalW; x += 60) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, totalH); ctx.stroke()
-  }
-  for (let y = 0; y < totalH; y += 60) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(totalW, y); ctx.stroke()
-  }
 
   // ── Header ──
   // Logo
@@ -354,21 +340,6 @@ async function generateRetentionImage(teams, configs) {
       ctx.beginPath()
       ctx.roundRect(cardX, cardY, CARD_W, cardH, 12)
       ctx.stroke()
-
-      // Team logo (blurred bg strip)
-      if (team.logoUrl) {
-        try {
-          const logoImg = await loadImage(team.logoUrl)
-          ctx.save()
-          ctx.beginPath()
-          ctx.roundRect(cardX, cardY, CARD_W, 56, [12, 12, 0, 0])
-          ctx.clip()
-          ctx.filter = "blur(20px) brightness(0.3)"
-          ctx.drawImage(logoImg, cardX - 20, cardY - 20, CARD_W + 40, 96)
-          ctx.restore()
-          ctx.filter = "none"
-        } catch (_) {}
-      }
 
       // Team logo circle
       if (team.logoUrl) {
