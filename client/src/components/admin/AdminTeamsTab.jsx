@@ -181,7 +181,7 @@ async function downloadSquadImage(team) {
     ctx.fillStyle = "#22d3ee"
     ctx.font      = "bold 13px monospace"
     ctx.textAlign = "right"
-    ctx.fillText(p.basePrice > 0 ? `₹${p.basePrice}` : "—", W - 36, y + ROW_H / 2 + 5)
+    ctx.fillText(p.baseValue > 0 ? `₹${p.baseValue}` : "—", W - 36, y + ROW_H / 2 + 5)
 
     // Row divider
     ctx.strokeStyle = "#1e293b"
