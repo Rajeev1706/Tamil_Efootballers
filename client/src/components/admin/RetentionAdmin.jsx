@@ -19,11 +19,23 @@ function usePlayers(teamId) {
   })
 }
 
+function useAllPlayers() {
+  return useQuery({
+    queryKey: ["players-all"],
+    queryFn: async () => {
+      const res = await api.get("/players")
+      return (res.data || []).sort((a, b) => a.name.localeCompare(b.name))
+    },
+  })
+}
+
 // ── TeamCard (per-team configuration) ────────────────────────────────────────
 function TeamCard({ team, config, onChange, allTeams }) {
-  const { data: players = [] } = usePlayers(team.id)
+  const { data: players = [] }    = usePlayers(team.id)
+  const { data: allPlayers = [] } = useAllPlayers()
   const [playerDropdown, setPlayerDropdown] = useState(false)
   const [captainDropdown, setCaptainDropdown] = useState(false)
+  const [captainSearch, setCaptainSearch] = useState("")
 
   const purse       = config.purse ?? ""
   const captain     = config.captain ?? null   // { id, name, grade }
@@ -102,20 +114,36 @@ function TeamCard({ team, config, onChange, allTeams }) {
             <ChevronDown className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
           </button>
           {captainDropdown && (
-            <div className="absolute z-20 mt-1 w-full bg-pitch-800 border border-surface-border rounded-xl shadow-xl max-h-48 overflow-y-auto">
-              <button
-                onClick={() => { onChange({ captain: null }); setCaptainDropdown(false) }}
-                className="w-full text-left px-3 py-2 text-xs text-slate-500 hover:text-white hover:bg-white/5 transition-colors">
-                — None —
-              </button>
-              {players.map(p => (
-                <button key={p.id}
-                  onClick={() => { onChange({ captain: p }); setCaptainDropdown(false) }}
-                  className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
-                  <span style={{ color: GRADE_COLORS[p.grade] }} className="text-xs font-bold w-5">{p.grade}</span>
-                  <span className="text-white">{p.name}</span>
+            <div className="absolute z-20 mt-1 w-full bg-pitch-800 border border-surface-border rounded-xl shadow-xl">
+              <div className="p-2 border-b border-surface-border">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search player…"
+                  value={captainSearch}
+                  onChange={e => setCaptainSearch(e.target.value)}
+                  className="w-full bg-pitch-900 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                <button
+                  onClick={() => { onChange({ captain: null }); setCaptainDropdown(false); setCaptainSearch("") }}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-500 hover:text-white hover:bg-white/5 transition-colors">
+                  — None —
                 </button>
-              ))}
+                {allPlayers
+                  .filter(p => !captainSearch || p.name.toLowerCase().includes(captainSearch.toLowerCase()))
+                  .map(p => (
+                    <button key={p.id}
+                      onClick={() => { onChange({ captain: p }); setCaptainDropdown(false); setCaptainSearch("") }}
+                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                      <span style={{ color: GRADE_COLORS[p.grade] }} className="text-xs font-bold w-5">{p.grade}</span>
+                      <span className="text-white">{p.name}</span>
+                      {p.teamName && <span className="text-slate-600 text-xs ml-auto truncate">{p.teamName}</span>}
+                    </button>
+                  ))
+                }
+              </div>
             </div>
           )}
         </div>
