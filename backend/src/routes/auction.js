@@ -504,7 +504,7 @@ router.post("/mark-unsold", authenticate, adminOnly, async (req, res, next) => {
     if (!session?.current_player_id) return res.status(400).json({ error: "No player is currently up." })
 
     const unsoldStatus = session.round === 1 ? "unsold_r1" : "unsold_r2"
-    await query("UPDATE auction_pool SET status=$1 WHERE session_id=$2 AND player_id=$3", [unsoldStatus, sessionId, session.current_player_id])
+    await query("UPDATE auction_pool SET status=$1, skipped_at=NOW() WHERE session_id=$2 AND player_id=$3", [unsoldStatus, sessionId, session.current_player_id])
     await query("UPDATE auction_sessions SET current_player_id=NULL, current_bid=NULL, current_bidder_team_id=NULL, version = version + 1 WHERE id=$1", [sessionId])
 
     res.json({ success: true })
@@ -596,36 +596,78 @@ router.post("/reduce-bid", authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /api/auction/undo-last-sale — reverses the most recent sale for
-// this session: refunds the team's budget, removes the player from their
-// roster, and puts the player back up as the current player (pending
-// again in the pool) so the admin can re-run the sale correctly.
+// POST /api/auction/undo-last-sale — reverses the most recent action
+// (sale OR skip) for this session. Compares the latest sale's sold_at
+// with the latest skipped player's skipped_at to determine which happened
+// last, then undoes that one.
 router.post("/undo-last-sale", authenticate, adminOnly, async (req, res, next) => {
   try {
     const { sessionId } = z.object({ sessionId: z.number().int() }).parse(req.body)
+
+    // Get the most recent sale
     const lastSaleRes = await query(
       "SELECT * FROM auction_sales WHERE session_id=$1 ORDER BY sold_at DESC LIMIT 1",
       [sessionId]
     )
     const lastSale = lastSaleRes.rows[0]
-    if (!lastSale) return res.status(400).json({ error: "No sale to undo." })
 
-    await query("UPDATE teams SET budget = budget + $1 WHERE id=$2", [lastSale.price, lastSale.team_id])
-    await query("UPDATE players SET next_team_id=NULL, auction_price=0 WHERE id=$1", [lastSale.player_id])
-    await query("UPDATE auction_pool SET status='pending' WHERE session_id=$1 AND player_id=$2", [sessionId, lastSale.player_id])
-    await query("DELETE FROM auction_sales WHERE id=$1", [lastSale.id])
-    await query("DELETE FROM auction_bid_log WHERE session_id=$1 AND player_id=$2", [sessionId, lastSale.player_id])
-
-    // Always brings the undone player straight back up for bidding, even
-    // if someone else was already up — by explicit request. Any bidding
-    // in progress on that other player is discarded (they simply remain
-    // in the pending pool and can be drawn again via "Start Auction").
-    await query(
-      "UPDATE auction_sessions SET current_player_id=$1, current_bid=$2, current_bidder_team_id=NULL, timer_started_at=NULL, version = version + 1 WHERE id=$3",
-      [lastSale.player_id, STARTING_BID, sessionId]
+    // Get the most recently skipped player
+    const lastSkipRes = await query(
+      "SELECT * FROM auction_pool WHERE session_id=$1 AND status IN ('unsold_r1','unsold_r2') AND skipped_at IS NOT NULL ORDER BY skipped_at DESC LIMIT 1",
+      [sessionId]
     )
+    const lastSkip = lastSkipRes.rows[0]
 
-    res.json({ success: true, restoredAsCurrent: true })
+    if (!lastSale && !lastSkip) return res.status(400).json({ error: "Nothing to undo." })
+
+    // Pick whichever happened most recently
+    const undoSkip = lastSkip && (!lastSale || new Date(lastSkip.skipped_at) > new Date(lastSale.sold_at))
+
+    if (undoSkip) {
+      // Undo a skip — restore player to pending and bring back as current
+      await query(
+        "UPDATE auction_pool SET status='pending', skipped_at=NULL WHERE session_id=$1 AND player_id=$2",
+        [sessionId, lastSkip.player_id]
+      )
+      // If another player is currently being bid on, put them back to pending first
+      const curSession = await query("SELECT current_player_id FROM auction_sessions WHERE id=$1", [sessionId])
+      if (curSession.rows[0]?.current_player_id && curSession.rows[0].current_player_id !== lastSkip.player_id) {
+        await query(
+          "UPDATE auction_pool SET status='pending' WHERE session_id=$1 AND player_id=$2",
+          [sessionId, curSession.rows[0].current_player_id]
+        )
+        await query("DELETE FROM auction_bid_log WHERE session_id=$1 AND player_id=$2", [sessionId, curSession.rows[0].current_player_id])
+      }
+      await query(
+        "UPDATE auction_sessions SET current_player_id=$1, current_bid=$2, current_bidder_team_id=NULL, timer_started_at=NULL, version = version + 1 WHERE id=$3",
+        [lastSkip.player_id, STARTING_BID, sessionId]
+      )
+      res.json({ success: true, restoredAsCurrent: true, undidSkip: true })
+    } else {
+      // Undo a sale — refund budget, remove from sales, restore to current
+      await query("UPDATE teams SET budget = budget + $1 WHERE id=$2", [lastSale.price, lastSale.team_id])
+      await query("UPDATE players SET next_team_id=NULL, auction_price=0 WHERE id=$1", [lastSale.player_id])
+      await query("UPDATE auction_pool SET status='pending' WHERE session_id=$1 AND player_id=$2", [sessionId, lastSale.player_id])
+      await query("DELETE FROM auction_sales WHERE id=$1", [lastSale.id])
+      await query("DELETE FROM auction_bid_log WHERE session_id=$1 AND player_id=$2", [sessionId, lastSale.player_id])
+
+      // If another player is currently being bid on, put them back to pending first
+      const curSession = await query("SELECT current_player_id FROM auction_sessions WHERE id=$1", [sessionId])
+      if (curSession.rows[0]?.current_player_id && curSession.rows[0].current_player_id !== lastSale.player_id) {
+        await query(
+          "UPDATE auction_pool SET status='pending' WHERE session_id=$1 AND player_id=$2",
+          [sessionId, curSession.rows[0].current_player_id]
+        )
+        await query("DELETE FROM auction_bid_log WHERE session_id=$1 AND player_id=$2", [sessionId, curSession.rows[0].current_player_id])
+      }
+
+      await query(
+        "UPDATE auction_sessions SET current_player_id=$1, current_bid=$2, current_bidder_team_id=NULL, timer_started_at=NULL, version = version + 1 WHERE id=$3",
+        [lastSale.player_id, STARTING_BID, sessionId]
+      )
+      res.json({ success: true, restoredAsCurrent: true, undidSkip: false })
+    }
+
     broadcastAuctionUpdate(getFullAuctionState, { skipReveal: true })
   } catch (err) { next(err) }
 })
