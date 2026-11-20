@@ -338,6 +338,19 @@ router.post("/build-pool", authenticate, adminOnly, async (req, res, next) => {
       ), 0)
     `, [sessionId])
 
+    // Assign a fixed random reveal order to all pool players right now,
+    // so the sequence is saved in DB and consistent across page loads/restarts.
+    await query(`
+      UPDATE auction_pool ap
+      SET reveal_order = sub.rn
+      FROM (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY random()) AS rn
+        FROM auction_pool
+        WHERE session_id = $1 AND status = 'pending'
+      ) sub
+      WHERE ap.id = sub.id
+    `, [sessionId])
+
     await query("UPDATE auction_sessions SET status = 'active', version = version + 1 WHERE id = $1", [sessionId])
 
     res.json({ success: true, poolCount: parseInt(poolCountRes.rows[0].count) })
@@ -368,7 +381,7 @@ router.post("/next-player", authenticate, adminOnly, async (req, res, next) => {
       poolEntry = poolRes.rows[0]
     } else {
       const poolRes = await query(
-        "SELECT * FROM auction_pool WHERE session_id=$1 AND status='pending' ORDER BY random() LIMIT 1",
+        "SELECT * FROM auction_pool WHERE session_id=$1 AND status='pending' ORDER BY reveal_order ASC NULLS LAST LIMIT 1",
         [sessionId]
       )
       poolEntry = poolRes.rows[0]
@@ -521,6 +534,19 @@ router.post("/advance-round", authenticate, adminOnly, async (req, res, next) =>
       "UPDATE auction_pool SET status='pending', round_seen=2 WHERE session_id=$1 AND status='unsold_r1' RETURNING id",
       [sessionId]
     )
+    // Assign fresh random reveal_order for round 2 players (continuing from max of round 1)
+    await query(`
+      UPDATE auction_pool ap
+      SET reveal_order = sub.rn
+      FROM (
+        SELECT id,
+          (SELECT COALESCE(MAX(reveal_order), 0) FROM auction_pool WHERE session_id = $1)
+          + ROW_NUMBER() OVER (ORDER BY random()) AS rn
+        FROM auction_pool
+        WHERE session_id = $1 AND round_seen = 2 AND status = 'pending'
+      ) sub
+      WHERE ap.id = sub.id
+    `, [sessionId])
     await query("UPDATE auction_sessions SET round=2, version = version + 1 WHERE id=$1", [sessionId])
     res.json({ success: true, playersCarriedOver: result.rows.length })
     broadcastAuctionUpdate(getFullAuctionState)
