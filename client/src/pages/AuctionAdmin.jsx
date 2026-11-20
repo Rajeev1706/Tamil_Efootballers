@@ -276,9 +276,9 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
                         {selPlayer && (
                           <>
                             <button type="button"
-                              onClick={() => setPicks(p => ({ ...p, [team.id]: { ...pick, price: selPlayer.marketValue || 0 } }))}
+                              onClick={() => setPicks(p => ({ ...p, [team.id]: { ...pick, price: selPlayer.baseValue || 0 } }))}
                               className="px-1.5 py-1 rounded bg-blue-900/40 border border-blue-500/30 text-[10px] text-blue-300 font-semibold whitespace-nowrap">
-                              Base ₹{selPlayer.marketValue ?? 0}
+                              Base ₹{selPlayer.baseValue ?? 0}
                             </button>
                             <button type="button"
                               onClick={() => setPicks(p => ({ ...p, [team.id]: { ...pick, price: selPlayer.auctionPrice || 0 } }))}
