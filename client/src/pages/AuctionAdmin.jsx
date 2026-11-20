@@ -584,7 +584,8 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
 
   const totalRetained = retentions.length
   const poolTotal = pool.length
-  const slotsPerTeam = teams.length > 0 ? Math.round((poolTotal + totalRetained) / teams.length) : 0
+  const totalCaptains = teams.reduce((sum, t) => sum + (t.captains?.length || 0), 0)
+  const slotsPerTeam = teams.length > 0 ? Math.round((poolTotal + totalRetained + totalCaptains) / teams.length) : 0
 
   return (
     <div className="auction-layout max-w-[100rem] mx-auto">
