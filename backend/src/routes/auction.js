@@ -70,8 +70,13 @@ async function getFullAuctionState() {
   // When team_ids is NULL (sessions created before team selection was saved),
   // fall back to teams with budget > 0 — non-participating teams were set to
   // budget=0 during build-pool, so this correctly excludes them.
-  const teamIdsFilter = session.team_ids && session.team_ids.length > 0
-    ? `WHERE t.id = ANY(ARRAY[${session.team_ids.map(Number).join(",")}]::int[])`
+  // team_ids is stored as a JSON string in the DB — parse it first.
+  const rawTeamIds = session.team_ids
+  const parsedTeamIds = rawTeamIds
+    ? (Array.isArray(rawTeamIds) ? rawTeamIds : JSON.parse(rawTeamIds))
+    : null
+  const teamIdsFilter = parsedTeamIds && parsedTeamIds.length > 0
+    ? `WHERE t.id = ANY(ARRAY[${parsedTeamIds.map(Number).join(",")}]::int[])`
     : "WHERE t.budget > 0"
 
   const teamsRes = await query(`
@@ -221,7 +226,8 @@ router.post("/pool/add", authenticate, adminOnly, async (req, res, next) => {
     // Captains of NON-PARTICIPATING teams are free agents and CAN be auctioned.
     if (player.is_captain && player.team_id) {
       const sessionRes2 = await query("SELECT team_ids FROM auction_sessions WHERE id=$1", [sessionId])
-      const teamIds = sessionRes2.rows[0]?.team_ids
+      const rawTids = sessionRes2.rows[0]?.team_ids
+      const teamIds = rawTids ? (Array.isArray(rawTids) ? rawTids : JSON.parse(rawTids)) : null
       if (!teamIds || teamIds.includes(player.team_id)) {
         return res.status(400).json({ error: "Captains of participating teams aren't auctioned." })
       }
@@ -303,7 +309,10 @@ router.post("/build-pool", authenticate, adminOnly, async (req, res, next) => {
 
     // Set budget only for participating teams. Non-participating teams get 0.
     const session = sessionRes.rows[0]
-    const participatingTeamIds = session.team_ids ?? null
+    const rawIds = session.team_ids
+    const participatingTeamIds = rawIds
+      ? (Array.isArray(rawIds) ? rawIds : JSON.parse(rawIds))
+      : null
 
     if (participatingTeamIds && participatingTeamIds.length > 0) {
       // Reset all teams to 0 first
