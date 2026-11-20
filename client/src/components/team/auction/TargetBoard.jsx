@@ -44,7 +44,8 @@ function BudgetBar({ targets, totalBudget }) {
   const mustTotal   = targets.filter(t => t.priority === "must_have").reduce((a, t) => a + (t.maxBid || 0), 0)
   const wantTotal   = targets.filter(t => t.priority === "want").reduce((a, t) => a + (t.maxBid || 0), 0)
   const backupTotal = targets.filter(t => t.priority === "backup").reduce((a, t) => a + (t.maxBid || 0), 0)
-  const totalPlanned = mustTotal + wantTotal + backupTotal
+  // Backups are fallbacks — only count must+want in planned (you won't buy both a want AND its backup)
+  const totalPlanned = mustTotal + wantTotal
   const buffer      = Math.max(0, totalBudget - totalPlanned)
   const pct         = totalBudget > 0 ? Math.min(100, (totalPlanned / totalBudget) * 100) : 0
   const overBudget  = totalPlanned > totalBudget
