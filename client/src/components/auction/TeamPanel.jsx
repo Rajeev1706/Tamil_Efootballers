@@ -33,7 +33,7 @@ function CaptainChip({ name }) {
   )
 }
 
-export default function TeamPanel({ title, teamList, sales, retentions = [], budgetPerTeam }) {
+export default function TeamPanel({ title, teamList, sales, retentions = [], budgetPerTeam, slotsPerTeam = 0 }) {
   return (
     <div className="side-panel">
       <h2>{title}</h2>
@@ -44,6 +44,7 @@ export default function TeamPanel({ title, teamList, sales, retentions = [], bud
         const isLowBudget  = t.budget <= 100
         const total        = budgetPerTeam || t.budget
         const spentPct     = total > 0 ? Math.min(100, Math.round(((total - t.budget) / total) * 100)) : 0
+        const acquired     = captains.length + teamRetained.length + roster.length
 
         const hasAnyPlayers = captains.length > 0 || teamRetained.length > 0 || roster.length > 0
 
@@ -58,6 +59,16 @@ export default function TeamPanel({ title, teamList, sales, retentions = [], bud
                 <h4>{t.name}</h4>
                 <p>💰 ₹{t.budget} left</p>
               </div>
+              {slotsPerTeam > 0 && (
+                <span className={cn(
+                  "text-xs font-semibold px-1.5 py-0.5 rounded-md tabular-nums",
+                  acquired >= slotsPerTeam
+                    ? "bg-green-900/40 text-green-400 border border-green-700/40"
+                    : "bg-pitch-800 text-slate-400 border border-surface-border"
+                )}>
+                  {acquired}/{slotsPerTeam}
+                </span>
+              )}
             </div>
 
             <div className="team-budget-bar">
