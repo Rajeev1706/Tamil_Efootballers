@@ -454,14 +454,15 @@ router.post("/sell", authenticate, adminOnly, async (req, res, next) => {
       rtmTeamId: z.number().int().optional(), // team that triggered RTM (may differ from buyer)
     }).parse(req.body)
 
-    // ── RTM limit check — max 2 RTMs per team per auction ──────────────────
+    // ── RTM limit check — a team can trigger RTM any number of times,
+    //    but once they successfully BUY a player via RTM, they can't use it again ──
     if (rtmUsed && rtmTeamId) {
       const rtmCountRes = await query(
         "SELECT COUNT(*)::int AS count FROM auction_sales WHERE session_id=$1 AND rtm_team_id=$2",
         [sessionId, rtmTeamId]
       )
-      if (rtmCountRes.rows[0].count >= 2) {
-        return res.status(400).json({ error: "This team has already used both their RTM cards (2/2)." })
+      if (rtmCountRes.rows[0].count >= 1) {
+        return res.status(400).json({ error: "This team has already used their RTM — once a player is bought via RTM, it cannot be used again." })
       }
     }
     const sessionRes = await query("SELECT * FROM auction_sessions WHERE id=$1", [sessionId])

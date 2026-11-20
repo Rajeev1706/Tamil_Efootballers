@@ -358,8 +358,8 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
 function RtmModal({ player, currentBidderName, currentBid, prevTeamName, rtmUsedCount = 0, onResolve, onClose }) {
   const [step, setStep] = useState(1)
   const [finalBid, setFinalBid] = useState(currentBid)
-  const rtmRemaining = 2 - rtmUsedCount
-  const rtmBlocked = rtmUsedCount >= 2
+  const rtmRemaining = 1 - rtmUsedCount
+  const rtmBlocked = rtmUsedCount >= 1
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
@@ -369,12 +369,12 @@ function RtmModal({ player, currentBidderName, currentBid, prevTeamName, rtmUsed
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-white">🃏 RTM Opportunity</h3>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${rtmBlocked ? "bg-rose-400/20 text-rose-400" : "bg-accent/20 text-accent"}`}>
-                RTM {rtmUsedCount}/2 used
+                RTM {rtmUsedCount > 0 ? "used" : "available"}
               </span>
             </div>
             <p className="text-sm text-slate-400 mb-4">
               <strong>{prevTeamName}</strong>, your former player <strong>{player}</strong> is about to be sold to <strong>{currentBidderName}</strong> for ₹{currentBid}. Use your Right to Match?
-              {rtmBlocked && <span className="block mt-2 text-rose-400 font-semibold">⛔ {prevTeamName} has used both RTM cards (2/2). Cannot RTM.</span>}
+              {rtmBlocked && <span className="block mt-2 text-rose-400 font-semibold">⛔ {prevTeamName} has already bought a player via RTM. Cannot RTM again.</span>}
             </p>
             <div className="flex gap-2">
               <button onClick={() => onResolve({ rtmUsed: false })} className="flex-1 py-2 rounded-lg border border-surface-border text-slate-400">No, let them go</button>
@@ -383,7 +383,7 @@ function RtmModal({ player, currentBidderName, currentBid, prevTeamName, rtmUsed
                 disabled={rtmBlocked}
                 className="flex-1 py-2 rounded-lg bg-accent text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {rtmBlocked ? "RTM Unavailable" : `Yes, use RTM (${rtmRemaining} left)`}
+                {rtmBlocked ? "RTM Unavailable" : `Yes, use RTM`}
               </button>
             </div>
           </>
