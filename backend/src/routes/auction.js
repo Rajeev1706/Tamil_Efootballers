@@ -250,7 +250,7 @@ router.post("/pool/add", authenticate, adminOnly, async (req, res, next) => {
     }
 
     await query(
-      "INSERT INTO auction_pool (session_id, player_id, card_type, prev_team_id) VALUES ($1,$2,$3,$4)",
+      "INSERT INTO auction_pool (session_id, player_id, card_type, prev_team_id, reveal_order) VALUES ($1,$2,$3,$4, floor(random()*100)::int)",
       [sessionId, playerId, cardType, effectivePrevTeamId]
     )
     res.json({ success: true, cardType })
@@ -336,19 +336,6 @@ router.post("/build-pool", authenticate, adminOnly, async (req, res, next) => {
         SELECT SUM(r.price) FROM auction_retentions r
         WHERE r.session_id = $1 AND r.team_id = t.id
       ), 0)
-    `, [sessionId])
-
-    // Assign a fixed random reveal order to all pool players right now,
-    // so the sequence is saved in DB and consistent across page loads/restarts.
-    await query(`
-      UPDATE auction_pool ap
-      SET reveal_order = sub.rn
-      FROM (
-        SELECT id, ROW_NUMBER() OVER (ORDER BY random()) AS rn
-        FROM auction_pool
-        WHERE session_id = $1 AND status = 'pending'
-      ) sub
-      WHERE ap.id = sub.id
     `, [sessionId])
 
     await query("UPDATE auction_sessions SET status = 'active', version = version + 1 WHERE id = $1", [sessionId])
