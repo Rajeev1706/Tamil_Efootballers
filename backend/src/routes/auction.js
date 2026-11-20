@@ -70,27 +70,15 @@ async function getFullAuctionState() {
   // When team_ids is NULL (sessions created before team selection was saved),
   // fall back to teams with budget > 0 — non-participating teams were set to
   // budget=0 during build-pool, so this correctly excludes them.
-  // team_ids is stored as a JSON string in the DB — parse it first.
-  const rawTeamIds = session.team_ids
+  // team_ids is aliased as "teamIds" in the SELECT — use that camelCase key.
+  // It may be a native JS array (if column is int[]/jsonb) or a JSON string (text column).
+  const rawTeamIds = session.teamIds
   const parsedTeamIds = rawTeamIds
     ? (Array.isArray(rawTeamIds) ? rawTeamIds : JSON.parse(rawTeamIds))
     : null
 
-  // Resolve succession: if a selected team has a successor, show the successor instead.
-  // e.g. Demon Slayer (selected) → Gomma Esports (successor) means Gomma Esports appears.
-  let resolvedTeamIds = parsedTeamIds
-  if (parsedTeamIds && parsedTeamIds.length > 0) {
-    const succRes = await query(
-      `SELECT id, successor_team_id FROM teams WHERE id = ANY(ARRAY[${parsedTeamIds.map(Number).join(",")}]::int[]) AND successor_team_id IS NOT NULL`
-    )
-    if (succRes.rows.length > 0) {
-      const succMap = Object.fromEntries(succRes.rows.map(r => [r.id, r.successor_team_id]))
-      resolvedTeamIds = parsedTeamIds.map(id => succMap[id] ?? id)
-    }
-  }
-
-  const teamIdsFilter = resolvedTeamIds && resolvedTeamIds.length > 0
-    ? `WHERE t.id = ANY(ARRAY[${resolvedTeamIds.map(Number).join(",")}]::int[])`
+  const teamIdsFilter = parsedTeamIds && parsedTeamIds.length > 0
+    ? `WHERE t.id = ANY(ARRAY[${parsedTeamIds.map(Number).join(",")}]::int[])`
     : "WHERE t.budget > 0"
 
   const teamsRes = await query(`
