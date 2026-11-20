@@ -611,17 +611,22 @@ router.post("/undo-last-sale", authenticate, adminOnly, async (req, res, next) =
     )
     const lastSale = lastSaleRes.rows[0]
 
-    // Get the most recently skipped player
+    // Get the most recently skipped player (skipped_at may be NULL for old entries)
     const lastSkipRes = await query(
-      "SELECT * FROM auction_pool WHERE session_id=$1 AND status IN ('unsold_r1','unsold_r2') AND skipped_at IS NOT NULL ORDER BY skipped_at DESC LIMIT 1",
+      "SELECT * FROM auction_pool WHERE session_id=$1 AND status IN ('unsold_r1','unsold_r2') ORDER BY skipped_at DESC NULLS LAST LIMIT 1",
       [sessionId]
     )
     const lastSkip = lastSkipRes.rows[0]
 
     if (!lastSale && !lastSkip) return res.status(400).json({ error: "Nothing to undo." })
 
-    // Pick whichever happened most recently
-    const undoSkip = lastSkip && (!lastSale || new Date(lastSkip.skipped_at) > new Date(lastSale.sold_at))
+    // Pick whichever happened most recently.
+    // If skipped_at is NULL (old entry skipped before this feature), undo the skip only
+    // if there's no sale at all — otherwise we can't tell order, so undo the sale.
+    const undoSkip = lastSkip && (
+      !lastSale ||
+      (lastSkip.skipped_at && new Date(lastSkip.skipped_at) > new Date(lastSale.sold_at))
+    )
 
     if (undoSkip) {
       // Undo a skip — restore player to pending and bring back as current
