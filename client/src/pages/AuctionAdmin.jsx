@@ -254,27 +254,46 @@ function RetentionScreen({ session, teams, allPlayers, retentions = [], pool = [
               <div className="flex gap-2">
                 <select value={pick.playerId || ""} onChange={e => {
                     const pid = e.target.value
-                    const player = allPlayers.find(p => String(p.id) === pid)
-                    const autoPrice = player ? Math.max(player.auctionPrice || 0, player.marketValue || 0) : ""
-                    setPicks(p => ({ ...p, [team.id]: { ...pick, playerId: pid, price: autoPrice } }))
+                    setPicks(p => ({ ...p, [team.id]: { ...pick, playerId: pid, price: "" } }))
                   }}
                   className="flex-1 bg-pitch-800 border border-surface-border rounded-lg px-2 py-1.5 text-sm text-white">
                   <option value="">Select player…</option>
                   {allPlayers.filter(p =>
-                    !retainedIds.has(p.id) && !pooledIds.has(p.id) && !captainIds.has(p.id) &&
-                    (p.teamId === team.id || p.teamId === team.predecessorTeamId)
+                    !retainedIds.has(p.id) && !pooledIds.has(p.id) &&
+                    (p.teamId === team.id || (team.predecessorTeamId != null && p.teamId === team.predecessorTeamId))
                   ).map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.name} (MV: {p.marketValue ?? 0} | AP: {p.auctionPrice ?? 0})
-                      {p.teamId !== team.id ? " [Predecessor]" : ""}
+                      {p.name}{p.teamId !== team.id ? " [Predecessor]" : ""}
                     </option>
                   ))}
                 </select>
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-slate-500 mb-0.5">Retention Price</span>
-                  <input type="number" value={pick.price || ""}
-                    onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, price: e.target.value } }))}
-                    className="w-24 bg-pitch-800 border border-accent/40 rounded-lg px-2 py-1.5 text-sm text-accent font-bold text-center" />
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] text-slate-500">Retention Price</span>
+                  {(() => {
+                    const selPlayer = allPlayers.find(p => String(p.id) === String(pick.playerId))
+                    return (
+                      <div className="flex items-center gap-1">
+                        {selPlayer && (
+                          <>
+                            <button type="button"
+                              onClick={() => setPicks(p => ({ ...p, [team.id]: { ...pick, price: selPlayer.marketValue || 0 } }))}
+                              className="px-1.5 py-1 rounded bg-blue-900/40 border border-blue-500/30 text-[10px] text-blue-300 font-semibold whitespace-nowrap">
+                              Base ₹{selPlayer.marketValue ?? 0}
+                            </button>
+                            <button type="button"
+                              onClick={() => setPicks(p => ({ ...p, [team.id]: { ...pick, price: selPlayer.auctionPrice || 0 } }))}
+                              className="px-1.5 py-1 rounded bg-green-900/40 border border-green-500/30 text-[10px] text-green-300 font-semibold whitespace-nowrap">
+                              AP ₹{selPlayer.auctionPrice ?? 0}
+                            </button>
+                          </>
+                        )}
+                        <input type="number" value={pick.price || ""}
+                          onChange={e => setPicks(p => ({ ...p, [team.id]: { ...pick, price: e.target.value } }))}
+                          placeholder="₹"
+                          className="w-20 bg-pitch-800 border border-accent/40 rounded-lg px-2 py-1 text-sm text-accent font-bold text-center" />
+                      </div>
+                    )
+                  })()}
                 </div>
                 <button
                   onClick={() => {
