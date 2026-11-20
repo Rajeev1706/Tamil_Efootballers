@@ -582,9 +582,13 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
   const leftTeams = teams.slice(0, Math.ceil(teams.length / 2))
   const rightTeams = teams.slice(Math.ceil(teams.length / 2))
 
+  const totalRetained = retentions.length
+  const poolTotal = pool.length
+  const slotsPerTeam = teams.length > 0 ? Math.round((poolTotal + totalRetained) / teams.length) : 0
+
   return (
     <div className="auction-layout max-w-[100rem] mx-auto">
-      <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
+      <TeamPanel title="👤 Teams" teamList={leftTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} slotsPerTeam={slotsPerTeam} />
 
       <div className={cn("space-y-4", shake && "auction-shake")}>
       <div className="flex items-center justify-between">
@@ -760,7 +764,7 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
       <PoolPanel pool={pool} clickable />
       </div>
 
-      <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} />
+      <TeamPanel title="👤 Teams" teamList={rightTeams} sales={sales} retentions={retentions} budgetPerTeam={session.budgetPerTeam} slotsPerTeam={slotsPerTeam} />
     </div>
   )
 }
