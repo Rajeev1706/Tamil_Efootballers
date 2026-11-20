@@ -75,12 +75,27 @@ async function getFullAuctionState() {
   const parsedTeamIds = rawTeamIds
     ? (Array.isArray(rawTeamIds) ? rawTeamIds : JSON.parse(rawTeamIds))
     : null
-  const teamIdsFilter = parsedTeamIds && parsedTeamIds.length > 0
-    ? `WHERE t.id = ANY(ARRAY[${parsedTeamIds.map(Number).join(",")}]::int[])`
+
+  // Resolve succession: if a selected team has a successor, show the successor instead.
+  // e.g. Demon Slayer (selected) → Gomma Esports (successor) means Gomma Esports appears.
+  let resolvedTeamIds = parsedTeamIds
+  if (parsedTeamIds && parsedTeamIds.length > 0) {
+    const succRes = await query(
+      `SELECT id, successor_team_id FROM teams WHERE id = ANY(ARRAY[${parsedTeamIds.map(Number).join(",")}]::int[]) AND successor_team_id IS NOT NULL`
+    )
+    if (succRes.rows.length > 0) {
+      const succMap = Object.fromEntries(succRes.rows.map(r => [r.id, r.successor_team_id]))
+      resolvedTeamIds = parsedTeamIds.map(id => succMap[id] ?? id)
+    }
+  }
+
+  const teamIdsFilter = resolvedTeamIds && resolvedTeamIds.length > 0
+    ? `WHERE t.id = ANY(ARRAY[${resolvedTeamIds.map(Number).join(",")}]::int[])`
     : "WHERE t.budget > 0"
 
   const teamsRes = await query(`
     SELECT t.id, t.name, t.budget, t.logo_url AS "logoUrl",
+      t.predecessor_team_id AS "predecessorTeamId",
       COALESCE(
         json_agg(json_build_object('id', p.id, 'name', p.name) ORDER BY p.name)
         FILTER (WHERE p.id IS NOT NULL),
@@ -89,7 +104,7 @@ async function getFullAuctionState() {
     FROM teams t
     LEFT JOIN players p ON p.team_id = t.id AND p.is_captain = true
     ${teamIdsFilter}
-    GROUP BY t.id, t.name, t.budget, t.logo_url
+    GROUP BY t.id, t.name, t.budget, t.logo_url, t.predecessor_team_id
     ORDER BY t.name
   `)
 
