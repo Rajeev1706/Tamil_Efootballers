@@ -2054,6 +2054,38 @@ router.post("/playoffs/:id/tiebreaker/results", authenticate, adminOnly, async (
 
     const winnerId = team1Total > team2Total ? match.team1_id : match.team2_id
     await query("UPDATE team_league_playoffs SET winner_team_id = $1, status = 'completed' WHERE id = $2", [winnerId, matchId])
+
+    // ── Save each of the 5 tiebreaker 1v1s to match_records ──────────────────
+    const season = await getCurrentSeason()
+    const tbFull = (await query("SELECT * FROM team_league_playoff_tiebreakers WHERE playoff_match_id = $1", [matchId])).rows[0]
+    const matchups = [
+      { p1Id: tbFull.m1_p1_id, p2Id: tbFull.m1_p2_id, p1Pts: m1.p1Pts, p2Pts: m1.p2Pts },
+      { p1Id: tbFull.m2_p1_id, p2Id: tbFull.m2_p2_id, p1Pts: m2.p1Pts, p2Pts: m2.p2Pts },
+      { p1Id: tbFull.m3_p1_id, p2Id: tbFull.m3_p2_id, p1Pts: m3.p1Pts, p2Pts: m3.p2Pts },
+      { p1Id: tbFull.m4_p1_id, p2Id: tbFull.m4_p2_id, p1Pts: m4.p1Pts, p2Pts: m4.p2Pts },
+      { p1Id: tbFull.m5_p1_id, p2Id: tbFull.m5_p2_id, p1Pts: m5.p1Pts, p2Pts: m5.p2Pts },
+    ]
+    for (const mu of matchups) {
+      if (!mu.p1Id || !mu.p2Id) continue
+      const p1Result = mu.p1Pts > mu.p2Pts ? "win" : mu.p1Pts < mu.p2Pts ? "loss" : "draw"
+      const p2Result = mu.p2Pts > mu.p1Pts ? "win" : mu.p2Pts < mu.p1Pts ? "loss" : "draw"
+      const p1GradeRes = await query("SELECT grade FROM players WHERE id=$1", [mu.p1Id])
+      const p2GradeRes = await query("SELECT grade FROM players WHERE id=$1", [mu.p2Id])
+      const p1Grade = p1GradeRes.rows[0]?.grade || "C"
+      const p2Grade = p2GradeRes.rows[0]?.grade || "C"
+      // Insert p1's perspective
+      await query(`
+        INSERT INTO match_records (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
+        VALUES ($1,$2,$3,$4,'playoff_tiebreaker',$5,$6,NOW(),$7)
+      `, [mu.p1Id, mu.p2Id, p1Result, p2Grade, mu.p1Pts, mu.p2Pts, season])
+      // Insert p2's perspective
+      await query(`
+        INSERT INTO match_records (player_id, opponent_id, result, opponent_grade, match_type, player_score, opponent_score, recorded_at, season_number)
+        VALUES ($1,$2,$3,$4,'playoff_tiebreaker',$5,$6,NOW(),$7)
+      `, [mu.p2Id, mu.p1Id, p2Result, p1Grade, mu.p2Pts, mu.p1Pts, season])
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const { advanceLeaguePlayoffWinner } = await import("../services/leaguePlayoffLogic.js")
     await advanceLeaguePlayoffWinner(match, winnerId)
 
