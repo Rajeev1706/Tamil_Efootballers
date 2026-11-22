@@ -84,7 +84,7 @@ async function buildFullConfig(configId) {
   for (const set of sets) {
     // players
     const players = (await query(`
-      SELECT fsp.*, p.name AS player_name, t.name AS team_name, t.color AS team_color
+      SELECT fsp.*, p.name AS player_name, t.name AS team_name, t.logo_url AS team_logo
       FROM finals_set_players fsp
       JOIN players p ON p.id = fsp.player_id
       JOIN teams   t ON t.id = fsp.team_id
