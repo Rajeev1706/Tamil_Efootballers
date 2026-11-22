@@ -18,7 +18,7 @@ const router = Router()
         num_sets        INT  NOT NULL DEFAULT 3,
         season_number   INT  NOT NULL,
         status          TEXT NOT NULL DEFAULT 'setup'
-                         CHECK (status IN ('setup','drawn','in_progress','completed')),
+                         CHECK (status IN ('setup','drawn','in_progress','completed','needs_decision')),
         winner_team_id  INT  REFERENCES teams(id) ON DELETE SET NULL,
         created_at      TIMESTAMPTZ DEFAULT NOW()
       )
