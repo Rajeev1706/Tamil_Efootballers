@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import api from "../lib/api"
-import { useAuth } from "../lib/auth"   // adjust path if needed
+import { useAuthStore } from "../store/authStore"
 
 const SET_ACCENTS = ["#22d3ee", "#a78bfa", "#34d399", "#fb923c", "#f472b6"]
 
@@ -155,7 +155,7 @@ export default function FinalsPage() {
   const { configId } = useParams()
   const navigate     = useNavigate()
   const queryClient  = useQueryClient()
-  const { user }     = useAuth?.() || {}
+  const user         = useAuthStore(s => s.user)
   const isAdmin      = user?.role === "admin"
 
   const { data, isLoading, error } = useQuery({
