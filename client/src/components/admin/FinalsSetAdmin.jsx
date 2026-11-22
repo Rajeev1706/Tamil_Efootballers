@@ -14,20 +14,32 @@ const MATCH_OPTIONS = [
 
 const ACCENT = "#22d3ee"
 
-function PlayerPicker({ label, players, selected, onChange, disabledIds = [] }) {
+const SEL_STYLE = {
+  background: "#0f172a",
+  border: "1px solid rgba(255,255,255,0.15)",
+  borderRadius: 10,
+  padding: "10px 14px",
+  color: "white",
+  fontSize: 14,
+  width: "100%",
+  outline: "none",
+  appearance: "auto",
+}
+
+function PlayerPicker({ label, players, selected, onChange, maxSelect, disabledIds = [] }) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <p style={{ color: "#94a3b8", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>
-        {label}
+        {label} <span style={{ color: "#475569", fontWeight: 400 }}>({selected.length}/{maxSelect})</span>
       </p>
       <div style={{
-        maxHeight: 200, overflowY: "auto",
+        maxHeight: 220, overflowY: "auto",
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10,
         background: "rgba(0,0,0,0.3)",
       }}>
         {players.map(p => {
           const isSel = selected.includes(p.id)
-          const isDisabled = disabledIds.includes(p.id) && !isSel
+          const isDisabled = (disabledIds.includes(p.id) && !isSel) || (!isSel && selected.length >= maxSelect)
           return (
             <div
               key={p.id}
@@ -58,6 +70,9 @@ function PlayerPicker({ label, players, selected, onChange, disabledIds = [] }) 
             </div>
           )
         })}
+        {players.length === 0 && (
+          <p style={{ padding: "12px", color: "#475569", fontSize: 12, textAlign: "center" }}>No players found</p>
+        )}
       </div>
     </div>
   )
@@ -67,13 +82,22 @@ export default function FinalsSetAdmin() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
 
-  const [selectedOption, setSelectedOption] = useState(null)  // MATCH_OPTIONS item
+  const [selectedOption, setSelectedOption] = useState(null)
   const [matchRow,       setMatchRow]       = useState(null)
   const [numSets,        setNumSets]        = useState(3)
-  const [setSize,        setSetSize]        = useState(3)      // per set, same for all
-  const [setsConfig,     setSetsConfig]     = useState([])     // [{ setNumber, t1Sel, t2Sel }]
+  // Per-set sizes: array of numbers, length = numSets
+  const [setSizes,       setSetSizes]       = useState([3, 3, 3])
+  const [setsConfig,     setSetsConfig]     = useState([]) // [{ setId, setNumber, t1Sel, t2Sel }]
   const [configId,       setConfigId]       = useState(null)
-  const [step,           setStep]           = useState("match") // match | config | players | done
+  const [step,           setStep]           = useState("match")
+
+  // Keep setSizes in sync when numSets changes
+  useEffect(() => {
+    setSetSizes(prev => {
+      const next = Array.from({ length: numSets }, (_, i) => prev[i] ?? 3)
+      return next
+    })
+  }, [numSets])
 
   // Fetch current season
   const { data: settings } = useQuery({
@@ -82,13 +106,12 @@ export default function FinalsSetAdmin() {
   })
   const season = Number(settings?.current_season || 1)
 
-  // Fetch match row once option is selected
+  // Fetch match row
   const { data: matchData, isLoading: matchLoading } = useQuery({
     queryKey: ["finals-match", selectedOption?.source, selectedOption?.matchType, season],
     queryFn: async () => {
       if (!selectedOption) return null
-      const table = selectedOption.source
-      const res = await api.get(`/finals-sets/match-lookup?source=${table}&matchType=${selectedOption.matchType}&season=${season}`)
+      const res = await api.get(`/finals-sets/match-lookup?source=${selectedOption.source}&matchType=${selectedOption.matchType}&season=${season}`)
       return res.data
     },
     enabled: !!selectedOption && !!season,
@@ -96,9 +119,10 @@ export default function FinalsSetAdmin() {
 
   useEffect(() => {
     if (matchData?.match) setMatchRow(matchData.match)
+    else if (matchData) setMatchRow(null)
   }, [matchData])
 
-  // Fetch teams' players
+  // Fetch team players
   const { data: team1PlayersData } = useQuery({
     queryKey: ["players", matchRow?.team1_id],
     queryFn: () => api.get(`/players?teamId=${matchRow.team1_id}`).then(r => r.data),
@@ -117,7 +141,6 @@ export default function FinalsSetAdmin() {
     mutationFn: (body) => api.post("/finals-sets/create", body).then(r => r.data),
     onSuccess: (data) => {
       setConfigId(data.config.id)
-      // Init setsConfig state
       const init = data.config.sets.map(s => ({ setId: s.id, setNumber: s.set_number, t1Sel: [], t2Sel: [] }))
       setSetsConfig(init)
       setStep("players")
@@ -135,13 +158,12 @@ export default function FinalsSetAdmin() {
     onError: (e) => alert(e?.response?.data?.error || "Failed to save players"),
   })
 
-  // All selected player ids across all sets (for disabling in other sets)
   const allT1Selected = setsConfig.flatMap(s => s.t1Sel)
   const allT2Selected = setsConfig.flatMap(s => s.t2Sel)
 
   function handleCreateConfig() {
     if (!matchRow) return alert("No match found for this category and season")
-    const sets = Array.from({ length: numSets }, (_, i) => ({ setSize }))
+    const sets = setSizes.map(sz => ({ setSize: sz }))
     createConfig.mutate({
       matchId: matchRow.id,
       matchSource: selectedOption.source,
@@ -149,33 +171,34 @@ export default function FinalsSetAdmin() {
       sets,
       seasonNumber: season,
     })
-    setStep("config-creating")
   }
 
   function handleSavePlayers() {
-    // Validate
-    for (const s of setsConfig) {
-      if (s.t1Sel.length !== setSize || s.t2Sel.length !== setSize) {
-        return alert(`Set ${s.setNumber} needs exactly ${setSize} players from each team`)
+    for (let i = 0; i < setsConfig.length; i++) {
+      const s = setsConfig[i]
+      const sz = setSizes[i] ?? 3
+      if (s.t1Sel.length !== sz || s.t2Sel.length !== sz) {
+        return alert(`Set ${s.setNumber} needs exactly ${sz} players from each team`)
       }
     }
-    const setsPlayers = setsConfig.map(s => ({
-      setId:       s.setId,
-      team1Id:     matchRow.team1_id,
-      team2Id:     matchRow.team2_id,
+    const setsPlayers = setsConfig.map((s, i) => ({
+      setId:        s.setId,
+      team1Id:      matchRow.team1_id,
+      team2Id:      matchRow.team2_id,
       team1Players: s.t1Sel,
       team2Players: s.t2Sel,
     }))
     savePlayers.mutate({ setsPlayers })
   }
 
-  const S = { // styles
-    page:    { minHeight: "100vh", background: "#03060f", color: "white", fontFamily: "system-ui,-apple-system,sans-serif", padding: "32px 24px" },
-    card:    { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 16 },
-    label:   { color: "#94a3b8", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 8 },
-    input:   { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 14, width: "100%", outline: "none" },
-    btn:     (c="#22d3ee") => ({ padding: "12px 28px", background: c, color: c === "#22d3ee" ? "#030f14" : "white", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: "pointer" }),
-    btnGhost:{ padding: "12px 28px", background: "transparent", color: "#64748b", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer" },
+  const totalMatches = setSizes.reduce((a, b) => a + b, 0)
+
+  const S = {
+    page:     { minHeight: "100vh", background: "#03060f", color: "white", fontFamily: "system-ui,-apple-system,sans-serif", padding: "32px 24px" },
+    card:     { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 16 },
+    label:    { color: "#94a3b8", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 8 },
+    btn:      (c="#22d3ee") => ({ padding: "12px 28px", background: c, color: c === "#22d3ee" ? "#030f14" : "white", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: "pointer" }),
+    btnGhost: { padding: "12px 28px", background: "transparent", color: "#64748b", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer" },
   }
 
   return (
@@ -190,10 +213,10 @@ export default function FinalsSetAdmin() {
           </p>
         </div>
 
-        {/* Step: Select match */}
-        {(step === "match" || step === "config" || step === "config-creating") && (
+        {/* Match selector */}
+        {(step === "match" || step === "config") && (
           <div style={S.card}>
-            <p style={{ ...S.label }}>Select match</p>
+            <p style={S.label}>Select match</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {MATCH_OPTIONS.map(opt => (
                 <div
@@ -206,48 +229,68 @@ export default function FinalsSetAdmin() {
                     transition: "all 0.15s",
                   }}
                 >
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: selectedOption?.matchType === opt.matchType ? ACCENT : "white" }}>{opt.label}</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: selectedOption?.matchType === opt.matchType ? ACCENT : "white" }}>
+                    {opt.label}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Step: Config (num sets, set size) */}
+        {/* Config step */}
         {step === "config" && selectedOption && (
           <div style={S.card}>
             {matchLoading && <p style={{ color: "#475569" }}>Loading match…</p>}
             {matchRow && (
               <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(34,211,238,0.06)", borderRadius: 10, border: "1px solid rgba(34,211,238,0.2)" }}>
-                <p style={{ margin: 0, fontSize: 13, color: ACCENT, fontWeight: 700 }}>
-                  Match found — Season {season}
-                </p>
-                <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 12 }}>
-                  {matchRow.team1_name} vs {matchRow.team2_name}
-                </p>
+                <p style={{ margin: 0, fontSize: 13, color: ACCENT, fontWeight: 700 }}>Match found — Season {season}</p>
+                <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 12 }}>{matchRow.team1_name} vs {matchRow.team2_name}</p>
               </div>
             )}
             {matchData && !matchRow && (
               <p style={{ color: "#ef4444", fontSize: 13 }}>No match found for this category in season {season}</p>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-              <div>
-                <label style={S.label}>Number of sets</label>
-                <select value={numSets} onChange={e => setNumSets(Number(e.target.value))} style={{ ...S.input }}>
-                  {[2,3,4,5].map(n => <option key={n} value={n}>{n} sets</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={S.label}>Players per set (each team)</label>
-                <select value={setSize} onChange={e => setSetSize(Number(e.target.value))} style={{ ...S.input }}>
-                  {[2,3,4,5].map(n => <option key={n} value={n}>{n} players</option>)}
-                </select>
+            {/* Number of sets */}
+            <div style={{ marginTop: 16 }}>
+              <label style={S.label}>Number of sets</label>
+              <select value={numSets} onChange={e => setNumSets(Number(e.target.value))} style={SEL_STYLE}>
+                <option value={2}>2 sets</option>
+                <option value={3}>3 sets</option>
+                <option value={4}>4 sets</option>
+                <option value={5}>5 sets</option>
+              </select>
+            </div>
+
+            {/* Per-set player count */}
+            <div style={{ marginTop: 20 }}>
+              <label style={S.label}>Players per set (each team)</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                {Array.from({ length: numSets }, (_, i) => (
+                  <div key={i}>
+                    <label style={{ ...S.label, fontSize: 10, marginBottom: 6 }}>Set {i + 1}</label>
+                    <select
+                      value={setSizes[i] ?? 3}
+                      onChange={e => setSetSizes(prev => {
+                        const next = [...prev]
+                        next[i] = Number(e.target.value)
+                        return next
+                      })}
+                      style={SEL_STYLE}
+                    >
+                      <option value={2}>2 players</option>
+                      <option value={3}>3 players</option>
+                      <option value={4}>4 players</option>
+                      <option value={5}>5 players</option>
+                    </select>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 10, fontSize: 12, color: "#64748b" }}>
-              Total 1v1 matches: {numSets} sets × {setSize} matchups = <strong style={{ color: "#94a3b8" }}>{numSets * setSize} matches</strong>
+              Total 1v1 matches: {setSizes.slice(0, numSets).join(" + ")} = <strong style={{ color: "#94a3b8" }}>{totalMatches} matches</strong>
             </div>
 
             <button
@@ -260,82 +303,79 @@ export default function FinalsSetAdmin() {
           </div>
         )}
 
-        {/* Step: Assign players */}
+        {/* Players step */}
         {step === "players" && configId && matchRow && (
           <>
-            <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(34,211,238,0.06)", borderRadius: 10, border: "1px solid rgba(34,211,238,0.2)", display: "flex", justifyContent: "space-between" }}>
+            <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(34,211,238,0.06)", borderRadius: 10, border: "1px solid rgba(34,211,238,0.2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <p style={{ margin: 0, fontSize: 13, color: ACCENT, fontWeight: 700 }}>{matchRow.team1_name} vs {matchRow.team2_name}</p>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12 }}>{numSets} sets · {setSize} players per team per set · {numSets * setSize} total matches</p>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12 }}>
+                  {numSets} sets · {setSizes.slice(0, numSets).map((s,i) => `Set ${i+1}: ${s}p`).join(", ")} · {totalMatches} total matches
+                </p>
               </div>
-              <div style={{ textAlign: "right", fontSize: 11, color: "#475569" }}>
-                Config ID: {configId}
-              </div>
+              <div style={{ textAlign: "right", fontSize: 11, color: "#475569" }}>Config ID: {configId}</div>
             </div>
 
-            {setsConfig.map((s, si) => (
-              <div key={s.setId} style={{ ...S.card, border: "1px solid rgba(255,255,255,0.1)" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: ACCENT }}>Set {s.setNumber}</p>
-                  <span style={{
-                    fontSize: 11, padding: "3px 10px", borderRadius: 20,
-                    background: (s.t1Sel.length === setSize && s.t2Sel.length === setSize) ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)",
-                    color: (s.t1Sel.length === setSize && s.t2Sel.length === setSize) ? "#34d399" : "#475569",
-                    border: `1px solid ${(s.t1Sel.length === setSize && s.t2Sel.length === setSize) ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.08)"}`,
-                  }}>
-                    {s.t1Sel.length}/{setSize} · {s.t2Sel.length}/{setSize}
-                  </span>
+            {setsConfig.map((s, si) => {
+              const sz = setSizes[si] ?? 3
+              const ready = s.t1Sel.length === sz && s.t2Sel.length === sz
+              return (
+                <div key={s.setId} style={{ ...S.card, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: ACCENT }}>Set {s.setNumber}
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: "#475569" }}>({sz} players each)</span>
+                    </p>
+                    <span style={{
+                      fontSize: 11, padding: "3px 10px", borderRadius: 20,
+                      background: ready ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)",
+                      color: ready ? "#34d399" : "#475569",
+                      border: `1px solid ${ready ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.08)"}`,
+                    }}>
+                      {s.t1Sel.length}/{sz} · {s.t2Sel.length}/{sz}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    <PlayerPicker
+                      label={matchRow.team1_name}
+                      players={team1Players}
+                      selected={s.t1Sel}
+                      maxSelect={sz}
+                      disabledIds={allT1Selected.filter(id => !s.t1Sel.includes(id))}
+                      onChange={val => setSetsConfig(prev => prev.map((x, i) => i === si ? { ...x, t1Sel: val } : x))}
+                    />
+                    <div style={{ width: 1, background: "rgba(255,255,255,0.06)" }} />
+                    <PlayerPicker
+                      label={matchRow.team2_name}
+                      players={team2Players}
+                      selected={s.t2Sel}
+                      maxSelect={sz}
+                      disabledIds={allT2Selected.filter(id => !s.t2Sel.includes(id))}
+                      onChange={val => setSetsConfig(prev => prev.map((x, i) => i === si ? { ...x, t2Sel: val } : x))}
+                    />
+                  </div>
                 </div>
-
-                <div style={{ display: "flex", gap: 16 }}>
-                  <PlayerPicker
-                    label={matchRow.team1_name}
-                    players={team1Players}
-                    selected={s.t1Sel}
-                    disabledIds={allT1Selected.filter(id => !s.t1Sel.includes(id))}
-                    onChange={val => setSetsConfig(prev => prev.map((x, i) => i === si ? { ...x, t1Sel: val.slice(0, setSize) } : x))}
-                  />
-                  <div style={{ width: 1, background: "rgba(255,255,255,0.06)" }} />
-                  <PlayerPicker
-                    label={matchRow.team2_name}
-                    players={team2Players}
-                    selected={s.t2Sel}
-                    disabledIds={allT2Selected.filter(id => !s.t2Sel.includes(id))}
-                    onChange={val => setSetsConfig(prev => prev.map((x, i) => i === si ? { ...x, t2Sel: val.slice(0, setSize) } : x))}
-                  />
-                </div>
-              </div>
-            ))}
+              )
+            })}
 
             <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={handleSavePlayers}
-                disabled={savePlayers.isPending}
-                style={S.btn()}
-              >
+              <button onClick={handleSavePlayers} disabled={savePlayers.isPending} style={S.btn()}>
                 {savePlayers.isPending ? "Saving…" : "Save Players & Continue to Reveal →"}
               </button>
             </div>
           </>
         )}
 
-        {/* Step: Done */}
+        {/* Done */}
         {step === "done" && (
           <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
             <h2 style={{ margin: "0 0 8px", color: "#34d399" }}>Setup Complete!</h2>
             <p style={{ color: "#64748b", margin: "0 0 24px" }}>Players assigned. Ready for the draw reveal.</p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button
-                onClick={() => navigate(`/finals/reveal/${configId}`)}
-                style={S.btn()}
-              >
+              <button onClick={() => navigate(`/finals/reveal/${configId}`)} style={S.btn()}>
                 🎲 Start Set Reveal →
               </button>
-              <button
-                onClick={() => navigate(`/finals/${configId}`)}
-                style={S.btnGhost}
-              >
+              <button onClick={() => navigate(`/finals/${configId}`)} style={S.btnGhost}>
                 View Finals Page
               </button>
             </div>
