@@ -308,9 +308,9 @@ function FinalsSetPanel({ match }) {
             const inp  = scoreInputs[mu.id] || {}
             const t1Val = inp.t1 !== undefined ? inp.t1 : (mu.team1_score ?? "")
             const t2Val = inp.t2 !== undefined ? inp.t2 : (mu.team2_score ?? "")
-            const wTeam = mu.winner_player_id ? playerTeamMap[mu.winner_player_id] : null
-            const t1Won = wTeam === match.team1Id
-            const t2Won = wTeam === match.team2Id
+            // t1Won/t2Won = did the LEFT/RIGHT player (by matchup position) win?
+            const t1Won = done && mu.winner_player_id === mu.team1_player_id
+            const t2Won = done && mu.winner_player_id === mu.team2_player_id
 
             return (
               <div key={mu.id} className={cn(
