@@ -218,11 +218,8 @@ function FinalsSetPanel({ match }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
   })
 
-  const forceWinnerMut = useMutation({
-    mutationFn: ({ configId, winnerTeamId }) =>
-      api.post(`/finals-sets/${configId}/force-winner`, { winnerTeamId }).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
-  })
+  // Per-matchup score state: { [matchupId]: { t1: "", t2: "" } }
+  const [scoreInputs, setScoreInputs] = useState({})
 
   if (isLoading) return <p className="text-xs text-slate-500 text-center py-2">Loading finals…</p>
 
@@ -253,29 +250,33 @@ function FinalsSetPanel({ match }) {
   const totalMatchups = allMatchups.length
   const doneMatchups  = allMatchups.filter(m => m.status === "completed").length
 
-  // Tally wins by team
-  let team1Wins = 0, team2Wins = 0
+  // Tally wins by team using player-team mapping
+  const playerTeamMap = {}
   for (const set of config.sets) {
-    for (const mu of set.matchups) {
-      if (!mu.winner_player_id) continue
-      if (mu.winner_player_id === mu.team1_player_id) team1Wins++
-      else team2Wins++
+    for (const p of (set.players || [])) {
+      playerTeamMap[p.player_id] = p.team_id
     }
+  }
+  let team1Wins = 0, team2Wins = 0
+  for (const mu of allMatchups) {
+    if (!mu.winner_player_id) continue
+    const wTeam = playerTeamMap[mu.winner_player_id]
+    if (wTeam === match.team1Id) team1Wins++
+    else if (wTeam === match.team2Id) team2Wins++
   }
 
   const isCompleted = config.status === "completed"
+  const needsTiebreaker = config.status === "needs_decision"
   const winner = isCompleted && config.winner_team_id
     ? (config.winner_team_id === match.team1Id ? match.team1Name : match.team2Name)
     : null
 
-  const handleWinner = (setId, mu, side) => {
-    // side: "team1" or "team2"
-    const scores = [{
-      matchupId: mu.id,
-      team1Score: side === "team1" ? 1 : 0,
-      team2Score: side === "team2" ? 1 : 0,
-    }]
-    scoreMut.mutate({ configId: config.id, setId, scores })
+  const handleSave = (setId, mu) => {
+    const inp = scoreInputs[mu.id] || {}
+    const t1 = inp.t1 !== undefined ? inp.t1 : (mu.team1_score ?? "")
+    const t2 = inp.t2 !== undefined ? inp.t2 : (mu.team2_score ?? "")
+    if (t1 === "" || t2 === "") { alert("Enter scores for both players"); return }
+    scoreMut.mutate({ configId: config.id, setId, scores: [{ matchupId: mu.id, team1Score: t1, team2Score: t2 }] })
   }
 
   return (
@@ -300,73 +301,72 @@ function FinalsSetPanel({ match }) {
       )}
 
       {/* Matchup list */}
-      <div className="space-y-1.5">
-        {config.sets.map(set => (
+      <div className="space-y-2">
+        {config.sets.map(set =>
           set.matchups.map(mu => {
             const done = mu.status === "completed"
-            const t1Won = mu.winner_player_id === mu.team1_player_id
-            const t2Won = mu.winner_player_id === mu.team2_player_id
+            const inp  = scoreInputs[mu.id] || {}
+            const t1Val = inp.t1 !== undefined ? inp.t1 : (mu.team1_score ?? "")
+            const t2Val = inp.t2 !== undefined ? inp.t2 : (mu.team2_score ?? "")
+            const wTeam = mu.winner_player_id ? playerTeamMap[mu.winner_player_id] : null
+            const t1Won = wTeam === match.team1Id
+            const t2Won = wTeam === match.team2Id
+
             return (
               <div key={mu.id} className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2 py-1.5",
+                "rounded-lg px-2 py-2 space-y-1",
                 done ? "bg-pitch-900/40" : "bg-pitch-900/20 border border-surface-border/20"
               )}>
-                {/* Team1 player + W button */}
-                <span className={cn("text-xs flex-1 truncate text-right", t1Won && "text-emerald-400 font-semibold")}>
-                  {mu.team1_player_name}
-                </span>
-                {!done && (
-                  <button
-                    onClick={() => handleWinner(set.id, mu, "team1")}
-                    disabled={scoreMut.isPending}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/50 disabled:opacity-40"
-                  >W</button>
-                )}
-                {done && (
-                  <span className={cn("text-[10px] font-bold w-6 text-center",
-                    t1Won ? "text-emerald-400" : "text-slate-600")}>
-                    {t1Won ? "W" : "L"}
+                <div className="flex items-center gap-1.5">
+                  <span className={cn("text-xs flex-1 truncate text-right",
+                    done && t1Won ? "text-emerald-400 font-semibold" : done && !t1Won ? "text-slate-500" : "text-white")}>
+                    {mu.team1_player_name}
                   </span>
-                )}
-                <span className="text-slate-600 text-[10px]">vs</span>
-                {done && (
-                  <span className={cn("text-[10px] font-bold w-6 text-center",
-                    t2Won ? "text-emerald-400" : "text-slate-600")}>
-                    {t2Won ? "W" : "L"}
+                  <input
+                    type="number" min="0"
+                    value={t1Val}
+                    onChange={e => setScoreInputs(prev => ({ ...prev, [mu.id]: { ...prev[mu.id], t1: e.target.value } }))}
+                    className="w-10 bg-pitch-800 border border-surface-border/40 rounded px-1 py-0.5 text-xs text-center text-white focus:outline-none focus:border-violet-500/60"
+                  />
+                  <span className="text-slate-600 text-[10px]">–</span>
+                  <input
+                    type="number" min="0"
+                    value={t2Val}
+                    onChange={e => setScoreInputs(prev => ({ ...prev, [mu.id]: { ...prev[mu.id], t2: e.target.value } }))}
+                    className="w-10 bg-pitch-800 border border-surface-border/40 rounded px-1 py-0.5 text-xs text-center text-white focus:outline-none focus:border-violet-500/60"
+                  />
+                  <span className={cn("text-xs flex-1 truncate",
+                    done && t2Won ? "text-emerald-400 font-semibold" : done && !t2Won ? "text-slate-500" : "text-white")}>
+                    {mu.team2_player_name}
                   </span>
-                )}
-                {!done && (
                   <button
-                    onClick={() => handleWinner(set.id, mu, "team2")}
+                    onClick={() => handleSave(set.id, mu)}
                     disabled={scoreMut.isPending}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/50 disabled:opacity-40"
-                  >W</button>
+                    className="text-[10px] px-2 py-0.5 rounded bg-violet-600/30 border border-violet-500/30 text-violet-300 hover:bg-violet-600/50 disabled:opacity-40 whitespace-nowrap">
+                    {done ? "Edit" : "Save"}
+                  </button>
+                </div>
+                {done && (
+                  <div className="flex justify-center">
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded font-semibold",
+                      t1Won ? "text-emerald-400" : t2Won ? "text-blue-400" : "text-slate-500")}>
+                      {t1Won ? `${mu.team1_player_name} wins` : t2Won ? `${mu.team2_player_name} wins` : "Draw"}
+                    </span>
+                  </div>
                 )}
-                <span className={cn("text-xs flex-1 truncate", t2Won && "text-emerald-400 font-semibold")}>
-                  {mu.team2_player_name}
-                </span>
               </div>
             )
           })
-        ))}
+        )}
       </div>
 
-      {/* Force winner if all done but tied */}
-      {!isCompleted && doneMatchups === totalMatchups && team1Wins === team2Wins && (
-        <div className="space-y-1">
-          <p className="text-xs text-rose-400 text-center font-semibold">⚡ Tied! Force a winner:</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => forceWinnerMut.mutate({ configId: config.id, winnerTeamId: match.team1Id })}
-              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-600/30">
-              {match.team1Name}
-            </button>
-            <button
-              onClick={() => forceWinnerMut.mutate({ configId: config.id, winnerTeamId: match.team2Id })}
-              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-600/30">
-              {match.team2Name}
-            </button>
-          </div>
+      {/* 5v5 Tiebreaker if tied after all matchups */}
+      {needsTiebreaker && (
+        <div className="border border-rose-500/20 rounded-xl p-3 bg-rose-500/5 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-rose-400 text-center">
+            ⚡ {team1Wins}–{team2Wins} Draw! 5v5 Tiebreaker
+          </p>
+          <TiebreakerPanel match={match} />
         </div>
       )}
 

@@ -342,23 +342,41 @@ router.post("/:configId/set/:setId/score", authenticate, adminOnly, async (req, 
       const t1 = Number(team1Score)
       const t2 = Number(team2Score)
 
-      // Determine winner player
       const mu = (await query(
-        "SELECT team1_player_id, team2_player_id FROM finals_set_matchups WHERE id=$1 AND set_id=$2",
+        "SELECT *, status AS mu_status FROM finals_set_matchups WHERE id=$1 AND set_id=$2",
         [matchupId, setId]
       )).rows[0]
       if (!mu) continue
 
+      const wasAlreadyDone = mu.mu_status === "completed"
+
       let winnerPlayerId = null
       if (t1 > t2) winnerPlayerId = mu.team1_player_id
       else if (t2 > t1) winnerPlayerId = mu.team2_player_id
-      // draw = null winner
 
       await query(`
         UPDATE finals_set_matchups
         SET team1_score=$1, team2_score=$2, winner_player_id=$3, status='completed'
         WHERE id=$4
       `, [t1, t2, winnerPlayerId, matchupId])
+
+      // Log match_records only on first completion (avoid duplicates on re-submit)
+      if (!wasAlreadyDone) {
+        const p1 = (await query("SELECT grade FROM players WHERE id=$1", [mu.team1_player_id])).rows[0]
+        const p2 = (await query("SELECT grade FROM players WHERE id=$1", [mu.team2_player_id])).rows[0]
+        if (p1 && p2) {
+          const p1Result = t1 > t2 ? "win" : t1 < t2 ? "loss" : "draw"
+          const p2Result = t2 > t1 ? "win" : t2 < t1 ? "loss" : "draw"
+          await query(
+            "INSERT INTO match_records (player_id, opponent_id, result, opponent_grade, recorded_by) VALUES ($1,$2,$3,$4,$5)",
+            [mu.team1_player_id, mu.team2_player_id, p1Result, p2.grade, req.user.id]
+          )
+          await query(
+            "INSERT INTO match_records (player_id, opponent_id, result, opponent_grade, recorded_by) VALUES ($1,$2,$3,$4,$5)",
+            [mu.team2_player_id, mu.team1_player_id, p2Result, p1.grade, req.user.id]
+          )
+        }
+      }
     }
 
     // Check if all matchups in set are done
@@ -375,38 +393,40 @@ router.post("/:configId/set/:setId/score", authenticate, adminOnly, async (req, 
     )).rows
 
     if (incompleteSets.length === 0) {
-      // Tally 1v1 wins per team
       const cfg = (await query("SELECT * FROM finals_set_config WHERE id=$1", [configId])).rows[0]
       const matchTable = cfg.match_source
-      const matchRow   = (await query(`SELECT team1_id, team2_id FROM ${matchTable} WHERE id=$1`, [cfg.match_id])).rows[0]
+      const matchRow = (await query(`SELECT team1_id, team2_id FROM ${matchTable} WHERE id=$1`, [cfg.match_id])).rows[0]
 
       const setIds = (await query("SELECT id FROM finals_sets WHERE config_id=$1", [configId])).rows.map(r => r.id)
+
+      // Get all players to determine team per player
+      const allPlayers = (await query(
+        "SELECT player_id, team_id FROM finals_set_players WHERE set_id = ANY($1)", [setIds]
+      )).rows
+      const playerTeamMap = {}
+      for (const p of allPlayers) playerTeamMap[p.player_id] = p.team_id
+
       const allMatchups = (await query(
-        `SELECT m.*, fsp1.team_id AS team1_team, fsp2.team_id AS team2_team
-         FROM finals_set_matchups m
-         JOIN finals_set_players fsp1 ON fsp1.player_id = m.team1_player_id AND fsp1.set_id = m.set_id
-         JOIN finals_set_players fsp2 ON fsp2.player_id = m.team2_player_id AND fsp2.set_id = m.set_id
-         WHERE m.set_id = ANY($1)`,
-        [setIds]
+        "SELECT * FROM finals_set_matchups WHERE set_id = ANY($1)", [setIds]
       )).rows
 
       let team1Wins = 0, team2Wins = 0
       for (const mu of allMatchups) {
-        if (mu.winner_player_id === null) continue
-        const winnerTeam = allMatchups.find(m => m.id === mu.id)
-        // Check which team the winner belongs to
-        if (mu.winner_player_id === mu.team1_player_id) team1Wins++
-        else if (mu.winner_player_id === mu.team2_player_id) team2Wins++
+        if (!mu.winner_player_id) continue
+        const winnerTeam = playerTeamMap[mu.winner_player_id]
+        if (winnerTeam === matchRow.team1_id) team1Wins++
+        else if (winnerTeam === matchRow.team2_id) team2Wins++
       }
 
+      let newStatus = "completed"
       let winnerTeamId = null
       if (team1Wins > team2Wins) winnerTeamId = matchRow.team1_id
       else if (team2Wins > team1Wins) winnerTeamId = matchRow.team2_id
-      // If equal: needs_decision — leave null for now
+      else newStatus = "needs_decision" // Tied → 5v5 tiebreaker
 
       await query(
-        "UPDATE finals_set_config SET status='completed', winner_team_id=$1 WHERE id=$2",
-        [winnerTeamId, configId]
+        "UPDATE finals_set_config SET status=$1, winner_team_id=$2 WHERE id=$3",
+        [newStatus, winnerTeamId, configId]
       )
     }
 
