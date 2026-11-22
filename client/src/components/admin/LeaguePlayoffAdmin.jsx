@@ -1,8 +1,9 @@
 // components/admin/LeaguePlayoffAdmin.jsx
 // Admin panel for the league_knockout format playoffs (Q1 → Eliminator → Q2 → Final)
-// 2-leg coin toss flow + 3v3 tiebreaker for tied aggregates
+// 2-leg coin toss flow + 3v3 tiebreaker if level
 import { useState } from "react"
-import { Trophy, Trash2, RefreshCw, CheckCircle, Coins, Shuffle } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { Trophy, Trash2, RefreshCw, CheckCircle, Coins, Shuffle, Layers } from "lucide-react"
 import {
   useTeamLeaguePlayoffs,
   useGenerateLeaguePlayoffs,
@@ -315,6 +316,26 @@ function PlayoffMatchCard({ match }) {
                 Fixtures are live in Team Dashboards. Team owners log player results,
                 admin closes each leg from the Fixtures tab.
               </div>
+            </div>
+          )}
+
+          {/* Set Format button — Qualifier 2 & Final only */}
+          {(match.matchType === "qualifier2" || match.matchType === "final") && (
+            <div className="pt-1 border-t border-surface-border/30">
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    source: "team_league_playoffs",
+                    matchType: match.matchType,
+                    matchId: match.id,
+                  })
+                  window.location.href = `/admin/finals-setup?${params}`
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600/20 border border-violet-500/40 text-violet-300 font-semibold text-xs hover:bg-violet-600/30 hover:border-violet-500/60 transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Setup Set Format
+              </button>
             </div>
           )}
         </>

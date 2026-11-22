@@ -35,6 +35,9 @@ const TeamTrophyCabinet   = lazy(() => import("./pages/TeamTrophyCabinet"))
 const TeamTrophyDetail    = lazy(() => import("./pages/TeamTrophyDetail"))
 const DuoTournament       = lazy(() => import("./pages/DuoTournament"))
 const DuoDraw             = lazy(() => import("./pages/DuoDraw"))
+const FinalsSetAdmin      = lazy(() => import("./components/admin/FinalsSetAdmin"))
+const FinalsSetReveal     = lazy(() => import("./pages/FinalsSetReveal"))
+const FinalsPage          = lazy(() => import("./pages/FinalsPage"))
 
 // Minimal spinner shown while a page chunk loads
 function PageLoader() {
@@ -80,6 +83,9 @@ export default function App() {
           <Route path="/ucl-knockout/draw/:id"   element={<ProtectedRoute role="admin"><UclKODraw /></ProtectedRoute>} />
           <Route path="/admin/auction"           element={<ProtectedRoute role="admin"><AuctionAdmin /></ProtectedRoute>} />
           <Route path="/duo/draw/:season"        element={<ProtectedRoute role="admin"><DuoDraw /></ProtectedRoute>} />
+          <Route path="/finals/:configId"        element={<FinalsPage />} />
+          <Route path="/finals/reveal/:configId" element={<ProtectedRoute role="admin"><FinalsSetReveal /></ProtectedRoute>} />
+          <Route path="/admin/finals-setup"      element={<ProtectedRoute role="admin"><FinalsSetAdmin /></ProtectedRoute>} />
 
           {/* Auth-protected team routes */}
           <Route path="/team"         element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />

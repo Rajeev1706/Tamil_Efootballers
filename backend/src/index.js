@@ -33,6 +33,7 @@ import tlgRoutes            from "./routes/tlg.js"
 import trendingRoutes      from "./routes/trending.js"
 import powerRankingRoutes  from "./routes/powerRankings.js"
 import seasonSummaryRoutes from "./routes/seasonSummaries.js"
+import finalsSetsRoutes    from "./routes/finalsSets.js"
 import { setSocketServer } from "./services/socket.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 import powerRankingsRouter from "./routes/powerRankings.js"
@@ -89,6 +90,7 @@ app.use("/api/tlg",    tlgRoutes)
 app.use("/api/trending",       trendingRoutes)
 app.use("/api/power-rankings", powerRankingRoutes)
 app.use("/api/season-summaries", seasonSummaryRoutes)
+app.use("/api/finals-sets",     finalsSetsRoutes)
 
 // GET /api/settings
 app.get("/api/settings", async (_req, res) => {
