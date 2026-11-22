@@ -2056,7 +2056,7 @@ router.post("/playoffs/:id/tiebreaker/results", authenticate, adminOnly, async (
     await query("UPDATE team_league_playoffs SET winner_team_id = $1, status = 'completed' WHERE id = $2", [winnerId, matchId])
 
     // ── Save each of the 5 tiebreaker 1v1s to match_records ──────────────────
-    const season = await getCurrentSeason()
+    const season = match.season_number
     const tbFull = (await query("SELECT * FROM team_league_playoff_tiebreakers WHERE playoff_match_id = $1", [matchId])).rows[0]
     const matchups = [
       { p1Id: tbFull.m1_p1_id, p2Id: tbFull.m1_p2_id, p1Pts: m1.p1Pts, p2Pts: m1.p2Pts },
