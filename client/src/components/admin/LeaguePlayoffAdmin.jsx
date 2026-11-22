@@ -263,8 +263,8 @@ function PlayoffMatchCard({ match }) {
           {/* Tiebreaker panel */}
           {needsDecision && <TiebreakerPanel match={match} />}
 
-          {/* Toss flow */}
-          {!completed && !needsDecision && !choiceDone && (
+          {/* Toss flow — only for Q1 and Eliminator; Q2/Final use Set Format */}
+          {!completed && !needsDecision && !choiceDone && match.matchType !== "qualifier2" && match.matchType !== "final" && (
             <div className="border border-surface-border/40 rounded-xl p-3 bg-pitch-900/40 space-y-3">
               <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide text-center">🪙 Coin Toss</p>
               {(!tossDone || isRedoing) && !choiceDone ? (
@@ -303,8 +303,8 @@ function PlayoffMatchCard({ match }) {
             </div>
           )}
 
-          {/* Fixtures created */}
-          {!completed && !needsDecision && choiceDone && (
+          {/* Fixtures created — only for Q1 and Eliminator */}
+          {!completed && !needsDecision && choiceDone && match.matchType !== "qualifier2" && match.matchType !== "final" && (
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                 <CheckCircle className="w-3.5 h-3.5" />
