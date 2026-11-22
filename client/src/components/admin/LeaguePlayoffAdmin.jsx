@@ -3,7 +3,8 @@
 // 2-leg coin toss flow + 3v3 tiebreaker if level
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Trophy, Trash2, RefreshCw, CheckCircle, Coins, Shuffle, Layers } from "lucide-react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Trophy, Trash2, RefreshCw, CheckCircle, Coins, Shuffle, Layers, Crown } from "lucide-react"
 import {
   useTeamLeaguePlayoffs,
   useGenerateLeaguePlayoffs,
@@ -17,6 +18,7 @@ import {
 import { usePlayers } from "../../lib/queries"
 import { TeamAvatar } from "../common/TeamLogo"
 import { cn } from "../../lib/utils"
+import api from "../../lib/api"
 
 const MATCH_LABELS = {
   qualifier1: "Qualifier 1  (1st vs 2nd)",
@@ -198,6 +200,183 @@ function TiebreakerPanel({ match }) {
   return null
 }
 
+// ── Finals Set Panel (inline score entry for qualifier2 / final) ──────────────
+function FinalsSetPanel({ match }) {
+  const qc = useQueryClient()
+  const qKey = ["finals-set-config", match.id]
+
+  const { data, isLoading } = useQuery({
+    queryKey: qKey,
+    queryFn: () =>
+      api.get(`/finals-sets/match/${match.id}?source=team_league_playoffs`).then(r => r.data.config),
+    staleTime: 10000,
+  })
+
+  const scoreMut = useMutation({
+    mutationFn: ({ configId, setId, scores }) =>
+      api.post(`/finals-sets/${configId}/set/${setId}/score`, { scores }).then(r => r.data.config),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
+  })
+
+  const forceWinnerMut = useMutation({
+    mutationFn: ({ configId, winnerTeamId }) =>
+      api.post(`/finals-sets/${configId}/force-winner`, { winnerTeamId }).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qKey }),
+  })
+
+  if (isLoading) return <p className="text-xs text-slate-500 text-center py-2">Loading finals…</p>
+
+  // No config yet — show setup button
+  if (!data) {
+    return (
+      <div className="pt-1 border-t border-surface-border/30">
+        <button
+          onClick={() => {
+            const params = new URLSearchParams({
+              source: "team_league_playoffs",
+              matchType: match.matchType,
+              matchId: match.id,
+            })
+            window.location.href = `/admin/finals-setup?${params}`
+          }}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600/20 border border-violet-500/40 text-violet-300 font-semibold text-xs hover:bg-violet-600/30 hover:border-violet-500/60 transition-colors"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Setup Set Format
+        </button>
+      </div>
+    )
+  }
+
+  const config = data
+  const allMatchups = config.sets.flatMap(s => s.matchups)
+  const totalMatchups = allMatchups.length
+  const doneMatchups  = allMatchups.filter(m => m.status === "completed").length
+
+  // Tally wins by team
+  let team1Wins = 0, team2Wins = 0
+  for (const set of config.sets) {
+    for (const mu of set.matchups) {
+      if (!mu.winner_player_id) continue
+      if (mu.winner_player_id === mu.team1_player_id) team1Wins++
+      else team2Wins++
+    }
+  }
+
+  const isCompleted = config.status === "completed"
+  const winner = isCompleted && config.winner_team_id
+    ? (config.winner_team_id === match.team1Id ? match.team1Name : match.team2Name)
+    : null
+
+  const handleWinner = (setId, mu, side) => {
+    // side: "team1" or "team2"
+    const scores = [{
+      matchupId: mu.id,
+      team1Score: side === "team1" ? 1 : 0,
+      team2Score: side === "team2" ? 1 : 0,
+    }]
+    scoreMut.mutate({ configId: config.id, setId, scores })
+  }
+
+  return (
+    <div className="pt-2 border-t border-surface-border/30 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wide text-violet-400">
+          🎯 Set Format — {doneMatchups}/{totalMatchups} done
+        </span>
+        <span className="text-xs font-mono text-white">
+          <span className="text-emerald-400 font-bold">{team1Wins}</span>
+          <span className="text-slate-500 mx-1">–</span>
+          <span className="text-blue-400 font-bold">{team2Wins}</span>
+        </span>
+      </div>
+
+      {winner && (
+        <div className="flex items-center justify-center gap-2 py-2 rounded-lg bg-gold/10 border border-gold/20">
+          <Crown className="w-4 h-4 text-gold" />
+          <span className="text-sm font-bold text-gold">{winner} wins the Final!</span>
+        </div>
+      )}
+
+      {/* Matchup list */}
+      <div className="space-y-1.5">
+        {config.sets.map(set => (
+          set.matchups.map(mu => {
+            const done = mu.status === "completed"
+            const t1Won = mu.winner_player_id === mu.team1_player_id
+            const t2Won = mu.winner_player_id === mu.team2_player_id
+            return (
+              <div key={mu.id} className={cn(
+                "flex items-center gap-1.5 rounded-lg px-2 py-1.5",
+                done ? "bg-pitch-900/40" : "bg-pitch-900/20 border border-surface-border/20"
+              )}>
+                {/* Team1 player + W button */}
+                <span className={cn("text-xs flex-1 truncate text-right", t1Won && "text-emerald-400 font-semibold")}>
+                  {mu.team1_player_name}
+                </span>
+                {!done && (
+                  <button
+                    onClick={() => handleWinner(set.id, mu, "team1")}
+                    disabled={scoreMut.isPending}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/50 disabled:opacity-40"
+                  >W</button>
+                )}
+                {done && (
+                  <span className={cn("text-[10px] font-bold w-6 text-center",
+                    t1Won ? "text-emerald-400" : "text-slate-600")}>
+                    {t1Won ? "W" : "L"}
+                  </span>
+                )}
+                <span className="text-slate-600 text-[10px]">vs</span>
+                {done && (
+                  <span className={cn("text-[10px] font-bold w-6 text-center",
+                    t2Won ? "text-emerald-400" : "text-slate-600")}>
+                    {t2Won ? "W" : "L"}
+                  </span>
+                )}
+                {!done && (
+                  <button
+                    onClick={() => handleWinner(set.id, mu, "team2")}
+                    disabled={scoreMut.isPending}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/50 disabled:opacity-40"
+                  >W</button>
+                )}
+                <span className={cn("text-xs flex-1 truncate", t2Won && "text-emerald-400 font-semibold")}>
+                  {mu.team2_player_name}
+                </span>
+              </div>
+            )
+          })
+        ))}
+      </div>
+
+      {/* Force winner if all done but tied */}
+      {!isCompleted && doneMatchups === totalMatchups && team1Wins === team2Wins && (
+        <div className="space-y-1">
+          <p className="text-xs text-rose-400 text-center font-semibold">⚡ Tied! Force a winner:</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => forceWinnerMut.mutate({ configId: config.id, winnerTeamId: match.team1Id })}
+              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-600/30">
+              {match.team1Name}
+            </button>
+            <button
+              onClick={() => forceWinnerMut.mutate({ configId: config.id, winnerTeamId: match.team2Id })}
+              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-600/30">
+              {match.team2Name}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {scoreMut.isError && (
+        <p className="text-rose-400 text-xs text-center">{scoreMut.error?.response?.data?.error || "Error saving"}</p>
+      )}
+    </div>
+  )
+}
+
 // ── Single playoff match card ──────────────────────────────────────────────────
 function PlayoffMatchCard({ match }) {
   const toss       = useTossLeaguePlayoffMatch()
@@ -319,24 +498,9 @@ function PlayoffMatchCard({ match }) {
             </div>
           )}
 
-          {/* Set Format button — Qualifier 2 & Final only */}
+          {/* Set Format panel — Qualifier 2 & Final only */}
           {(match.matchType === "qualifier2" || match.matchType === "final") && (
-            <div className="pt-1 border-t border-surface-border/30">
-              <button
-                onClick={() => {
-                  const params = new URLSearchParams({
-                    source: "team_league_playoffs",
-                    matchType: match.matchType,
-                    matchId: match.id,
-                  })
-                  window.location.href = `/admin/finals-setup?${params}`
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600/20 border border-violet-500/40 text-violet-300 font-semibold text-xs hover:bg-violet-600/30 hover:border-violet-500/60 transition-colors"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Setup Set Format
-              </button>
-            </div>
+            <FinalsSetPanel match={match} />
           )}
         </>
       )}
