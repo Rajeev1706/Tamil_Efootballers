@@ -290,10 +290,8 @@ router.patch("/:id/avatar", async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// PATCH /api/players/:id/squad-image — authenticated only (no admin required)
-// Used by ImageUpload component on the player profile page so any logged-in
-// user can upload/remove their own squad photo without needing admin access.
-router.patch("/:id/squad-image", authenticate, async (req, res, next) => {
+// PATCH /api/players/:id/squad-image — open to all (including guests)
+router.patch("/:id/squad-image", async (req, res, next) => {
   try {
     const { imageUrl } = req.body
     const result = await query(

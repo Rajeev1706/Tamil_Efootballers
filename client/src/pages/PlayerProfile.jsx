@@ -403,7 +403,7 @@ export default function PlayerProfile() {
 
           <PlayerSquadCard
             player={player}
-            canUpload={isAdmin || authUser?.teamId === player.teamId}
+            canUpload={true}
           />
 
           {/* Season summary */}
