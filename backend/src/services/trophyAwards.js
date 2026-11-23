@@ -56,6 +56,11 @@ export async function reconcileTrophyRoster({ sourceKey, trophyColumn, playerIds
   )
   const previousSet = new Set(existing.rows.map(r => r.player_id))
 
+  // Safety guard: if correctSet is empty but previousSet has records, it means
+  // reconcile was called with no winners (empty/null playerIds) — this is not a
+  // genuine result correction, so skip the revert to avoid wrongly stripping trophies.
+  if (correctSet.size === 0 && previousSet.size > 0) return
+
   // Revert anyone who WAS awarded for this event but is no longer correct
   for (const playerId of previousSet) {
     if (!correctSet.has(playerId)) {
