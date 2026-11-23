@@ -910,17 +910,24 @@ router.get("/:id/mv-debug", authenticate, adminOnly, async (req, res, next) => {
 })
 
 // POST /api/players/recalc-all-mv — admin: recalculate MV for all players in current season
-// Runs in parallel batches of 10 to avoid request timeout on large rosters
+// Responds immediately and runs recalc in background to avoid request timeout on large rosters
 router.post("/recalc-all-mv", authenticate, adminOnly, async (req, res, next) => {
   try {
     const allPlayers = await query("SELECT id FROM players ORDER BY id")
     const ids = allPlayers.rows.map(p => p.id)
     const BATCH = 10
-    for (let i = 0; i < ids.length; i += BATCH) {
-      await Promise.all(ids.slice(i, i + BATCH).map(id => recalcMarketValue(id)))
-      await Promise.all(ids.slice(i, i + BATCH).map(id => recalcForm(id)))
-    }
-    res.json({ success: true, updated: ids.length })
+
+    // Respond immediately so the request doesn't timeout — recalc runs in background
+    res.json({ success: true, updated: ids.length, message: "MV recalc running in background" })
+
+    // Run in background after response is sent
+    ;(async () => {
+      for (let i = 0; i < ids.length; i += BATCH) {
+        await Promise.all(ids.slice(i, i + BATCH).map(id => recalcMarketValue(id)))
+        await Promise.all(ids.slice(i, i + BATCH).map(id => recalcForm(id)))
+      }
+      console.log(`[recalc-all-mv] Done — ${ids.length} players updated`)
+    })().catch(err => console.error("[recalc-all-mv] error:", err.message))
   } catch (err) { next(err) }
 })
 
