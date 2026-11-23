@@ -21,18 +21,33 @@ import { cn } from "../../lib/utils"
 import api from "../../lib/api"
 
 const MATCH_LABELS = {
-  qualifier1: "Qualifier 1  (1st vs 2nd)",
-  eliminator: "Eliminator   (3rd vs 4th)",
-  qualifier2: "Qualifier 2  (Q1 loser vs Eliminator winner)",
-  final:      "Final        (Q1 winner vs Q2 winner)",
+  qualifier1:         "Qualifier 1  (1st vs 2nd)",
+  eliminator:         "Eliminator   (3rd vs 4th)",
+  qualifier2:         "Qualifier 2  (Q1 loser vs Eliminator winner)",
+  final:              "Final        (Q1 winner vs Q2 winner)",
+  europa_qualifier1:  "Europa Q1    (5th vs 6th)",
+  europa_eliminator:  "Europa Eliminator  (7th vs 8th)  — loser relegated",
+  europa_qualifier2:  "Europa Q2    (EQ1 loser vs Elim winner)",
+  europa_final:       "Europa Final (EQ1 winner vs EQ2 winner)",
 }
 
 const MATCH_COLORS = {
-  qualifier1: "border-gold/40 bg-gold/5",
-  eliminator: "border-violet-500/30 bg-violet-500/5",
-  qualifier2: "border-sky-500/30 bg-sky-500/5",
-  final:      "border-emerald-500/40 bg-emerald-500/5",
+  qualifier1:        "border-gold/40 bg-gold/5",
+  eliminator:        "border-violet-500/30 bg-violet-500/5",
+  qualifier2:        "border-sky-500/30 bg-sky-500/5",
+  final:             "border-emerald-500/40 bg-emerald-500/5",
+  europa_qualifier1: "border-blue-500/30 bg-blue-500/5",
+  europa_eliminator: "border-rose-500/40 bg-rose-500/5",
+  europa_qualifier2: "border-orange-500/30 bg-orange-500/5",
+  europa_final:      "border-cyan-500/30 bg-cyan-500/5",
 }
+
+const TOSS_MATCH_TYPES = new Set([
+  "qualifier1", "eliminator", "europa_qualifier1", "europa_eliminator"
+])
+const SET_FORMAT_MATCH_TYPES = new Set([
+  "qualifier2", "final", "europa_qualifier2", "europa_final"
+])
 
 // ── Coin flip animation ────────────────────────────────────────────────────────
 function CoinFlip({ onDone }) {
@@ -442,8 +457,8 @@ function PlayoffMatchCard({ match }) {
           {/* Tiebreaker panel */}
           {needsDecision && <TiebreakerPanel match={match} />}
 
-          {/* Toss flow — only for Q1 and Eliminator; Q2/Final use Set Format */}
-          {!completed && !needsDecision && !choiceDone && match.matchType !== "qualifier2" && match.matchType !== "final" && (
+          {/* Toss flow — Q1, Eliminator, Europa Q1, Europa Eliminator; set-format matches use FinalsSetPanel */}
+          {!completed && !needsDecision && !choiceDone && TOSS_MATCH_TYPES.has(match.matchType) && (
             <div className="border border-surface-border/40 rounded-xl p-3 bg-pitch-900/40 space-y-3">
               <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide text-center">🪙 Coin Toss</p>
               {(!tossDone || isRedoing) && !choiceDone ? (
@@ -482,8 +497,8 @@ function PlayoffMatchCard({ match }) {
             </div>
           )}
 
-          {/* Fixtures created — only for Q1 and Eliminator */}
-          {!completed && !needsDecision && choiceDone && match.matchType !== "qualifier2" && match.matchType !== "final" && (
+          {/* Fixtures created — toss-based matches only */}
+          {!completed && !needsDecision && choiceDone && TOSS_MATCH_TYPES.has(match.matchType) && (
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                 <CheckCircle className="w-3.5 h-3.5" />
@@ -498,8 +513,8 @@ function PlayoffMatchCard({ match }) {
             </div>
           )}
 
-          {/* Set Format panel — Qualifier 2 & Final only */}
-          {(match.matchType === "qualifier2" || match.matchType === "final") && (
+          {/* Set Format panel — Q2, Final, Europa Q2, Europa Final */}
+          {SET_FORMAT_MATCH_TYPES.has(match.matchType) && (
             <FinalsSetPanel match={match} />
           )}
         </>
@@ -518,8 +533,16 @@ export default function LeaguePlayoffAdmin() {
 
   const matches    = data?.matches || []
   const hasMatches = matches.length > 0
-  const ORDER      = ["qualifier1", "eliminator", "qualifier2", "final"]
-  const sorted     = [...matches].sort((a, b) => ORDER.indexOf(a.matchType) - ORDER.indexOf(b.matchType))
+
+  const CHAMP_ORDER  = ["qualifier1", "eliminator", "qualifier2", "final"]
+  const EUROPA_ORDER = ["europa_qualifier1", "europa_eliminator", "europa_qualifier2", "europa_final"]
+
+  const champMatches  = [...matches]
+    .filter(m => CHAMP_ORDER.includes(m.matchType))
+    .sort((a, b) => CHAMP_ORDER.indexOf(a.matchType) - CHAMP_ORDER.indexOf(b.matchType))
+  const europaMatches = [...matches]
+    .filter(m => EUROPA_ORDER.includes(m.matchType))
+    .sort((a, b) => EUROPA_ORDER.indexOf(a.matchType) - EUROPA_ORDER.indexOf(b.matchType))
 
   return (
     <div className="space-y-6">
@@ -566,8 +589,32 @@ export default function LeaguePlayoffAdmin() {
       )}
 
       {hasMatches && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sorted.map(m => <PlayoffMatchCard key={m.id} match={m} />)}
+        <div className="space-y-8">
+          {/* ── Champions Bracket ──────────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-gold" />
+              <h3 className="text-sm font-bold text-gold uppercase tracking-wide">Champions Bracket</h3>
+              <span className="text-xs text-slate-500">(1st – 4th)</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {champMatches.map(m => <PlayoffMatchCard key={m.id} match={m} />)}
+            </div>
+          </div>
+
+          {/* ── Europa Bracket ─────────────────────────────────────── */}
+          {europaMatches.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wide">Europa Bracket</h3>
+                <span className="text-xs text-slate-500">(5th – 8th · loser of Eliminator relegated)</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {europaMatches.map(m => <PlayoffMatchCard key={m.id} match={m} />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

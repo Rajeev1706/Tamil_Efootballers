@@ -1533,7 +1533,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
     // the bottom 2 by league position. The 7th/8th place playoff loser is the
     // true relegated team; the winner survives regardless of league finish.
     const playedTeams = standingsRes.rows
-    const relegationCutoff = playedTeams.length >= 8 ? playedTeams.length - 1 : null
+    const relegationCutoff = playedTeams.length >= 8 ? playedTeams.length : null
 
     const relegatedRes = await query(
       "SELECT value FROM app_settings WHERE key = 'tlg_relegated_team_id'"
@@ -1547,7 +1547,7 @@ router.post("/season-reset", authenticate, adminOnly, async (req, res, next) => 
       // Fall back to bottom-2-by-position only when no playoff result exists.
       const relegated = relegatedTeamId
         ? team.team_id === relegatedTeamId
-        : (relegationCutoff ? team.league_pos >= relegationCutoff : false)
+        : (relegationCutoff ? team.league_pos === relegationCutoff : false)
       await query(`
         INSERT INTO team_season_history
           (team_id, season_number, year, team_league_pos, championship_pos, relegated)
