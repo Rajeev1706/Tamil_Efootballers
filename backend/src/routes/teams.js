@@ -1170,6 +1170,30 @@ async function clearCurrentSeasonData(q) {
 
   // Clear revolution BDR log entries so REV badges don't carry over to the new season
   await q(`DELETE FROM bdr_awards_log WHERE award_type LIKE 'rev_%'`)
+
+  // Clear Weekly tournaments
+  await q(`DELETE FROM weekly_tournament_matches`)
+  await q(`DELETE FROM weekly_tournament_players`)
+  await q(`DELETE FROM weekly_tournaments`)
+
+  // Clear Revolution tournaments
+  await q(`DELETE FROM revolution_matches`)
+  await q(`DELETE FROM revolution_players`)
+  await q(`DELETE FROM revolution_tournaments`)
+
+  // Clear Duo tournaments
+  await q(`DELETE FROM duo_knockout_deciders`)
+  await q(`DELETE FROM duo_selections`)
+  await q(`DELETE FROM duo_fixtures`)
+  await q(`DELETE FROM duo_group_members`)
+  await q(`DELETE FROM duo_groups`)
+  await q(`DELETE FROM duo_pairs`)
+
+  // Clear Team League Playoffs and Finals set format
+  await q(`DELETE FROM finals_set_matchups`)
+  await q(`DELETE FROM finals_sets`)
+  await q(`DELETE FROM finals_set_config`)
+  await q(`DELETE FROM team_league_playoffs`)
 }
 
 
