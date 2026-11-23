@@ -18,7 +18,7 @@ import { useAuctionTimer } from "../hooks/useAuctionTimer"
 import { useBumpOnChange } from "../hooks/useBumpOnChange"
 import TeamPanel from "../components/auction/TeamPanel"
 import PoolPanel from "../components/auction/AuctionPoolPanel"
-import { useAuctionSocket } from "../hooks/useAuctionSocket"
+import { useAuctionSocket, setOptimisticBidFloor } from "../hooks/useAuctionSocket"
 import api from "../lib/api"
 
 const CARD_COLORS = { silver: "border-slate-400 text-slate-300", gold: "border-gold text-gold", purple: "border-purple-400 text-purple-300" }
@@ -514,6 +514,9 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
         // will correct the display regardless.
       }
     }
+    // Queue is empty — clear the floor so the next socket broadcast
+    // can freely update the display to whatever the server confirmed.
+    setOptimisticBidFloor(null)
     isProcessingBidQueueRef.current = false
   }
 
@@ -531,6 +534,9 @@ function LiveAuctionScreen({ session, pool = [], sales = [], teams = [], retenti
         },
       }
     })
+    // Raise the floor to this bid — socket handler won't show anything
+    // lower than this while the queue is still being processed.
+    setOptimisticBidFloor(amount)
     bidQueueRef.current.push({ sessionId: session.id, teamId, amount })
     processBidQueue()
   }

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy, Gavel, Target, RefreshCw } from "lucide-react"
+import { Users, Search, Calendar, ArrowLeftRight, Settings, ClipboardList, Trophy, Gavel, Target, RefreshCw, Camera } from "lucide-react"
 import Layout from "../components/layout/Layout"
 import TeamHeader from "../components/team/TeamHeader"
 import Squad from "../components/team/Squad"
@@ -10,6 +10,7 @@ import Trades from "../components/team/Trades"
 import TeamSettings from "../components/team/TeamSettings"
 import FixtureMaker from "../components/team/FixtureMaker"
 import TeamResults from "../components/team/TeamResults"
+import SquadImageTab from "../components/team/SquadImageTab"
 import AuctionPlanner from "../components/team/auction/AuctionPlanner"
 import ReplacementModule from "../components/common/ReplacementModule"
 import Loading from "../components/common/Loading"
@@ -28,6 +29,7 @@ const TABS = [
   { id: "fixmaker",    label: "Fixture maker", icon: ClipboardList  },
   { id: "trades",      label: "Trades",        icon: ArrowLeftRight },
   { id: "auction",     label: "Auction",       icon: Target         },
+  { id: "squad-image", label: "Squad Image",   icon: Camera         },
   { id: "settings",    label: "Settings",      icon: Settings       },
 ]
 
@@ -227,6 +229,7 @@ export default function TeamDashboard() {
               totalBudget={myPurse}
             />
           )}
+          {activeTab === "squad-image" && <SquadImageTab players={myPlayers} />}
           {activeTab === "settings" && <TeamSettings team={teamData} />}
         </div>
       </div>

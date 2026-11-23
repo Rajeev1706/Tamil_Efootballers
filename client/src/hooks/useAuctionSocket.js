@@ -12,6 +12,15 @@ let sharedSocket = null
 let lastSeenVersion = -1
 let lastSeenTopSaleId = undefined
 
+// When rapid +5 clicks queue up multiple bids, the socket broadcasts for each
+// confirmed bid (e.g. 30, 35) arrive while we're still optimistically showing
+// the final queued value (e.g. 40). Without a floor, those mid-queue broadcasts
+// snap the display back to the already-confirmed lower value, causing the visible
+// flicker. We track the highest optimistically-queued bid here, and the socket
+// handler won't downgrade the displayed bid below it while the queue is active.
+let optimisticBidFloor = null
+export function setOptimisticBidFloor(value) { optimisticBidFloor = value }
+
 function getSocket() {
   if (!sharedSocket) {
     sharedSocket = io(SOCKET_URL, {
@@ -62,7 +71,23 @@ export function useAuctionSocket() {
         if (incomingVersion < lastSeenVersion) return // stale, out-of-order — drop it
         lastSeenVersion = incomingVersion
       }
-      qc.setQueryData(["auction-current"], data)
+      // If we have queued bids still in-flight, the server's confirmed bid may be
+      // lower than our optimistic display (e.g. server confirmed 30 but we're
+      // showing 40 because two more +5 clicks are queued). Preserve the floor so
+      // the UI doesn't flicker back to the already-confirmed lower value.
+      qc.setQueryData(["auction-current"], (prev) => {
+        if (
+          optimisticBidFloor != null &&
+          data?.session?.currentBid != null &&
+          data.session.currentBid < optimisticBidFloor
+        ) {
+          return {
+            ...data,
+            session: { ...data.session, currentBid: optimisticBidFloor },
+          }
+        }
+        return data
+      })
 
       const topSaleId = data?.sales?.[0]?.id ?? null
       if (lastSeenTopSaleId !== undefined && topSaleId !== lastSeenTopSaleId) {

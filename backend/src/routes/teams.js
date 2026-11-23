@@ -1828,7 +1828,7 @@ router.patch("/playoffs/:id/result", authenticate, adminOnly, async (req, res, n
       // the trophy to the actual correct champion's current roster.
       const rosterRes = await query("SELECT id FROM players WHERE team_id = $1", [winnerId])
       await reconcileTrophyRoster({
-        sourceKey: `team_league_champion_season_${match.season_number}`,
+        sourceKey: `league-knockout-final-s${match.season_number}`,
         trophyColumn: "trophy2_count",
         playerIds: rosterRes.rows.map(r => r.id),
         seasonNumber: match.season_number,
