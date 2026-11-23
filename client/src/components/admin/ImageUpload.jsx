@@ -1,7 +1,7 @@
 import { useState, useRef } from "react"
 import { Camera, Loader2, CheckCircle, X } from "lucide-react"
 import { uploadPlayerImage } from "../../lib/supabase"
-import { useUpdatePlayer } from "../../lib/queries"
+import api from "../../lib/api"
 import { cn } from "../../lib/utils"
 
 export default function ImageUpload({ player, onSuccess }) {
@@ -9,7 +9,6 @@ export default function ImageUpload({ player, onSuccess }) {
   const [loading, setLoading]   = useState(false)
   const [saved, setSaved]       = useState(false)
   const inputRef                = useRef(null)
-  const updatePlayer            = useUpdatePlayer()
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0]
@@ -22,22 +21,25 @@ export default function ImageUpload({ player, onSuccess }) {
 
     try {
       const publicUrl = await uploadPlayerImage(player.id, file)
-      updatePlayer.mutate({ id: player.id, imageUrl: publicUrl }, {
-        onSuccess: () => { setSaved(true); onSuccess?.(publicUrl) },
-        onError:   (err) => alert(err.response?.data?.error || "Failed to save image"),
-      })
+      await api.patch(`/players/${player.id}/squad-image`, { imageUrl: publicUrl })
+      setSaved(true)
+      onSuccess?.(publicUrl)
     } catch (err) {
-      alert(err.message || "Upload failed")
+      alert(err.response?.data?.error || err.message || "Failed to save image")
       setPreview(player?.imageUrl || null)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRemove = () => {
-    updatePlayer.mutate({ id: player.id, imageUrl: null }, {
-      onSuccess: () => { setPreview(null); setSaved(false) },
-    })
+  const handleRemove = async () => {
+    try {
+      await api.patch(`/players/${player.id}/squad-image`, { imageUrl: null })
+      setPreview(null)
+      setSaved(false)
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to remove image")
+    }
   }
 
   return (

@@ -223,7 +223,6 @@ const updateSchema = z.object({
   bdrDelta:      z.number().int().optional(),
   isCaptain:     z.boolean().optional(),
   auctionPrice:  z.number().int().min(0).optional(),
-  baseValue:     z.number().int().min(0).optional(),
   teamId:        z.number().int().positive().optional().nullable(),
   imageUrl:      z.string().optional().nullable(),
   gradeFloor:    z.string().optional().nullable(),
@@ -286,6 +285,22 @@ router.patch("/:id/avatar", async (req, res, next) => {
       avatarBgUrlProvided, body.avatarBgUrl ?? null,
       req.params.id,
     ])
+    if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })
+    res.json(result.rows[0])
+  } catch (err) { next(err) }
+})
+
+// PATCH /api/players/:id/squad-image — authenticated only (no admin required)
+// Used by ImageUpload component on the player profile page so any logged-in
+// user can upload/remove their own squad photo without needing admin access.
+router.patch("/:id/squad-image", authenticate, async (req, res, next) => {
+  try {
+    const { imageUrl } = req.body
+    const result = await query(
+      `UPDATE players SET image_url = $1 WHERE id = $2
+       RETURNING id, image_url AS "imageUrl"`,
+      [imageUrl ?? null, req.params.id]
+    )
     if (!result.rows[0]) return res.status(404).json({ error: "Player not found" })
     res.json(result.rows[0])
   } catch (err) { next(err) }
@@ -1035,10 +1050,10 @@ router.get("/:id/bdr-breakdown", async (req, res, next) => {
     const seasonRes = await query("SELECT value FROM app_settings WHERE key = 'current_season'")
     const season = parseInt(seasonRes.rows[0]?.value || "6")
     const { rows } = await query(`
-      SELECT label, season_number, source_key, SUM(amount)::int AS total
+      SELECT label, SUM(amount)::int AS total
       FROM player_bdr_breakdown
       WHERE player_id = $1 AND amount > 0 AND season_number = $2
-      GROUP BY label, season_number, source_key
+      GROUP BY label
       ORDER BY total DESC
     `, [req.params.id, season])
     res.json(rows)
